@@ -2749,6 +2749,38 @@ $('#thread').addEventListener('click', e => {
   clearTimeout(tapT); tapId = id; tapT = setTimeout(() => { tapT = null; tapId = null; msgActions(m); }, 260);
 });
 let tapT = null, tapId = null;
+// সোয়াইপ করে উত্তর: মেসেজ ডানে টানলে সেটার উত্তর দেওয়া শুরু হয় (মেসেঞ্জার/হোয়াটসঅ্যাপের মতো)
+{
+  let sw = null, swiped = false;
+  const thread = $('#thread');
+  thread.addEventListener('touchstart', e => {
+    const row = e.target.closest('.mrow'); if (!row || e.touches.length !== 1 || e.target.closest('audio, .mp-opt')) { sw = null; return; }
+    const b = row.querySelector('[data-mid]'); const m = b && (S.th?.msgs || []).find(x => String(x.id) === b.dataset.mid);
+    if (!m || m.deleted || S.th?.partner?.rel?.blocked || !$('#t-ro').hidden) { sw = null; return; }
+    sw = { row, m, x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, dir: 0, done: false, sign: row.classList.contains('mine') ? -1 : 1 };   // নিজের মেসেজ বাঁয়ে, অন্যের মেসেজ ডানে
+  }, { passive: true });
+  thread.addEventListener('touchmove', e => {
+    if (!sw) return;
+    const dx = (e.touches[0].clientX - sw.x0) * sw.sign, dy = e.touches[0].clientY - sw.y0;
+    if (!sw.dir) { if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return; sw.dir = Math.abs(dx) > Math.abs(dy) * 1.3 && dx > 0 ? 1 : -1; }
+    if (sw.dir < 0) { sw = null; return; }   // উপর-নিচ স্ক্রল বা বাঁয়ে টানা: কিছু না
+    sw.dx = Math.max(0, Math.min(90, dx));
+    sw.row.style.transform = `translateX(${sw.dx * sw.sign}px)`; sw.row.classList.add('swiping');
+    let ic0 = sw.row.querySelector('.sw-ic'); if (!ic0) { ic0 = document.createElement('span'); ic0.className = 'sw-ic'; ic0.innerHTML = ic('reply', 18); (sw.row.classList.contains('mine') ? sw.row.querySelector('.mcol') : sw.row).prepend(ic0); }
+    ic0.style.opacity = Math.min(1, sw.dx / 60); ic0.classList.toggle('ready', sw.dx >= 60);
+    if (sw.dx >= 60 && !sw.done) { sw.done = true; navigator.vibrate?.(12); } else if (sw.dx < 60) sw.done = false;
+  }, { passive: true });
+  const end = () => {
+    if (!sw) return;
+    const { row, m, dx } = sw; sw = null;
+    row.style.transition = 'transform .18s ease'; row.style.transform = '';
+    setTimeout(() => { row.style.transition = ''; row.classList.remove('swiping'); row.querySelector('.sw-ic')?.remove(); }, 200);
+    if (dx >= 60) { swiped = true; setTimeout(() => { swiped = false; }, 400); S.reply = m; S.edit = null; setReplyBar(); $('#tmsg').focus(); }
+  };
+  thread.addEventListener('touchend', end); thread.addEventListener('touchcancel', end);
+  // সোয়াইপের পর আঙুল তোলাকে "চাপ" ধরা হবে না
+  thread.addEventListener('click', e => { if (swiped) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+}
 // চেপে ধরে রাখলে (বা ডান-ক্লিকে) অপশন: ছবির মেসেজেও রিয়্যাক্ট/মুছা যায়
 $('#thread').addEventListener('contextmenu', e => {
   const b = e.target.closest('[data-mid]'); if (!b) return;

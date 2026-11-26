@@ -831,6 +831,8 @@ async function supabaseApi() {
       const rows = ok(await sb.from('notifications').select('id,type,meta,p:posts!notifications_post_id_fkey(page_id)').eq('user_id', me.id).eq('read', false).limit(300));
       return rows.filter(n => inScope(n, pageId)).length;
     },
+    async adminBroadcast(text, unionId) { return Number(ok(await sb.rpc('admin_broadcast', { p_text: text, p_union: unionId || null }))) || 0; },
+    async announcements() { return ok(await sb.from('announcements').select('id,body,union_id,recipients,created_at').order('created_at', { ascending: false }).limit(10)); },
     async deleteNotification(id) { ok(await sb.from('notifications').delete().eq('id', id).eq('user_id', me.id)); },
     async markNotificationUnread(id) { ok(await sb.rpc('mark_notification_unread', { p_id: id })); },
     async notifMutes() { return me ? new Set(ok(await sb.from('notif_mutes').select('post_id').eq('user_id', me.id)).map(r => r.post_id)) : new Set(); },
@@ -920,7 +922,7 @@ function demoApi() {
     settings: get('settings', { publicDonorPhone: false }),
     wallet: get('wallet', { coins: 120, ledger: [{ amount: 100, reason: 'admin', ref: 'স্বাগতম', createdAt: ago(30) }, { amount: 5, reason: 'post', ref: 'x1', createdAt: ago(20) }, { amount: 15, reason: 'like', ref: 'x2', createdAt: ago(19) }] }),
     chats: get('chats', []),
-    msgSaved: get('msgSaved', []), shared: get('shared', {}), friendMarks: get('friendMarks', {}), friendLists: get('friendLists', []), sugHidden: get('sugHidden', []), notifMutes: get('notifMutes', []), notifOff: get('notifOff', []),             // গ্রুপ চ্যাট { id, name, createdBy, createdAt, members: [{ id, role, lastReadAt }] }
+    msgSaved: get('msgSaved', []), shared: get('shared', {}), friendMarks: get('friendMarks', {}), friendLists: get('friendLists', []), sugHidden: get('sugHidden', []), notifMutes: get('notifMutes', []), notifOff: get('notifOff', []), annc: get('annc', []),             // গ্রুপ চ্যাট { id, name, createdBy, createdAt, members: [{ id, role, lastReadAt }] }
     convSet: get('convSet', {}),         // কথোপকথনের সেটিং (মিউট, রিকোয়েস্ট, মুছা)
     votes: get('votes', {}),             // postId -> { userId: অপশন }
     going: get('going', {}),             // postId -> [userId]
@@ -964,7 +966,7 @@ function demoApi() {
     ]),
   };
   let meId = get('me', null);
-  const save = () => { for (const k of ['chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone' }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -1153,6 +1155,12 @@ function demoApi() {
     const nt = (from, type, h, postId = null, groupId = null, read = false) => db.notifs.push({ id: nid(db.notifs), to: id, from, type, postId, groupId, createdAt: t(h), read });
     nt('d2', 'like', 2.6, p1.id); nt('d1', 'comment', 2.5, p1.id); nt('d2', 'comment', 2, p1.id);
     nt('d4', 'friend_request', 1.5); nt('d3', 'friend_request', 1.2); nt('d4', 'group_request', 1, null, g.id);
+    { const ntm = (from, type, h, meta, postId = null, read = false) => db.notifs.push({ id: nid(db.notifs), to: id, from, type, postId, groupId: null, meta, createdAt: t(h), read });
+      ntm('d6', 'announce', 0.3, { text: 'আগামীকাল সকাল ৯টা থেকে বিকেল ৩টা পর্যন্ত ভালুকা পৌরসভা ও আশেপাশে বিদ্যুৎ থাকবে না। প্রয়োজনীয় কাজ আগেই সেরে নিন।' });
+      ntm('d2', 'birthday', 0.5, { count: 1, names: ['সুমি আক্তার'] });
+      ntm('d1', 'friend_anniv', 0.6, { years: 2 });
+      ntm('d4', 'area_alert', 1.4, { cat: 'হারানো-প্রাপ্তি', union: 'হবিরবাড়ী ইউনিয়ন' }, p1.id);
+      ntm(id, 'milestone', 3, { kind: 'reacts', n: 10 }, p1.id, true); }
     nt('d6', 'follow', 20, null, null, true); nt('d2', 'friend_accept', 40, null, null, true); nt('d3', 'group_approved', 45, null, 1, true);
     // যাচাই বাকি একটি সেবা (অ্যাডমিন হিসেবে যাচাই করে দেখার জন্য)
     db.services.push({ id: nid(db.services), name: 'সুমন মোবাইল সার্ভিসিং', category: 'fix', address: 'সদর বাজার', phone: '01700-000077', hours: 'সকাল ৯টা–রাত ৯টা', verified: false, demo: true });
@@ -1945,6 +1953,13 @@ function demoApi() {
         .map(n => ({ id: n.id, type: n.type, postId: n.postId, groupId: n.groupId || null, groupName: db.groups.find(g => g.id === n.groupId)?.name || '', read: n.read, createdAt: n.createdAt, actor: user(n.from) || { id: n.from, name: 'সদস্য', avatar: '' }, snippet: db.posts.find(p => p.id === n.postId)?.body || '', postImage: demoPic((db.posts.find(p => p.id === n.postId)?.images || [])[0] || db.posts.find(p => p.id === n.postId)?.image || '') || '', postBg: db.posts.find(p => p.id === n.postId)?.bg || '', meta: n.meta || {} })));
     },
     async unreadNotifications(pageId) { return db.notifs.filter(n => n.to === meId && !n.read && !isBlocked(n.from) && inScope(demoN(n), pageId)).length; },
+    async adminBroadcast(text, unionId) {
+      db.annc = db.annc || []; if (db.annc.filter(a => Date.now() - new Date(a.created_at) < 864e5).length >= 5) throw new Error('announce limit');
+      db.annc.unshift({ id: nid(db.annc), body: text.trim(), union_id: unionId || null, recipients: 1, created_at: new Date().toISOString() });
+      db.notifs.push({ id: nid(db.notifs), to: meId, from: 'd6', type: 'announce', meta: { text: text.trim(), union: unionId ? (db.unions || []).find?.(u => u.id === unionId)?.name || null : null }, createdAt: new Date().toISOString(), read: false });
+      save(); notifyListeners.forEach(cb => cb()); return wait(1);
+    },
+    async announcements() { return wait(db.annc || []); },
     async deleteNotification(id) { db.notifs = db.notifs.filter(n => !(n.id === id && n.to === meId)); save(); return wait(); },
     async markNotificationUnread(id) { const n = db.notifs.find(x => x.id === id && x.to === meId); if (n) n.read = false; save(); return wait(); },
     async notifMutes() { return new Set(db.notifMutes || []); },

@@ -1593,3 +1593,25 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .nt-more:hover{background:var(--g2)}
 .nt-newbar{position:sticky;top:calc(var(--hh,0px) + 8px);z-index:4;display:block;margin:0 auto 8px;border:0;border-radius:999px;background:#2563eb;color:#fff;font:inherit;font-size:14px;font-weight:700;padding:8px 16px;box-shadow:0 4px 14px rgba(37,99,235,.35);cursor:pointer}
 .nt-newbar[hidden]{display:none}
+/* নোটিফিকেশন: ধরন অনুযায়ী রঙিন চিহ্ন */
+.notif .ico i{color:#fff}
+.notif[data-n-type="like"] .ico i,.notif[data-n-type="milestone"] .ico i{background:#e5303f}
+.notif[data-n-type="comment"] .ico i,.notif[data-n-type="reply"] .ico i{background:#16a34a}
+.notif[data-n-type="mention"] .ico i,.notif[data-n-type="tag"] .ico i,.notif[data-n-type="chat_mention"] .ico i{background:#7c3aed}
+.notif[data-n-type="share"] .ico i{background:#0891b2}
+.notif[data-n-type^="friend"] .ico i,.notif[data-n-type="follow"] .ico i{background:#2563eb}
+.notif[data-n-type^="group"] .ico i,.notif[data-n-type^="chat_join"] .ico i,.notif[data-n-type="page_admin"] .ico i{background:#ea580c}
+.notif[data-n-type="blood_request"] .ico i{background:#b91c1c}
+.notif[data-n-type="event_reminder"] .ico i{background:#0d9488}
+.notif[data-n-type="birthday"] .ico i{background:#db2777}
+.notif[data-n-type="friend_anniv"] .ico i{background:#2563eb}
+.notif[data-n-type="area_alert"] .ico i{background:#d97706}
+/* বিশেষ নোটিফিকেশন */
+.nt-ann{background:light-dark(#fef2f2,#2a0f12)!important;border:1px solid light-dark(#fecaca,#7f1d1d)!important;margin:4px 0}
+.nt-ann .ann-h{display:block;color:light-dark(#b91c1c,#fca5a5);font-size:14px}
+.nt-ann .ann-t{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.nt-area{border-left:3px solid #d97706}
+.ann-sheet{text-align:center}.ann-full{text-align:left;font-size:16px;white-space:pre-wrap;line-height:1.6;background:var(--bg);border-radius:12px;padding:12px}
+.nt-sum{background:light-dark(#ecfdf5,#052e1f);border:1px solid light-dark(#a7f3d0,#065f46);border-radius:12px;padding:10px 12px;margin:8px 0 4px;font-size:14px}
+.nt-sum-i{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px}
+.ann-h1{display:flex;flex-direction:column;border-top:1px solid var(--line);padding:8px 0;font-size:14px}.ann-h1 small{color:var(--mut)}

@@ -149,6 +149,7 @@ function errText(e) {
   if (/friend_req:upazila/.test(m)) return 'ইনি শুধু নিজের উপজেলার মানুষের কাছ থেকে ফ্রেন্ড রিকোয়েস্ট নেন। চাইলে ফলো করতে পারেন।';
   if (/lists max 20/.test(m)) return 'সর্বোচ্চ ২০টি তালিকা বানানো যায়';
   if (/friend_lists_user_id_name_key|duplicate key/.test(m)) return 'এই নামে আগে থেকেই একটা তালিকা আছে';
+  if (/announce limit/.test(m)) return 'দিনে সর্বোচ্চ ৫টি জরুরি ঘোষণা পাঠানো যায়';
   if (/admins only/.test(m)) return 'এই গ্রুপে শুধু অ্যাডমিনরা মেসেজ পাঠাতে পারেন';
   if (/last admin/.test(m)) return 'গ্রুপে অন্তত একজন অ্যাডমিন থাকতে হবে';
   if (/invalid link/.test(m)) return 'লিংকটি কাজ করছে না';
@@ -3336,6 +3337,7 @@ const SOUNDS = {
   seen: c => { tone(c, { f: 1568, dur: 0.06, vol: 0.035, type: 'triangle' }); },                                     // ছোট টিক
   react: c => { tone(c, { f: 660, to: 990, dur: 0.07, vol: 0.08, type: 'triangle' }); tone(c, { f: 1320, at: 0.07, dur: 0.09, vol: 0.06, type: 'triangle' }); },  // বুদ্বুদ
   incoming: c => { [784, 988, 1319].forEach((f, i) => tone(c, { f, at: i * 0.11, dur: 0.22, vol: 0.07 })); },        // তিন নোটের মিষ্টি ঘণ্টা
+  notif: c => { tone(c, { f: 1047, dur: 0.16, vol: 0.06, type: 'triangle' }); tone(c, { f: 1568, at: 0.08, dur: 0.24, vol: 0.05, type: 'triangle' }); },  // নোটিফিকেশন: ঝিনুকের মতো দুই টোকা
 };
 let sndLast = 0;
 function playSound(k) {
@@ -3343,10 +3345,10 @@ function playSound(k) {
   const now = Date.now(); if (now - sndLast < 120) return; sndLast = now;   // একসাথে কয়েকটা বাজলে কান না ঝালাপালা হয়
   try { const c = sndCtx(); if (c) SOUNDS[k]?.(c); } catch { /* শব্দ না হলেও চলে */ }
 }
-const SND_LIST = [['send', '📤 মেসেজ পাঠালে'], ['receive', '📥 খোলা চ্যাটে মেসেজ এলে'], ['incoming', '🔔 নতুন মেসেজ এলে (অন্য পাতায় থাকলে)'], ['seen', '👀 মেসেজ দেখলে (সিন)'], ['react', '❤️ রিয়্যাক্ট দিলে বা পেলে']];
+const SND_LIST = [['send', '📤 মেসেজ পাঠালে'], ['receive', '📥 খোলা চ্যাটে মেসেজ এলে'], ['incoming', '🔔 নতুন মেসেজ এলে (অন্য পাতায় থাকলে)'], ['seen', '👀 মেসেজ দেখলে (সিন)'], ['react', '❤️ রিয়্যাক্ট দিলে বা পেলে'], ['notif', '🔔 নতুন নোটিফিকেশন এলে']];
 function soundSheet() {
   const o = local.get('msgsnd', {}), all = o.all !== false;
-  openSheet(`<h2>🔊 মেসেজের শব্দ</h2><label class="snd-row snd-all"><span><b>সব শব্দ</b></span><input type="checkbox" data-snd="all" ${all ? 'checked' : ''}></label>
+  openSheet(`<h2>🔊 শব্দ (মেসেজ ও নোটিফিকেশন)</h2><label class="snd-row snd-all"><span><b>সব শব্দ</b></span><input type="checkbox" data-snd="all" ${all ? 'checked' : ''}></label>
     ${SND_LIST.map(([k, l]) => `<div class="snd-row${all ? '' : ' off'}"><label><input type="checkbox" data-snd="${k}" ${o[k] !== false ? 'checked' : ''} ${all ? '' : 'disabled'}> ${l}</label><button type="button" class="sbtn ghost" data-sndtry="${k}" aria-label="শুনে দেখুন">▶ শুনুন</button></div>`).join('')}
     <p class="mut" style="font-size:13px">মিউট করা চ্যাটের নতুন মেসেজে শব্দ হবে না। ফোন সাইলেন্ট থাকলে শব্দ হবে না।</p><button class="btn ghost wide" data-close style="margin-top:6px">বন্ধ করুন</button>`);
   $('#sheet').onchange = e => { const k = e.target.dataset?.snd; if (!k) return; const v = local.get('msgsnd', {}); v[k] = e.target.checked; local.set('msgsnd', v); if (k === 'all') soundSheet(); };
@@ -3908,7 +3910,9 @@ const SELF_TYPES = ['milestone', 'follower_milestone', 'weekly'];
 function selfNotif(n) {
   const m = n.meta || {};
   let icon = '🎉', text = '';
-  if (n.type === 'milestone') text = `অভিনন্দন! আপনার পোস্ট <b>${bn(m.n || 0)} জন</b> দেখেছেন${n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : ''}`;
+  if (n.type === 'milestone' && m.kind === 'reacts') { icon = '❤️'; text = `অভিনন্দন! আপনার পোস্টে <b>${bn(m.n || 0)}টি রিয়্যাক্ট</b> হয়েছে${n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : ''}`; }
+  else if (n.type === 'milestone' && m.kind === 'friends') { icon = '🤝'; text = `অভিনন্দন! আপনার এখন <b>${bn(m.n || 0)} জন বন্ধু</b>`; }
+  else if (n.type === 'milestone') text = `অভিনন্দন! আপনার পোস্ট <b>${bn(m.n || 0)} জন</b> দেখেছেন${n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : ''}`;
   else if (n.type === 'follower_milestone') text = `অভিনন্দন! আপনার ফলোয়ার এখন <b>${bn(m.n || 0)} জন</b>`;
   else {
     icon = '📊';
@@ -3949,6 +3953,13 @@ function groupNotifs(list) {
   }
   return out;
 }
+// আজকের সারাংশ
+function ntSummary(list) {
+  const today = list.filter(n => ntSection(n.createdAt) === 'আজ'), c = t => today.filter(n => t.includes(n.type)).length;
+  const items = [[c(['like']), 'টি রিয়্যাক্ট', '❤️'], [c(['comment', 'reply']), 'টি মন্তব্য', '💬'], [c(['share']), 'টি শেয়ার', '↗'], [c(['follow']), ' জন নতুন ফলোয়ার', '➕'], [c(['friend_request']), 'টি ফ্রেন্ড রিকোয়েস্ট', '👤']].filter(x => x[0]);
+  if (!items.length) return '';
+  return `<div class="nt-sum"><b>📊 আজ আপনার জন্য</b><div class="nt-sum-i">${items.map(([n, l, i]) => `<span>${i} ${bn(n)}${l}</span>`).join('')}</div></div>`;
+}
 function ntSection(d) {
   const p = dhakaParts(d), t = dhakaParts(new Date());
   if (p.day === t.day && p.mon === t.mon) return 'আজ';
@@ -3966,14 +3977,24 @@ function renderNotifs() {
     box.innerHTML = f === 'all' ? (S.actAs ? `<div class="empty">${esc(S.actAs.name)} পেইজের এখনো কোনো নোটিফিকেশন নেই।<br>কেউ পেইজের পোস্টে রিয়্যাক্ট বা মন্তব্য করলে এখানে দেখাবে।</div>` : '<div class="empty">এখনো কোনো নোটিফিকেশন নেই।<br>কেউ আপনার পোস্টে লাইক বা মন্তব্য করলে, বা ফ্রেন্ড রিকোয়েস্ট পাঠালে এখানে দেখাবে।</div>') : `<div class="empty">${f === 'unread' ? 'সব নোটিফিকেশন পড়া হয়ে গেছে ✓' : 'এই ধরনের কোনো নোটিফিকেশন নেই।'}</div>`;
     return;
   }
-  let html = '', sec = '';
+  let html = f === 'all' ? ntSummary(N.list) : '', sec = '';
   for (const n of list) {
     const s2 = ntSection(n.createdAt); if (s2 !== sec) { sec = s2; html += `<h3 class="nt-sec">${s2}</h3>`; }
     html += notifRow(n, pending);
   }
   box.innerHTML = html;
 }
+function specialNotif(n) {
+  const m = n.meta || {}, base = (cls, icon, body) => `<div class="notif nt-sp ${cls}${n.isNew ? ' new' : ''}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="" data-n-user="${esc(n.actor.id)}" data-n-aid="${esc(n.id)}" role="button" tabindex="0">
+    <span class="ico">${icon}</span><span class="txt">${body}<span class="time">${esc(ago(n.createdAt))}</span></span>${ntMoreBtn(n)}</div>`;
+  if (n.type === 'announce') return base('nt-ann', '<span class="self-ic">📢</span>', `<b class="ann-h">জরুরি ঘোষণা${m.union ? ` · ${esc(m.union)}` : ' · উপজেলা'}</b><span class="ann-t">${esc(m.text || '')}</span>`);
+  if (n.type === 'birthday') { const c = Number(m.count) || 1; return base('nt-bd', `${av(n.actor)}<i>🎂</i>`, `আজ <b>${esc(n.actor.name)}</b>${c > 1 ? ` ও আরও <b>${bn(c - 1)} জনের</b>` : '-এর'} জন্মদিন। শুভেচ্ছা জানাতে চাপুন 🎉`); }
+  if (n.type === 'friend_anniv') return base('nt-an', `${av(n.actor)}<i>🤝</i>`, `আজ <b>${esc(n.actor.name)}</b>-এর সাথে আপনার বন্ধুত্বের <b>${bn(m.years || 1)} বছর</b> পূর্ণ হলো`);
+  if (n.type === 'area_alert') return base('nt-area', `${av(n.actor)}<i>${m.cat === 'সাহায্য চাই' ? '🆘' : '🔎'}</i>`, `<b>${esc(n.actor.name)}</b> আপনার এলাকায়${m.union ? ` (${esc(m.union)})` : ''} একটি <b>${esc(m.cat || 'জরুরি')}</b> পোস্ট দিয়েছেন${n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 50))}${n.snippet.length > 50 ? '…' : ''}"</span>` : ''}`);
+  return '';
+}
 function notifRow(n, pending) {
+  const sp = specialNotif(n); if (sp) return sp;
   if (SELF_TYPES.includes(n.type)) return selfNotif({ ...n, read: !n.isNew }).replace('</div>', ntMoreBtn(n) + '</div>');
   const row = (() => {
       if (SELF_TYPES.includes(n.type)) return selfNotif(n);
@@ -3981,7 +4002,7 @@ function notifRow(n, pending) {
       const txt1 = n.type === 'page_admin' && n.meta?.page ? `আপনাকে "${n.meta.page}" পেইজের অ্যাডমিন বানিয়েছেন` : n.meta?.page && (n.type === 'verify_ok' || n.type === 'verify_no') ? `আপনার পেইজ "${n.meta.page}"-এর ভেরিফাইড ব্যাজের আবেদন ${n.type === 'verify_ok' ? 'অনুমোদন করেছেন' : 'গ্রহণ করেননি'}` : txt0;
       const txt2 = n.type === 'blood_request' ? `-এর ${n.meta?.bg || ''} রক্ত দরকার। আপনি কাছাকাছি একজন ${n.meta?.bg || ''} ডোনার, সাহায্য করতে পারবেন?` : txt1;
       const txt = S.actAs ? txt2.replace('আপনার পোস্ট', 'পেইজের পোস্ট').replace('আপনার পেইজ', 'পেইজ') : txt2;
-      const snip = n.type === 'chat_join_request' || n.type === 'chat_join_ok' ? ` <span class="q">${esc(n.meta?.chat || '')}</span>` : n.type === 'chat_mention' ? ` <span class="q">${esc(n.meta?.chat || '')}${n.meta?.text ? ` · "${esc(n.meta.text.slice(0, 40))}"` : ''}</span>` : n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
+      const snip = n.type === 'share' && n.meta?.text ? ` <span class="q">"${esc(n.meta.text.slice(0, 80))}${n.meta.text.length > 80 ? '…' : ''}"</span>` : n.type === 'chat_join_request' || n.type === 'chat_join_ok' ? ` <span class="q">${esc(n.meta?.chat || '')}</span>` : n.type === 'chat_mention' ? ` <span class="q">${esc(n.meta?.chat || '')}${n.meta?.text ? ` · "${esc(n.meta.text.slice(0, 40))}"` : ''}</span>` : n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
       const reqBtns = n.type === 'friend_request' && pending.has(n.actor.id)
         ? `<div class="acts2"><button class="sbtn" data-fr="accept" data-id="${esc(n.actor.id)}">গ্রহণ করুন</button><button class="sbtn ghost" data-fr="remove" data-id="${esc(n.actor.id)}">মুছুন</button></div>` : '';
       return `<div class="notif${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="${esc(n.groupId ?? '')}" data-n-user="${esc(n.actor.id)}" data-n-page="${esc(n.meta?.page_id ?? '')}" data-n-chat="${esc(n.meta?.chat_id ?? '')}" role="button" tabindex="0">
@@ -4024,12 +4045,13 @@ $('#notifs').addEventListener('click', e => {
 // কোন ধরনের নোটিফিকেশন পাবেন
 const NT_PREFS = [['❤️ রিয়্যাক্ট', ['like']], ['💬 মন্তব্য ও উত্তর', ['comment', 'reply']], ['@ উল্লেখ ও ট্যাগ', ['mention', 'tag', 'chat_mention']], ['↗ শেয়ার', ['share']],
   ['👤 ফ্রেন্ড রিকোয়েস্ট ও গ্রহণ', ['friend_request', 'friend_accept']], ['➕ নতুন ফলোয়ার', ['follow']], ['👥 গ্রুপ ও গ্রুপ চ্যাট', ['group_request', 'group_approved', 'chat_join_request', 'chat_join_ok']],
-  ['📅 অনুষ্ঠানের রিমাইন্ডার', ['event_reminder']], ['🩸 কাছাকাছি রক্তের অনুরোধ', ['blood_request']], ['🏆 মাইলফলক ও সাপ্তাহিক রিপোর্ট', ['milestone', 'follower_milestone', 'weekly']]];
+  ['📅 অনুষ্ঠানের রিমাইন্ডার', ['event_reminder']], ['🩸 কাছাকাছি রক্তের অনুরোধ', ['blood_request']], ['📍 এলাকার সতর্কবার্তা (হারানো-প্রাপ্তি, সাহায্য চাই)', ['area_alert']],
+  ['🎂 সকালে জন্মদিন ও বন্ধুত্বের বার্ষিকী মনে করানো', ['birthday', 'friend_anniv']], ['🏆 মাইলফলক ও সাপ্তাহিক রিপোর্ট', ['milestone', 'follower_milestone', 'weekly']]];
 async function notifSettingsSheet() {
   const off = new Set(await S.api.notifPrefs().catch(() => []));
   openSheet(`<h2>⚙️ নোটিফিকেশন সেটিং</h2><p class="mut">যেগুলো বন্ধ রাখবেন, সেগুলোর নোটিফিকেশন আর আসবে না।</p>
     ${NT_PREFS.map(([l, types], i) => `<label class="snd-row"><span>${l}</span><input type="checkbox" data-ntp="${i}" ${types.some(t => off.has(t)) ? '' : 'checked'}></label>`).join('')}
-    <p class="mut" style="font-size:13px">ভেরিফাই ব্যাজ, বুস্ট আর পেইজের অ্যাডমিন হওয়ার মতো জরুরি নোটিফিকেশন সবসময় আসবে। কোনো একটা পোস্টের নোটিফিকেশন বন্ধ করতে সেই নোটিফিকেশনের ⋯ চাপুন।</p>
+    <p class="mut" style="font-size:13px">উপজেলার জরুরি ঘোষণা, ভেরিফাই ব্যাজ, বুস্ট আর পেইজের অ্যাডমিন হওয়ার মতো জরুরি নোটিফিকেশন সবসময় আসবে। কোনো একটা পোস্টের নোটিফিকেশন বন্ধ করতে সেই নোটিফিকেশনের ⋯ চাপুন।</p>
     <button class="btn ghost wide" data-close style="margin-top:6px">বন্ধ করুন</button>`);
   $('#sheet').classList.add('tall');
   $('#sheet').onchange = e => {
@@ -4042,6 +4064,7 @@ $('#notif-set').addEventListener('click', () => { if (needUser()) notifSettingsS
 // পাতা খোলা থাকা অবস্থায় নতুন নোটিফিকেশন: উপরে বার
 $('#nt-newbar').addEventListener('click', () => { window.scrollTo({ top: 0, behavior: 'smooth' }); loadNotifs(true); });
 function notifArrived() {
+  playSound('notif');
   if (S.view !== 'notif') return refreshBadges();
   if (scrollY < 150) return loadNotifs(true);
   S.ntNew = (S.ntNew || 0) + 1; const b = $('#nt-newbar'); b.hidden = false; b.textContent = `↑ ${bn(S.ntNew)}টি নতুন নোটিফিকেশন`;
@@ -4050,6 +4073,10 @@ function openNotif(el) {
   if (!el || el.closest('button')) return;
   const t = el.dataset.nType;
   if ((t === 'blood_request' || t === 'event_reminder' || t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag' || t === 'boost_ok' || t === 'boost_no') && el.dataset.nPost) openPost(el.dataset.nPost);
+  else if (t === 'area_alert' && el.dataset.nPost) openPost(el.dataset.nPost);
+  else if (t === 'birthday') { const u = el.dataset.nUser; birthdaySheet(); if (!u) return; }
+  else if (t === 'friend_anniv' && el.dataset.nUser) { const x = (S.nt?.list || []).find(n => String(n.id) === el.dataset.nAid); openThread(el.dataset.nUser).then(() => { const i = $('#tmsg'); if (i && !i.value) { i.value = `আজ আমাদের বন্ধুত্বের ${bn(x?.meta?.years || 1)} বছর পূর্ণ হলো! 🤝`; composeState(); } }); }
+  else if (t === 'announce') { const x = (S.nt?.list || []).find(n => String(n.id) === el.dataset.nAid); openSheet(`<div class="ann-sheet"><div class="lock-ic">📢</div><h2>জরুরি ঘোষণা${x?.meta?.union ? ` · ${esc(x.meta.union)}` : ''}</h2><p class="ann-full">${linkify(x?.meta?.text || '')}</p><p class="mut">${esc(x ? bnWhen(x.createdAt, true) : '')}</p><button class="btn wide" data-close>ঠিক আছে</button></div>`); }
   else if ((t === 'chat_mention' || t === 'chat_join_ok') && el.dataset.nChat) openChatGroup(el.dataset.nChat);
   else if (t === 'chat_join_request' && el.dataset.nChat) openChatGroup(el.dataset.nChat).then(() => { if (S.th?.isAdmin) joinReqSheet(S.th); });
   else if (t === 'friend_request') go('friends');
@@ -4058,6 +4085,7 @@ function openNotif(el) {
   else if (t === 'page_admin' && el.dataset.nPage) openPage(el.dataset.nPage);
   else if (t === 'weekly' || t === 'follower_milestone' || t === 'milestone') { S.insTarget = null; open('insights'); loadInsights(); }
   else if (t.startsWith('group_') && el.dataset.nGroup) openGroup(el.dataset.nGroup);
+  else if (t === 'birthday' || t === 'announce' || t === 'friend_anniv') { /* উপরে সামলানো */ }
   else openUser(el.dataset.nUser);
 }
 $('#notifs').addEventListener('click', e => openNotif(e.target.closest('.notif')));
@@ -4536,7 +4564,7 @@ function renderMenu() {
       <button id="plock">🔒 প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
       <button id="listpriv">বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
       <button id="showact">🟢 সক্রিয় অবস্থা দেখান (মেসেজে)</button>
-      <button id="msgsnd">🔊 মেসেজের শব্দ</button>
+      <button id="msgsnd">🔊 শব্দ (মেসেজ ও নোটিফিকেশন)</button>
       <button id="ntset2">🔔 নোটিফিকেশন সেটিং</button>
       <button id="blocked">ব্লক করা মানুষ</button>
       <button id="theme">থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
@@ -4815,6 +4843,20 @@ function decideReq(id, ok, btn) {
 }
 
 // ================================================================ অ্যাডমিন ড্যাশবোর্ড
+// অ্যাডমিন: জরুরি ঘোষণা পাঠানো ও আগের ঘোষণা
+document.addEventListener('click', async e => {
+  const b = e.target.closest('#ann-go'); if (!b) return;
+  const text = $('#ann-text').value.trim(), uid = $('#ann-union').value ? Number($('#ann-union').value) : null;
+  if (text.length < 5) return toast('ঘোষণার লেখা দিন');
+  const where = uid ? (S.unions || []).find(u => u.id === uid)?.name : 'পুরো উপজেলার সবার';
+  if (!(await confirmSheet(`এই ঘোষণা ${where}${uid ? '-এর সবার' : ''} নোটিফিকেশনে যাবে। পাঠাবেন?\n\n"${text.slice(0, 120)}"`, 'পাঠান'))) return;
+  busy(b, async () => { const n = await S.api.adminBroadcast(text, uid); toast(`${bn(n)} জনের কাছে ঘোষণা পাঠানো হয়েছে`); $('#ann-text').value = ''; annHistory(); });
+});
+async function annHistory() {
+  const box = $('#ann-hist'); if (!box) return;
+  const l = await S.api.announcements().catch(() => []);
+  box.innerHTML = l.length ? `<p class="mut" style="margin:12px 0 4px;font-size:13px">সাম্প্রতিক ঘোষণা</p>${l.slice(0, 5).map(a => `<div class="ann-h1"><span>${esc(a.body.slice(0, 90))}${a.body.length > 90 ? '…' : ''}</span><small>${esc(ago(a.created_at))} · ${bn(a.recipients)} জন</small></div>`).join('')}` : '';
+}
 async function loadAdmin() {
   const box = $('#admin');
   if (!me()?.admin) { box.innerHTML = '<div class="empty">এই পাতা শুধু অ্যাডমিনদের জন্য।</div>'; return; }
@@ -4833,6 +4875,11 @@ async function loadAdmin() {
         ${stat('store', st.pendingServices, 'যাচাই বাকি সেবা', 'dir')}
         ${stat('flag', st.openReports, 'অমীমাংসিত রিপোর্ট')}
       </div>
+      <h3 class="res-h">📢 জরুরি ঘোষণা পাঠান</h3>
+      <div class="card ann-form"><p class="mut" style="margin:0 0 8px;font-size:13.5px">বন্যা, বিদ্যুৎ বিভ্রাট, টিকা কর্মসূচির মতো জরুরি খবর সবার নোটিফিকেশনে যাবে। কেউ বন্ধ করতে পারবেন না, তাই শুধু সত্যিকারের জরুরি খবরে ব্যবহার করুন (দিনে সর্বোচ্চ ৫টি)।</p>
+        <textarea class="f" id="ann-text" maxlength="500" rows="3" placeholder="ঘোষণার লেখা…"></textarea>
+        <select class="f" id="ann-union" style="margin-top:8px"><option value="">পুরো উপজেলা (সবাই)</option>${(S.unions || []).map(u => `<option value="${esc(u.id)}">শুধু ${esc(u.name)}</option>`).join('')}</select>
+        <button class="btn wide" id="ann-go" style="margin-top:8px">📢 পাঠান</button><div id="ann-hist"></div></div>
       <h3 class="res-h">ভেরিফাইড ব্যাজের আবেদন${vreqs.length ? ` <span class="cnt">${bn(vreqs.length)}</span>` : ''}</h3>
       ${vreqs.length ? vreqs.map(adminReqCard).join('') : '<div class="card mut">এখন কোনো আবেদন অপেক্ষায় নেই।</div>'}
       <h3 class="res-h">বুস্টের আবেদন${aboosts.length ? ` <span class="cnt">${bn(aboosts.length)}</span>` : ''}</h3>
@@ -4877,6 +4924,7 @@ async function loadAdmin() {
         <p class="mut" style="margin:8px 0 0;font-size:13px">এই ডিভাইস: ${esc(versionLabel())}</p>
       </div>
       <p class="note">সেটিং বদলালে সঙ্গে সঙ্গে সব ব্যবহারকারীর জন্য কার্যকর হয়।</p>`;
+    annHistory();
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 $('#admin').addEventListener('change', async e => {

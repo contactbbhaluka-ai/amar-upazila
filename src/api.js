@@ -68,7 +68,7 @@ async function supabaseApi() {
       author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '', badge: r.sp.page_id ? badgeOf(r.sp.pages) : badgeOf(r.sp.profiles) } : null,
   });
   const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url,verified,verified_until),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until)),kind,album_id,al:albums!posts_album_id_fkey(id,name),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila,verified,verified_until),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until),groups!posts_group_id_fkey(name)';
-  const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count, verified: badgeOf(r), verifiedUntil: r.verified_until || null });
+  const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count, verified: badgeOf(r), verifiedUntil: r.verified_until || null, cover: r.cover_url || '' });
   const toGroup = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, about: r.about || '', privacy: r.privacy, avatar: r.avatar_url || '', members: r.member_count });
   const inList = ids => `(${ids.join(',')})`;
 
@@ -274,25 +274,35 @@ async function supabaseApi() {
     },
     async removeCover() { ok(await sb.from('profiles').update({ cover_url: null }).eq('id', me.id)); me.cover = ''; },
     // ছবি: কারও সব ছবি, বা একটা অ্যালবামের (albumId), বা প্রোফাইল/কভার ছবির (kind)
-    async photos(userId, { albumId, kind } = {}) {
-      let q = sb.from('posts').select('id,image_url,image_urls,created_at').eq('user_id', userId).is('page_id', null).is('group_id', null)
-        .order('created_at', { ascending: false }).limit(300);
+    async photos(userId, { albumId, kind, pageId } = {}) {
+      let q = sb.from('posts').select('id,image_url,image_urls,created_at');
+      q = (pageId ? q.eq('page_id', pageId) : q.eq('user_id', userId).is('page_id', null)).is('group_id', null).order('created_at', { ascending: false }).limit(300);
       if (albumId) q = q.eq('album_id', albumId);
       if (kind === 'uploads') q = q.eq('kind', 'normal').is('album_id', null); else if (kind) q = q.eq('kind', kind);
       return flattenPhotos(ok(await q).map(r => ({ id: r.id, createdAt: r.created_at, images: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []) })));
     },
-    async albums(userId) {
+    async albums(userId, pageId) {
+      const aq = sb.from('albums').select('id,name,privacy,created_at'), pq = sb.from('posts').select('id,image_url,image_urls,album_id,kind,created_at');
       const [al, ps] = await Promise.all([
-        sb.from('albums').select('id,name,privacy,created_at').eq('user_id', userId).order('created_at', { ascending: false }),
-        sb.from('posts').select('id,image_url,image_urls,album_id,kind,created_at').eq('user_id', userId).is('page_id', null).is('group_id', null)
-          .order('created_at', { ascending: false }).limit(500),
+        (pageId ? aq.eq('page_id', pageId) : aq.eq('user_id', userId).is('page_id', null)).order('created_at', { ascending: false }),
+        (pageId ? pq.eq('page_id', pageId) : pq.eq('user_id', userId).is('page_id', null)).is('group_id', null).order('created_at', { ascending: false }).limit(500),
       ]);
       const posts = ok(ps).map(r => ({ id: r.id, albumId: r.album_id, kind: r.kind, createdAt: r.created_at, images: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []) }));
       const pack = (id, name, privacy, rows, own) => { const ph = flattenPhotos(rows); return { id, name, privacy, count: ph.length, cover: ph[0]?.url || '', virtual: !own }; };
       const out = Object.entries(VIRTUAL_ALBUMS).map(([k, name]) => pack(k, name, 'public', posts.filter(p => inVirtual(k, p)), false)).filter(a => a.count);
       return [...out, ...ok(al).map(a => pack(a.id, a.name, a.privacy, posts.filter(p => p.albumId === a.id), true))];
     },
-    async createAlbum({ name, privacy }) { return ok(await sb.from('albums').insert({ user_id: me.id, name, privacy: privacy || 'public' }).select('id').single()).id; },
+    async createAlbum({ name, privacy, pageId }) { return ok(await sb.from('albums').insert({ user_id: me.id, page_id: pageId || null, name, privacy: pageId ? 'public' : (privacy || 'public') }).select('id').single()).id; },
+    // পেইজের প্রোফাইল ও কভার ছবি (পেইজের নামে পোস্টও হয়, পেইজের অ্যালবামে জমা থাকে)
+    async setPageAvatar(pageId, blob, share = true) {
+      const url = await upload(blob, 'page'); ok(await sb.from('pages').update({ avatar_url: url }).eq('id', pageId));
+      if (share) await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'avatar', pageId }); return url;
+    },
+    async setPageCover(pageId, blob, share = true) {
+      const url = await upload(blob, 'page'); ok(await sb.from('pages').update({ cover_url: url }).eq('id', pageId));
+      if (share) await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', pageId }); return url;
+    },
+    async removePageCover(pageId) { ok(await sb.from('pages').update({ cover_url: null }).eq('id', pageId)); },
     async updateAlbum(id, { name, privacy }) { ok(await sb.from('albums').update({ name, privacy }).eq('id', id)); },
     async deleteAlbum(id) { ok(await sb.from('albums').delete().eq('id', id)); },
     async deleteAccount() {
@@ -1030,19 +1040,22 @@ function demoApi() {
     async setAvatar(blob, share = true) { const url = await toBlobUrl(blob); person(meId).avatar = url; save(); await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'avatar', privacy: share ? 'public' : 'only_me' }); return url; },
     async setCover(blob, share = true) { const url = await toBlobUrl(blob); person(meId).cover = url; save(); await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', privacy: share ? 'public' : 'only_me' }); return url; },
     async removeCover() { person(meId).cover = ''; save(); },
-    async photos(userId, { albumId, kind } = {}) {
-      const mine = this.__visiblePosts().filter(p => p.userId === userId && !p.pageId && !p.groupId && (!albumId || p.albumId === Number(albumId)) && (!kind || inVirtual(kind, p)));
+    async photos(userId, { albumId, kind, pageId } = {}) {
+      const mine = this.__visiblePosts().filter(p => (pageId ? p.pageId === Number(pageId) : p.userId === userId && !p.pageId) && !p.groupId && (!albumId || p.albumId === Number(albumId)) && (!kind || inVirtual(kind, p)));
       return wait(flattenPhotos(mine.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(p => ({ id: p.id, createdAt: p.createdAt, images: (p.images?.length ? p.images : (p.image ? [p.image] : [])).map(demoPic) }))));
     },
-    async albums(userId) {
-      const posts = this.__visiblePosts().filter(p => p.userId === userId && !p.pageId && !p.groupId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    async albums(userId, pageId) {
+      const posts = this.__visiblePosts().filter(p => (pageId ? p.pageId === Number(pageId) : p.userId === userId && !p.pageId) && !p.groupId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .map(p => ({ id: p.id, kind: p.kind || 'normal', albumId: p.albumId || null, createdAt: p.createdAt, images: (p.images?.length ? p.images : (p.image ? [p.image] : [])).map(demoPic) }));
       const pack = (id, name, privacy, rows, own) => { const ph = flattenPhotos(rows); return { id, name, privacy, count: ph.length, cover: ph[0]?.url || '', virtual: !own }; };
       const out = Object.entries(VIRTUAL_ALBUMS).map(([k, name]) => pack(k, name, 'public', posts.filter(p => inVirtual(k, p)), false)).filter(a => a.count);
-      const own = db.albums.filter(a => a.userId === userId && albumVisible(a)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const own = db.albums.filter(a => (pageId ? a.pageId === Number(pageId) : a.userId === userId && !a.pageId) && albumVisible(a)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return wait([...out, ...own.map(a => pack(a.id, a.name, a.privacy, posts.filter(p => p.albumId === a.id), true))]);
     },
-    async createAlbum({ name, privacy }) { const a = { id: nid(db.albums), userId: meId, name, privacy: privacy || 'public', createdAt: new Date().toISOString() }; db.albums.push(a); save(); return a.id; },
+    async createAlbum({ name, privacy, pageId }) { const a = { id: nid(db.albums), userId: meId, pageId: pageId ? Number(pageId) : null, name, privacy: pageId ? 'public' : (privacy || 'public'), createdAt: new Date().toISOString() }; db.albums.push(a); save(); return a.id; },
+    async setPageAvatar(pageId, blob, share = true) { const url = await toBlobUrl(blob), pg = pageOf(pageId); pg.avatar = url; save(); if (share) await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'avatar', pageId }); return url; },
+    async setPageCover(pageId, blob, share = true) { const url = await toBlobUrl(blob), pg = pageOf(pageId); pg.cover = url; save(); if (share) await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', pageId }); return url; },
+    async removePageCover(pageId) { const pg = pageOf(pageId); if (pg) pg.cover = ''; save(); },
     async updateAlbum(id, { name, privacy }) {
       const a = db.albums.find(x => x.id === Number(id) && x.userId === meId); if (!a) throw new Error('row-level security');
       if (privacy && privacy !== a.privacy) db.posts.filter(p => p.albumId === a.id).forEach(p => { p.privacy = privacy; });

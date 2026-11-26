@@ -169,7 +169,7 @@ const catName = k => (SERVICE_CATS.find(c => c[0] === k) || ['', ''])[1];
 const S = {
   api: null, unions: [], union: local.get('union', ''), scope: 'area', fcat: '', dcat: '',
   feeds: { home: { posts: [], more: false }, me: { posts: [], more: false }, user: { posts: [], more: false }, post: { posts: [], more: false }, search: { posts: [], more: false }, saved: { posts: [], more: false }, page: { posts: [], more: false }, group: { posts: [], more: false } },
-  seenBoosts: new Set(), open: new Map(), view: 'home', tab: 'home', stack: [], bgroup: '', bscope: 'home', bready: false, settings: { ...Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d])), ...local.get('settings', {}) }, userId: null, threadId: null, postId: null, pageId: null, groupId: null, photo: null, stopMsg: null, stopNotif: null,
+  seenBoosts: new Set(), curPage: null, open: new Map(), view: 'home', tab: 'home', stack: [], bgroup: '', bscope: 'home', bready: false, settings: { ...Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d])), ...local.get('settings', {}) }, userId: null, threadId: null, postId: null, pageId: null, groupId: null, photo: null, stopMsg: null, stopNotif: null,
 };
 const me = () => S.api?.me();
 
@@ -1074,7 +1074,7 @@ document.addEventListener('click', e => {
 });
 
 // ================================================================ প্রোফাইল: কভার ছবি, পোস্ট/ছবি ট্যাব, অ্যালবাম
-S.pstate = { me: { tab: 'posts', seg: 'all', album: null }, user: { tab: 'posts', seg: 'all', album: null, uid: null } };
+S.pstate = { me: { tab: 'posts', seg: 'all', album: null }, user: { tab: 'posts', seg: 'all', album: null, uid: null }, page: { tab: 'posts', seg: 'all', album: null } };
 function coverHtml(p, own) {
   return `<div class="cover${p.cover ? '' : ' empty'}">
     ${p.cover ? `<button class="cover-img" data-viewpic="${esc(p.cover)}" aria-label="কভার ছবি দেখুন"><img src="${esc(p.cover)}" alt=""></button>` : ''}
@@ -1085,8 +1085,8 @@ function coverHtml(p, own) {
     : p.avatar ? `<button class="avbtn" data-viewpic="${esc(p.avatar)}" aria-label="প্রোফাইল ছবি দেখুন">${av(p, 'lg')}</button>` : av(p, 'lg')}</div>`;
 }
 function profTabs(key) {
-  const st = S.pstate[key];
-  return `<div class="ptabs" role="tablist">${[['posts', 'পোস্ট'], ['about', 'এবাউট'], ['photos', 'ছবি']].map(([k, l]) => `<button role="tab" data-ptab="${key}|${k}" aria-selected="${st.tab === k}" class="${st.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  const st = S.pstate[key], tabs = key === 'page' ? [['posts', 'পোস্ট'], ['photos', 'ছবি']] : [['posts', 'পোস্ট'], ['about', 'এবাউট'], ['photos', 'ছবি']];
+  return `<div class="ptabs${key === 'page' ? ' two' : ''}" role="tablist">${tabs.map(([k, l]) => `<button role="tab" data-ptab="${key}|${k}" aria-selected="${st.tab === k}" class="${st.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div id="${key}-pane"></div>`;
 }
 function profComposer() {
@@ -1100,7 +1100,7 @@ function showProfPane(key) {
   if (!pane) return;
   const own = key === 'me';
   if (st.tab === 'posts') {
-    pane.innerHTML = own ? profComposer() + '<h2 class="sec-h">আমার পোস্ট</h2>' : '';
+    pane.innerHTML = own ? profComposer() + '<h2 class="sec-h">আমার পোস্ট</h2>' : key === 'page' && S.curPage?.isOwner ? pageComposer(S.curPage) : '';
     feed.hidden = false; loadFeed(key);
   } else if (st.tab === 'about') {
     feed.hidden = true; if (more) more.hidden = true;
@@ -1110,34 +1110,46 @@ function showProfPane(key) {
     loadPhotosPane(key);
   }
 }
-const profUid = key => (key === 'me' ? me()?.id : S.userId);
+const profUid = key => (key === 'me' ? me()?.id : key === 'page' ? S.curPage?.ownerId : S.userId);
+const ownPane = key => key === 'me' || (key === 'page' && !!S.curPage?.isOwner);
+const panePage = key => (key === 'page' ? S.curPage?.id : undefined);
+function pageComposer(pg) {
+  return `<div class="card composer-mini prof-comp"><div class="cm-top">${entAv(pg)}<button class="cm-open" data-pgcompose="">${esc(pg.name)}-এর পক্ষে কিছু লিখুন…</button></div>
+    <div class="cm-quick"><button data-pgcompose="photo"><span class="qi">${ic('photo', 20)}</span>ছবি</button><button data-pgcompose="album"><span class="qi">${ic('album', 20)}</span>অ্যালবাম</button></div></div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-pgcompose]'); if (!b || !S.curPage) return;
+  const pg = S.curPage;
+  if (b.dataset.pgcompose === 'album') { Object.assign(S.pstate.page, { tab: 'photos', seg: 'albums', album: null }); return openPage(pg.id, true); }
+  openPostComposer({ pageId: pg.id, title: `${pg.name}-এর পক্ষে পোস্ট`, authorName: pg.name }, b.dataset.pgcompose || undefined);
+});
 async function loadPhotosPane(key) {
-  const st = S.pstate[key], pane = $('#' + key + '-pane'), uid = profUid(key), own = key === 'me';
+  const st = S.pstate[key], pane = $('#' + key + '-pane'), uid = profUid(key), own = ownPane(key), pgid = panePage(key), isPage = key === 'page';
   if (!pane || !uid) return;
   const seg = `<div class="seg pseg">${[['all', 'সব ছবি'], ['albums', 'অ্যালবাম']].map(([k, l]) => `<button data-pseg="${key}|${k}" class="${st.seg === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   pane.innerHTML = (st.album ? '' : seg) + '<div class="ph-grid"><div class="skel"></div></div>';
   try {
     if (st.album) {
-      const albums = await S.api.albums(uid), a = albums.find(x => String(x.id) === String(st.album));
+      const albums = await S.api.albums(uid, pgid), a = albums.find(x => String(x.id) === String(st.album));
       if (!a) { st.album = null; return loadPhotosPane(key); }
-      const list = await S.api.photos(uid, VIRTUAL_KINDS.includes(a.id) ? { kind: a.id } : { albumId: a.id });
+      const list = await S.api.photos(uid, VIRTUAL_KINDS.includes(a.id) ? { kind: a.id, pageId: pgid } : { albumId: a.id, pageId: pgid });
       S.phList = list;
       pane.innerHTML = `<div class="album-head"><button class="back" data-albumback="${key}" aria-label="সব অ্যালবাম">←</button>
-          <div class="ah-t"><b>${esc(a.name)}</b><span class="mut">${bn(a.count)}টি ছবি${a.virtual ? '' : ` · ${ic(PRIVACY[a.privacy][0], 13)} ${PRIVACY[a.privacy][1]}`}</span></div>
+          <div class="ah-t"><b>${esc(a.name)}</b><span class="mut">${bn(a.count)}টি ছবি${a.virtual || isPage ? '' : ` · ${ic(PRIVACY[a.privacy][0], 13)} ${PRIVACY[a.privacy][1]}`}</span></div>
           ${own && !a.virtual ? `<button class="sbtn" data-albumadd="${esc(a.id)}">${ic('plus', 16)} ছবি যোগ করুন</button><button class="more" data-albummenu="${esc(a.id)}" aria-label="অ্যালবামের অপশন">⋯</button>` : ''}</div>
         ${photoGrid(list, own && !a.virtual ? 'এখনো কোনো ছবি নেই। "ছবি যোগ করুন" চেপে শুরু করুন।' : 'এখনো কোনো ছবি নেই।')}`;
-      S.curAlbum = a;
+      S.curAlbum = a; S.curAlbumKey = key;
       return;
     }
     if (st.seg === 'all') {
-      const list = await S.api.photos(uid); S.phList = list;
+      const list = await S.api.photos(uid, { pageId: pgid }); S.phList = list;
       pane.innerHTML = seg + photoGrid(list, own ? 'এখনো কোনো ছবি নেই। ছবিসহ পোস্ট করলে এখানে দেখাবে।' : 'এখনো কোনো ছবি নেই।');
     } else {
-      const albums = await S.api.albums(uid);
+      const albums = await S.api.albums(uid, pgid);
       pane.innerHTML = seg + `<div class="al-grid">
-        ${own ? `<button class="al-card new" data-albumnew>${ic('plus', 30)}<b>নতুন অ্যালবাম</b></button>` : ''}
+        ${own ? `<button class="al-card new" data-albumnew="${key}">${ic('plus', 30)}<b>নতুন অ্যালবাম</b></button>` : ''}
         ${albums.map(a => `<button class="al-card" data-album="${key}|${esc(a.id)}">${a.cover ? `<img src="${esc(a.cover)}" alt="" loading="lazy">` : `<span class="al-empty">${ic('album', 30)}</span>`}
-          <b>${esc(a.name)}</b><span class="mut">${bn(a.count)}টি ছবি${own && !a.virtual ? ` · ${ic(PRIVACY[a.privacy][0], 12)}` : ''}</span></button>`).join('')}
+          <b>${esc(a.name)}</b><span class="mut">${bn(a.count)}টি ছবি${own && !a.virtual && !isPage ? ` · ${ic(PRIVACY[a.privacy][0], 12)}` : ''}</span></button>`).join('')}
       </div>${!albums.length && !own ? '<div class="empty">কোনো অ্যালবাম নেই।</div>' : ''}`;
     }
   } catch (e) { pane.innerHTML = seg + `<div class="empty">${esc(errText(e))}</div>`; }
@@ -1147,19 +1159,19 @@ const photoGrid = (list, emptyText) => list.length
   ? `<div class="ph-grid">${list.map((ph, i) => `<button class="ph-cell" data-phi="${i}" aria-label="ছবি ${bn(i + 1)}"><img src="${esc(ph.url)}" alt="" loading="lazy"></button>`).join('')}</div>`
   : `<div class="empty">${emptyText}</div>`;
 
-function albumSheet(a, then) {
-  const pv = a?.privacy || 'public';
+function albumSheet(a, then, key = 'me') {
+  const pv = a?.privacy || 'public', isPage = key === 'page';
   openSheet(`<h2>${a ? 'অ্যালবাম এডিট' : 'নতুন অ্যালবাম'}</h2>
     <label for="al-name">অ্যালবামের নাম</label><input id="al-name" maxlength="60" value="${esc(a?.name || '')}" placeholder="যেমন: ঈদ ২০২৬, ভ্রমণ, পরিবার">
-    <label>কারা দেখবে</label><div class="pv-pick">${Object.entries(PRIVACY).map(([k, [icn, l, sub]]) => `<label class="pv-opt"><input type="radio" name="al-pv" value="${k}" ${k === pv ? 'checked' : ''}><span class="pv-ic">${ic(icn, 20)}</span><span class="pv-tx"><b>${l}</b><small>${sub}</small></span><span class="pv-radio" aria-hidden="true"></span></label>`).join('')}</div>
-    ${a ? '<p class="mut" style="font-size:13px">প্রাইভেসি বদলালে অ্যালবামের সব ছবিতেও একই প্রাইভেসি হবে।</p>' : ''}
+    ${isPage ? '<p class="mut" style="font-size:13px">পেইজের অ্যালবাম সবাই দেখতে পান।</p>' : `<label>কারা দেখবে</label><div class="pv-pick">${Object.entries(PRIVACY).map(([k, [icn, l, sub]]) => `<label class="pv-opt"><input type="radio" name="al-pv" value="${k}" ${k === pv ? 'checked' : ''}><span class="pv-ic">${ic(icn, 20)}</span><span class="pv-tx"><b>${l}</b><small>${sub}</small></span><span class="pv-radio" aria-hidden="true"></span></label>`).join('')}</div>
+    ${a ? '<p class="mut" style="font-size:13px">প্রাইভেসি বদলালে অ্যালবামের সব ছবিতেও একই প্রাইভেসি হবে।</p>' : ''}`}
     <button class="btn wide" id="al-save" style="margin-top:12px">${a ? 'সংরক্ষণ' : 'অ্যালবাম তৈরি করুন'}</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
   $('#al-save').onclick = e => {
     const name = $('#al-name').value.trim(), privacy = document.querySelector('[name=al-pv]:checked')?.value || 'public';
     if (!name) return toast('অ্যালবামের নাম দিন');
     busy(e.currentTarget, async () => {
-      if (a) await S.api.updateAlbum(a.id, { name, privacy }); else { const id = await S.api.createAlbum({ name, privacy }); S.pstate.me.album = id; }
-      closeSheet(); toast(a ? 'অ্যালবাম আপডেট হয়েছে' : 'অ্যালবাম তৈরি হয়েছে'); loadPhotosPane('me'); then?.();
+      if (a) await S.api.updateAlbum(a.id, { name, privacy: isPage ? 'public' : privacy }); else { const id = await S.api.createAlbum({ name, privacy, pageId: isPage ? S.curPage?.id : null }); S.pstate[key].album = id; }
+      closeSheet(); toast(a ? 'অ্যালবাম আপডেট হয়েছে' : 'অ্যালবাম তৈরি হয়েছে'); loadPhotosPane(key); then?.();
     });
   };
 }
@@ -1169,16 +1181,19 @@ function openAlbum(uid, albumId) {
   if (key === 'me') { go('me'); renderMe(); } else openUser(uid, false, true);
 }
 // নতুন প্রোফাইল বা কভার ছবি: আগে দেখে নিয়ে, নিউজফিডে জানাবেন কিনা বেছে সেভ
-function picSheet(kind, blob) {
+function picSheet(kind, blob, page) {
   const url = URL.createObjectURL(blob), cover = kind === 'cover';
   openSheet(`<h2>${cover ? 'নতুন কভার ছবি' : 'নতুন প্রোফাইল ছবি'}</h2>
     <div class="pic-prev${cover ? ' cover' : ''}"><img src="${url}" alt=""></div>
-    <label class="chk"><input type="checkbox" id="pic-share" checked> <span>নিউজফিডে শেয়ার করুন <small class="mut">(বন্ধ রাখলে শুধু আপনার "${cover ? 'কভার ছবি' : 'প্রোফাইল ছবি'}" অ্যালবামে থাকবে, অন্যরা দেখবে না)</small></span></label>
+    <label class="chk"><input type="checkbox" id="pic-share" checked> <span>${page ? 'পেইজে পোস্ট হিসেবে জানান' : 'নিউজফিডে শেয়ার করুন'} <small class="mut">(${page ? `চালু থাকলে পেইজের "${cover ? 'কভার ছবি' : 'প্রোফাইল ছবি'}" অ্যালবামেও জমা থাকবে` : `বন্ধ রাখলে শুধু আপনার "${cover ? 'কভার ছবি' : 'প্রোফাইল ছবি'}" অ্যালবামে থাকবে, অন্যরা দেখবে না`})</small></span></label>
     <button class="btn wide" id="pic-save" style="margin-top:12px">সংরক্ষণ করুন</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
   $('#pic-save').onclick = e => busy(e.currentTarget, async () => {
     const share = $('#pic-share').checked;
-    if (cover) await S.api.setCover(blob, share); else await S.api.setAvatar(blob, share);
-    URL.revokeObjectURL(url); closeSheet(); renderMe(); renderComposer(); loadFeed('home');
+    if (page) { if (cover) await S.api.setPageCover(page.id, blob, share); else await S.api.setPageAvatar(page.id, blob, share); }
+    else if (cover) await S.api.setCover(blob, share); else await S.api.setAvatar(blob, share);
+    URL.revokeObjectURL(url); closeSheet();
+    if (page) { openPage(page.id, true); loadFeed('page'); } else { renderMe(); renderComposer(); }
+    loadFeed('home');
     toast(cover ? 'কভার ছবি বদলানো হয়েছে' : 'প্রোফাইল ছবি বদলানো হয়েছে');
   });
 }
@@ -1205,21 +1220,24 @@ document.addEventListener('click', async e => {
   if (b.dataset.pseg) { const [key, seg] = b.dataset.pseg.split('|'); S.pstate[key].seg = seg; return loadPhotosPane(key); }
   if (b.dataset.album) { const [key, id] = b.dataset.album.split('|'); S.pstate[key].album = id; return loadPhotosPane(key); }
   if (b.dataset.albumback) { S.pstate[b.dataset.albumback].album = null; return loadPhotosPane(b.dataset.albumback); }
-  if (b.dataset.albumnew !== undefined) return albumSheet(null);
+  if (b.dataset.albumnew !== undefined) return albumSheet(null, null, b.dataset.albumnew || 'me');
   if (b.dataset.phi) {
     const list = S.phList || [], i = Number(b.dataset.phi);
     return openViewer({ images: list.map(x => x.url), postIds: list.map(x => x.postId) }, i);
   }
-  if (b.dataset.albumadd) { const a = S.curAlbum; return openPostComposer({ albumId: a.id, albumName: a.name, privacy: a.privacy, title: 'অ্যালবামে ছবি যোগ করুন' }, 'photo'); }
+  if (b.dataset.albumadd) {
+    const a = S.curAlbum, pg = S.curAlbumKey === 'page' ? S.curPage : null;
+    return openPostComposer(pg ? { albumId: a.id, albumName: a.name, pageId: pg.id, authorName: pg.name, title: `${pg.name}: অ্যালবামে ছবি যোগ করুন` } : { albumId: a.id, albumName: a.name, privacy: a.privacy, title: 'অ্যালবামে ছবি যোগ করুন' }, 'photo');
+  }
   if (b.dataset.albummenu) {
-    const a = S.curAlbum;
-    openSheet(`<div class="menu"><button data-act="edit">${ic('edit', 18)} নাম ও প্রাইভেসি বদলান</button><button data-act="del" class="danger">অ্যালবাম মুছুন</button><button data-close>বন্ধ করুন</button></div>`);
+    const a = S.curAlbum, key = S.curAlbumKey || 'me';
+    openSheet(`<div class="menu"><button data-act="edit">${ic('edit', 18)} ${key === 'page' ? 'নাম বদলান' : 'নাম ও প্রাইভেসি বদলান'}</button><button data-act="del" class="danger">অ্যালবাম মুছুন</button><button data-close>বন্ধ করুন</button></div>`);
     $('#sheet').onclick = async ev => {
       const act = ev.target.closest('[data-act]')?.dataset.act; if (!act) return;
-      if (act === 'edit') return albumSheet(a);
+      if (act === 'edit') return albumSheet(a, null, key);
       closeSheet();
       if (act === 'del' && await confirmSheet(`"${a.name}" অ্যালবাম মুছবেন? ভেতরের ছবির পোস্টগুলো মুছবে না, শুধু অ্যালবাম থেকে বেরিয়ে যাবে।`, 'মুছুন', true))
-        await busy(null, async () => { await S.api.deleteAlbum(a.id); S.pstate.me.album = null; S.pstate.me.seg = 'albums'; loadPhotosPane('me'); toast('অ্যালবাম মুছে ফেলা হয়েছে'); });
+        await busy(null, async () => { await S.api.deleteAlbum(a.id); S.pstate[key].album = null; S.pstate[key].seg = 'albums'; loadPhotosPane(key); toast('অ্যালবাম মুছে ফেলা হয়েছে'); });
     };
   }
 });
@@ -2796,19 +2814,45 @@ async function openPage(id, silent) {
   try {
     const pg = await S.api.page(S.pageId);
     const tel = String(pg.phone || '').replace(/[^\d+]/g, '');
-    $('#page').innerHTML = `<div class="card ent-head">${entAv(pg)}<h2 style="margin:4px 0 0">${esc(pg.name)}${vb(pg.verified, true)}</h2><div class="meta">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div>
+    if (S.curPage?.id !== pg.id) Object.assign(S.pstate.page, { tab: 'posts', seg: 'all', album: null });
+    S.curPage = pg;
+    $('#page').innerHTML = `<div class="card ent-head prof-fb pg-head">${pageCoverHtml(pg)}<h2 style="margin:8px 0 0">${esc(pg.name)}${vb(pg.verified, true)}</h2><div class="meta">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div>
       ${pg.about ? `<p class="about">${esc(pg.about)}</p>` : ''}${pg.phone ? `<p class="meta" style="margin:6px 0 0">📞 ${esc(bn(pg.phone))}</p>` : ''}
       <div class="row">${pg.isOwner
-        ? `<button class="sbtn" id="pg-post">+ পোস্ট করুন</button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button><button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button><button class="sbtn ghost" id="pg-edit">এডিট</button><button class="sbtn ghost" id="pg-del" style="color:var(--r)">মুছুন</button>`
-        : `<button class="sbtn ${pg.following ? 'ghost' : ''}" data-pf="${esc(pg.id)}" data-on="${pg.following ? 1 : 0}">${pg.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button>${tel ? `<a class="sbtn ghost" style="text-decoration:none;display:inline-grid;place-items:center" href="tel:${esc(tel)}">কল করুন</a>` : ''}<button class="more" id="pg-more" aria-label="আরও">⋯</button>`}</div></div>`;
+        ? `<button class="sbtn" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button><button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button><button class="sbtn ghost" id="pg-edit">এডিট</button><button class="sbtn ghost" id="pg-del" style="color:var(--r)">মুছুন</button>`
+        : `<button class="sbtn ${pg.following ? 'ghost' : ''}" data-pf="${esc(pg.id)}" data-on="${pg.following ? 1 : 0}">${pg.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button>${tel ? `<a class="sbtn ghost" style="text-decoration:none;display:inline-grid;place-items:center" href="tel:${esc(tel)}">কল করুন</a>` : ''}<button class="more" id="pg-more" aria-label="আরও">⋯</button>`}</div></div>${profTabs('page')}`;
     if (!pg.isOwner && !silent) S.api.entVisit?.('page', pg.id).catch(() => {});
     $('#pg-badge')?.addEventListener('click', () => pageBadgeSheet(pg));
     $('#pg-post')?.addEventListener('click', () => openPostComposer({ pageId: pg.id, title: `${pg.name}-এর পক্ষে পোস্ট`, authorName: pg.name }));
+    $('#pavfile')?.addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) picSheet('avatar', f, pg); });
+    $('#pcoverfile')?.addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) picSheet('cover', f, pg); });
+    $('#pcover-btn')?.addEventListener('click', () => pageCoverMenu(pg));
     $('#pg-edit')?.addEventListener('click', () => pageForm(pg));
     $('#pg-del')?.addEventListener('click', async () => { if (await confirmSheet(`"${pg.name}" পেইজ ও এর সব পোস্ট মুছে ফেলবেন?`, 'মুছুন', true)) busy(null, async () => { await S.api.deletePage(pg.id); toast('পেইজ মুছে ফেলা হয়েছে'); back(); }); });
     $('#pg-more')?.addEventListener('click', () => { if (!needUser()) return; openSheet(`<div class="menu">${me()?.admin ? `<button data-act="ab">${ic('shield', 16)} অ্যাডমিন: পেইজের ব্যাজ</button>` : ''}<button data-act="r">পেইজ রিপোর্ট করুন</button><button data-close>বন্ধ করুন</button></div>`); $('#sheet').onclick = ev => { if (ev.target.closest('[data-act=r]')) reportSheet('user', 'page:' + pg.id); if (ev.target.closest('[data-act=ab]')) adminPageBadgeSheet(pg); }; });
-    if (!silent) loadFeed('page');
+    showProfPane('page');
   } catch (e) { $('#page').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+}
+function pageCoverHtml(pg) {
+  const own = pg.isOwner;
+  return `<div class="cover${pg.cover ? '' : ' empty'}">
+    ${pg.cover ? `<button class="cover-img" data-viewpic="${esc(pg.cover)}" aria-label="কভার ছবি দেখুন"><img src="${esc(pg.cover)}" alt=""></button>` : ''}
+    ${own ? `<button class="cover-btn" id="pcover-btn">${ic('camera', 16)} ${pg.cover ? 'কভার বদলান' : 'কভার ছবি যোগ করুন'}</button><input type="file" id="pcoverfile" accept="image/*" hidden>` : ''}
+  </div>
+  <div class="prof-av pg-av">${own
+    ? `<label class="av-edit" title="পেইজের ছবি বদলান">${entAv(pg)}<span class="av-cam">${ic('camera', 16)}</span><input type="file" id="pavfile" accept="image/*" hidden></label>`
+    : pg.avatar ? `<button class="avbtn" data-viewpic="${esc(pg.avatar)}" aria-label="পেইজের ছবি দেখুন">${entAv(pg)}</button>` : entAv(pg)}</div>`;
+}
+function pageCoverMenu(pg) {
+  if (!pg.cover) return $('#pcoverfile').click();
+  openSheet(`<div class="menu"><button data-act="up">${ic('camera', 18)} নতুন ছবি আপলোড করুন</button><button data-act="view">${ic('photo', 18)} কভার ছবি দেখুন</button><button data-act="rm" class="danger">কভার ছবি সরান</button><button data-close>বন্ধ করুন</button></div>`);
+  $('#sheet').onclick = async ev => {
+    const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    closeSheet();
+    if (a === 'up') $('#pcoverfile').click();
+    if (a === 'view') openViewer({ images: [pg.cover] });
+    if (a === 'rm' && await confirmSheet('পেইজের কভার ছবি সরাবেন? ছবিটা পেইজের "কভার ছবি" অ্যালবামে থেকে যাবে।', 'সরান', true)) await busy(null, async () => { await S.api.removePageCover(pg.id); openPage(pg.id, true); toast('কভার ছবি সরানো হয়েছে'); });
+  };
 }
 function pageForm(pg) {
   const st = {};

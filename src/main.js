@@ -1872,6 +1872,7 @@ document.addEventListener('click', e => {
   if (e.target.closest('#listpriv')) listPrivacySheet();
   if (e.target.closest('#plock, .lock-chip')) lockSheet();
   if (e.target.closest('#showact')) showActiveSheet();
+  if (e.target.closest('#msgsnd')) soundSheet();
 });
 // মেসেজে "সক্রিয় আছেন" দেখানো চালু/বন্ধ (বন্ধ করলে নিজেও অন্যদেরটা দেখবেন না)
 async function showActiveSheet() {
@@ -2638,6 +2639,13 @@ async function openConv(t, silent) {
     }
     const data = await S.api.thread(th);
     if (S.th !== th) return;
+    // সিন: আমার শেষ মেসেজ আগে দেখা হয়নি, এখন দেখা হয়েছে
+    if (silent && th.msgs?.length && data.msgs.length) {
+      const pl = [...th.msgs].reverse().find(m => m.mine), nl = [...data.msgs].reverse().find(m => m.mine);
+      if (th.kind !== 'group' && pl && nl && pl.id === nl.id && !pl.read && nl.read) playSound('seen');
+      if (th.kind === 'group' && nl) { const cnt = ms => (data.members || []).filter(x => x.id !== me().id && x.lastReadAt >= nl.createdAt).length, pc = (th.members || []).filter(x => x.id !== me().id && x.lastReadAt >= nl.createdAt).length; if (cnt() > pc) playSound('seen'); }
+      if (S.rxSoundPending) { S.rxSoundPending = false; const rxSum = l => l.filter(m => m.mine).reduce((a, m) => a + Object.values(m.reactions || {}).reduce((x, y) => x + y, 0), 0); if (rxSum(data.msgs) > rxSum(th.msgs)) playSound('react'); }
+    }
     th.muted = data.muted; th.members = data.members; th.msgs = data.msgs; th.shared = data.shared || { nicknames: {} };
     if (data.marked) S.api.markUnread(th, false).then(refreshBadges).catch(() => {});
     // শুধু অ্যাডমিনরা লিখতে পারেন এমন গ্রুপে সাধারণ সদস্যের লেখার জায়গা বন্ধ
@@ -2840,6 +2848,7 @@ function quickHeart(m, el) {
   if (m.deleted) return;
   const on = m.myReaction !== '❤️';
   if (on && el) { const h = document.createElement('span'); h.className = 'heart-pop'; h.textContent = '❤️'; el.appendChild(h); setTimeout(() => h.remove(), 800); }
+  if (on) { playSound('react'); S.myRxAt = Date.now(); }
   S.api.reactMessage(m.id, on ? '❤️' : null).then(() => openConv(S.th, true)).catch(e => toast(errText(e)));
 }
 function msgActions(m) {
@@ -2856,7 +2865,7 @@ function msgActions(m) {
       <button data-close>বন্ধ করুন</button></div>`);
   $('#sheet').onclick = async ev => {
     const rx = ev.target.closest('[data-mx]');
-    if (rx) { closeSheet(); return busy(null, async () => { await S.api.reactMessage(m.id, m.myReaction === rx.dataset.mx ? null : rx.dataset.mx); openConv(S.th, true); }); }
+    if (rx) { closeSheet(); if (m.myReaction !== rx.dataset.mx) { playSound('react'); S.myRxAt = Date.now(); } return busy(null, async () => { await S.api.reactMessage(m.id, m.myReaction === rx.dataset.mx ? null : rx.dataset.mx); openConv(S.th, true); }); }
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
     closeSheet();
     if (a === 'reply') { S.reply = m; S.edit = null; setReplyBar(); $('#tmsg').focus(); }
@@ -2924,6 +2933,7 @@ async function sendNow(opts = {}, btn) {
   if (th.kind === 'group' && body.includes('@')) opts.mentions = (th.members || []).filter(x => x.id !== me().id && body.includes('@' + x.name)).map(x => x.id);
   await busy(btn, async () => {
     await S.api.send(th, body, { replyTo: S.reply?.id || null, ...opts });
+    playSound('send');
     if (raw) $('#tmsg').value = '';
     $('#t-mention').hidden = true;
     S.reply = null; setReplyBar(); composeState(); $('#t-emoji').hidden = true;
@@ -2947,7 +2957,7 @@ $('#t-file').addEventListener('change', async e => {
       await S.api.send(th, '', { image: blob, replyTo: sent === 0 ? S.reply?.id || null : null });
       sent++;
     }
-    toast(`${bn(sent)}টি ছবি পাঠানো হয়েছে`);
+    toast(`${bn(sent)}টি ছবি পাঠানো হয়েছে`); playSound('send');
   } catch (er) { toast(`${bn(sent)}টি গেছে, বাকিগুলো পাঠানো যায়নি: ${errText(er)}`); }
   btn.disabled = false; S.reply = null; setReplyBar();
   if (th.request) { await S.api.convSet(th, { accepted: true }).catch(() => {}); th.request = false; }
@@ -3302,6 +3312,45 @@ async function joinReqSheet(th) {
     };
   } catch (e) { $('#jr-list').innerHTML = `<p class="mut">${esc(errText(e))}</p>`; }
 }
+// ================================================================ মেসেজের শব্দ (ফাইল নয়, ফোনেই তৈরি — অ্যাপ ভারী হয় না)
+const SND = { ctx: null };
+const sndOn = (k) => { const o = local.get('msgsnd', {}); return o.all !== false && o[k] !== false; };
+function sndCtx() {
+  if (!SND.ctx) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; SND.ctx = new C(); }
+  if (SND.ctx.state === 'suspended') SND.ctx.resume().catch(() => {});
+  return SND.ctx;
+}
+// প্রথম ছোঁয়াতেই অডিও চালু (ব্রাউজার না ছুঁলে শব্দ করতে দেয় না)
+['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, () => { try { sndCtx(); } catch { /* শব্দ ছাড়াও চলে */ } }, { once: true, passive: true }));
+// একটা নরম স্বর: freq থেকে to পর্যন্ত, শুরু at সেকেন্ড পরে
+function tone(c, { f, to = f, at = 0, dur = 0.12, vol = 0.12, type = 'sine' }) {
+  const t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (to !== f) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+const SOUNDS = {
+  send: c => { tone(c, { f: 520, to: 1040, dur: 0.11, vol: 0.09 }); },                                              // ফুঁ দেওয়ার মতো উপরে ওঠা
+  receive: c => { tone(c, { f: 880, dur: 0.09, vol: 0.08 }); tone(c, { f: 1175, at: 0.09, dur: 0.12, vol: 0.07 }); },  // টুং-টাং
+  seen: c => { tone(c, { f: 1568, dur: 0.06, vol: 0.035, type: 'triangle' }); },                                     // ছোট টিক
+  react: c => { tone(c, { f: 660, to: 990, dur: 0.07, vol: 0.08, type: 'triangle' }); tone(c, { f: 1320, at: 0.07, dur: 0.09, vol: 0.06, type: 'triangle' }); },  // বুদ্বুদ
+  incoming: c => { [784, 988, 1319].forEach((f, i) => tone(c, { f, at: i * 0.11, dur: 0.22, vol: 0.07 })); },        // তিন নোটের মিষ্টি ঘণ্টা
+};
+let sndLast = 0;
+function playSound(k) {
+  if (!sndOn(k) || document.visibilityState === 'hidden') return;
+  const now = Date.now(); if (now - sndLast < 120) return; sndLast = now;   // একসাথে কয়েকটা বাজলে কান না ঝালাপালা হয়
+  try { const c = sndCtx(); if (c) SOUNDS[k]?.(c); } catch { /* শব্দ না হলেও চলে */ }
+}
+const SND_LIST = [['send', '📤 মেসেজ পাঠালে'], ['receive', '📥 খোলা চ্যাটে মেসেজ এলে'], ['incoming', '🔔 নতুন মেসেজ এলে (অন্য পাতায় থাকলে)'], ['seen', '👀 মেসেজ দেখলে (সিন)'], ['react', '❤️ রিয়্যাক্ট দিলে বা পেলে']];
+function soundSheet() {
+  const o = local.get('msgsnd', {}), all = o.all !== false;
+  openSheet(`<h2>🔊 মেসেজের শব্দ</h2><label class="snd-row snd-all"><span><b>সব শব্দ</b></span><input type="checkbox" data-snd="all" ${all ? 'checked' : ''}></label>
+    ${SND_LIST.map(([k, l]) => `<div class="snd-row${all ? '' : ' off'}"><label><input type="checkbox" data-snd="${k}" ${o[k] !== false ? 'checked' : ''} ${all ? '' : 'disabled'}> ${l}</label><button type="button" class="sbtn ghost" data-sndtry="${k}" aria-label="শুনে দেখুন">▶ শুনুন</button></div>`).join('')}
+    <p class="mut" style="font-size:13px">মিউট করা চ্যাটের নতুন মেসেজে শব্দ হবে না। ফোন সাইলেন্ট থাকলে শব্দ হবে না।</p><button class="btn ghost wide" data-close style="margin-top:6px">বন্ধ করুন</button>`);
+  $('#sheet').onchange = e => { const k = e.target.dataset?.snd; if (!k) return; const v = local.get('msgsnd', {}); v[k] = e.target.checked; local.set('msgsnd', v); if (k === 'all') soundSheet(); };
+  $('#sheet').onclick = e => { const b = e.target.closest('[data-sndtry]'); if (b) { const k = b.dataset.sndtry, v = local.get('msgsnd', {}); local.set('msgsnd', { ...v, all: true, [k]: true }); playSound(k); local.set('msgsnd', v); } };
+}
 // ================================================================ গ্রুপ চ্যাট
 async function friendPicker(title, exclude, btnLabel, onPick, withName) {
   openSheet(`<h2>${title}</h2>${withName ? '<input class="f" id="gp-name" maxlength="60" placeholder="গ্রুপের নাম (যেমন: পরিবার, বন্ধুরা)">' : ''}<input type="search" id="gp-q" placeholder="বন্ধু খুঁজুন…" aria-label="বন্ধু খুঁজুন"><div id="gp-list" style="margin-top:8px"><div class="mut">লোড হচ্ছে…</div></div>
@@ -3386,9 +3435,13 @@ function listenMessages() {
   const reloadThread = () => { clearTimeout(reloadT); reloadT = setTimeout(() => { if (S.view === 'thread' && S.th) openConv(S.th, true); }, 300); };
   S.stopMsg = S.api.onMessage(ev => {
     const th = S.th, inThread = S.view === 'thread' && th && (ev.type === 'rx' || (th.kind === 'group' ? ev.chatId === th.id : !ev.chatId && (ev.from === th.id || ev.to === th.id || (th.pageId && ev.pageId === th.pageId)) && (ev.pageId || null) === (th.pageId || null)));
-    if (inThread) { if (ev.type === 'new' && !ev.mine) $('#t-typing').hidden = true; reloadThread(); if (ev.type === 'new') refreshBadges(); return; }
+    if (inThread) {
+      if (ev.type === 'new' && !ev.mine) { $('#t-typing').hidden = true; if (!th.muted) playSound('receive'); }
+      if (ev.type === 'rx' && Date.now() - (S.myRxAt || 0) > 2500) S.rxSoundPending = true;   // অন্য কেউ রিয়্যাক্ট দিলে (মেসেজ লোডের পর মিলিয়ে বাজবে)
+      reloadThread(); if (ev.type === 'new') refreshBadges(); return;
+    }
     if (ev.type !== 'new' || ev.mine) { if (S.view === 'msgs' && ev.type === 'update') loadConvs(); return; }
-    if (!S.mutedKeys.has(evKey(ev))) toast('নতুন মেসেজ এসেছে');
+    if (!S.mutedKeys.has(evKey(ev))) { toast('নতুন মেসেজ এসেছে'); playSound('incoming'); }
     if (S.view === 'msgs') loadConvs();
     if (S.view === 'page' && ev.pageId && ev.pageId === S.curPage?.id && S.curPage.canManage) S.api.pageUnread().then(u => { const n = u.get(ev.pageId) || 0, b = $('#pg-unread'); if (b) { b.hidden = !n; b.textContent = bn(n); } }).catch(() => {});
     refreshBadges();
@@ -4377,6 +4430,7 @@ function renderMenu() {
       <button id="plock">🔒 প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
       <button id="listpriv">বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
       <button id="showact">🟢 সক্রিয় অবস্থা দেখান (মেসেজে)</button>
+      <button id="msgsnd">🔊 মেসেজের শব্দ</button>
       <button id="blocked">ব্লক করা মানুষ</button>
       <button id="theme">থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
       <a href="./privacy.html">গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>

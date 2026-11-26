@@ -1568,3 +1568,8 @@ img.av{aspect-ratio:1/1}
 /* রিফ্রেশের পর আগের পাতা খোলা পর্যন্ত হোম লুকানো, বদলে হালকা লোডিং */
 html.nav-restore #v-home{display:none!important}
 html.nav-restore main::before{content:'';display:block;height:120px;border-radius:14px;background:var(--card);border:1px solid var(--line);margin-bottom:12px;animation:pulse 1.2s ease-in-out infinite}
+/* মেসেজের শব্দ সেটিং */
+.snd-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 4px;border-bottom:1px solid var(--line);font-size:15px}
+.snd-row label{display:flex;align-items:center;gap:8px;flex:1;cursor:pointer}
+.snd-row.off{opacity:.5}
+.snd-all{font-size:16px}

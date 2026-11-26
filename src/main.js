@@ -1298,7 +1298,7 @@ function renderAbout(key) {
     return `<div class="ab-sec${isOpen ? ' open' : ''}" data-absec="${a.id}">
       <button class="ab-head" data-abopen="${a.id}" aria-expanded="${isOpen}">
         <span class="ab-ic">${ic(a.ic, 18)}</span>
-        <span class="ab-tx"><b>${a.t}${a.chips ? ` ${a.chips(u)}` : a.own ? ` <span class="ab-only">${ic('lock', 11)} শুধু আপনি</span>` : ''}</b><small class="${sum ? '' : 'ab-empty'}">${esc(sum || (a.empty ? '+ ' + a.empty : ''))}</small></span>
+        <span class="ab-tx"><b>${a.t}${a.chips ? ` ${a.chips(u)}` : a.own ? ` <span class="ab-only">${ic('lock', 11)} শুধু আপনি</span>` : ''}</b>${sum ? `<small>${esc(sum)}</small>` : ''}</span>
         <span class="ab-chev">${a.action ? ic('chevR', 18) : ic('chevD', 18)}</span>
       </button>
       ${isOpen ? `<form class="ab-form" data-abform="${a.id}">${a.form(u)}<div class="ab-btns"><button type="button" class="btn ghost sm" data-abcancel>বাতিল</button><button class="btn sm">সেভ করুন</button></div></form>` : ''}

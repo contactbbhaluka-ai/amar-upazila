@@ -100,6 +100,9 @@ function ago(iso) {
   return new Date(iso).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 const clock = iso => new Date(iso).toLocaleTimeString('bn-BD', { hour: 'numeric', minute: '2-digit' });
+// জন্মসাল: বয়স অন্তত ১৩ (অ্যাপের নিয়ম)
+const MIN_AGE = 13;
+const birthSelect = (id, cur, required) => { const max = new Date().getFullYear() - MIN_AGE; let o = `<select class="f" id="${id}" ${required ? 'required' : ''}><option value="" ${cur ? '' : 'selected'} ${required ? 'disabled' : ''}>${required ? 'সাল বাছুন' : 'দেওয়া নেই'}</option>`; for (let y = max; y >= 1920; y--) o += `<option value="${y}" ${y === Number(cur) ? 'selected' : ''}>${bn(y)}</option>`; return o + '</select>'; };
 const GENDERS = { male: 'পুরুষ', female: 'নারী', other: 'অন্যান্য' };
 const genderSelect = (id, cur, required) => `<select class="f" id="${id}" ${required ? 'required' : ''}>
   <option value="" disabled ${cur === undefined ? 'selected' : ''}>বাছাই করুন</option>
@@ -1013,7 +1016,7 @@ document.addEventListener('click', async e => {
 // ================================================================ এবাউট (ফেসবুকের মতো): প্রতিটা অংশ চাপলে নিচে এডিট খোলে
 const joinedText = d => { if (!d) return ''; const t = new Date(d); return `${bn(t.getFullYear())} সালের ${['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'][t.getMonth()]} থেকে সদস্য`; };
 // এবাউটের প্রতিটা অংশ কারা দেখবে
-const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public' };
+const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me' };
 const aVis = (u, k) => (u.aboutVis || ABOUT_VIS0)[k] || ABOUT_VIS0[k];
 const visSel = (id, cur, label = 'কারা দেখবে') => `<label class="vis-sel" for="${id}"><span>${ic(PRIVACY[cur][0], 14)} ${label}</span><select id="${id}" class="f">${Object.entries(PRIVACY).map(([k, [, l]]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
 const visChip = (v, label) => `<span class="ab-vis" title="কারা দেখবে">${ic(PRIVACY[v][0], 11)} ${label ? label + ': ' : ''}${PRIVACY[v][1]}</span>`;
@@ -1074,18 +1077,21 @@ document.addEventListener('input', e => {
 });
 const ABOUT = [
   { id: 'intro', ic: 'info', t: 'পরিচিতি',
-    sum: u => [u.username && '@' + u.username, GENDERS[u.gender], u.bio].filter(Boolean).join(' · '), empty: 'ইউজারনেম, লিঙ্গ ও নিজের সম্পর্কে লিখুন',
+    chips: u => (u.birthYear ? visChip(aVis(u, 'birth'), 'জন্মসাল') : ''),
+    sum: u => [u.username && '@' + u.username, GENDERS[u.gender], u.birthYear && `জন্ম ${bn(u.birthYear)}`, u.bio].filter(Boolean).join(' · '), empty: 'ইউজারনেম, লিঙ্গ, জন্মসাল ও নিজের সম্পর্কে লিখুন',
     form: u => `<label for="ab-name">${ic('user', 16)} নাম</label><input id="ab-name" required minlength="2" maxlength="40" value="${esc(u.name)}">
       <label for="ab-un">@ ইউজারনেম</label><div class="un-wrap"><span class="un-at">@</span><input id="ab-un" maxlength="21" autocomplete="off" autocapitalize="none" spellcheck="false" value="${esc(u.username || '')}" placeholder="যেমন: arif.bhaluka"></div>
       <small class="un-msg mut" id="ab-un-msg">ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . দিয়ে ৩–২০ অক্ষর। প্রত্যেকের আলাদা।</small>
       <label for="ab-g">${ic('users', 16)} লিঙ্গ</label>${genderSelect('ab-g', u.gender || '', false)}
+      <label for="ab-by">${ic('calendar', 16)} জন্মসাল</label>${birthSelect('ab-by', u.birthYear || 0, false)}
+      ${visSel('ab-vis-birth', aVis(u, 'birth'), 'জন্মসাল কারা দেখবে')}
       <label for="ab-bio">${ic('note', 16)} নিজের সম্পর্কে</label><textarea id="ab-bio" maxlength="160" rows="2" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">${esc(u.bio || '')}</textarea>`,
     read: () => {
       const name = $('#ab-name').value.trim(); if (name.length < 2) return { err: 'নাম অন্তত ২ অক্ষরের দিন' };
       const username = normUsername($('#ab-un').value);
       if (username && !validUsername(username)) return { err: 'ইউজারনেমে শুধু ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . দিন (৩–২০ অক্ষর)' };
       const g = $('#ab-g').value;
-      return { name, username, gender: g === 'none' ? '' : g, bio: $('#ab-bio').value.trim() };
+      return { name, username, gender: g === 'none' ? '' : g, birthYear: Number($('#ab-by').value) || 0, bio: $('#ab-bio').value.trim(), aboutVis: { birth: $('#ab-vis-birth').value } };
     } },
   { id: 'work', ic: 'work', t: 'কাজ ও শিক্ষা', chips: u => visChip(aVis(u, 'works'), 'কাজ') + visChip(aVis(u, 'educations'), 'শিক্ষা'),
     sum: u => [...(u.works || []).map(workText), ...(u.educations || []).map(eduText)].join(' · '), empty: 'কর্মস্থল ও শিক্ষাপ্রতিষ্ঠান যোগ করুন',
@@ -1156,6 +1162,7 @@ function renderAbout(key) {
         : `<b>${esc(e.school)}</b> থেকে ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পাশ করেছেন${e.year ? ` (${bn(e.year)})` : ''}`]),
       u.union && [ic('pin', 18), `থাকেন <b>${esc(u.union)}</b>`],
       GENDERS[u.gender] && [ic('users', 18), GENDERS[u.gender]],
+      u.birthYear && [ic('calendar', 18), `জন্ম <b>${bn(u.birthYear)}</b> সালে`],
       u.phone && [ic('mobile', 18), `<a href="tel:${esc(u.phone)}" class="link">${bn(u.phone)}</a>`],
       blood && [ic('drop', 18), esc(blood)],
       u.joinedAt && [ic('calendar', 18), joinedText(u.joinedAt)],
@@ -1502,6 +1509,7 @@ async function renderMe(mode = 'login') {
     <form id="aform">
       ${signup ? `<label for="an">${ic('user', 16)} আপনার নাম</label><input id="an" required minlength="2" maxlength="40" autocomplete="name">
       <label for="su-g">${ic('users', 16)} লিঙ্গ</label>${genderSelect('su-g', undefined, true)}
+      <label for="su-by">${ic('calendar', 16)} জন্মসাল <span class="mut" style="font-weight:400">(বয়স ১৩ বছরের বেশি হতে হবে)</span></label>${birthSelect('su-by', 0, true)}
       ${addrHtml('su')}
       <label for="su-ph">${ic('mobile', 16)} মোবাইল নম্বর <span class="mut" style="font-weight:400">(WhatsApp থাকলে এই নম্বরেই)</span></label><input id="su-ph" required inputmode="tel" autocomplete="tel" placeholder="০১XXXXXXXXX" maxlength="17">
       ${bloodHtml('su', null)}` : ''}
@@ -1524,7 +1532,8 @@ async function renderMe(mode = 'login') {
       if (!validPhone(phone)) return toast('সঠিক মোবাইল নম্বর দিন (যেমন ০১৭১২৩৪৫৬৭৮)');
       if (blood.err) return toast(blood.err);
       const g = $('#su-g').value; if (!g) return toast('লিঙ্গ বাছাই করুন');
-      extra = { ...addr, phone, bloodGroup: blood.bloodGroup, lastDonated: blood.lastDonated, gender: g === 'none' ? '' : g };
+      const by = Number($('#su-by').value); if (!by) return toast('জন্মসাল বাছাই করুন');
+      extra = { ...addr, phone, bloodGroup: blood.bloodGroup, lastDonated: blood.lastDonated, gender: g === 'none' ? '' : g, birthYear: by };
     }
     busy(e.submitter, async () => {
       if (signup) {

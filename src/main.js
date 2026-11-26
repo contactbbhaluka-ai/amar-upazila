@@ -1040,7 +1040,7 @@ async function peopleSheet(uid, kind) {
     const head = `<h2>${PLIST[kind]}${r.hidden ? '' : ` <span class="mut" style="font-weight:400;font-size:15px">(${bn(r.list.length)})</span>`}</h2>
       ${own ? `<button class="vis-line" id="pl-priv">${ic(PRIVACY[vis][0], 15)} এই তালিকা কারা দেখবে: <b>${PRIVACY[vis][1]}</b> <span class="link">বদলান</span></button>` : ''}`;
     if (r.hidden) {
-      openSheet(`${head}<div class="empty pl-hidden">${ic('lock', 34)}<p><b>${esc(prof?.name || 'এই ব্যক্তি')}</b> ${PLIST[kind]} তালিকা ${vis === 'friends' ? 'শুধু বন্ধুদের জন্য রেখেছেন' : 'গোপন রেখেছেন'}।</p><p class="mut">মোট সংখ্যা প্রোফাইলেই দেখা যাচ্ছে।</p></div><button class="btn ghost wide" data-close>বন্ধ করুন</button>`);
+      openSheet(`${head}<div class="empty pl-hidden">${ic('lock', 34)}<p><b>${esc(prof?.name || 'এই ব্যক্তি')}</b> ${r.locked ? 'প্রোফাইল লক করে রেখেছেন। শুধু বন্ধুরা তালিকা দেখতে পারেন' : `${PLIST[kind]} তালিকা ${vis === 'friends' ? 'শুধু বন্ধুদের জন্য রেখেছেন' : 'গোপন রেখেছেন'}`}।</p><p class="mut">মোট সংখ্যা প্রোফাইলেই দেখা যাচ্ছে।</p></div><button class="btn ghost wide" data-close>বন্ধ করুন</button>`);
       return;
     }
     const row = u => `<div class="person" data-pname="${esc(u.name.toLowerCase())}">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name) + vb(u.verified), 'who-btn')}<div class="sub">${esc(u.union)}</div></div></div>`;
@@ -1076,18 +1076,41 @@ function oneListPrivacy(kind, back) {
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-plist]'); if (b) { const [uid, kind] = b.dataset.plist.split('|'); return peopleSheet(uid, kind); }
   if (e.target.closest('#listpriv')) listPrivacySheet();
+  if (e.target.closest('#plock, .lock-chip')) lockSheet();
 });
+// ফেসবুকের মতো প্রোফাইল লক: বন্ধু ছাড়া কেউ পোস্ট, ছবি, বিস্তারিত ও তালিকা দেখবে না
+function lockSheet() {
+  const u = me(); if (!u) return;
+  const on = !!u.locked;
+  openSheet(`<div class="lock-sheet"><div class="lock-ic">🔒</div><h2>${on ? 'আপনার প্রোফাইল লক করা আছে' : 'প্রোফাইল লক করুন'}</h2>
+    <p class="mut">${on ? 'এখন শুধু আপনার বন্ধুরা সব দেখতে পারছেন।' : 'লক করলে যারা আপনার বন্ধু নন তারা যা দেখবেন:'}</p>
+    <ul class="lock-list">
+      <li>✅ শুধু নাম, প্রোফাইল ছবি ও কভার (বড় করে দেখতে পারবেন না)</li>
+      <li>🚫 প্রোফাইলের পোস্ট ও ছবি/অ্যালবাম দেখা যাবে না — পাবলিক পোস্টও না</li>
+      <li>🚫 এবাউট বা বিস্তারিত তথ্য দেখা যাবে না</li>
+      <li>🚫 বন্ধু ও ফলোয়ার তালিকা দেখা যাবে না</li>
+      <li>👥 বন্ধুরা আগের মতোই সব দেখবেন; গ্রুপ ও পেইজের পোস্ট এর আওতায় নয়</li>
+    </ul>
+    <button class="btn wide${on ? ' ghost' : ''}" id="lock-go">${on ? 'প্রোফাইল আনলক করুন' : '🔒 প্রোফাইল লক করুন'}</button>
+    <button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button></div>`);
+  $('#lock-go').onclick = e => busy(e.currentTarget, async () => {
+    await S.api.setLock(!on); u.locked = !on; closeSheet();
+    toast(on ? 'প্রোফাইল আনলক করা হয়েছে' : '🔒 প্রোফাইল লক করা হয়েছে');
+    if (S.view === 'me') renderMe(); if (S.view === 'menu') renderMenu();
+  });
+}
 
 // ================================================================ প্রোফাইল: কভার ছবি, পোস্ট/ছবি ট্যাব, অ্যালবাম
 S.pstate = { me: { tab: 'posts', seg: 'all', album: null }, user: { tab: 'posts', seg: 'all', album: null, uid: null }, page: { tab: 'posts', seg: 'all', album: null } };
 function coverHtml(p, own) {
+  if (p.lockedOut) p = { ...p, _noview: true };   // লক: বন্ধু ছাড়া বড় করে দেখা যাবে না
   return `<div class="cover${p.cover ? '' : ' empty'}">
-    ${p.cover ? `<button class="cover-img" data-viewpic="${esc(p.cover)}" aria-label="কভার ছবি দেখুন"><img src="${esc(p.cover)}" alt=""></button>` : ''}
+    ${p.cover ? (p._noview ? `<div class="cover-img"><img src="${esc(p.cover)}" alt=""></div>` : `<button class="cover-img" data-viewpic="${esc(p.cover)}" aria-label="কভার ছবি দেখুন"><img src="${esc(p.cover)}" alt=""></button>`) : ''}
     ${own ? `<button class="cover-btn" id="cover-btn">${ic('camera', 16)} ${p.cover ? 'কভার বদলান' : 'কভার ছবি যোগ করুন'}</button>` : ''}
   </div>
   <div class="prof-av">${own
     ? `<label class="av-edit" title="প্রোফাইল ছবি বদলান">${av(p, 'lg')}<span class="av-cam">${ic('camera', 16)}</span><input type="file" id="avfile" accept="image/*" hidden></label>`
-    : p.avatar ? `<button class="avbtn" data-viewpic="${esc(p.avatar)}" aria-label="প্রোফাইল ছবি দেখুন">${av(p, 'lg')}</button>` : av(p, 'lg')}</div>`;
+    : p.avatar && !p._noview ? `<button class="avbtn" data-viewpic="${esc(p.avatar)}" aria-label="প্রোফাইল ছবি দেখুন">${av(p, 'lg')}</button>` : av(p, 'lg')}</div>`;
 }
 function profTabs(key) {
   const st = S.pstate[key], tabs = key === 'page' ? [['posts', 'পোস্ট'], ['photos', 'ছবি']] : [['posts', 'পোস্ট'], ['about', 'এবাউট'], ['photos', 'ছবি']];
@@ -1566,17 +1589,17 @@ async function openUser(id, silent, keepState) {
     if (!silent) S.api.profileVisit?.(id).catch(() => {});
     $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
-      ${introCard(p, false)}
+      ${p.lockedOut ? `<div class="lock-banner">🔒 <div><b>${esc(p.name)} প্রোফাইল লক করে রেখেছেন</b><small>শুধু বন্ধুরা পোস্ট, ছবি ও বিস্তারিত দেখতে পারেন।</small></div></div>` : introCard(p, false)}
       ${statsHtml(p)}
       ${r.blocked ? `<p class="mut">আপনি এই ব্যক্তিকে ব্লক করেছেন।</p><button class="btn ghost" id="unblock">আনব্লক করুন</button>`
-      : `<div class="row">${relBtns(p)}<button class="sbtn ${r.following ? 'ghost' : ''}" data-fo="${esc(p.id)}" data-on="${r.following ? 1 : 0}">${r.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" data-dm="${esc(p.id)}">মেসেজ</button><button class="more" id="umore" aria-label="আরও">⋯</button></div>`}</div>${r.blocked ? '' : profTabs('user')}`;
+      : `<div class="row">${relBtns(p)}<button class="sbtn ${r.following ? 'ghost' : ''}" data-fo="${esc(p.id)}" data-on="${r.following ? 1 : 0}">${r.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" data-dm="${esc(p.id)}">মেসেজ</button><button class="more" id="umore" aria-label="আরও">⋯</button></div>`}</div>${r.blocked || p.lockedOut ? '' : profTabs('user')}`;
     $('#unblock')?.addEventListener('click', e => busy(e.currentTarget, async () => { await S.api.unblock(p.id); openUser(p.id, true); loadFeed('user'); }));
     $('#umore')?.addEventListener('click', () => {
       if (!needUser()) return;
       openSheet(`<div class="menu">${me()?.admin ? `<button data-act="admin">${ic('shield', 16)} অ্যাডমিন: কয়েন ও ব্যাজ</button>` : ''}<button data-act="report">প্রোফাইল রিপোর্ট করুন</button><button data-act="block" class="danger">ব্লক করুন</button><button data-close>বন্ধ করুন</button></div>`);
       $('#sheet').onclick = ev => { const a = ev.target.closest('[data-act]')?.dataset.act; if (a === 'admin') adminUserSheet(p, () => openUser(p.id, true)); if (a === 'report') reportSheet('user', p.id); if (a === 'block') { closeSheet(); blockUser(p.id, p.name); } };
     });
-    if (r.blocked) $('#feed-user').hidden = true; else showProfPane('user');
+    if (r.blocked || p.lockedOut) $('#feed-user').hidden = true; else showProfPane('user');
   } catch (e) { $('#user').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 
@@ -1848,7 +1871,7 @@ async function renderMe(mode = 'login') {
   const u = me();
   if (u) {
     $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
-      <h2 style="margin:6px 0 0">${esc(u.name)}${vb(u.verified, true)}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
+      <h2 style="margin:6px 0 0">${esc(u.name)}${vb(u.verified, true)}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.locked ? '<button class="lock-chip">🔒 প্রোফাইল লক করা</button>' : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
@@ -2479,6 +2502,7 @@ function renderMenu() {
     <details class="card"${u ? '' : ' hidden'}><summary>⚙️ সেটিংস ও প্রাইভেসি</summary><div class="setlist">
       <button id="edit">প্রোফাইল এডিট</button>
       <button id="chpw">পাসওয়ার্ড পরিবর্তন</button>
+      <button id="plock">🔒 প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
       <button id="listpriv">বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
       <button id="blocked">ব্লক করা মানুষ</button>
       <button id="theme">থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>

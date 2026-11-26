@@ -1022,3 +1022,14 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .sw-toggle .chev{display:inline-block;transition:transform .15s;font-size:13px}
 .sw-toggle.open .chev{transform:rotate(180deg)}
 .sw-drop{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:40;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:8px}
+
+/* v38 প্রোফাইল লক */
+.lock-chip{display:inline-flex;align-items:center;gap:4px;margin:6px auto 0;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--g2);color:var(--mut);font:inherit;font-size:13px;cursor:pointer}
+.lock-banner{display:flex;gap:10px;align-items:center;text-align:left;margin:12px 0 4px;padding:12px 14px;border-radius:12px;background:var(--g2);font-size:22px}
+.lock-banner b{display:block;font-size:15px}
+.lock-banner small{display:block;font-size:13px;color:var(--mut);margin-top:2px}
+.lock-sheet{text-align:center}
+.lock-sheet .lock-ic{font-size:40px;margin:4px 0}
+.lock-sheet h2{margin:4px 0}
+.lock-list{list-style:none;padding:0;margin:12px 0 16px;text-align:left;display:grid;gap:8px;font-size:14px}
+.lock-list li{padding:8px 10px;border-radius:10px;background:var(--g2)}

@@ -45,14 +45,14 @@ async function supabaseApi() {
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
-  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,unions!profiles_union_id_fkey(name)';
+  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
     id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
     union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
     bloodGroup: p.blood_group || '', donorVisible: p.donor_visible !== false, lastDonated: p.last_donated || '',
     avatar: p.avatar_url || '', cover: p.cover_url || '', bio: p.bio || '', admin: p.role === 'admin',
     friendsVisibility: p.friends_visibility || 'public', followersVisibility: p.followers_visibility || 'public', followingVisibility: p.following_visibility || 'public', joinedAt: p.created_at || '',
-    gender: p.gender || '', username: p.username || '', verified: badgeOf(p), verifiedUntil: p.verified_until || null,
+    gender: p.gender || '', username: p.username || '', verified: badgeOf(p), verifiedUntil: p.verified_until || null, locked: !!p.locked,
     social: {}, works: [], educations: [],
   });
   const toPost = (r, mine, saved) => ({
@@ -497,6 +497,7 @@ async function supabaseApi() {
       const [counts, rel, about] = await Promise.all([sb.rpc('profile_counts', { uid: id }), relations([id]), sb.rpc('profile_about', { uid: id })]);
       const c = ok(counts) || {}, a = ok(about) || {};
       // মালিকের প্রাইভেসি অনুযায়ী যা দেখার অনুমতি আছে শুধু তাই আসে
+      if (a.locked) return { ...p, locked: true, lockedOut: true, bloodGroup: '', lastDonated: '', works: [], educations: [], social: {}, phone: '', orgs: [], featured: FEATURED0, friends: c.friends || 0, followers: c.followers || 0, following: c.following || 0, rel: rel.get(id) };
       return { ...p, works: a.works || [], educations: a.educations || [], social: a.social || {}, phone: a.phone || '', birthYear: a.birth_year || 0, birthDate: a.birth_date || '', relationship: a.relationship || '', religion: a.religion || '', orgs: a.orgs || [], featured: a.featured || FEATURED0,
         friends: c.friends || 0, followers: c.followers || 0, following: c.following || 0, rel: rel.get(id) };
     },
@@ -508,13 +509,14 @@ async function supabaseApi() {
     // বন্ধু/ফলোয়ার/ফলো করছেন তালিকা; মালিক গোপন রাখলে { hidden: true, visibility }
     async listPeople(uid, kind) {
       const r = ok(await sb.rpc('list_people', { uid, kind }));
-      if (!r.allowed) return { hidden: true, visibility: r.visibility || 'only_me', list: [] };
+      if (!r.allowed) return { hidden: true, locked: r.visibility === 'locked', visibility: r.visibility || 'only_me', list: [] };
       const ids = r.ids || [], out = [];
       for (let i = 0; i < ids.length; i += 150) out.push(...ok(await sb.from('profiles').select(PROFILE).in('id', ids.slice(i, i + 150))).map(toUser));
       const pos = new Map(ids.map((x, i) => [x, i]));
       return { hidden: false, visibility: r.visibility, list: out.filter(u => !blocked.has(u.id)).sort((a, b) => pos.get(a.id) - pos.get(b.id)) };
     },
     // কোন তালিকা কারা দেখবে: { friends, followers, following } প্রতিটা 'public' | 'friends' | 'only_me'
+    async setLock(on) { ok(await sb.from('profiles').update({ locked: !!on }).eq('id', me.id)); me.locked = !!on; },
     async setListPrivacy(v) {
       const cols = { friends: 'friends_visibility', followers: 'followers_visibility', following: 'following_visibility' }, row = {};
       for (const k in cols) if (v[k]) { row[cols[k]] = v[k]; me[k + 'Visibility'] = v[k]; }
@@ -655,7 +657,7 @@ function demoApi() {
     { id: 'd4', name: 'তানভীর আহমেদ', ...BH, unionId: 3, bio: 'নিয়মিত রক্তদাতা', bloodGroup: 'B+', phone: '01700000104', lastDonated: daysAgo(120) },
     { id: 'd5', name: 'মিজানুর রহমান', verified: 'paid', verifiedUntil: new Date(Date.now() + 20 * 864e5).toISOString(), ...BH, unionId: 4, bio: 'ব্যবসায়ী, ডাকাতিয়া বাজার', bloodGroup: 'AB+', phone: '01700000105', lastDonated: daysAgo(200) },
     { id: 'd6', name: 'উপজেলা যুব উন্নয়ন', ...BH, unionId: 1, bio: 'প্রশিক্ষণ ও চাকরির খবর', bloodGroup: '', phone: '' },
-    { id: 'd7', name: 'রুমানা আক্তার', ...BH, unionId: 12, bio: '', bloodGroup: 'A-', phone: '01700000107', lastDonated: daysAgo(20) },
+    { id: 'd7', name: 'রুমানা আক্তার', locked: true, ...BH, unionId: 12, bio: '', bloodGroup: 'A-', phone: '01700000107', lastDonated: daysAgo(20) },
     { id: 'd8', name: 'জাহিদ হাসান', district: 'ময়মনসিংহ', upazila: 'ত্রিশাল', unionId: null, bio: '', bloodGroup: 'O-', phone: '01700000108', lastDonated: daysAgo(95) },
     { id: 'd9', name: 'শফিকুল ইসলাম', district: 'ঢাকা', upazila: 'সাভার', unionId: null, bio: 'ভালুকার কারখানায় কাজ করি', bloodGroup: 'AB-', phone: '01700000109', lastDonated: '' },
   ];
@@ -724,7 +726,7 @@ function demoApi() {
   let meId = get('me', null);
   const save = () => { for (const k of ['pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
-  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null }; };
+  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
   const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true, aboutVis: { ...ABOUT_VIS0, ...(person(meId).aboutVis || {}) } } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
@@ -754,7 +756,9 @@ function demoApi() {
       daily: days.map((day, i) => ({ day, n: Math.round(people * share[i]) })), clicks: { profile: f(0.12), photo: (p.images?.length || p.image) ? f(0.3) : 0, more: (p.body || '').length > 200 ? f(0.18) : 0 } });
   }
   const addCoins = (amount, reason, ref) => { db.wallet.coins += amount; db.wallet.ledger.unshift({ amount, reason, ref: String(ref), createdAt: new Date().toISOString() }); };
-  const albumVisible = a => a.privacy === 'public' || a.userId === meId || (a.privacy === 'friends' && meId && friendIds(meId).includes(a.userId));
+  // প্রোফাইল লক: বন্ধু ছাড়া অন্যরা প্রোফাইলের কিছু দেখবে না
+  const lockedOut = uid => !!person(uid)?.locked && uid !== meId && !(meId && friendIds(meId).includes(uid));
+  const albumVisible = a => (a.pageId || !lockedOut(a.userId)) && a.privacy === 'public' || a.userId === meId || (a.privacy === 'friends' && meId && friendIds(meId).includes(a.userId));
   const friendRow = (a, b) => db.friendships.find(f => (f.requester === a && f.addressee === b) || (f.requester === b && f.addressee === a));
   const friendIds = of => db.friendships.filter(f => f.status === 'accepted' && (f.requester === of || f.addressee === of)).map(f => (f.requester === of ? f.addressee : f.requester));
   const rel = id => {
@@ -1088,7 +1092,7 @@ function demoApi() {
     async deleteAlbum(id) { db.albums = db.albums.filter(a => !(a.id === Number(id) && a.userId === meId)); db.posts.forEach(p => { if (p.albumId === Number(id)) p.albumId = null; }); save(); },
     __visiblePosts() {
       const myFriends = meId ? new Set(friendIds(meId)) : new Set();
-      return db.posts.filter(p => !isBlocked(p.userId) && (!p.privacy || p.privacy === 'public' || p.userId === meId || (p.privacy === 'friends' && myFriends.has(p.userId))));
+      return db.posts.filter(p => !isBlocked(p.userId) && (p.pageId || p.groupId || !lockedOut(p.userId)) && (!p.privacy || p.privacy === 'public' || p.userId === meId || (p.privacy === 'friends' && myFriends.has(p.userId))));
     },
     async deleteAccount() {
       const id = meId;
@@ -1287,6 +1291,7 @@ function demoApi() {
       const u = user(id);
       if (!u) throw new Error('not found');
       // ডেমো: মালিকের প্রাইভেসি মেনে কাজ/শিক্ষা/সোশ্যাল/মোবাইল
+      if (lockedOut(id)) return wait({ ...u, lockedOut: true, bloodGroup: '', lastDonated: '', works: [], educations: [], social: {}, phone: '', orgs: [], featured: FEATURED0, friends: friendIds(id).length, followers: db.follows.filter(f => f.endsWith(':' + id)).length, following: db.follows.filter(f => f.startsWith(id + ':')).length, rel: rel(id) });
       const vis = { ...ABOUT_VIS0, ...(person(id).aboutVis || {}) };
       const can = v => id === meId || v === 'public' || (v === 'friends' && meId && friendIds(meId).includes(id));
       Object.assign(u, { works: can(vis.works) ? u.works : [], educations: can(vis.educations) ? u.educations : [], social: can(vis.social) ? u.social : {}, phone: can(vis.contact) ? (person(id).phone || '') : '', birthYear: can(vis.birth) ? (person(id).birthYear || 0) : 0, birthDate: can(vis.birth) ? (person(id).birthDate || '') : '', relationship: can(vis.relationship) ? (person(id).relationship || '') : '', religion: can(vis.religion) ? (person(id).religion || '') : '', orgs: can(vis.orgs) ? (person(id).orgs || []) : [], featured: person(id).featured || FEATURED0 });
@@ -1295,12 +1300,14 @@ function demoApi() {
     async usernameFree(u) { return wait(![...PEOPLE, ...db.users].some(x => x.id !== meId && (x.username || '').toLowerCase() === u.toLowerCase())); },
     async listPeople(uid, kind) {
       const u = user(uid); if (!u) throw new Error('not found');
+      if (lockedOut(uid)) return wait({ hidden: true, locked: true, visibility: 'locked', list: [] });
       const vis = u[kind + 'Visibility'] || 'public';
       const allowed = uid === meId || vis === 'public' || (vis === 'friends' && meId && friendIds(meId).includes(uid));
       if (!allowed) return wait({ hidden: true, visibility: vis, list: [] });
       const ids = kind === 'friends' ? friendIds(uid) : kind === 'followers' ? db.follows.filter(f => f.endsWith(':' + uid)).map(f => f.split(':')[0]) : db.follows.filter(f => f.startsWith(uid + ':')).map(f => f.split(':')[1]);
       return wait({ hidden: false, visibility: vis, list: ids.filter(x => !isBlocked(x)).map(user).filter(Boolean) });
     },
+    async setLock(on) { person(meId).locked = !!on; save(); return wait(); },
     async setListPrivacy(v) {
       const p = person(meId); for (const k of ['friends', 'followers', 'following']) if (v[k]) p[k + 'Visibility'] = v[k]; save();
     },

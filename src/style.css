@@ -1579,3 +1579,4 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 /* প্রোফাইলের নাম ঠিক মাঝখানে; শেয়ার ও চোখ বাটন নামের ডানে বসে কিন্তু নামকে সরায় না */
 .prof h2.ph-h2{padding:0 78px;position:relative}
 .prof h2 .ph-acts{position:absolute;margin-left:12px;white-space:nowrap}
+.prof h2.ph-h2 .ph-acts{top:50%;transform:translateY(-50%);vertical-align:baseline}

@@ -1565,3 +1565,6 @@ img.av{aspect-ratio:1/1}
 .vp-bar i{position:relative;display:block;height:4px;border-radius:2px;background:currentColor;width:0;transition:width .2s linear}
 .vp-t{flex:none;font-size:12px!important;opacity:.85;margin:0!important;min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
 .m-voice.playing .vp-btn{box-shadow:0 0 0 3px rgba(0,106,78,.2)}
+/* রিফ্রেশের পর আগের পাতা খোলা পর্যন্ত হোম লুকানো, বদলে হালকা লোডিং */
+html.nav-restore #v-home{display:none!important}
+html.nav-restore main::before{content:'';display:block;height:120px;border-radius:14px;background:var(--card);border:1px solid var(--line);margin-bottom:12px;animation:pulse 1.2s ease-in-out infinite}

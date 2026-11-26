@@ -5266,11 +5266,13 @@ function restoreNav() {
     refreshSettings(); setTimeout(checkLiveUpdate, 8000);
     const homeP = loadFeed('home');
     if (!/^#(post|page|u|join)-/.test(location.hash)) restoreNav();   // রিফ্রেশের আগে যে পাতায় ছিলেন সেখানেই
+    document.documentElement.classList.remove('nav-restore');
     await homeP;
     setInterval(() => { if (document.visibilityState === 'visible') refreshBadges(); }, 60000);
     const deep = () => { const jn = location.hash.match(/^#join-([a-f0-9]{6,20})$/); if (jn) joinSheet(jn[1]); const m = location.hash.match(/^#post-(\d+)$/), pm = location.hash.match(/^#page-(\d+)$/), um = location.hash.match(/^#u-([\w-]{2,40})$/); if (um && !(S.view === 'user' && S.userId === um[1])) openUser(um[1]); if (m && !(S.view === 'post' && String(S.postId) === m[1])) openPost(m[1]); if (pm && !(S.view === 'page' && String(S.pageId) === pm[1])) openPage(pm[1]); };
     deep(); window.addEventListener('hashchange', deep);
   } catch (e) {
+    document.documentElement.classList.remove('nav-restore');
     $('#feed-home').innerHTML = `<div class="empty">${esc(errText(e))}<br><button class="btn" id="retry">আবার চেষ্টা করুন</button></div>`;
     $('#retry').onclick = () => location.reload();
   }

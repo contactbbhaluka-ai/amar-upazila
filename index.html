@@ -32,6 +32,8 @@
 </header>
 <div class="demo" id="demo" hidden>ডেমো মোড: ডেটা শুধু এই ডিভাইসে সেভ হচ্ছে</div>
 
+<!-- রিফ্রেশের আগে অন্য পাতায় থাকলে হোম এক ঝলক দেখা যাবে না -->
+<script>try{var n=JSON.parse(sessionStorage.getItem('au_nav')||'null');if(n&&n.v&&n.v!=='home'&&Date.now()-(n.at||0)<216e5&&!/^#(post|page|u|join)-/.test(location.hash)){document.documentElement.classList.add('nav-restore');var t=document.querySelectorAll('header [data-v]');for(var i=0;i<t.length;i++)t[i].classList.toggle('on',t[i].getAttribute('data-v')===(n.tab||'home'));}}catch(e){}</script>
 <main>
   <!-- হোম ফিড -->
   <section class="view on" id="v-home">

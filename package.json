@@ -11,6 +11,7 @@
     "android:open": "npx cap open android"
   },
   "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
     "@capacitor/android": "^7.0.0",
     "@capacitor/core": "^7.0.0",
     "@supabase/supabase-js": "^2.49.0"

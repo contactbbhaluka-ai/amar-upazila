@@ -3945,7 +3945,10 @@ async function ensureSvcFavs() {
   const who = me()?.id || '';
   if (S.svcFav && S.svcFavFor === who) return;
   S.svcFavFor = who;
-  S.svcFav = new Set(who ? await S.api.serviceFavs().catch(() => []) : local.get('svc_favs', []));
+  let ids;
+  if (who) { try { ids = await S.api.serviceFavs(); local.set('svc_favs_' + who, ids); } catch { ids = local.get('svc_favs_' + who, []); } }
+  else ids = local.get('svc_favs', []);
+  S.svcFav = new Set(ids);
 }
 async function toggleSvcFav(id) {
   await ensureSvcFavs();
@@ -4039,6 +4042,8 @@ function dirChips() {
 function drawDir() {
   const list = S.svcAll || [], q = $('#q').value.trim();
   dirChips();
+  $('#svc-off')?.remove();
+  if (S.svcOffline) $('#dir').insertAdjacentHTML('beforebegin', `<div id="svc-off" class="svc-off">📴 ইন্টারনেট নেই · ${esc(dateBn(S.svcOffline))} তারিখে সেভ করা তালিকা দেখাচ্ছেন। কল করা যাবে।</div>`);
   if (S.dcat === 'sos' || S.dcat === 'blood') return;
   if (!S.dcat && !q) return renderSvcGrid(list);
   if (S.dcat === 'near') return drawNear(list, q);
@@ -4077,15 +4082,21 @@ async function loadDir() {
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }
   if (S.dcat === 'blood') return loadBlood();
   const restore = () => { if (S.dirY != null) { const y = S.dirY; S.dirY = null; requestAnimationFrame(() => window.scrollTo(0, y)); } };
+  if (!S.svcAll) { const c = local.get('svc_cache'); if (c?.list) { S.svcAll = c.list; S.popCats = c.pop || []; S.svcCacheT = c.t; } }   // নেট ছাড়াও: ফোনে জমা রাখা তালিকা
   if (S.svcAll) { drawDir(); restore(); }   // আগের তালিকা সাথে সাথে দেখাই, পরে চুপচাপ হালনাগাদ
   else $('#dir').innerHTML = '<div class="skel"></div>';
   try {
     const [list, pop] = await Promise.all([S.api.services({}), S.api.popularServiceCats().catch(() => S.popCats || []), ensureSvcFavs()]);
     const popChanged = JSON.stringify(pop) !== JSON.stringify(S.popCats); S.popCats = pop;
+    const wasOff = !!S.svcOffline; S.svcOffline = null;
+    try { local.set('svc_cache', { t: Date.now(), list, pop }); } catch { /* জায়গা না থাকলে থাক */ }
     const changed = JSON.stringify(list) !== JSON.stringify(S.svcAll);
     S.svcAll = list;
-    if (changed || (popChanged && !S.dcat && !$('#q').value.trim()) || !$('#dir').children.length || $('#dir .skel')) { const y = window.scrollY; drawDir(); window.scrollTo(0, y); restore(); }
-  } catch (e) { if (!S.svcAll) $('#dir').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+    if (changed || wasOff || (popChanged && !S.dcat && !$('#q').value.trim()) || !$('#dir').children.length || $('#dir .skel')) { const y = window.scrollY; drawDir(); window.scrollTo(0, y); restore(); }
+  } catch (e) {
+    if (!S.svcAll) { $('#dir').innerHTML = `<div class="empty">📴 ইন্টারনেট নেই, আর আগে সেভ করা কোনো তালিকাও নেই। নেট চালু করে একবার খুললে পরের বার নেট ছাড়াও দেখা যাবে।</div>`; return; }
+    S.svcOffline = S.svcCacheT || Date.now(); const y = window.scrollY; drawDir(); window.scrollTo(0, y);
+  }
 }
 function openSvcCat(k) {
   if (k && k !== 'near' && k !== 'fav') { S.catSeen = S.catSeen || new Set(); if (!S.catSeen.has(k)) { S.catSeen.add(k); S.api.serviceCatVisit(k).catch(() => {}); } }   // একই সেশনে একবারই গোনা
@@ -4109,6 +4120,42 @@ document.addEventListener('click', e => {
   if (e.target.closest('[data-nearref]')) { S.myLoc = null; return openNear(); }
   const r = e.target.closest('[data-qprec]'); if (r) { $('#q').value = r.dataset.qprec; $('#qpanel').hidden = true; loadDir(); return; }
   if (e.target.closest('[data-qpclear]')) { local.set('svc_recent', []); showQPanel(); }
+});
+addEventListener('online', () => { if (S.view === 'dir' && S.svcOffline) loadDir(); });
+// ---------- কণ্ঠে খোঁজা: অ্যাপে নেটিভ প্লাগইন, ব্রাউজারে Web Speech
+const nativeSpeech = () => window.Capacitor?.isNativePlatform?.() && window.Capacitor?.Plugins?.SpeechRecognition;
+const webSpeech = () => window.SpeechRecognition || window.webkitSpeechRecognition;
+(async () => {
+  let ok = !!webSpeech();
+  const P = nativeSpeech();
+  if (P) { try { ok = !!(await P.available()).available; } catch { ok = false; } }
+  if ($('#qmic')) $('#qmic').hidden = !ok;
+})();
+function voiceDone(text) {
+  $('#qmic').classList.remove('on'); $('#q').placeholder = 'খুঁজুন: হাসপাতাল, doctor, bidyut…';
+  text = (text || '').trim().replace(/[।.?!]+$/, '');
+  if (!text) return toast('কিছু শোনা যায়নি, আবার চেষ্টা করুন');
+  $('#q').value = text; $('#qpanel').hidden = true; document.body.classList.add('dir-sub'); S.svcAll ? drawDir() : loadDir();
+}
+$('#qmic')?.addEventListener('click', async () => {
+  const btn = $('#qmic'); if (btn.classList.contains('on')) { try { S.rec?.stop(); } catch { /* ignore */ } return; }
+  const lang = EN ? 'en-US' : 'bn-BD', P = nativeSpeech();
+  btn.classList.add('on'); $('#q').placeholder = 'বলুন… (যেমন: হাসপাতাল)';
+  if (P) {
+    try {
+      const perm = await P.requestPermissions().catch(() => null);
+      if (perm && perm.speechRecognition === 'denied') throw new Error('perm');
+      const r = await P.start({ language: lang, maxResults: 1, prompt: 'বলুন… যেমন "হাসপাতাল"', partialResults: false, popup: true });
+      return voiceDone(r?.matches?.[0]);
+    } catch (e) { btn.classList.remove('on'); $('#q').placeholder = 'খুঁজুন: হাসপাতাল, doctor, bidyut…'; return toast(String(e?.message) === 'perm' ? 'মাইক্রোফোনের অনুমতি দিন। ফোনের সেটিংস থেকে এই অ্যাপের মাইক্রোফোন চালু করুন।' : 'কণ্ঠে খোঁজা যায়নি, আবার চেষ্টা করুন'); }
+  }
+  const SR = webSpeech(); if (!SR) return voiceDone('');
+  const rec = new SR(); S.rec = rec; rec.lang = lang; rec.interimResults = false; rec.maxAlternatives = 1;
+  let got = '';
+  rec.onresult = ev => { got = ev.results?.[0]?.[0]?.transcript || ''; };
+  rec.onerror = ev => { if (ev.error === 'not-allowed') toast('মাইক্রোফোনের অনুমতি দিন'); };
+  rec.onend = () => voiceDone(got);
+  try { rec.start(); } catch { voiceDone(''); }
 });
 $('#q').addEventListener('focus', showQPanel);
 $('#q').addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== $('#q') && !$('#qpanel')?.matches(':hover')) $('#qpanel').hidden = true; }, 200));

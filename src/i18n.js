@@ -144,6 +144,9 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'কণ্ঠে খুঁজুন': 'Voice search', 'বলুন… (যেমন: হাসপাতাল': 'Speak… (e.g. hospital', 'কিছু শোনা যায়নি, আবার চেষ্টা করুন': "Didn't catch that, please try again", 'কণ্ঠে খোঁজা যায়নি, আবার চেষ্টা করুন': "Voice search didn't work, please try again",
+  'মাইক্রোফোনের অনুমতি দিন': 'Allow the microphone', 'ইন্টারনেট নেই · {n} তারিখে সেভ করা তালিকা দেখাচ্ছেন। কল করা যাবে': 'No internet · showing the list saved on {n}. You can still call',
+  'ইন্টারনেট নেই, আর আগে সেভ করা কোনো তালিকাও নেই। নেট চালু করে একবার খুললে পরের বার নেট ছাড়াও দেখা যাবে': 'No internet and no saved list yet. Open it once with internet and next time it will work offline',
   'জনপ্রিয় ক্যাটাগরি': 'Popular categories',
   'কাছের সেবা': 'Nearby', 'আমার কাছের সেবা': 'Services near me', 'লোকেশন দিলে কাছের হাসপাতাল, ডাক্তার, ব্যাংক দূরত্বসহ দেখাবে': 'Share your location to see nearby hospitals, doctors and banks with distance',
   'আবার খুঁজুন': 'Refresh', 'পথ দেখুন': 'Directions', 'অবস্থান দিন': 'Set location', 'অবস্থান বদলান': 'Change location', 'অবস্থান সংরক্ষণ হয়েছে': 'Location saved', 'মিটার': 'm', 'কিমি': 'km',

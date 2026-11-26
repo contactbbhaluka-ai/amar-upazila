@@ -69,6 +69,12 @@ jobs:
           grep -q RECORD_AUDIO "$M" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-feature android:name="android.hardware.microphone" android:required="false" />\n</manifest>#' "$M"
           grep -n "AUDIO\|microphone" "$M"
 
+      - name: Speech recognition (সেবা ডিরেক্টরিতে কণ্ঠে খোঁজা)
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q RecognitionService "$M" || sed -i 's#</manifest>#    <queries>\n        <intent>\n            <action android:name="android.speech.RecognitionService" />\n        </intent>\n    </queries>\n</manifest>#' "$M"
+          grep -n "RecognitionService" "$M"
+
       - name: Location permission (মেসেজে লোকেশন পাঠানোর জন্য)
         run: |
           M=android/app/src/main/AndroidManifest.xml

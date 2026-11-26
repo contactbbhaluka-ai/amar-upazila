@@ -1481,13 +1481,13 @@ function introCard(u, own) {
   if (!rows.length && !own) return '';
   return `<div class="intro-card">${rows.join('')}
     ${!rows.length ? '<p class="mut" style="margin:0;font-size:13px">কাজ, শিক্ষা, ঠিকানা ইত্যাদি এখানে দেখাতে পারেন</p>' : ''}
-    ${own ? `<button class="intro-edit" id="feat-edit">${ic('edit', 13)} কী দেখাবে বাছাই করুন</button>` : ''}</div>`;
+    ${own ? `<button class="intro-edit" id="feat-edit">${ic('edit', 13)} কী কী দেখাবে বাছাই করুন</button>` : ''}</div>`;
 }
 const profileBase = u => ({ name: u.name, district: u.district, upazila: u.upazila, unionId: u.unionId, bio: u.bio, phone: u.phone, bloodGroup: u.bloodGroup, donorVisible: u.donorVisible, lastDonated: u.lastDonated });
 function featuredSheet() {
   const u = me(), cur = new Set(u.featured || FEATURED0);
   const has = k => detailRows(u, [k]).length > 0;
-  openSheet(`<h2>প্রোফাইলে কী দেখাবে</h2>
+  openSheet(`<h2>কী কী দেখাবে বাছাই করুন</h2>
     <p class="mut" style="margin-top:0">যেগুলোতে টিক দেবেন, প্রোফাইলের উপরে নামের নিচে দেখাবে। এবাউট ট্যাবে সবকিছুই থাকবে। প্রতিটা বিষয় কারা দেখবে, তা প্রাইভেসি সেটিং অনুযায়ী।</p>
     <div class="feat-list">${DETAIL_ITEMS.map(([k, l, vk]) => `<label class="feat-row${has(k) ? '' : ' empty'}">
       <input type="checkbox" value="${k}" ${cur.has(k) ? 'checked' : ''}>

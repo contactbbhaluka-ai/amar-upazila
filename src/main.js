@@ -3833,9 +3833,10 @@ function afterAuth() {
 // ================================================================ ☰ সেবা ডিরেক্টরি
 const svcCard = s => `<div class="card svc">
   <div class="ic svc-ic">${svcIc(s.category, 24)}</div>
-  <div style="flex:1"><h3>${esc(s.name)}</h3><div class="meta">${esc(s.address)}</div>${s.hours ? `<div class="meta">🕘 ${esc(s.hours)}</div>` : ''}
+  <div style="flex:1;min-width:0"><h3>${esc(s.name)}</h3><div class="meta">${esc(s.address)}</div>${s.hours ? `<div class="meta">🕘 ${esc(s.hours)}</div>` : ''}
     ${s.verified ? '<span class="ver">✔ যাচাইকৃত</span>' : `<span class="mut">যাচাই বাকি</span>${me()?.admin ? ` <button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button>` : ''}`}</div>
-  <a class="call" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a></div>`;
+  <div class="svc-act"><button class="svc-fav${S.svcFav?.has(s.id) ? ' on' : ''}" data-svcfav="${esc(s.id)}" aria-pressed="${!!S.svcFav?.has(s.id)}" aria-label="${S.svcFav?.has(s.id) ? 'প্রিয় থেকে সরান' : 'প্রিয় সেবায় রাখুন'}">${S.svcFav?.has(s.id) ? '❤️' : '🤍'}</button>
+  <a class="call" data-svccall="${esc(s.id)}" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a></div></div>`;
 const emergencyHtml = () => `<a class="big" href="tel:999"><span class="n">৯৯৯</span><span><b>জাতীয় জরুরি সেবা</b><br>পুলিশ, ফায়ার সার্ভিস, অ্যাম্বুলেন্স: টোল ফ্রি</span></a>
   <div class="em">${EMERGENCY.map(e => `<a class="emc" href="tel:${e[2]}"><div class="n">${e[0]}</div><div class="t">${esc(e[1])}</div></a>`).join('')}</div>`;
 let svcTimer;
@@ -3888,6 +3889,7 @@ const SVC_IC = {
   ladies: '<path d="M9 21h6M10 21V12h4v9M10 12l.8-6.5 3.2 2V12"/>',
   gents: '<circle cx="6" cy="6.5" r="2.5"/><circle cx="6" cy="17.5" r="2.5"/><path d="M8.2 7.8L20 17M8.2 16.2L20 7"/>',
   band: '<ellipse cx="12" cy="8" rx="8" ry="3"/><path d="M4 8v8c0 1.7 3.6 3 8 3s8-1.3 8-3V8M8 3l3 4M16 3l-3 4"/>',
+  fav: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
   all: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><path d="M17 13.5v7M13.5 17h7"/>',
 };
 // [শিরোনাম, রং, কী-গুলো]
@@ -3901,40 +3903,122 @@ const SVC_GROUPS = [
   ['খাবার, বাজার ও কাজ', '#e8710a', ['food', 'cook', 'shop', 'sale', 'job']],
   ['দৈনন্দিন সেবা', '#b7791f', ['bank', 'courier', 'net', 'power', 'clean', 'fix', 'ladies', 'gents', 'band']],
 ];
-const svcColor = k => (SVC_GROUPS.find(g => g[2].includes(k)) || [, '#0f8a5f'])[1];
+const svcColor = k => k === 'fav' ? '#e0245e' : (SVC_GROUPS.find(g => g[2].includes(k)) || [, '#0f8a5f'])[1];
 const svcIc = (k, size = 24) => `<span class="sic" style="--c:${svcColor(k)}"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SVC_IC[k] || SVC_IC.all}</svg></span>`;
 const svcCats = () => SERVICE_CATS.filter(c => c[0] !== 'blood' || feat('featBlood'));
+
+// ---------- স্মার্ট খোঁজা: বাংলা, ইংরেজি বা বাংলিশ (যেমন "haspatal") সবই মেলে
+const SVC_KW = {
+  sos: 'emergency 999 jorur jaruri help', fire: 'fire service agun dhomkol firebrigade', police: 'police thana station', amb: 'ambulance ambulens', blood: 'blood donor rokto',
+  upz: 'upazila uno parishad', pouro: 'pourashava pourosova municipality mayor', union: 'union parishad chairman member', gov: 'administration proshason dc ac land office vumi bhumi',
+  voter: 'voter nid id card vote', office: 'office', kazi: 'kazi marriage biye registry', health: 'hospital clinic haspatal medical', doc: 'doctor daktar dakter mbbs',
+  gym: 'gym fitness byayam', edu: 'school college madrasa iskul shikkha', tutor: 'tuition tutor teacher private shikkhok', lawyer: 'lawyer advocate ukil court', press: 'journalist sangbadik press news reporter',
+  it: 'computer it cyber expert web software', graphics: 'graphics design print press banner', video: 'video photo camera shooting', famous: 'famous person bekti', ff: 'freedom fighter muktijoddha 1971',
+  pride: 'achiever kriti meritorious', bride: 'bride groom patro patri matrimony biye', ghotok: 'matchmaker ghotok', tour: 'tourist place sightseeing park ghurar jayga', hotel: 'hotel residential room',
+  rentcar: 'car rent microbus taxi gari vara bhara', air: 'air ticket travel visa bimaan plane', bus: 'bus counter transport poribohon', tolet: 'to-let house rent basa vara bhara flat', food: 'restaurant food khabar hotel cafe',
+  cook: 'butcher cook babursi kosai catering', shop: 'market bazar hat dokan shop', sale: 'buy sell kena becha', job: 'job chakri career', bank: 'bank atm bkash nagad mobile banking',
+  courier: 'courier parcel sundarban sa paribahan', net: 'internet broadband wifi isp', power: 'electricity bidyut palli biddut meter', clean: 'cleaning cleaner porichchonno', fix: 'mechanic electrician plumber mistri raj mistri',
+  ladies: 'ladies parlour beauty salon', gents: 'gents parlour salon barber napit', band: 'band party drum music',
+};
+const BN_ROM = { 'ক': 'k', 'খ': 'kh', 'গ': 'g', 'ঘ': 'gh', 'ঙ': 'ng', 'চ': 'c', 'ছ': 'ch', 'জ': 'j', 'ঝ': 'jh', 'ঞ': 'n', 'ট': 't', 'ঠ': 'th', 'ড': 'd', 'ঢ': 'dh', 'ণ': 'n', 'ত': 't', 'থ': 'th', 'দ': 'd', 'ধ': 'dh', 'ন': 'n', 'প': 'p', 'ফ': 'ph', 'ব': 'b', 'ভ': 'bh', 'ম': 'm', 'য': 'j', 'র': 'r', 'ল': 'l', 'শ': 's', 'ষ': 's', 'স': 's', 'হ': 'h', 'ড়': 'r', 'ঢ়': 'r', 'ৎ': 't', 'ং': 'ng' };
+// উচ্চারণের কঙ্কাল: স্বরবর্ণ বাদ, কাছাকাছি শব্দ এক করা (ph=f, v=b, z=j, c=k ...)
+const skel = t => String(t || '').toLowerCase().normalize('NFC').replace(/[ঀ-৿]/g, ch => BN_ROM[ch] ?? '')
+  .replace(/ph/g, 'f').replace(/bh|v/g, 'b').replace(/z/g, 'j').replace(/q|c/g, 'k').replace(/x/g, 'ks').replace(/h/g, '').replace(/[aeiouyw]/g, '').replace(/[^a-z0-9]/g, '').replace(/(.)\1+/g, '$1');
+const svcHay = new Map();
+function svcMatch(text, q, qs) {
+  const t = String(text || '').toLowerCase(); if (t.includes(q)) return true; if (qs.length < 3) return false;
+  let k = svcHay.get(t); if (k == null) { k = t.split(/[\s,/()-]+/).map(skel).filter(Boolean); svcHay.set(t, k); }   // শব্দ ধরে ধরে মেলাই, দুই শব্দ জুড়ে ভুল মিল নয়
+  return /\s/.test(q) ? k.join('').includes(qs) : k.some(w => w.startsWith(qs) || (qs.length >= 4 && w.includes(qs)));
+}
+function svcSearch(list, raw) {
+  const q = raw.trim().toLowerCase(), qs = skel(q);
+  const cats = svcCats().filter(([k, n]) => svcMatch(n + ' ' + (SVC_KW[k] || ''), q, qs) || (SVC_KW[k] || '').split(' ').some(w => w.length > 2 && w.startsWith(q)));
+  const catSet = new Set(cats.map(c => c[0]));
+  const hits = list.filter(x => svcMatch(x.name, q, qs) || svcMatch(x.address, q, qs) || catSet.has(x.category));
+  return { cats, hits };
+}
+// ---------- প্রিয় সেবা (লগইন থাকলে অ্যাকাউন্টে, না থাকলে এই ফোনে)
+async function ensureSvcFavs() {
+  const who = me()?.id || '';
+  if (S.svcFav && S.svcFavFor === who) return;
+  S.svcFavFor = who;
+  S.svcFav = new Set(who ? await S.api.serviceFavs().catch(() => []) : local.get('svc_favs', []));
+}
+async function toggleSvcFav(id) {
+  await ensureSvcFavs();
+  const on = !S.svcFav.has(id);
+  on ? S.svcFav.add(id) : S.svcFav.delete(id);
+  document.querySelectorAll(`[data-svcfav="${id}"]`).forEach(b => { b.classList.toggle('on', on); b.textContent = on ? '❤️' : '🤍'; b.setAttribute('aria-pressed', on); });
+  toast(on ? 'প্রিয় সেবায় রাখা হয়েছে' : 'প্রিয় থেকে সরানো হয়েছে');
+  try { if (me()) await S.api.setServiceFav(id, on); else local.set('svc_favs', [...S.svcFav]); } catch (e) { toast(errText(e)); }
+  if (!S.dcat && !$('#q').value.trim() || S.dcat === 'fav') { const y = window.scrollY; drawDir(); window.scrollTo(0, y); }
+}
+// ---------- সাম্প্রতিক খোঁজা ও জনপ্রিয় সেবা (সার্চ বক্সে চাপলে)
+const svcRecent = () => local.get('svc_recent', []);
+function addSvcRecent(q) {
+  q = q.trim(); if (q.length < 2) return;
+  const l = svcRecent().filter(x => x !== q && !q.startsWith(x) && !x.startsWith(q)); l.unshift(q); local.set('svc_recent', l.slice(0, 6));
+}
+function showQPanel() {
+  const p = $('#qpanel'); if (!p) return;
+  if ($('#q').value.trim()) { p.hidden = true; return; }
+  const rec = svcRecent(), pop = (S.svcAll || []).filter(x => x.call_count > 0).sort((a, b) => b.call_count - a.call_count).slice(0, 5);
+  if (!rec.length && !pop.length) { p.hidden = true; return; }
+  p.innerHTML = (rec.length ? `<div class="qp-h"><span>🕘 সাম্প্রতিক খোঁজা</span><button data-qpclear>মুছুন</button></div><div class="qp-rec">${rec.map(r => `<button data-qprec="${esc(r)}">${esc(r)}</button>`).join('')}</div>` : '')
+    + (pop.length ? `<div class="qp-h"><span>🔥 জনপ্রিয় সেবা</span></div>${pop.map(x => `<div class="qp-pop">${svcIc(x.category, 18)}<span class="qp-n">${esc(x.name)}<small>${esc(catName(x.category))}</small></span><a class="qp-call" data-svccall="${esc(x.id)}" href="tel:${esc(String(x.phone).replace(/[^\d+]/g, ''))}">📞 কল</a></div>`).join('')}` : '');
+  p.hidden = false;
+}
 function renderSvcGrid(list) {
   const n = k => list.filter(x => x.category === k).length;
   const total = list.length, cats = svcCats(), has = k => k === 'sos' || cats.some(c => c[0] === k);
   const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : c[1], cnt = k === 'sos' || SVC_SPECIAL[k] ? 0 : n(k);
     return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
+  const favs = list.filter(x => S.svcFav?.has(x.id));
   $('#dir').innerHTML = `<div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div>`
+    + (favs.length ? `<h3 class="svc-sec" style="--c:#e0245e"><i></i>❤️ আমার প্রিয় সেবা <button class="svc-more" data-svc="fav">সব দেখুন</button></h3>${favs.slice(0, 3).map(svcCard).join('')}` : '')
     + SVC_GROUPS.map(([t, col, keys]) => { const ks = keys.filter(has); return ks.length ? `<h3 class="svc-sec" style="--c:${col}"><i></i>${esc(t)}</h3><div class="svc-grid">${ks.map(tile).join('')}</div>` : ''; }).join('');
+}
+function dirChips() {
+  const c = $('#dchips'), chipX = c.scrollLeft;   // চিপের সারি যেখানে ছিল সেখানেই থাকবে
+  const fav = S.svcFav?.size ? [['fav', 'প্রিয়', '']] : [];
+  c.innerHTML = [['', 'সব সেবা'], ...fav, ['sos', 'জরুরি নম্বর'], ...svcCats()].map(x => `<button class="chip svc-chip${x[0] === S.dcat ? ' on' : ''}" data-d="${x[0]}">${svcIc(x[0] || 'all', 16)}${esc(x[1])}</button>`).join('');
+  const on = c.querySelector('.chip.on'); c.scrollLeft = chipX;
+  // বাছাই করা চিপ পুরো চোখের বাইরে থাকলে (যেমন গ্রিড থেকে ঢুকলে) শুধু যতটুকু দরকার ততটুকু সরাই
+  if (on && (on.offsetLeft + on.offsetWidth <= c.scrollLeft || on.offsetLeft >= c.scrollLeft + c.clientWidth)) c.scrollLeft = Math.max(0, on.offsetLeft - 8 - (on.offsetLeft > c.scrollLeft ? c.clientWidth - on.offsetWidth - 16 : 0));
+}
+// আগে আনা সব সেবা থেকে এখানেই ছেঁকে দেখাই (খোঁজা, ধরন, প্রিয়)
+function drawDir() {
+  const list = S.svcAll || [], q = $('#q').value.trim();
+  dirChips();
+  if (S.dcat === 'sos' || S.dcat === 'blood') return;
+  if (!S.dcat && !q) return renderSvcGrid(list);
+  const cat = S.dcat === 'fav' ? ['fav', 'আমার প্রিয় সেবা'] : SERVICE_CATS.find(c => c[0] === S.dcat);
+  let base = S.dcat === 'fav' ? list.filter(x => S.svcFav?.has(x.id)) : S.dcat ? list.filter(x => x.category === S.dcat) : list, cats = [];
+  if (q) { const r = svcSearch(base, q); base = r.hits; if (!S.dcat) cats = r.cats; clearTimeout(S.recentT); if (base.length || cats.length) S.recentT = setTimeout(() => addSvcRecent(q), 1500); }
+  const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(base.length)}টি</span></div>`
+    : `<div class="svc-head"><b>"${esc(q)}"</b><span class="mut">${bn(base.length)}টি সেবা</span></div>`;
+  const catHtml = cats.length ? `<div class="svc-grid svc-qcats">${cats.slice(0, 8).map(([k, n]) => `<button class="svc-tile" data-svc="${k}">${svcIc(k, 22)}<span class="st-n">${esc(n)}</span></button>`).join('')}</div>` : '';
+  const empty = S.dcat === 'fav' ? 'এখনো কোনো প্রিয় সেবা নেই। যেকোনো সেবার কার্ডে 🤍 চাপলে এখানে থাকবে।'
+    : cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।';
+  $('#dir').innerHTML = head + catHtml + (base.length ? base.map(svcCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
 }
 async function loadDir() {
   if (S.dcat === 'blood' && !feat('featBlood')) S.dcat = '';
   const q = $('#q').value.trim(), landing = !S.dcat && !q;
-  // প্রথম পাতায় আইকনের গ্রিড; কোনো ধরনের ভেতরে বা খোঁজার সময় উপরে দ্রুত বদলানোর চিপ
   document.body.classList.toggle('dir-sub', !landing);
   if (landing) S.dirSub = false;
-  const chipX = $('#dchips').scrollLeft;   // চিপের সারি যেখানে ছিল সেখানেই থাকবে
-  $('#dchips').innerHTML = [['', 'সব সেবা', '🗂️'], ['sos', 'জরুরি নম্বর', '🚨'], ...svcCats()].map(c => `<button class="chip svc-chip${c[0] === S.dcat ? ' on' : ''}" data-d="${c[0]}">${svcIc(c[0] || 'all', 16)}${esc(c[1])}</button>`).join('');
-  { const c = $('#dchips'), on = c.querySelector('.chip.on'); c.scrollLeft = chipX;
-    // বাছাই করা চিপ পুরো চোখের বাইরে থাকলে (যেমন গ্রিড থেকে ঢুকলে) শুধু যতটুকু দরকার ততটুকু সরাই
-    if (on && (on.offsetLeft + on.offsetWidth <= c.scrollLeft || on.offsetLeft >= c.scrollLeft + c.clientWidth)) c.scrollLeft = Math.max(0, on.offsetLeft - 8 - (on.offsetLeft > c.scrollLeft ? c.clientWidth - on.offsetWidth - 16 : 0)); }
+  dirChips();
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }
   if (S.dcat === 'blood') return loadBlood();
-  if (landing && S.svcAll) { renderSvcGrid(S.svcAll); if (S.dirY != null) window.scrollTo(0, S.dirY); }   // আগের তালিকা সাথে সাথে দেখাই, পরে হালনাগাদ
+  const restore = () => { if (S.dirY != null) { const y = S.dirY; S.dirY = null; requestAnimationFrame(() => window.scrollTo(0, y)); } };
+  if (S.svcAll) { drawDir(); restore(); }   // আগের তালিকা সাথে সাথে দেখাই, পরে চুপচাপ হালনাগাদ
   else $('#dir').innerHTML = '<div class="skel"></div>';
   try {
-    const list = await S.api.services({ category: landing ? null : S.dcat || null, q });
-    if (landing) { S.svcAll = list; renderSvcGrid(list); if (S.dirY != null) { const y = S.dirY; S.dirY = null; requestAnimationFrame(() => window.scrollTo(0, y)); } return; }
-    const cat = SERVICE_CATS.find(c => c[0] === S.dcat);
-    const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(list.length)}টি</span></div>` : '';
-    if (!list.length) { $('#dir').innerHTML = head + `<div class="empty">${cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।'}</div>`; return; }
-    $('#dir').innerHTML = head + list.map(svcCard).join('');
-  } catch (e) { $('#dir').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+    const [list] = await Promise.all([S.api.services({}), ensureSvcFavs()]);
+    const changed = JSON.stringify(list) !== JSON.stringify(S.svcAll);
+    S.svcAll = list;
+    if (changed || !$('#dir').children.length || $('#dir .skel')) { const y = window.scrollY; drawDir(); window.scrollTo(0, y); restore(); }
+  } catch (e) { if (!S.svcAll) $('#dir').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 function openSvcCat(k) {
   const sp = SVC_SPECIAL[k];
@@ -3946,8 +4030,16 @@ function openSvcCat(k) {
   if (S.view === 'dir' && !S.dcat && !S.dirSub && k) { S.dirSub = true; S.dirBackY = window.scrollY; pushNav(); }
   S.dcat = k; loadDir(); window.scrollTo(0, 0);
 }
-$('#q').addEventListener('input', () => { clearTimeout(svcTimer); svcTimer = setTimeout(loadDir, 300); });
+$('#q').addEventListener('input', () => { showQPanel(); clearTimeout(svcTimer); svcTimer = setTimeout(() => (S.svcAll ? drawDir() : loadDir()), 200); document.body.classList.toggle('dir-sub', !!(S.dcat || $('#q').value.trim())); });
 $('#dchips').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (b) openSvcCat(b.dataset.d); });
+document.addEventListener('click', e => {
+  const f = e.target.closest('[data-svcfav]'); if (f) { e.preventDefault(); return toggleSvcFav(Number(f.dataset.svcfav) || f.dataset.svcfav); }
+  const c = e.target.closest('[data-svccall]'); if (c) S.api.serviceCalled(Number(c.dataset.svccall) || c.dataset.svccall).catch(() => {});
+  const r = e.target.closest('[data-qprec]'); if (r) { $('#q').value = r.dataset.qprec; $('#qpanel').hidden = true; loadDir(); return; }
+  if (e.target.closest('[data-qpclear]')) { local.set('svc_recent', []); showQPanel(); }
+});
+$('#q').addEventListener('focus', showQPanel);
+$('#q').addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== $('#q') && !$('#qpanel')?.matches(':hover')) $('#qpanel').hidden = true; }, 200));
 $('#dir').addEventListener('click', e => {
   const t = e.target.closest('[data-svc]'); if (t) return openSvcCat(t.dataset.svc);
   const b = e.target.closest('.blood-sum[data-d]'); if (b) { S.dcat = 'blood'; loadDir(); window.scrollTo(0, 0); return; }

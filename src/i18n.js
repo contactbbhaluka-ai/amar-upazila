@@ -144,6 +144,9 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'আমার প্রিয় সেবা': 'My favorite services', 'প্রিয়': 'Favorites', 'প্রিয় সেবায় রাখুন': 'Add to favorites', 'প্রিয় থেকে সরান': 'Remove from favorites', 'প্রিয় সেবায় রাখা হয়েছে': 'Added to favorites',
+  'প্রিয় থেকে সরানো হয়েছে': 'Removed from favorites', 'এখনো কোনো প্রিয় সেবা নেই। যেকোনো সেবার কার্ডে 🤍 চাপলে এখানে থাকবে': 'No favorite services yet. Tap 🤍 on any service card to keep it here',
+  'সাম্প্রতিক খোঁজা': 'Recent searches', 'জনপ্রিয় সেবা': 'Popular services', '{x}টি সেবা': '{x} services', 'খুঁজুন: হাসপাতাল, doctor, bidyut…': 'Search: hospital, doctor, electricity…',
   'ভালুকার সব সেবা এক জায়গায়': 'All Bhaluka services in one place', '{x}টি ধরন · মোট {x}টি সেবা যুক্ত': '{x} categories · {x} services listed', 'জরুরি সেবা': 'Emergency', 'সরকারি ও প্রশাসন': 'Government & administration',
   'শিক্ষা ও পেশাজীবী': 'Education & professionals', 'গুণী মানুষ ও বিয়ে': 'Notable people & marriage', 'ভ্রমণ, যাতায়াত ও থাকা': 'Travel, transport & stay', 'খাবার, বাজার ও কাজ': 'Food, market & jobs', 'দৈনন্দিন সেবা': 'Everyday services',
   'উপজেলা': 'Upazila', 'পৌরসভা': 'Pourashava', 'ইউনিয়ন': 'Union', 'ফায়ার সার্ভিস': 'Fire service', 'থানা পুলিশ': 'Police station', 'প্রশাসন': 'Administration', 'এ্যাম্বুলেন্স': 'Ambulance',

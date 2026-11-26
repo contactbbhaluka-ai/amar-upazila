@@ -4571,15 +4571,15 @@ document.addEventListener('click', async e => {
 
 // ================================================================ ☰ মেনু (ফেসবুকের মতো) ও সেটিং
 const THEMES = [['', 'ফোনের মতো'], ['light', 'লাইট'], ['dark', 'ডার্ক']];
-function applyTheme() { const t = local.get('theme', ''); if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
+function applyTheme() { const t = local.get('theme', 'light'); if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
 applyTheme();
-const isDark = () => { const t = local.get('theme', ''); return t ? t === 'dark' : !!window.matchMedia?.('(prefers-color-scheme: dark)').matches; };
+const isDark = () => { const t = local.get('theme', 'light'); return t ? t === 'dark' : !!window.matchMedia?.('(prefers-color-scheme: dark)').matches; };
 // লেখার আকার: পুরো অ্যাপ একসাথে বড়/ছোট (বয়স্কদের জন্য সুবিধা)
 const FONT_SIZES = [['sm', 'ছোট', 0.92], ['md', 'মাঝারি', 1], ['lg', 'বড়', 1.12], ['xl', 'অনেক বড়', 1.25]];
 function applyFont() { const z = FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[2] || 1; document.body.style.zoom = z === 1 ? '' : String(z); document.documentElement.style.setProperty('--zoom', z); }
 applyFont();
 // মেনুতে খোঁজা: শর্টকাট আর সেটিং দুটোই
-const MN_KEYS = { 'lang-tg': 'language bhasha english bangla ভাষা ইংরেজি বাংলা', 'acc-un': 'username id ইউজারনেম আইডি', chpw: 'password পাসওয়ার্ড গোপন', edit: 'profile প্রোফাইল নাম ছবি এডিট', delacc: 'delete account মুছে অ্যাকাউন্ট', plock: 'lock লক', listpriv: 'privacy তালিকা বন্ধু ফলোয়ার', showact: 'active online সক্রিয় অনলাইন',
+const MN_KEYS = { 'dark-tg': 'dark night mode theme ডার্ক রাত থিম মোড', 'lang-tg': 'language bhasha english bangla ভাষা ইংরেজি বাংলা', 'acc-un': 'username id ইউজারনেম আইডি', chpw: 'password পাসওয়ার্ড গোপন', edit: 'profile প্রোফাইল নাম ছবি এডিট', delacc: 'delete account মুছে অ্যাকাউন্ট', plock: 'lock লক', listpriv: 'privacy তালিকা বন্ধু ফলোয়ার', showact: 'active online সক্রিয় অনলাইন',
   blocked: 'block ব্লক', ntset2: 'notification নোটিফিকেশন', msgsnd: 'sound শব্দ আওয়াজ', theme: 'dark light ডার্ক লাইট থিম রং', fontsz: 'font size লেখা অক্ষর বড় ছোট', help: 'help সমস্যা সাহায্য অভিযোগ', about: 'version ভার্সন সম্পর্কে',
   logout: 'logout লগআউট বের', 'demo-guide': 'demo ডেমো' };
 const MN_SC_KEYS = { dir: 'হাসপাতাল ফার্মেসি ডাক্তার থানা service', blood: 'রক্ত ডোনার blood', sos: '৯৯৯ পুলিশ ফায়ার অ্যাম্বুলেন্স emergency', prayer: 'নামাজ আজান ওয়াক্ত আবহাওয়া বৃষ্টি weather', groups: 'group', pages: 'page দোকান ব্যবসা', saved: 'save সেভ', bday: 'birthday জন্মদিন', wallet: 'coin কয়েন ব্যাজ verify', insights: 'dashboard ড্যাশবোর্ড ভিউ' };
@@ -4640,7 +4640,7 @@ function renderMenu() {
       : `${demoCard()}<div class="card"><b>আপনি লগইন করেননি</b><p class="mut" style="margin:4px 0 10px">পোস্ট, বন্ধু, গ্রুপ ও পেইজ ব্যবহার করতে লগইন করুন।</p><button class="btn wide" data-v="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`}
     ${!u?.admin && S.announcer ? `<button class="me-row admin-row" data-mgo="announce"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:20px">📢</span><div class="info"><b>জরুরি ঘোষণা পাঠান</b><div class="sub">${esc(S.announcer.title)} হিসেবে</div></div></button>` : ''}
     ${u?.admin ? `<button class="me-row admin-row" data-mgo="admin"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('shield', 22)}</span><div class="info"><b>অ্যাডমিন ড্যাশবোর্ড</b><div class="sub">অ্যাপের সংখ্যা ও সেটিংস</div></div></button>` : ''}
-    <div class="mn-top"><input type="search" id="mn-q" placeholder="মেনুতে খুঁজুন… (যেমন: পাসওয়ার্ড, ব্লক, রক্ত)" aria-label="মেনুতে খুঁজুন" autocomplete="off"><button class="mn-dark" id="mn-dark" aria-label="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}" title="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}">${isDark() ? '☀️' : '🌙'}</button></div>
+    <div class="mn-top"><input type="search" id="mn-q" placeholder="মেনুতে খুঁজুন… (যেমন: পাসওয়ার্ড, ব্লক, রক্ত)" aria-label="মেনুতে খুঁজুন" autocomplete="off"><button class="mn-dark" id="mn-dark" aria-label="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}" title="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}">${isDark() ? '☀️' : '🌙'}</button><button class="mn-dark mn-lang" id="mn-lang" translate="no" aria-label="${EN ? 'বাংলা' : 'English'}" title="${EN ? 'বাংলা' : 'English'}">${EN ? 'বাং' : 'EN'}</button></div>
     <div id="mn-res" class="card" hidden></div>
     <div id="mn-main">
     <h3 class="mn-h">🏡 উপজেলার সেবা</h3>
@@ -4672,6 +4672,7 @@ function renderMenu() {
       <button id="edit"><span class="set-ic">📝</span>প্রোফাইলের বাকি তথ্য<span class="val">ঠিকানা, রক্তের গ্রুপ…</span></button>
       <button id="delacc" style="color:var(--r)"><span class="set-ic">🗑️</span>অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলুন</button></div></details>
     <div class="card lang-card"><button id="lang-tg" class="lang-row"><span class="lang-ic">🌐</span><span class="lang-t">${EN ? 'Language: English' : 'ভাষা: ইংরেজি (English)'}<small>${EN ? 'Turn off for Bangla' : 'চালু করলে পুরো অ্যাপ ইংরেজিতে'}</small></span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${EN ? 'checked' : ''}></button></div>
+    <div class="card lang-card"><button id="dark-tg" class="lang-row"><span class="lang-ic">🌙</span><span class="lang-t">ডার্ক মোড<small>${isDark() ? 'চালু · চোখের আরাম, রাতে ভালো' : 'বন্ধ · এখন দিনের (লাইট) মোড'}</small></span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${isDark() ? 'checked' : ''}></button></div>
     <details class="card"${u ? '' : ' hidden'}><summary>🔒 প্রাইভেসি</summary><div class="setlist">
       <button id="plock"><span class="set-ic">🔒</span>প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
       <button id="listpriv"><span class="set-ic">👁️</span>বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
@@ -4681,7 +4682,6 @@ function renderMenu() {
       <button id="ntset2"><span class="set-ic">🔔</span>নোটিফিকেশন সেটিং</button>
       <button id="msgsnd"><span class="set-ic">🔊</span>শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
     <details class="card"><summary>🎨 দেখতে কেমন</summary><div class="setlist">
-      <button id="theme"><span class="set-ic">🌓</span>থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
       <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button></div></details>
     <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
       ${S.api.demoLogin ? '<button id="demo-guide"><span class="set-ic">🧪</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">🔄</span>ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
@@ -5144,11 +5144,12 @@ document.addEventListener('click', e => {
   if (id === 'chpw') return passwordSheet();
   if (id === 'acc-name') return nameSheet();
   if (id === 'acc-un') return usernameSheet();
-  if (id === 'lang-tg') return setLang(!EN);
+  if (id === 'lang-tg' || id === 'mn-lang') return setLang(!EN);
+  if (id === 'dark-tg') { local.set('theme', isDark() ? 'light' : 'dark'); applyTheme(); renderMenu(); return; }
   if (id === 'acc-email') return emailSheet();
   if (id === 'acc-phone') return phoneSheet();
   if (id === 'theme') {
-    const cur = local.get('theme', '');
+    const cur = local.get('theme', 'light');
     openSheet(`<h2>থিম</h2><div class="seg3">${THEMES.map(([v, l]) => `<label><input type="radio" name="th" value="${v}" ${v === cur ? 'checked' : ''}>${esc(l)}</label>`).join('')}</div><button class="btn ghost wide" data-close style="margin-top:14px">ঠিক আছে</button>`);
     $('#sheet').onchange = ev => { local.set('theme', ev.target.value); applyTheme(); renderMenu(); };
   }

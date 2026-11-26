@@ -2647,11 +2647,13 @@ $('#tfaq').addEventListener('click', e => {
 let presT = 0;
 async function refreshBadges() {
   if (me() && !document.hidden && Date.now() - presT > 55000) { presT = Date.now(); S.api.touchPresence?.().catch(() => {}); }
-  if (!me()) { $('#b-msgs').hidden = $('#b-friends').hidden = $('#b-notif').hidden = true; return; }
+  if (!me()) { $('#b-msgs').hidden = $('#b-friends').hidden = $('#b-notif').hidden = $('#b-req').hidden = true; return; }
   try {
-    const [n, reqs, nt] = await Promise.all([S.actAs ? S.api.pageUnread().then(m => m.get(S.actAs.id) || 0) : S.api.unreadCount(), S.actAs ? [] : S.api.friendRequests(), S.api.unreadNotifications(S.actAs?.id)]);
+    const [mb, reqs, nt] = await Promise.all([S.actAs ? S.api.pageUnread().then(m => ({ unread: m.get(S.actAs.id) || 0, requests: 0 })) : S.api.msgBadges(), S.actAs ? [] : S.api.friendRequests(), S.api.unreadNotifications(S.actAs?.id)]);
     const setB = (id, v) => { $(id).hidden = !v; $(id).textContent = v > 99 ? '৯৯+' : bn(v); };
-    setB('#b-msgs', n); setB('#b-friends', reqs.length); setB('#b-notif', S.view === 'notif' ? 0 : nt);
+    setB('#b-msgs', mb.unread); setB('#b-friends', reqs.length); setB('#b-notif', S.view === 'notif' ? 0 : nt);
+    // নতুন মেসেজ রিকোয়েস্ট: সংখ্যা নয়, ছোট আলাদা চিহ্ন
+    const rd = $('#b-req'); rd.hidden = !mb.requests; rd.classList.toggle('with-badge', !!mb.unread); rd.setAttribute('aria-label', mb.requests ? `${bn(mb.requests)}টি নতুন মেসেজ রিকোয়েস্ট` : '');
   } catch { /* badge না দেখালেও চলে */ }
 }
 function listenMessages() {

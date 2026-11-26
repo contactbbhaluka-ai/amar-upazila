@@ -618,6 +618,8 @@ async function supabaseApi() {
         muted: !!c.muted, request: !!c.request, members: c.members || 0 }));
     },
     async conversations() { return (await this.inbox()).filter(c => c.kind !== 'group'); },
+    // ব্যাজের হিসাব: সাধারণ চ্যাটের না-পড়া, আর নতুন (না-পড়া) মেসেজ রিকোয়েস্ট কতজনের
+    async msgBadges() { const l = await this.inbox(); return { unread: l.filter(c => !c.asPage && !c.muted && !c.request).reduce((a, c) => a + c.unread, 0), requests: l.filter(c => c.request && c.unread > 0).length }; },
     // t = { kind: 'dm'|'page'|'group', id, pageId, asPage }
     async thread(t) {
       const sel = 'id,sender_id,recipient_id,body,created_at,read_at,is_auto,image_path,voice_path,voice_secs,reply_to,deleted_at,chat_id,rt:reply_to(id,body,sender_id,image_path,voice_path,deleted_at),sp:profiles!messages_sender_id_fkey(id,name,avatar_url)';
@@ -1612,6 +1614,8 @@ function demoApi() {
       return wait(out.sort((a, b) => b.lastAt.localeCompare(a.lastAt)));
     },
     async conversations() { return (await this.inbox()).filter(c => c.kind !== 'group'); },
+    // ব্যাজের হিসাব: সাধারণ চ্যাটের না-পড়া, আর নতুন (না-পড়া) মেসেজ রিকোয়েস্ট কতজনের
+    async msgBadges() { const l = await this.inbox(); return { unread: l.filter(c => !c.asPage && !c.muted && !c.request).reduce((a, c) => a + c.unread, 0), requests: l.filter(c => c.request && c.unread > 0).length }; },
     async thread(t) {
       const set = db.convSet[demoKey(t)] || {};
       const rows = db.messages.filter(m => (t.kind === 'group' ? m.chatId === Number(t.id) : !m.chatId && ((m.from === meId && m.to === t.id) || (m.from === t.id && m.to === meId)) && (m.pageId || null) === (t.pageId ? Number(t.pageId) : null))

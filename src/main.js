@@ -2527,7 +2527,7 @@ async function renderMe(mode = 'login') {
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
-      <div class="row prof-tools"><button class="btn ghost" data-pshare="me">${ic('link', 15)} প্রোফাইল শেয়ার / QR</button><button class="btn ghost" data-frames>🖼️ ছবিতে ফ্রেম</button><button class="btn ghost" data-viewas="public">👁️ অন্যরা কেমন দেখে</button></div>
+      <div class="prof-tools"><button class="pt-btn" data-pshare="me">${ic('link', 14)} শেয়ার / QR</button><button class="pt-btn" data-frames>🖼️ ফ্রেম</button><button class="pt-btn" data-viewas="public">👁️ অন্যরা কেমন দেখে</button></div>
       <div class="row"><button class="btn ghost" id="edit">${ic('edit', 15)} এবাউট এডিট</button><button class="btn ghost" data-insights="1">${ic('eye', 15)} ড্যাশবোর্ড</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
       ${profTabs('me')}`;
     S.api.profile(u.id).then(p => { if ($('#mystats')) $('#mystats').innerHTML = statsHtml(p); }).catch(() => {});

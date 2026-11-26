@@ -915,9 +915,7 @@ async function tagPicker() {
   $('#sheet').onchange = e => { const id = e.target.dataset?.tg; if (!id) return; const f = friends.find(x => String(x.id) === id); if (e.target.checked) sel.set(f.id, { id: f.id, name: f.name }); else sel.delete(f.id); };
   $('#tg-done').onclick = () => { d.tags = [...sel.values()]; renderComposerSheet(); };
 }
-document.querySelector('[data-compose="photo"] .qi').innerHTML = ic('photo', 20);
-document.querySelector('[data-compose="tag"] .qi').innerHTML = ic('tag', 20);
-document.querySelector('[data-compose="privacy"] .qi').innerHTML = ic('globe', 20);
+document.querySelector('[data-compose="photo"] .qi').innerHTML = ic('photo', 24);
 $('#cm-open').addEventListener('click', () => openPostComposer(actAsOpts()));
 $('#composer').addEventListener('click', e => { const b = e.target.closest('[data-compose]'); if (b) openPostComposer(actAsOpts(), S.actAs && b.dataset.compose !== 'photo' ? undefined : b.dataset.compose); });
 
@@ -1956,7 +1954,6 @@ function renderComposer() {
   const u = me(), pg = u && S.actAs;
   $('#comp-av').innerHTML = pg ? entAv(pg) : u ? av(u) : `<div class="av" aria-hidden="true">?</div>`; $('#tab-av').innerHTML = pg ? entAv(pg) : u ? av(u) : TAB_ME_ICON;
   $('#cm-open').textContent = pg ? `${pg.name}-এর পক্ষে কিছু লিখুন…` : u ? `আপনার মনে কী আছে, ${u.name.split(' ')[0]}?` : 'আপনার মনে কী আছে? পোস্ট করতে লগইন করুন';
-  document.querySelectorAll('#composer [data-compose="tag"], #composer [data-compose="privacy"]').forEach(b => { b.hidden = !!pg; });
   swapFriendsTab(!!pg);   // পেইজের পোস্ট সবসময় পাবলিক
   renderActAsBar();
 }

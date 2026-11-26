@@ -1036,3 +1036,8 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 
 /* v39 দ্রুততা: স্ক্রিনের বাইরের পোস্ট আঁকা হয় না (লম্বা ফিডে স্ক্রল মসৃণ, ব্যাটারি কম) */
 .card.post{content-visibility:auto;contain-intrinsic-size:auto 380px}
+
+/* v40 হোম পোস্ট বক্স: ফেসবুকের মতো এক লাইনে, পাশে ছবির আইকন */
+#composer.composer-mini{padding:10px 12px}
+.cm-photo{flex:none;display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:none;cursor:pointer;color:#2e9d5b}
+.cm-photo:hover,.cm-photo:active{background:var(--g2)}

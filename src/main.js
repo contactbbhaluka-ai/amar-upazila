@@ -1965,7 +1965,7 @@ async function switcherHtml() {
   const pages = await S.api.myPages().catch(() => []);
   if (!pages.length) return '';
   const u = me(), cur = S.actAs?.id;
-  return `<div class="card switcher"><b class="sw-h">প্রোফাইল বদলান</b>
+  return `<div class="switcher"><b class="sw-h">প্রোফাইল বা পেইজ বদলান</b>
     <button class="sw-row${!cur ? ' on' : ''}" data-actas="">${av(u, 'sm')}<span><b>${esc(u.name)}</b><small>আপনার প্রোফাইল</small></span>${!cur ? '<i>✓</i>' : ''}</button>
     ${pages.map(pg => `<button class="sw-row${cur === pg.id ? ' on' : ''}" data-actas="${esc(pg.id)}">${entAv(pg)}<span><b>${esc(pg.name)}${vb(pg.verified)}</b><small>পেইজ · ${pg.isAdmin ? 'অ্যাডমিন' : 'মালিক'}</small></span>${cur === pg.id ? '<i>✓</i>' : ''}</button>`).join('')}</div>`;
 }
@@ -2459,7 +2459,7 @@ function renderMenu() {
     return `<button class="sc${off ? ' off' : ''}" data-mgo="${go2}"><span class="si">${icon}</span>${esc(label)}${off ? '<small>বন্ধ আছে (শুধু অ্যাডমিন দেখছেন)</small>' : sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
   };
   $('#menu').innerHTML = `
-    ${u ? `<button class="me-row" data-v="me">${S.actAs ? entAv(S.actAs) : av(u)}<div class="info"><b>${esc(S.actAs ? S.actAs.name : u.name)}</b><div class="sub">${S.actAs ? 'পেইজ দেখুন' : 'আপনার প্রোফাইল দেখুন'}</div></div></button><div id="switcher"></div>`
+    ${u ? `<div class="me-wrap"><button class="me-row" data-v="me">${S.actAs ? entAv(S.actAs) : av(u)}<div class="info"><b>${esc(S.actAs ? S.actAs.name : u.name)}</b><div class="sub">${S.actAs ? 'পেইজ দেখুন' : 'আপনার প্রোফাইল দেখুন'}</div></div></button><button class="sw-toggle" id="sw-toggle" aria-label="প্রোফাইল বা পেইজ বদলান" aria-expanded="false" hidden>${ic('users', 16)}<span class="chev">▾</span></button><div id="switcher" class="sw-drop" hidden></div></div>`
       : `${demoCard()}<div class="card"><b>আপনি লগইন করেননি</b><p class="mut" style="margin:4px 0 10px">পোস্ট, বন্ধু, গ্রুপ ও পেইজ ব্যবহার করতে লগইন করুন।</p><button class="btn wide" data-v="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`}
     ${u?.admin ? `<button class="me-row admin-row" data-mgo="admin"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('shield', 22)}</span><div class="info"><b>অ্যাডমিন ড্যাশবোর্ড</b><div class="sub">অ্যাপের সংখ্যা ও সেটিংস</div></div></button>` : ''}
     <div class="sc-grid">
@@ -2486,8 +2486,14 @@ function renderMenu() {
       <button id="about">অ্যাপ সম্পর্কে<span class="val">${esc(versionLabel())}</span></button></div></details>
     ${u ? '<button class="btn ghost wide" id="logout" style="margin-top:4px">লগআউট</button>' : ''}`;
   document.querySelectorAll('#menu details').forEach((d, i) => { d.open = !!wasOpen[i]; });
-  if (u) switcherHtml().then(h => { const el = $('#switcher'); if (el) el.innerHTML = h; });
+  if (u) switcherHtml().then(h => { const el = $('#switcher'), t = $('#sw-toggle'); if (!el || !h) return; el.innerHTML = h; t.hidden = false; });
 }
+// ফেসবুকের মতো: নামের পাশের ▾ চাপলে প্রোফাইল/পেইজের তালিকা নামে
+document.addEventListener('click', e => {
+  const t = e.target.closest('#sw-toggle'), d = $('#switcher');
+  if (t && d) { const open = d.hidden; d.hidden = !open; t.setAttribute('aria-expanded', open); t.classList.toggle('open', open); return; }
+  if (d && !d.hidden && !e.target.closest('.me-wrap')) { d.hidden = true; $('#sw-toggle')?.classList.remove('open'); $('#sw-toggle')?.setAttribute('aria-expanded', 'false'); }
+});
 $('#menu').addEventListener('click', e => {
   const b = e.target.closest('[data-mgo]'); if (!b) return;
   const t = b.dataset.mgo;

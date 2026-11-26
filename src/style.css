@@ -1014,3 +1014,11 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 #cm-av .ent-av{width:32px;height:32px;min-width:32px;font-size:13px;border-radius:8px}
 .cm-row .avbtn .ent-av{width:34px;height:34px;min-width:34px;font-size:14px;border-radius:9px}
 .pc-author .ent-av{width:42px;height:42px;min-width:42px;font-size:17px;border-radius:11px}
+
+/* ===== v37: প্রোফাইল বদলের ড্রপডাউন ===== */
+.me-wrap{position:relative}
+.me-wrap .me-row{padding-right:64px}
+.sw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;gap:2px;border:0;background:var(--g2);color:var(--gt);border-radius:99px;padding:7px 10px;cursor:pointer;min-height:0}
+.sw-toggle .chev{display:inline-block;transition:transform .15s;font-size:13px}
+.sw-toggle.open .chev{transform:rotate(180deg)}
+.sw-drop{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:40;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:8px}

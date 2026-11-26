@@ -1254,3 +1254,9 @@ body{overscroll-behavior-y:contain}
 .pymk-x{position:absolute;top:4px;right:4px;border:0;background:none;color:var(--mut);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
 .sh-ic.ms{background:linear-gradient(135deg,#0866ff,#a033ff);color:#fff}
 .dl-loc{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:8px 0 2px;font-size:13.5px}
+
+/* v49 নিজের প্রোফাইল/পেইজে হালকা ব্যাজ: চাপলে আবেদন */
+.vb-get{display:inline-grid;place-items:center;vertical-align:middle;margin-left:6px;border:0;background:none;padding:2px;border-radius:50%;cursor:pointer;min-height:0}
+.vb-get svg{width:22px;height:22px;filter:grayscale(1);opacity:.35;transition:opacity .15s}
+.vb-get:hover svg,.vb-get:focus-visible svg{opacity:.7}
+.flash{animation:flash 1.6s ease-out}@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--g)}100%{box-shadow:0 0 0 0 transparent}}

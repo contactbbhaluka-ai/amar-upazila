@@ -205,6 +205,8 @@ const userLink = (id, inner, cls = 'avbtn') => `<button class="${cls}" data-user
 // নীল ভেরিফাইড ব্যাজ (পাবলিক ফিগার ও কেনা ব্যাজ দুটোই নীল; প্রোফাইলে চাপলে কোনটা তা লেখা থাকে)
 const VB_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#1d9bf0" d="M12 1.8l2.4 1.9 3-.3 1 2.9 2.6 1.6-.6 3 1.4 2.7-2.2 2.1-.2 3-3 .6-1.8 2.5-2.8-1.1-2.8 1.1-1.8-2.5-3-.6-.2-3-2.2-2.1L2.3 11l-.6-3 2.6-1.6 1-2.9 3 .3z"/><path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const vb = (b, big) => (b ? `<span class="vbadge${big ? ' vb-lg' : ''}" ${big ? `role="button" tabindex="0" data-vbinfo="${b}"` : ''} title="ভেরিফাইড" aria-label="ভেরিফাইড">${VB_SVG}</span>` : '');
+// নিজের প্রোফাইল/পেইজে ব্যাজ না থাকলে হালকা রঙের ব্যাজ; চাপলে ব্যাজের আবেদন
+const vbGet = kind => `<button class="vb-get" data-vbget="${kind}" title="ভেরিফাইড ব্যাজ নিন" aria-label="ভেরিফাইড ব্যাজের জন্য আবেদন করুন">${VB_SVG}</button>`;
 const entAv = (e, icon) => e?.avatar ? `<img loading="lazy" decoding="async" class="ent-av" src="${esc(e.avatar)}" alt="">` : `<div class="ent-av" aria-hidden="true">${icon || esc((e?.name || '?').charAt(0))}</div>`;
 const PAGE_CATS = ['দোকান ও ব্যবসা', 'স্বাস্থ্য', 'শিক্ষা', 'সংগঠন ও ক্লাব', 'সরকারি প্রতিষ্ঠান', 'খাবার ও রেস্টুরেন্ট', 'চাকরি ও প্রশিক্ষণ', 'খবর ও মিডিয়া', 'কৃষি', 'ধর্মীয় প্রতিষ্ঠান', 'অন্যান্য'];
 
@@ -2450,7 +2452,7 @@ async function renderMe(mode = 'login') {
   const u = me();
   if (u) {
     $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
-      <h2 style="margin:6px 0 0">${esc(u.name)}${vb(u.verified, true)}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.locked ? '<button class="lock-chip">🔒 প্রোফাইল লক করা</button>' : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
+      <h2 style="margin:6px 0 0">${esc(u.name)}${u.verified ? vb(u.verified, true) : vbGet('me')}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.locked ? '<button class="lock-chip">🔒 প্রোফাইল লক করা</button>' : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
@@ -3193,6 +3195,11 @@ $('#wallet').addEventListener('click', async e => {
   }
 });
 // পেইজের মালিক: পেইজের ব্যাজের অবস্থা ও আবেদন
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-vbget]'); if (!b) return;
+  if (b.dataset.vbget === 'me') { open('wallet'); return loadWallet().then(() => { const el = $('#wallet .vb-status'); el?.scrollIntoView({ block: 'start', behavior: 'smooth' }); el?.parentElement?.classList.add('flash'); }); }
+  if (S.curPage) pageBadgeSheet(S.curPage);
+});
 async function pageBadgeSheet(pg) {
   openSheet('<div class="skel"></div>');
   try {
@@ -3525,7 +3532,7 @@ async function openPage(id, silent) {
     const tel = String(pg.phone || '').replace(/[^\d+]/g, '');
     if (S.curPage?.id !== pg.id) Object.assign(S.pstate.page, { tab: 'posts', seg: 'all', album: null });
     S.curPage = pg;
-    $('#page').innerHTML = `<div class="card ent-head prof-fb pg-head">${pageCoverHtml(pg)}<h2 style="margin:8px 0 0">${esc(pg.name)}${vb(pg.verified, true)}</h2><div class="meta">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div>
+    $('#page').innerHTML = `<div class="card ent-head prof-fb pg-head">${pageCoverHtml(pg)}<h2 style="margin:8px 0 0">${esc(pg.name)}${pg.verified ? vb(pg.verified, true) : pg.isOwner ? vbGet('page') : ''}</h2><div class="meta">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div>
       ${pg.about ? `<p class="about">${esc(pg.about)}</p>` : ''}${pg.phone ? `<p class="meta" style="margin:6px 0 0">📞 ${esc(bn(pg.phone))}</p>` : ''}
       ${pageAddrHtml(pg)}
       <div class="row">${pg.canManage

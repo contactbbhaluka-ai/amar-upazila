@@ -1,5 +1,5 @@
 // আমার উপজেলা — অ্যাপের UI
-import { createApi, PAGE } from './api.js';
+import { createApi, PAGE, boostState } from './api.js';
 import { POST_CATS, SERVICE_CATS, EMERGENCY, PUBLIC_URL, SETTING_KEYS, PLAY_URL } from './config.js';
 import { DISTRICTS, DISTRICT_ORDER, HOME_UPAZILA, HOME_DISTRICT, BLOOD_GROUPS } from './bd-geo.js';
 
@@ -168,7 +168,7 @@ const catName = k => (SERVICE_CATS.find(c => c[0] === k) || ['', ''])[1];
 const S = {
   api: null, unions: [], union: local.get('union', ''), scope: 'area', fcat: '', dcat: '',
   feeds: { home: { posts: [], more: false }, me: { posts: [], more: false }, user: { posts: [], more: false }, post: { posts: [], more: false }, search: { posts: [], more: false }, saved: { posts: [], more: false }, page: { posts: [], more: false }, group: { posts: [], more: false } },
-  open: new Map(), view: 'home', tab: 'home', stack: [], bgroup: '', bscope: 'home', bready: false, settings: { ...Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d])), ...local.get('settings', {}) }, userId: null, threadId: null, postId: null, pageId: null, groupId: null, photo: null, stopMsg: null, stopNotif: null,
+  seenBoosts: new Set(), open: new Map(), view: 'home', tab: 'home', stack: [], bgroup: '', bscope: 'home', bready: false, settings: { ...Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d])), ...local.get('settings', {}) }, userId: null, threadId: null, postId: null, pageId: null, groupId: null, photo: null, stopMsg: null, stopNotif: null,
 };
 const me = () => S.api?.me();
 
@@ -339,9 +339,9 @@ function postHtml(p) {
   const u = me();
   const link = (inner, cls) => p.pageId ? `<button class="${cls}" data-page="${esc(p.pageId)}">${inner}</button>` : userLink(p.userId, inner, cls);
   const via = p.groupId && S.view !== 'group' ? ` <span class="via">▸ <button data-group="${esc(p.groupId)}">${esc(p.groupName)}</button></span>` : '';
-  return `<article class="card post">
+  return `<article class="card post${p.sponsored ? ' sponsored' : ''}">
     <div class="top">${link(av(p), 'avbtn')}
-      <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
+      <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
       <button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
     <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>
     ${p.body ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
@@ -358,15 +358,28 @@ function postHtml(p) {
 
   </article>`;
 }
+// হোম ফিডে ৩, ৮, ১৩… নম্বর জায়গায় একটা করে বুস্ট করা পোস্ট
+function withAds(f) {
+  const ads = [...(f.ads || [])];
+  if (!ads.length) return f.posts;
+  const adIds = new Set(ads.map(a => a.id)), posts = f.posts.filter(p => !adIds.has(p.id)), out = [];   // একই পোস্ট দুইবার না দেখাই
+  posts.forEach((p, i) => { out.push(p); if (i % 5 === 1 && ads.length) out.push(ads.shift()); });
+  if (posts.length < 2 && ads.length) out.push(ads.shift());
+  return out;
+}
 function renderFeed(key) {
-  const f = S.feeds[key], box = $('#feed-' + key);
-  box.innerHTML = f.posts.length ? f.posts.map(postHtml).join('')
+  const f = S.feeds[key], box = $('#feed-' + key), list = key === 'home' ? withAds(f) : f.posts;
+  box.innerHTML = f.posts.length ? list.map(postHtml).join('')
     : key === 'search' ? '' : key === 'post' ? '<div class="empty">পোস্টটি আর নেই।</div>'
     : key === 'saved' ? '<div class="empty">কোনো সেভ করা পোস্ট নেই।<br>পোস্টের ⋯ মেনু থেকে "পোস্ট সেভ করুন" চাপুন।</div>'
     : key === 'page' || key === 'group' ? '<div class="empty">এখনো কোনো পোস্ট নেই।</div>'
     : `<div class="empty">${key === 'home' && S.scope === 'friends' ? 'বন্ধু বা যাদের ফলো করছেন তাদের কোনো পোস্ট এখনো নেই।<br>"বন্ধু" ট্যাব থেকে মানুষ খুঁজে যুক্ত হোন।' : key === 'home' ? 'এখানে এখনো কোনো পোস্ট নেই।<br>প্রথম পোস্টটি আপনিই করুন!' : 'এখনো কোনো পোস্ট নেই।'}</div>`;
   const more = $('#more-' + key); if (more) more.hidden = !f.more;
   watchCarousels(box);
+  if (key === 'home') {
+    const fresh = list.filter(p => p.sponsored && !S.seenBoosts.has(p.boostId)).map(p => p.boostId);
+    if (fresh.length) { fresh.forEach(id => S.seenBoosts.add(id)); S.api.boostSeen(fresh).catch(() => {}); }
+  }
 }
 async function loadFeed(key, append) {
   const f = S.feeds[key], box = $('#feed-' + key);
@@ -382,13 +395,15 @@ async function loadFeed(key, append) {
     if (key !== 'home' && !q.userId && !q.postId && !q.saved && !q.pageId && !q.groupId) { f.posts = []; box.innerHTML = ''; return; }
     const plainHome = key === 'home' && !append && S.scope === 'area' && !q.unionId && !q.category && !S.api.demoLogin;
     const call = () => S.api.posts({ ...q, before: append ? f.posts.at(-1)?.createdAt : undefined });
+    const adsP = key === 'home' && !append && !q.category && feat('featBoost') ? S.api.boostedPosts(3).catch(() => []) : null;
     const rows = plainHome ? await cachedCall('feed', async () => (await call()).slice(0, PAGE)) : await call();
+    if (adsP) f.ads = await adsP;
     f.posts = append ? [...f.posts, ...rows] : rows; f.more = !['post', 'saved'].includes(key) && rows.length >= PAGE;
   } catch (e) { toast(errText(e)); if (!append) f.posts = []; }
   renderFeed(key);
 }
 const feedOf = el => el.closest('[data-feed]')?.dataset.feed;
-const findPost = (key, id) => S.feeds[key].posts.find(p => String(p.id) === String(id));
+const findPost = (key, id) => S.feeds[key].posts.find(p => String(p.id) === String(id)) || (S.feeds[key].ads || []).find(p => String(p.id) === String(id));
 
 document.addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -497,6 +512,7 @@ function postMenu(key, p) {
   const u = me(), mine = u && (p.userId === u.id || u.admin);
   openSheet(`<div class="menu">
     ${u && (p.tags || []).some(t => t.id === u.id) ? '<button data-act="untag">আমার ট্যাগ সরিয়ে দিন</button>' : ''}
+    ${u && p.userId === u.id && (p.privacy || 'public') === 'public' && !p.groupId && feat('featBoost') ? `<button data-act="boost">${ic('send', 16)} পোস্ট বুস্ট করুন</button>` : ''}
     ${u && p.userId === u.id ? '<button data-act="edit">পোস্ট এডিট করুন</button>' : ''}
     ${mine ? '<button data-act="del" class="danger">পোস্টটি মুছে ফেলুন</button>' : ''}
     ${u && p.userId !== u.id ? `<button data-act="report">পোস্টটি রিপোর্ট করুন</button>${p.pageId ? '' : `<button data-act="block" class="danger">${esc(p.author)}-কে ব্লক করুন</button>`}` : ''}
@@ -515,6 +531,7 @@ function postMenu(key, p) {
     }
     if (a === 'report') reportSheet('post', p.id);
     if (a === 'edit') { closeSheet(); openEditPost(p); }
+    if (a === 'boost') boostSheet(p);
     if (a === 'untag') { closeSheet(); await busy(null, async () => { await S.api.untagMe(p.id); p.tags = p.tags.filter(t => t.id !== me().id); renderFeed(key); toast('ট্যাগ সরানো হয়েছে'); }); }
     if (a === 'block') { closeSheet(); blockUser(p.userId, p.author); }
     if (a === 'del') {
@@ -1807,6 +1824,8 @@ const NT = {
   group_approved: ['✅', 'আপনাকে গ্রুপে যুক্ত করেছেন'],
   verify_ok: ['✔', 'আপনার ভেরিফাইড ব্যাজের আবেদন অনুমোদন করেছেন'],
   verify_no: ['✖', 'আপনার ভেরিফাইড ব্যাজের আবেদন গ্রহণ করেননি'],
+  boost_ok: ['🚀', 'আপনার পোস্টের বুস্ট অনুমোদন করেছেন, এখন চলছে'],
+  boost_no: ['✖', 'আপনার পোস্টের বুস্ট গ্রহণ করেননি, কয়েন ফেরত গেছে'],
 };
 async function loadNotifs(keep) {
   const box = $('#notifs');
@@ -1830,7 +1849,7 @@ async function loadNotifs(keep) {
 function openNotif(el) {
   if (!el || el.closest('button')) return;
   const t = el.dataset.nType;
-  if ((t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag') && el.dataset.nPost) openPost(el.dataset.nPost);
+  if ((t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag' || t === 'boost_ok' || t === 'boost_no') && el.dataset.nPost) openPost(el.dataset.nPost);
   else if (t === 'friend_request') go('friends');
   else if (t === 'verify_ok' || t === 'verify_no') { open('wallet'); loadWallet(); }
   else if (t.startsWith('group_') && el.dataset.nGroup) openGroup(el.dataset.nGroup);
@@ -2197,8 +2216,8 @@ $('#menu').addEventListener('click', e => {
 });
 
 // ================================================================ কয়েন ও ভেরিফাইড ব্যাজ
-const COIN_RULES = [['earnPost', 'পোস্ট করলে'], ['earnComment', 'মন্তব্য করলে'], ['earnLike', 'লাইক/রিয়্যাক্ট দিলে'], ['earnShare', 'শেয়ার করলে'], ['earnCap', 'দিনে সর্বোচ্চ আয়'], ['badgePrice', 'ব্যাজের দাম (কয়েন)'], ['badgeDays', 'ব্যাজের মেয়াদ (দিন)']];
-const COIN_WHY = { post: 'পোস্ট করেছেন', comment: 'মন্তব্য করেছেন', like: 'রিয়্যাক্ট দিয়েছেন', share: 'শেয়ার করেছেন', badge: 'ভেরিফাইড ব্যাজ', refund: 'কয়েন ফেরত', admin: 'অ্যাডমিন দিয়েছেন' };
+const COIN_RULES = [['earnPost', 'পোস্ট করলে'], ['earnComment', 'মন্তব্য করলে'], ['earnLike', 'লাইক/রিয়্যাক্ট দিলে'], ['earnShare', 'শেয়ার করলে'], ['earnCap', 'দিনে সর্বোচ্চ আয়'], ['badgePrice', 'ব্যাজের দাম (কয়েন)'], ['badgeDays', 'ব্যাজের মেয়াদ (দিন)'], ['boostPrice', 'বুস্টের দাম (প্রতিদিন)']];
+const COIN_WHY = { post: 'পোস্ট করেছেন', comment: 'মন্তব্য করেছেন', like: 'রিয়্যাক্ট দিয়েছেন', share: 'শেয়ার করেছেন', badge: 'ভেরিফাইড ব্যাজ', boost: 'পোস্ট বুস্ট', refund: 'কয়েন ফেরত', admin: 'অ্যাডমিন দিয়েছেন' };
 const VCATS = ['জনপ্রতিনিধি', 'রাজনীতিবিদ', 'সরকারি কর্মকর্তা', 'সাংবাদিক', 'শিল্পী / লেখক', 'খেলোয়াড়', 'ব্যবসায়ী / প্রতিষ্ঠান', 'শিক্ষক / চিকিৎসক', 'সমাজকর্মী', 'অন্যান্য'];
 const coin = n => `🪙 ${bn(n)}`;
 const setN = k => Number(S.settings[k] ?? SETTING_KEYS[k][1]) || 0;
@@ -2209,7 +2228,7 @@ async function loadWallet() {
   if (!u) { box.innerHTML = '<div class="empty">কয়েন ও ব্যাজ দেখতে লগইন করুন।</div>'; return; }
   box.innerHTML = '<div class="skel"></div>';
   try {
-    const [w, req] = await Promise.all([S.api.wallet(), S.api.myVerifyRequest(), S.api.settings().then(v => { S.settings = { ...S.settings, ...v }; }).catch(() => {})]);
+    const [w, req, boosts] = await Promise.all([S.api.wallet(), S.api.myVerifyRequest(), S.api.myBoosts().catch(() => []), S.api.settings().then(v => { S.settings = { ...S.settings, ...v }; }).catch(() => {})]);
     S.walletCoins = w.coins;
     const price = setN('badgePrice'), days = setN('badgeDays'), cap = setN('earnCap'), pending = req?.status === 'pending';
     const badge = u.verified;
@@ -2232,17 +2251,20 @@ async function loadWallet() {
           <button class="vb-opt" data-vapply="paid"><b>${badge === 'paid' ? 'মেয়াদ বাড়ান' : 'কয়েন দিয়ে ব্যাজ নিন'}: ${coin(price)} · ${bn(days)} দিন</b><small>${w.coins >= price ? 'যে কেউ নিতে পারেন। অ্যাডমিন অনুমোদন দিলে চালু হবে।' : `আরও ${bn(price - w.coins)} কয়েন দরকার। পোস্ট, মন্তব্য, লাইক ও শেয়ার করে কয়েন জমান।`}</small></button>
         </div>` : ''}
       </div>
+      <h3 class="res-h">আমার বুস্ট করা পোস্ট</h3>
+      <div class="card">${boosts.length ? boosts.map(boostRow).join('') : `<p class="mut" style="margin:0">নিজের পাবলিক পোস্টের ⋯ মেনু থেকে "পোস্ট বুস্ট করুন" চাপলে পোস্টটি এলাকার আরও অনেকের হোম ফিডে "স্পন্সরড" হিসেবে দেখাবে। খরচ প্রতিদিন ${coin(setN('boostPrice'))}।</p>`}</div>
       <h3 class="res-h">কীভাবে কয়েন পাবেন</h3>
       <div class="card earn-rules">
         ${[['post', 'পোস্ট করলে', 'earnPost'], ['comment', 'অন্যের পোস্টে মন্তব্য করলে', 'earnComment'], ['like', 'অন্যের পোস্টে লাইক বা রিয়্যাক্ট দিলে', 'earnLike'], ['share', 'অন্যের পোস্ট শেয়ার করলে', 'earnShare']]
           .map(([, l, k]) => `<div class="er-row"><span>${l}</span><b>+${bn(setN(k))}</b></div>`).join('')}
-        <p class="mut" style="margin:8px 0 0;font-size:13px">দিনে সর্বোচ্চ ${bn(cap)} কয়েন। একই পোস্টে বারবার লাইক দিলে বা নিজের পোস্টে কয়েন হয় না। কয়েন শুধু অ্যাপের ভেতরে ব্যাজ নিতে খরচ করা যায় (শীঘ্রই বিজ্ঞাপনেও), টাকা হিসেবে তোলা যায় না।</p>
+        <p class="mut" style="margin:8px 0 0;font-size:13px">দিনে সর্বোচ্চ ${bn(cap)} কয়েন। একই পোস্টে বারবার লাইক দিলে বা নিজের পোস্টে কয়েন হয় না। কয়েন শুধু অ্যাপের ভেতরে ব্যাজ নিতে ও পোস্ট বুস্ট করতে খরচ করা যায়, টাকা হিসেবে তোলা যায় না।</p>
       </div>
       <h3 class="res-h">কয়েনের হিসাব</h3>
       <div class="card ledger">${w.ledger.length ? w.ledger.map(l => `<div class="lg-row"><span><b>${COIN_WHY[l.reason] || l.reason}</b><small>${esc(ago(l.createdAt))}</small></span><b class="${l.amount < 0 ? 'neg' : 'pos'}">${l.amount < 0 ? '−' : '+'}${bn(Math.abs(l.amount))}</b></div>`).join('') : '<p class="mut" style="margin:0">এখনো কোনো হিসাব নেই।</p>'}</div>`;
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 $('#wallet').addEventListener('click', async e => {
+  const bo = e.target.closest('[data-bopen]'); if (bo) return openPost(bo.dataset.bopen);
   const a = e.target.closest('[data-vapply]');
   if (a) return verifySheet(a.dataset.vapply);
   if (e.target.id === 'vreq-cancel') {
@@ -2279,6 +2301,63 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('click', e => { if (e.target.closest('[data-mgo2="wallet"]')) { closeSheet(); open('wallet'); loadWallet(); } });
 
+const BOOST_ST = { pending: ['অনুমোদনের অপেক্ষায়', 'wait'], active: ['চলছে', 'on'], ended: ['শেষ হয়েছে', 'off'], stopped: ['বন্ধ করা হয়েছে', 'off'], cancelled: ['বাতিল', 'off'], rejected: ['গ্রহণ হয়নি', 'no'] };
+const BOOST_DAYS = [1, 3, 7, 15, 30];
+const daysLeft = d => Math.max(0, Math.ceil((new Date(d) - Date.now()) / 864e5));
+function boostRow(b) {
+  const st = boostState(b), [lbl, cls] = BOOST_ST[st] || [st, 'off'];
+  return `<button class="bo-row" data-bopen="${b.postId}">${b.postImage ? `<img src="${esc(b.postImage)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}
+    <span class="bo-tx"><b>${esc((b.postBody || 'ছবি পোস্ট').slice(0, 60))}</b><small>${bn(b.days)} দিন · ${b.unionName ? esc(b.unionName) : 'পুরো উপজেলা'} · ${coin(b.coins)}${st === 'active' ? ` · আর ${bn(daysLeft(b.endsAt))} দিন` : ''}</small>
+    <small><span class="bo-st ${cls}">${lbl}</span>${b.reach || st === 'active' || st === 'ended' ? ` · ${bn(b.reach)} জন দেখেছেন` : ''}${b.adminNote && st === 'rejected' ? ` · কারণ: ${esc(b.adminNote)}` : ''}</small></span></button>`;
+}
+async function boostSheet(p) {
+  openSheet('<div class="skel"></div>');
+  try {
+    const [b, w] = await Promise.all([S.api.postBoost(p.id), S.api.wallet()]);
+    const st = b && boostState(b);
+    if (b && (st === 'pending' || st === 'active')) {
+      openSheet(`<h2>পোস্ট বুস্ট</h2>${boostRow(b).replace('<button class="bo-row"', '<div class="bo-row"').replace(/<\/button>$/, '</div>')}
+        <p class="mut" style="font-size:13px">${st === 'pending' ? 'অ্যাডমিন অনুমোদন দিলে চালু হবে। এখন বাতিল করলে পুরো কয়েন ফেরত পাবেন।' : 'এখন বন্ধ করলে বাকি পুরো দিনগুলোর কয়েন ফেরত পাবেন।'}</p>
+        <button class="btn danger wide" id="bo-cancel">${st === 'pending' ? 'বুস্ট বাতিল করুন' : 'বুস্ট বন্ধ করুন'}</button><button class="btn ghost wide" data-close style="margin-top:8px">ঠিক আছে</button>`);
+      $('#bo-cancel').onclick = ev => busy(ev.currentTarget, async () => { await S.api.cancelBoost(b.id); closeSheet(); toast(st === 'pending' ? 'বুস্ট বাতিল হয়েছে, কয়েন ফেরত গেছে' : 'বুস্ট বন্ধ হয়েছে'); });
+      return;
+    }
+    const per = setN('boostPrice');
+    openSheet(`<h2>পোস্ট বুস্ট করুন</h2>
+      <p class="mut" style="margin-top:0">পোস্টটি এলাকার আরও অনেকের হোম ফিডে "স্পন্সরড" হিসেবে দেখাবে। অ্যাডমিন অনুমোদন দিলে চালু হবে।</p>
+      <div class="bo-prev">${esc((p.body || 'ছবি পোস্ট').slice(0, 90))}</div>
+      <form id="boform">
+        <label>কত দিন</label><div class="bo-days">${BOOST_DAYS.map((d, i) => `<label><input type="radio" name="bod" value="${d}" ${i === 2 ? 'checked' : ''}><span>${bn(d)} দিন</span></label>`).join('')}</div>
+        <label for="bo-aud">কাদের দেখাবে</label><select class="f" id="bo-aud"><option value="">পুরো উপজেলার সবাই</option>${unionOptions('')}</select>
+        <div class="bo-sum"><span>মোট খরচ</span><b id="bo-total"></b></div>
+        <p class="mut" id="bo-bal" style="margin:4px 0 0;font-size:13px"></p>
+        <div class="row" style="margin-top:14px"><button class="btn" style="flex:1" id="bo-go">বুস্ট করুন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div>
+      </form>`);
+    const upd = () => {
+      const d = Number(document.querySelector('[name="bod"]:checked').value), cost = d * per, ok = w.coins >= cost;
+      $('#bo-total').textContent = coin(cost);
+      $('#bo-bal').textContent = ok ? `আপনার আছে ${bn(w.coins)} কয়েন, বুস্টের পর থাকবে ${bn(w.coins - cost)}` : `আপনার আছে ${bn(w.coins)} কয়েন, আরও ${bn(cost - w.coins)} কয়েন দরকার`;
+      $('#bo-bal').classList.toggle('err', !ok); $('#bo-go').disabled = !ok;
+    };
+    $('#boform').onchange = upd; upd();
+    $('#boform').onsubmit = ev => {
+      ev.preventDefault();
+      const d = Number(document.querySelector('[name="bod"]:checked').value), un = $('#bo-aud').value;
+      busy(ev.submitter, async () => { await S.api.requestBoost(p.id, d, un ? Number(un) : null); closeSheet(); toast('বুস্টের আবেদন জমা হয়েছে, অনুমোদন পেলে চালু হবে'); });
+    };
+  } catch (e) { closeSheet(); toast(errText(e)); }
+}
+const adminBoostCard = b => `<div class="card vreq-card">
+  <div class="person" style="padding:0">${userLink(b.userId, av(b.user || { name: '?' }))}<div class="info">${userLink(b.userId, esc(b.user?.name || 'সদস্য') + vb(b.user?.verified), 'who-btn')}<div class="sub">${esc(ago(b.createdAt))}</div></div>
+    <span class="vk paid">${coin(b.coins)}</span></div>
+  <button class="bo-row" data-openpost="${b.postId}" style="margin-top:8px">${b.postImage ? `<img src="${esc(b.postImage)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}<span class="bo-tx"><b>${esc((b.postBody || 'ছবি পোস্ট').slice(0, 80))}</b><small>${bn(b.days)} দিন · ${b.unionName ? esc(b.unionName) : 'পুরো উপজেলা'} · পোস্ট দেখুন ↗</small></span></button>
+  <div class="row" style="margin-top:8px"><button class="btn sm" style="flex:1" data-bdec="${b.id}" data-ok="1">অনুমোদন</button><button class="btn ghost sm" style="flex:1" data-bdec="${b.id}" data-ok="0">প্রত্যাখ্যান</button></div></div>`;
+function decideBoostUI(id, ok, btn) {
+  if (ok) return busy(btn, async () => { await S.api.decideBoost(id, true); toast('বুস্ট চালু হয়েছে'); loadAdmin(); });
+  openSheet(`<h2>বুস্ট প্রত্যাখ্যান</h2><form id="brjform"><label for="brj-note">কারণ (পোস্টদাতা দেখবেন)</label><textarea id="brj-note" rows="3" maxlength="300" placeholder="যেমন: পোস্টে ভুল বা বিভ্রান্তিকর তথ্য আছে"></textarea>
+    <div class="row" style="margin-top:14px"><button class="btn danger" style="flex:1">প্রত্যাখ্যান করুন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div></form>`);
+  $('#brjform').onsubmit = ev => { ev.preventDefault(); busy(ev.submitter, async () => { await S.api.decideBoost(id, false, $('#brj-note').value.trim()); closeSheet(); toast('প্রত্যাখ্যান করা হয়েছে, কয়েন ফেরত গেছে'); loadAdmin(); }); };
+}
 const adminReqCard = r => `<div class="card vreq-card">
   <div class="person" style="padding:0">${userLink(r.userId, av(r.user || { name: r.name }))}<div class="info">${userLink(r.userId, esc(r.user?.name || r.name) + vb(r.user?.verified), 'who-btn')}<div class="sub">${esc(ago(r.createdAt))}</div></div>
     <span class="vk ${r.kind}">${r.kind === 'paid' ? `কয়েন (${bn(r.coinsHeld)})` : 'পাবলিক ফিগার'}</span></div>
@@ -2297,7 +2376,7 @@ async function loadAdmin() {
   if (!me()?.admin) { box.innerHTML = '<div class="empty">এই পাতা শুধু অ্যাডমিনদের জন্য।</div>'; return; }
   box.innerHTML = '<div class="skel"></div>';
   try {
-    const [st, set, vreqs] = await Promise.all([S.api.adminStats(), S.api.settings(), S.api.adminVerifyRequests().catch(() => [])]);
+    const [st, set, vreqs, aboosts] = await Promise.all([S.api.adminStats(), S.api.settings(), S.api.adminVerifyRequests().catch(() => []), S.api.adminBoosts().catch(() => [])]);
     S.settings = set;
     const stat = (icon, n, label, go) => `<button class="astat" ${go ? `data-ago="${go}"` : 'disabled'}><span class="ai">${ic(icon, 20)}</span><b>${bn(n)}</b><span>${label}</span></button>`;
     box.innerHTML = `
@@ -2312,6 +2391,8 @@ async function loadAdmin() {
       </div>
       <h3 class="res-h">ভেরিফাইড ব্যাজের আবেদন${vreqs.length ? ` <span class="cnt">${bn(vreqs.length)}</span>` : ''}</h3>
       ${vreqs.length ? vreqs.map(adminReqCard).join('') : '<div class="card mut">এখন কোনো আবেদন অপেক্ষায় নেই।</div>'}
+      <h3 class="res-h">বুস্টের আবেদন${aboosts.length ? ` <span class="cnt">${bn(aboosts.length)}</span>` : ''}</h3>
+      ${aboosts.length ? aboosts.map(adminBoostCard).join('') : '<div class="card mut">এখন কোনো বুস্ট অপেক্ষায় নেই।</div>'}
       <div class="card">
         <b>কয়েন ও ব্যাজের নিয়ম</b><p class="mut" style="margin:2px 0 8px">প্রতিটা কাজে কত কয়েন, দিনে সর্বোচ্চ কত, আর ব্যাজের দাম ও মেয়াদ।</p>
         <div class="ver-grid coin-grid">
@@ -2330,7 +2411,7 @@ async function loadAdmin() {
       </div>
       <h3 class="res-h">অ্যাপ নিয়ন্ত্রণ</h3>
       <div class="card">
-        ${[['featBlood', 'ব্লাড ব্যাংক'], ['featGroups', 'গ্রুপ'], ['featPages', 'পেইজ']].map(([k, l]) => `
+        ${[['featBlood', 'ব্লাড ব্যাংক'], ['featGroups', 'গ্রুপ'], ['featPages', 'পেইজ'], ['featBoost', 'পোস্ট বুস্ট (বিজ্ঞাপন)']].map(([k, l]) => `
         <label class="switch-row" for="set-${k}">
           <span class="sw-text"><b>${l}</b><span class="mut">বন্ধ করলে মেনু থেকে লুকিয়ে যায়; অ্যাডমিনরা তখনো দেখতে পান।</span></span>
           <input type="checkbox" id="set-${k}" data-flag="${k}" class="switch" role="switch" ${set[k] !== false ? 'checked' : ''}>
@@ -2371,6 +2452,8 @@ $('#admin').addEventListener('change', async e => {
   });
 });
 $('#admin').addEventListener('click', e => {
+  const bd = e.target.closest('[data-bdec]');
+  if (bd) return decideBoostUI(Number(bd.dataset.bdec), bd.dataset.ok === '1', bd);
   const vr = e.target.closest('[data-vreq]');
   if (vr) return decideReq(Number(vr.dataset.vreq), vr.dataset.ok === '1', vr);
   if (e.target.id === 'save-coin') {

@@ -47,5 +47,7 @@ export const SETTING_KEYS = {
   // কয়েন ও ভেরিফাইড ব্যাজ
   earnPost: ['earn_post', 5], earnComment: ['earn_comment', 2], earnLike: ['earn_like', 1], earnShare: ['earn_share', 3],
   earnCap: ['earn_daily_cap', 50], badgePrice: ['badge_price', 500], badgeDays: ['badge_days', 30],
+  // পোস্ট বুস্ট (বিজ্ঞাপন)
+  boostPrice: ['boost_price_day', 50], featBoost: ['feature_boost', true],
 };
 export const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.amarupazila.app';

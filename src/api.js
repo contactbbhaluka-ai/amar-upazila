@@ -17,6 +17,10 @@ const FEATURED0 = ['works', 'educations', 'addr', 'social', 'joined'];
 export const badgeOf = p => (p?.verified === 'authentic' ? 'authentic' : p?.verified === 'paid' && new Date(p.verified_until ?? p.verifiedUntil) > Date.now() ? 'paid' : '');
 const EARN_REASONS = ['post', 'comment', 'like', 'share'];
 const dhakaMidnight = () => { const d = new Date(Date.now() + 6 * 3600e3); d.setUTCHours(0, 0, 0, 0); return new Date(d.getTime() - 6 * 3600e3); };
+const toBoost = r => r && ({ id: r.id, postId: r.post_id, userId: r.user_id, days: r.days, coins: r.coins, unionId: r.union_id || null, unionName: r.un?.name || r.unionName || '', status: r.status, adminNote: r.admin_note || '',
+  startsAt: r.starts_at || null, endsAt: r.ends_at || null, reach: r.reach || 0, createdAt: r.created_at, postBody: r.po?.body ?? r.postBody ?? '', postImage: r.po?.image_urls?.[0] || r.po?.image_url || r.postImage || '' });
+// চালু = অনুমোদিত এবং মেয়াদ শেষ হয়নি; মেয়াদ পার হলে "শেষ"
+export const boostState = b => (b.status === 'active' ? (new Date(b.endsAt) > Date.now() ? 'active' : 'ended') : b.status);
 const toReq = r => r && ({ id: r.id, userId: r.user_id, kind: r.kind, name: r.full_name, category: r.category || '', links: r.links || '', note: r.note || '', status: r.status, adminNote: r.admin_note || '', coinsHeld: r.coins_held || 0, createdAt: r.created_at, decidedAt: r.decided_at || null });
 const settingDefaults = () => Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d]));
 
@@ -172,6 +176,23 @@ async function supabaseApi() {
       const key = SETTING_KEYS[name]?.[0]; if (!key) throw new Error('unknown setting');
       ok(await sb.from('app_settings').upsert({ key, value, updated_by: me.id, updated_at: new Date().toISOString() }));
     },
+    // ---------- পোস্ট বুস্ট
+    async boostedPosts(n = 3) {
+      const rows = ok(await sb.rpc('active_boosts', { p_limit: n })) || [];
+      if (!rows.length) return [];
+      const posts = await this.posts({ ids: rows.map(r => r.post_id) });
+      return rows.map(r => { const p = posts.find(x => x.id === r.post_id); return p && { ...p, sponsored: true, boostId: r.boost_id }; }).filter(Boolean);
+    },
+    async boostSeen(ids) { if (me && ids.length) await sb.rpc('boost_seen', { p_ids: ids }); },
+    async requestBoost(postId, days, unionId) { return ok(await sb.rpc('request_boost', { p_post: postId, p_days: days, p_union: unionId || null })); },
+    async cancelBoost(id) { ok(await sb.rpc('cancel_boost', { p_id: id })); },
+    async myBoosts() { return ok(await sb.from('boosts').select('id,post_id,user_id,days,coins,union_id,status,admin_note,starts_at,ends_at,reach,created_at,po:posts!boosts_post_id_fkey(body,image_url,image_urls),un:unions!boosts_union_id_fkey(name)').eq('user_id', me.id).order('created_at', { ascending: false }).limit(30)).map(toBoost); },
+    async postBoost(postId) { const r = ok(await sb.from('boosts').select('id,post_id,user_id,days,coins,union_id,status,admin_note,starts_at,ends_at,reach,created_at,po:posts!boosts_post_id_fkey(body,image_url,image_urls),un:unions!boosts_union_id_fkey(name)').eq('post_id', postId).order('created_at', { ascending: false }).limit(1)); return toBoost(r[0]) || null; },
+    async adminBoosts() {
+      const rows = ok(await sb.from('boosts').select('id,post_id,user_id,days,coins,union_id,status,admin_note,starts_at,ends_at,reach,created_at,po:posts!boosts_post_id_fkey(body,image_url,image_urls),un:unions!boosts_union_id_fkey(name),p:profiles!boosts_user_id_fkey(' + PROFILE + ')').eq('status', 'pending').order('created_at'));
+      return rows.map(r => ({ ...toBoost(r), user: toUser(r.p) }));
+    },
+    async decideBoost(id, approve, note) { ok(await sb.rpc('decide_boost', { p_id: id, p_approve: approve, p_note: note || null })); },
     // ---------- কয়েন ও ভেরিফাইড ব্যাজ
     async wallet() {
       const [w, led, today] = await Promise.all([
@@ -260,9 +281,10 @@ async function supabaseApi() {
     },
 
     // ---------- পোস্ট
-    async posts({ scope = 'area', unionId, category, before, userId, postId, q: text, groupId, pageId, saved }) {
+    async posts({ scope = 'area', unionId, category, before, userId, postId, q: text, groupId, pageId, saved, ids }) {
       let q = sb.from('posts').select(POST_COLS).order('created_at', { ascending: false }).limit(PAGE);
       if (postId) q = q.eq('id', postId);
+      else if (ids) q = q.in('id', ids.length ? ids : [0]).limit(10);
       else if (saved) {
         const ids = ok(await sb.from('saved_posts').select('post_id').eq('user_id', me.id).order('created_at', { ascending: false }).limit(100)).map(r => r.post_id);
         if (!ids.length) return [];
@@ -602,6 +624,7 @@ function demoApi() {
     saved: get('saved', []),             // "userId:postId"
     settings: get('settings', { publicDonorPhone: false }),
     wallet: get('wallet', { coins: 120, ledger: [{ amount: 100, reason: 'admin', ref: 'স্বাগতম', createdAt: ago(30) }, { amount: 5, reason: 'post', ref: 'x1', createdAt: ago(20) }, { amount: 15, reason: 'like', ref: 'x2', createdAt: ago(19) }] }),
+    boosts: get('boosts', [{ id: 1, post_id: 3, user_id: 'd5', days: 7, coins: 350, union_id: null, status: 'active', starts_at: ago(24), ends_at: new Date(Date.now() + 6 * 864e5).toISOString(), reach: 214, created_at: ago(25) }]),
     vreqs: get('vreqs', [{ id: 1, user_id: 'd7', kind: 'public_figure', full_name: 'রুমানা আক্তার', category: 'সাংবাদিক', links: 'https://example.com/rumana', note: 'স্থানীয় পত্রিকার প্রতিবেদক', status: 'pending', coins_held: 0, created_at: ago(5) }]),
     albums: get('albums', []),           // { id, userId, name, privacy, createdAt }
     manual: get('manual', [            // হাতে যোগ করা ডোনার
@@ -638,7 +661,7 @@ function demoApi() {
     ]),
   };
   let meId = get('me', null);
-  const save = () => { for (const k of ['wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -819,6 +842,44 @@ function demoApi() {
     },
     async settings() { return { ...settingDefaults(), ...db.settings }; },
     async setSetting(name, value) { db.settings[name] = value; save(); },
+    async boostedPosts(n = 3) {
+      if (db.settings.featBoost === false) return [];
+      const me = person(meId);
+      const live = db.boosts.filter(b => b.status === 'active' && new Date(b.ends_at) > Date.now() && b.user_id !== meId && !isBlocked(b.user_id) && (!b.union_id || b.union_id === me?.unionId))
+        .sort(() => Math.random() - 0.5).slice(0, n);
+      const posts = await this.posts({ ids: live.map(b => b.post_id) });
+      return live.map(b => { const p = posts.find(x => x.id === b.post_id); return p && { ...p, sponsored: true, boostId: b.id }; }).filter(Boolean);
+    },
+    async boostSeen(ids) { const seen = get('bseen', {}), day = new Date().toISOString().slice(0, 10); for (const id of ids) { const k = id + ':' + day; if (seen[k]) continue; seen[k] = 1; const b = db.boosts.find(x => x.id === id); if (b) b.reach++; } set('bseen', seen); save(); },
+    async requestBoost(postId, days, unionId) {
+      const p = db.posts.find(x => x.id === Number(postId));
+      if (!p || p.userId !== meId) throw new Error('শুধু নিজের পোস্ট বুস্ট করা যায়');
+      if ((p.privacy || 'public') !== 'public' || p.groupId) throw new Error('শুধু পাবলিক পোস্ট বুস্ট করা যায়');
+      if (db.boosts.some(b => b.post_id === p.id && (b.status === 'pending' || (b.status === 'active' && new Date(b.ends_at) > Date.now())))) throw new Error('এই পোস্টের একটি বুস্ট আগে থেকেই চলছে বা অপেক্ষায় আছে');
+      const price = days * sett('boostPrice');
+      if (db.wallet.coins < price) throw new Error(`যথেষ্ট কয়েন নেই (দরকার ${price})`);
+      const b = { id: nid(db.boosts), post_id: p.id, user_id: meId, days, coins: price, union_id: unionId || null, status: 'pending', reach: 0, created_at: new Date().toISOString() };
+      db.boosts.push(b); addCoins(-price, 'boost', b.id); save(); return b.id;
+    },
+    async cancelBoost(id) {
+      const b = db.boosts.find(x => x.id === id && x.user_id === meId); if (!b) throw new Error('বুস্ট পাওয়া যায়নি');
+      let back = 0;
+      if (b.status === 'pending') { b.status = 'cancelled'; back = b.coins; }
+      else if (b.status === 'active' && new Date(b.ends_at) > Date.now()) { back = Math.min(b.coins, Math.floor((new Date(b.ends_at) - Date.now()) / 864e5) * Math.floor(b.coins / b.days)); b.status = 'stopped'; b.ends_at = new Date().toISOString(); }
+      else throw new Error('এই বুস্ট আর বন্ধ করা যায় না');
+      if (back) addCoins(back, 'refund', 'boost:' + id); save();
+    },
+    __boost(b) { const po = db.posts.find(x => x.id === b.post_id); return toBoost({ ...b, unionName: uname(b.union_id), postBody: po?.body || '', postImage: demoPic(po?.images?.[0] || po?.image || '') }); },
+    async myBoosts() { return wait(db.boosts.filter(b => b.user_id === meId).sort((a, b) => b.created_at.localeCompare(a.created_at)).map(b => this.__boost(b))); },
+    async postBoost(postId) { const b = [...db.boosts].reverse().find(x => x.post_id === Number(postId)); return wait(b ? this.__boost(b) : null); },
+    async adminBoosts() { return wait(db.boosts.filter(b => b.status === 'pending').map(b => ({ ...this.__boost(b), user: user(b.user_id) }))); },
+    async decideBoost(id, approve, note) {
+      const b = db.boosts.find(x => x.id === id && x.status === 'pending'); if (!b) throw new Error('বুস্ট পাওয়া যায়নি');
+      Object.assign(b, approve ? { status: 'active', starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + b.days * 864e5).toISOString(), admin_note: note || '' } : { status: 'rejected', admin_note: note || '' });
+      if (!approve && b.user_id === meId) addCoins(b.coins, 'refund', 'boost:' + id);
+      if (b.user_id === meId) notify(meId, 'd6', approve ? 'boost_ok' : 'boost_no', b.post_id);
+      save();
+    },
     async wallet() {
       const since = dhakaMidnight().toISOString(), w = db.wallet;
       return wait({ coins: w.coins, today: w.ledger.filter(l => EARN_REASONS.includes(l.reason) && l.createdAt >= since).reduce((t, l) => t + l.amount, 0), ledger: w.ledger.slice(0, 60) });
@@ -902,10 +963,11 @@ function demoApi() {
       meId = null; save();
     },
 
-    async posts({ scope = 'area', unionId, category, before, userId, postId, q, groupId, pageId, saved }) {
+    async posts({ scope = 'area', unionId, category, before, userId, postId, q, groupId, pageId, saved, ids }) {
       const myFriends = meId ? new Set(friendIds(meId)) : new Set();
       const visible = db.posts.filter(p => (!p.groupId || canSeeGroup(p.groupId))
         && (!p.privacy || p.privacy === 'public' || p.userId === meId || (p.privacy === 'friends' && myFriends.has(p.userId))));
+      if (ids) return this.__map(visible.filter(p => ids.includes(p.id) && !isBlocked(p.userId)));
       if (postId || q || saved) {
         const t = (q || '').trim().toLowerCase();
         const savedIds = db.saved.filter(x => x.startsWith(meId + ':')).map(x => Number(x.split(':')[1]));

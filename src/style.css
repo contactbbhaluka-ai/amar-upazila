@@ -1470,3 +1470,9 @@ img.av{aspect-ratio:1/1}
 #v-thread[data-theme]:not([data-theme=""]) .bub.mine:not(.deleted):not(.imgonly):not(.stkonly){background:var(--tc);border-color:var(--tc)}
 #v-thread[data-theme]:not([data-theme=""]) .t-ic{color:var(--tc)}
 @media (prefers-reduced-motion: reduce){.heart-pop,.bub.flash{animation:none}}
+/* চ্যাটের উপরের অংশ (নাম, সেটিং, পিন, খোঁজা) স্ক্রল করলেও উপরে আটকে থাকে */
+.t-headwrap{position:sticky;top:var(--hh,0px);z-index:4;background:var(--bg);margin:-14px -12px 8px;padding:8px 12px 6px;border-bottom:1px solid var(--line);box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.t-headwrap .bar{margin:0}
+.t-headwrap #t-top{max-width:none}
+.t-headwrap .t-pin{width:100%;margin:6px 0 0}.t-headwrap .t-dis{margin:6px 0 0}.t-headwrap .t-search{margin:6px 0 0;padding:0;max-width:none}
+.t-set{display:grid;place-items:center}

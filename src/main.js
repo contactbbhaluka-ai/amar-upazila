@@ -4826,3 +4826,6 @@ async function cachedCall(key, fn) {
     $('#retry').onclick = () => location.reload();
   }
 })();
+// হেডারের উচ্চতা মেপে রাখা: চ্যাটের উপরের অংশ ঠিক হেডারের নিচে আটকে থাকে (ফেসবুকের মতো)
+{ const top = document.getElementById('top'), setH = () => document.documentElement.style.setProperty('--hh', top.offsetHeight + 'px');
+  setH(); if (window.ResizeObserver) new ResizeObserver(setH).observe(top); else addEventListener('resize', setH); }

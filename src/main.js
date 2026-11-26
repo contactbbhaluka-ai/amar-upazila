@@ -3918,8 +3918,11 @@ async function loadDir() {
   // প্রথম পাতায় আইকনের গ্রিড; কোনো ধরনের ভেতরে বা খোঁজার সময় উপরে দ্রুত বদলানোর চিপ
   document.body.classList.toggle('dir-sub', !landing);
   if (landing) S.dirSub = false;
+  const chipX = $('#dchips').scrollLeft;   // চিপের সারি যেখানে ছিল সেখানেই থাকবে
   $('#dchips').innerHTML = [['', 'সব সেবা', '🗂️'], ['sos', 'জরুরি নম্বর', '🚨'], ...svcCats()].map(c => `<button class="chip svc-chip${c[0] === S.dcat ? ' on' : ''}" data-d="${c[0]}">${svcIc(c[0] || 'all', 16)}${esc(c[1])}</button>`).join('');
-  setTimeout(() => { const c = $('#dchips'), on = c?.querySelector('.chip.on'); if (c && on) c.scrollLeft = on.offsetLeft - (c.clientWidth - on.offsetWidth) / 2; }, 0);
+  { const c = $('#dchips'), on = c.querySelector('.chip.on'); c.scrollLeft = chipX;
+    // বাছাই করা চিপ পুরো চোখের বাইরে থাকলে (যেমন গ্রিড থেকে ঢুকলে) শুধু যতটুকু দরকার ততটুকু সরাই
+    if (on && (on.offsetLeft + on.offsetWidth <= c.scrollLeft || on.offsetLeft >= c.scrollLeft + c.clientWidth)) c.scrollLeft = Math.max(0, on.offsetLeft - 8 - (on.offsetLeft > c.scrollLeft ? c.clientWidth - on.offsetWidth - 16 : 0)); }
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }
   if (S.dcat === 'blood') return loadBlood();
   if (landing && S.svcAll) { renderSvcGrid(S.svcAll); if (S.dirY != null) window.scrollTo(0, S.dirY); }   // আগের তালিকা সাথে সাথে দেখাই, পরে হালনাগাদ

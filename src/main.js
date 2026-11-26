@@ -1873,6 +1873,7 @@ document.addEventListener('click', e => {
   if (e.target.closest('#plock, .lock-chip')) lockSheet();
   if (e.target.closest('#showact')) showActiveSheet();
   if (e.target.closest('#msgsnd')) soundSheet();
+  if (e.target.closest('#ntset2')) notifSettingsSheet();
 });
 // মেসেজে "সক্রিয় আছেন" দেখানো চালু/বন্ধ (বন্ধ করলে নিজেও অন্যদেরটা দেখবেন না)
 async function showActiveSheet() {
@@ -3430,7 +3431,7 @@ async function refreshBadges() {
 function listenMessages() {
   S.stopMsg?.(); S.stopMsg = null; S.stopNotif?.(); S.stopNotif = null;
   if (!me()) return;
-  S.stopNotif = S.api.onNotify(() => { if (S.view === 'notif') loadNotifs(); else refreshBadges(); });
+  S.stopNotif = S.api.onNotify(() => notifArrived());
   let reloadT = null;
   const reloadThread = () => { clearTimeout(reloadT); reloadT = setTimeout(() => { if (S.view === 'thread' && S.th) openConv(S.th, true); }, 300); };
   S.stopMsg = S.api.onMessage(ev => {
@@ -3917,14 +3918,64 @@ function selfNotif(n) {
   return `<div class="notif self${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="" data-n-user="" role="button" tabindex="0">
     <span class="ico"><span class="self-ic">${icon}</span></span><span class="txt">${text}<span class="time">${esc(ago(n.createdAt))}</span></span></div>`;
 }
+// ================================================================ নোটিফিকেশন পাতা: ফিল্টার, আজ/সপ্তাহ/আগে, একত্র করা, ছোট ছবি, ⋯ মেনু
+const NT_FILTERS = [['all', 'সব'], ['unread', 'না-পড়া'], ['comment', '💬 মন্তব্য'], ['react', '❤️ রিয়্যাক্ট'], ['friend', '👤 বন্ধু'], ['group', '👥 গ্রুপ ও পেইজ']];
+const NT_KIND = { comment: ['comment', 'reply', 'mention', 'tag', 'chat_mention'], react: ['like', 'share'], friend: ['friend_request', 'friend_accept', 'follow'], group: ['group_request', 'group_approved', 'page_admin', 'chat_join_request', 'chat_join_ok'] };
+const NT_GROUPABLE = new Set(['like', 'comment', 'share']);
+const NT_GROUP_TXT = { like: 'আপনার পোস্টে রিয়্যাক্ট দিয়েছেন', comment: 'আপনার পোস্টে মন্তব্য করেছেন', share: 'আপনার পোস্ট শেয়ার করেছেন' };
 async function loadNotifs(keep) {
   const box = $('#notifs');
-  if (!me()) { box.innerHTML = `<div class="empty">নোটিফিকেশন দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
+  if (!me()) { $('#nt-tools').innerHTML = ''; box.innerHTML = `<div class="empty">নোটিফিকেশন দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
   if (!keep) box.innerHTML = '<div class="skel"></div>';
+  $('#nt-newbar').hidden = true; S.ntNew = 0;
   try {
-    const [list, reqs] = await Promise.all([S.api.notifications(S.actAs?.id), S.actAs ? [] : S.api.friendRequests()]);
-    const pending = new Set(reqs.map(r => r.id));
-    box.innerHTML = list.length ? list.map(n => {
+    const [list, reqs, mutes] = await Promise.all([S.api.notifications(S.actAs?.id), S.actAs ? [] : S.api.friendRequests(), S.api.notifMutes().catch(() => new Set())]);
+    const prevUnread = S.nt?.unread || new Set();
+    S.nt = { list, pending: new Set(reqs.map(r => r.id)), mutes, unread: new Set([...list.filter(n => !n.read).map(n => n.id), ...(keep ? [...prevUnread].filter(id => list.some(n => n.id === id)) : [])]) };
+    renderNotifs();
+    if (list.some(n => !n.read)) { await S.api.markNotificationsRead(list.filter(n => !n.read).map(n => n.id)); $('#b-notif').hidden = true; }
+  } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+}
+// একই পোস্টে অনেকের রিয়্যাক্ট/মন্তব্য/শেয়ার এক লাইনে
+function groupNotifs(list) {
+  const out = [], byKey = new Map();
+  for (const n of list) {
+    if (NT_GROUPABLE.has(n.type) && n.postId) {
+      const k = n.type + ':' + n.postId, g = byKey.get(k);
+      if (g) { if (!g.actorIds.has(n.actor.id)) { g.actorIds.add(n.actor.id); g.others++; } g.ids.push(n.id); if (S.nt.unread.has(n.id)) g.isNew = true; continue; }
+      const ng = { ...n, ids: [n.id], actorIds: new Set([n.actor.id]), others: 0, isNew: S.nt.unread.has(n.id) };
+      byKey.set(k, ng); out.push(ng);
+    } else out.push({ ...n, ids: [n.id], others: 0, isNew: S.nt.unread.has(n.id) });
+  }
+  return out;
+}
+function ntSection(d) {
+  const p = dhakaParts(d), t = dhakaParts(new Date());
+  if (p.day === t.day && p.mon === t.mon) return 'আজ';
+  return Date.now() - new Date(d) < 7 * 864e5 ? 'এই সপ্তাহে' : 'আগে';
+}
+function renderNotifs() {
+  const box = $('#notifs'), N = S.nt; if (!N) return;
+  const f = S.ntF || 'all';
+  $('#nt-tools').innerHTML = `<div class="chips fr-sf nt-f">${NT_FILTERS.map(([k, l]) => `<button class="chip${f === k ? ' on' : ''}" data-ntf="${k}">${l}${k === 'unread' && N.unread.size ? ` <span class="badge">${bn(N.unread.size)}</span>` : ''}</button>`).join('')}</div>`;
+  const pending = N.pending;
+  let list = groupNotifs(N.list);
+  if (f === 'unread') list = list.filter(n => n.isNew);
+  else if (NT_KIND[f]) list = list.filter(n => NT_KIND[f].includes(n.type));
+  if (!list.length) {
+    box.innerHTML = f === 'all' ? (S.actAs ? `<div class="empty">${esc(S.actAs.name)} পেইজের এখনো কোনো নোটিফিকেশন নেই।<br>কেউ পেইজের পোস্টে রিয়্যাক্ট বা মন্তব্য করলে এখানে দেখাবে।</div>` : '<div class="empty">এখনো কোনো নোটিফিকেশন নেই।<br>কেউ আপনার পোস্টে লাইক বা মন্তব্য করলে, বা ফ্রেন্ড রিকোয়েস্ট পাঠালে এখানে দেখাবে।</div>') : `<div class="empty">${f === 'unread' ? 'সব নোটিফিকেশন পড়া হয়ে গেছে ✓' : 'এই ধরনের কোনো নোটিফিকেশন নেই।'}</div>`;
+    return;
+  }
+  let html = '', sec = '';
+  for (const n of list) {
+    const s2 = ntSection(n.createdAt); if (s2 !== sec) { sec = s2; html += `<h3 class="nt-sec">${s2}</h3>`; }
+    html += notifRow(n, pending);
+  }
+  box.innerHTML = html;
+}
+function notifRow(n, pending) {
+  if (SELF_TYPES.includes(n.type)) return selfNotif({ ...n, read: !n.isNew }).replace('</div>', ntMoreBtn(n) + '</div>');
+  const row = (() => {
       if (SELF_TYPES.includes(n.type)) return selfNotif(n);
       const [ic, txt0] = NT[n.type] || ['•', ''];
       const txt1 = n.type === 'page_admin' && n.meta?.page ? `আপনাকে "${n.meta.page}" পেইজের অ্যাডমিন বানিয়েছেন` : n.meta?.page && (n.type === 'verify_ok' || n.type === 'verify_no') ? `আপনার পেইজ "${n.meta.page}"-এর ভেরিফাইড ব্যাজের আবেদন ${n.type === 'verify_ok' ? 'অনুমোদন করেছেন' : 'গ্রহণ করেননি'}` : txt0;
@@ -3935,10 +3986,65 @@ async function loadNotifs(keep) {
         ? `<div class="acts2"><button class="sbtn" data-fr="accept" data-id="${esc(n.actor.id)}">গ্রহণ করুন</button><button class="sbtn ghost" data-fr="remove" data-id="${esc(n.actor.id)}">মুছুন</button></div>` : '';
       return `<div class="notif${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="${esc(n.groupId ?? '')}" data-n-user="${esc(n.actor.id)}" data-n-page="${esc(n.meta?.page_id ?? '')}" data-n-chat="${esc(n.meta?.chat_id ?? '')}" role="button" tabindex="0">
         <span class="ico">${av(n.actor)}<i>${ic}</i></span>
-        <span class="txt"><b>${esc(n.actor.name)}</b>${n.type === 'event_reminder' || n.type === 'blood_request' ? '' : ' '}${esc(txt)}${n.type === 'event_reminder' && n.meta?.at ? ` <span class="q">${esc(bnWhen(n.meta.at, true))}${n.meta.place ? ' · ' + esc(n.meta.place) : ''}</span>` : snip}<span class="time">${esc(ago(n.createdAt))}</span>${reqBtns}</span></div>`;
-    }).join('') : (S.actAs ? `<div class="empty">${esc(S.actAs.name)} পেইজের এখনো কোনো নোটিফিকেশন নেই।<br>কেউ পেইজের পোস্টে রিয়্যাক্ট বা মন্তব্য করলে এখানে দেখাবে।</div>` : '<div class="empty">এখনো কোনো নোটিফিকেশন নেই।<br>কেউ আপনার পোস্টে লাইক বা মন্তব্য করলে, বা ফ্রেন্ড রিকোয়েস্ট পাঠালে এখানে দেখাবে।</div>');
-    if (list.some(n => !n.read)) { await S.api.markNotificationsRead(list.filter(n => !n.read).map(n => n.id)); $('#b-notif').hidden = true; }
-  } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+        <span class="txt"><b>${esc(n.actor.name)}</b>${n.others ? ` ও আরও <b>${bn(n.others)} জন</b>` : ''}${n.type === 'event_reminder' || n.type === 'blood_request' ? '' : ' '}${esc(txt)}${n.type === 'event_reminder' && n.meta?.at ? ` <span class="q">${esc(bnWhen(n.meta.at, true))}${n.meta.place ? ' · ' + esc(n.meta.place) : ''}</span>` : snip}<span class="time">${esc(ago(n.createdAt))}</span>${reqBtns}</span></div>`;
+  })();
+  // একত্রিত হলে লেখা বদলানো, ডানে পোস্টের ছোট ছবি, ⋯ বাটন
+  let html = n.others && NT_GROUP_TXT[n.type] ? row.replace(esc((NT[n.type] || [])[1] || '§'), esc(NT_GROUP_TXT[n.type])) : row;
+  html = html.replace(/class="notif( new)?"/, `class="notif${n.isNew ? ' new' : ''}"`);
+  const th = n.postImage ? `<img class="nt-th" src="${esc(n.postImage)}" alt="" loading="lazy" decoding="async">` : n.postBg ? `<span class="nt-th pbg-mini ${esc(n.postBg)}">Aa</span>` : '';
+  const k = html.lastIndexOf('</div>');
+  return html.slice(0, k) + th + ntMoreBtn(n) + html.slice(k);
+}
+const ntMoreBtn = n => `<button class="nt-more" data-ntmenu="${esc(n.ids.join(','))}" data-ntpost="${esc(n.postId ?? '')}" aria-label="অপশন">${ic('dots', 16)}</button>`;
+$('#nt-tools').addEventListener('click', e => { const b = e.target.closest('[data-ntf]'); if (b) { S.ntF = b.dataset.ntf; renderNotifs(); } });
+// ⋯ মেনু: না-পড়া / মুছুন / এই পোস্টের নোটিফিকেশন বন্ধ
+$('#notifs').addEventListener('click', e => {
+  const b = e.target.closest('[data-ntmenu]'); if (!b) return;
+  e.stopImmediatePropagation();
+  const ids = b.dataset.ntmenu.split(',').map(Number), postId = b.dataset.ntpost ? Number(b.dataset.ntpost) : null;
+  const isNew = ids.some(id => S.nt.unread.has(id)), muted = postId && S.nt.mutes.has(postId);
+  openSheet(`<div class="menu">
+    <button data-act="read">${isNew ? '✓ পড়া হিসেবে চিহ্ন দিন' : '📩 না-পড়া হিসেবে চিহ্ন দিন'}</button>
+    <button data-act="del" class="danger">🗑 ${ids.length > 1 ? `এই ${bn(ids.length)}টি নোটিফিকেশন মুছুন` : 'নোটিফিকেশনটি মুছুন'}</button>
+    ${postId ? `<button data-act="mute">${muted ? '🔔 এই পোস্টের নোটিফিকেশন আবার চালু করুন' : '🔕 এই পোস্টের নোটিফিকেশন বন্ধ করুন'}</button>` : ''}
+    <button data-act="set">⚙️ নোটিফিকেশন সেটিং</button><button data-close>বন্ধ করুন</button></div>`);
+  $('#sheet').onclick = ev => {
+    const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    if (a === 'set') return notifSettingsSheet();
+    closeSheet();
+    if (a === 'read') return busy(null, async () => {
+      if (isNew) { await S.api.markNotificationsRead(ids); ids.forEach(id => S.nt.unread.delete(id)); }
+      else { await S.api.markNotificationUnread(ids[0]); S.nt.unread.add(ids[0]); }
+      renderNotifs(); refreshBadges();
+    });
+    if (a === 'del') return busy(null, async () => { for (const id of ids) await S.api.deleteNotification(id); S.nt.list = S.nt.list.filter(n => !ids.includes(n.id)); ids.forEach(id => S.nt.unread.delete(id)); renderNotifs(); toast('মুছে ফেলা হয়েছে'); });
+    if (a === 'mute') return busy(null, async () => { await S.api.muteNotifPost(postId, !muted); if (muted) S.nt.mutes.delete(postId); else S.nt.mutes.add(postId); toast(muted ? 'এই পোস্টের নোটিফিকেশন আবার চালু হয়েছে' : 'এই পোস্টের আর কোনো নোটিফিকেশন আসবে না'); });
+  };
+});
+// কোন ধরনের নোটিফিকেশন পাবেন
+const NT_PREFS = [['❤️ রিয়্যাক্ট', ['like']], ['💬 মন্তব্য ও উত্তর', ['comment', 'reply']], ['@ উল্লেখ ও ট্যাগ', ['mention', 'tag', 'chat_mention']], ['↗ শেয়ার', ['share']],
+  ['👤 ফ্রেন্ড রিকোয়েস্ট ও গ্রহণ', ['friend_request', 'friend_accept']], ['➕ নতুন ফলোয়ার', ['follow']], ['👥 গ্রুপ ও গ্রুপ চ্যাট', ['group_request', 'group_approved', 'chat_join_request', 'chat_join_ok']],
+  ['📅 অনুষ্ঠানের রিমাইন্ডার', ['event_reminder']], ['🩸 কাছাকাছি রক্তের অনুরোধ', ['blood_request']], ['🏆 মাইলফলক ও সাপ্তাহিক রিপোর্ট', ['milestone', 'follower_milestone', 'weekly']]];
+async function notifSettingsSheet() {
+  const off = new Set(await S.api.notifPrefs().catch(() => []));
+  openSheet(`<h2>⚙️ নোটিফিকেশন সেটিং</h2><p class="mut">যেগুলো বন্ধ রাখবেন, সেগুলোর নোটিফিকেশন আর আসবে না।</p>
+    ${NT_PREFS.map(([l, types], i) => `<label class="snd-row"><span>${l}</span><input type="checkbox" data-ntp="${i}" ${types.some(t => off.has(t)) ? '' : 'checked'}></label>`).join('')}
+    <p class="mut" style="font-size:13px">ভেরিফাই ব্যাজ, বুস্ট আর পেইজের অ্যাডমিন হওয়ার মতো জরুরি নোটিফিকেশন সবসময় আসবে। কোনো একটা পোস্টের নোটিফিকেশন বন্ধ করতে সেই নোটিফিকেশনের ⋯ চাপুন।</p>
+    <button class="btn ghost wide" data-close style="margin-top:6px">বন্ধ করুন</button>`);
+  $('#sheet').classList.add('tall');
+  $('#sheet').onchange = e => {
+    const i = e.target.dataset?.ntp; if (i == null) return;
+    NT_PREFS[Number(i)][1].forEach(t => { if (e.target.checked) off.delete(t); else off.add(t); });
+    S.api.setNotifPrefs([...off]).then(() => toast(e.target.checked ? 'চালু করা হয়েছে' : 'বন্ধ করা হয়েছে')).catch(er => toast(errText(er)));
+  };
+}
+$('#notif-set').addEventListener('click', () => { if (needUser()) notifSettingsSheet(); });
+// পাতা খোলা থাকা অবস্থায় নতুন নোটিফিকেশন: উপরে বার
+$('#nt-newbar').addEventListener('click', () => { window.scrollTo({ top: 0, behavior: 'smooth' }); loadNotifs(true); });
+function notifArrived() {
+  if (S.view !== 'notif') return refreshBadges();
+  if (scrollY < 150) return loadNotifs(true);
+  S.ntNew = (S.ntNew || 0) + 1; const b = $('#nt-newbar'); b.hidden = false; b.textContent = `↑ ${bn(S.ntNew)}টি নতুন নোটিফিকেশন`;
 }
 function openNotif(el) {
   if (!el || el.closest('button')) return;
@@ -4431,6 +4537,7 @@ function renderMenu() {
       <button id="listpriv">বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
       <button id="showact">🟢 সক্রিয় অবস্থা দেখান (মেসেজে)</button>
       <button id="msgsnd">🔊 মেসেজের শব্দ</button>
+      <button id="ntset2">🔔 নোটিফিকেশন সেটিং</button>
       <button id="blocked">ব্লক করা মানুষ</button>
       <button id="theme">থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
       <a href="./privacy.html">গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>

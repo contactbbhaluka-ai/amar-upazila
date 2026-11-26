@@ -1580,3 +1580,16 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .prof h2.ph-h2{padding:0 78px;position:relative}
 .prof h2 .ph-acts{position:absolute;margin-left:12px;white-space:nowrap}
 .prof h2.ph-h2 .ph-acts{top:50%;transform:translateY(-50%);vertical-align:baseline}
+/* নোটিফিকেশন (২) */
+.nt-gear{border:0;background:none;color:var(--mut);width:36px;height:36px;border-radius:50%;display:grid;place-items:center;cursor:pointer;padding:0;min-height:0}
+.nt-gear:hover{background:var(--g2)}
+.nt-f{margin-bottom:8px}
+.nt-sec{font-size:15px;margin:12px 2px 4px;color:var(--ink)}
+.nt-sec:first-child{margin-top:6px}
+.notif{position:relative;align-items:center}
+.nt-th{flex:none;width:46px;height:46px;border-radius:8px;object-fit:cover;margin-left:6px;background:var(--g2)}
+.pbg-mini{display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px}
+.nt-more{flex:none;border:0;background:none;color:var(--mut);width:32px;height:32px;border-radius:50%;display:grid;place-items:center;cursor:pointer;padding:0;min-height:0;margin-left:2px}
+.nt-more:hover{background:var(--g2)}
+.nt-newbar{position:sticky;top:calc(var(--hh,0px) + 8px);z-index:4;display:block;margin:0 auto 8px;border:0;border-radius:999px;background:#2563eb;color:#fff;font:inherit;font-size:14px;font-weight:700;padding:8px 16px;box-shadow:0 4px 14px rgba(37,99,235,.35);cursor:pointer}
+.nt-newbar[hidden]{display:none}

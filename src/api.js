@@ -819,11 +819,11 @@ async function supabaseApi() {
     // ---------- নোটিফিকেশন
     // pageId দিলে শুধু ওই পেইজের নোটিফিকেশন; না দিলে পেইজেরগুলো বাদে বাকি সব
     async notifications(pageId) {
-      const rows = ok(await sb.from('notifications').select('id,type,post_id,group_id,read,created_at,actor_id,meta, a:profiles!notifications_actor_id_fkey(id,name,avatar_url), p:posts!notifications_post_id_fkey(body,page_id), g:groups!notifications_group_id_fkey(name)')
+      const rows = ok(await sb.from('notifications').select('id,type,post_id,group_id,read,created_at,actor_id,meta, a:profiles!notifications_actor_id_fkey(id,name,avatar_url), p:posts!notifications_post_id_fkey(body,page_id,image_url,bg), g:groups!notifications_group_id_fkey(name)')
         .eq('user_id', me.id).order('created_at', { ascending: false }).limit(100));
       return rows.filter(n => n.a && !blocked.has(n.actor_id) && inScope(n, pageId)).slice(0, 60).map(n => ({
         id: n.id, type: n.type, postId: n.post_id, groupId: n.group_id, groupName: n.g?.name || '', read: n.read, createdAt: n.created_at,
-        actor: { id: n.a.id, name: n.a.name, avatar: n.a.avatar_url || '' }, snippet: n.p?.body || '', meta: n.meta || {},
+        actor: { id: n.a.id, name: n.a.name, avatar: n.a.avatar_url || '' }, snippet: n.p?.body || '', postImage: n.p?.image_url || '', postBg: n.p?.bg || '', meta: n.meta || {},
       }));
     },
     async unreadNotifications(pageId) {
@@ -831,6 +831,12 @@ async function supabaseApi() {
       const rows = ok(await sb.from('notifications').select('id,type,meta,p:posts!notifications_post_id_fkey(page_id)').eq('user_id', me.id).eq('read', false).limit(300));
       return rows.filter(n => inScope(n, pageId)).length;
     },
+    async deleteNotification(id) { ok(await sb.from('notifications').delete().eq('id', id).eq('user_id', me.id)); },
+    async markNotificationUnread(id) { ok(await sb.rpc('mark_notification_unread', { p_id: id })); },
+    async notifMutes() { return me ? new Set(ok(await sb.from('notif_mutes').select('post_id').eq('user_id', me.id)).map(r => r.post_id)) : new Set(); },
+    async muteNotifPost(postId, on) { if (on) ok(await sb.from('notif_mutes').upsert({ user_id: me.id, post_id: postId }, { ignoreDuplicates: true })); else ok(await sb.from('notif_mutes').delete().eq('user_id', me.id).eq('post_id', postId)); },
+    async notifPrefs() { return me ? (ok(await sb.from('notif_prefs').select('off').eq('user_id', me.id).maybeSingle())?.off || []) : []; },
+    async setNotifPrefs(off) { ok(await sb.from('notif_prefs').upsert({ user_id: me.id, off, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })); },
     async markNotificationsRead(ids) { if (ids) { if (ids.length) ok(await sb.rpc('mark_notifications_read_ids', { p_ids: ids })); } else ok(await sb.rpc('mark_notifications_read')); },
     onNotify(cb) {
       if (!me) return () => {};
@@ -914,7 +920,7 @@ function demoApi() {
     settings: get('settings', { publicDonorPhone: false }),
     wallet: get('wallet', { coins: 120, ledger: [{ amount: 100, reason: 'admin', ref: 'স্বাগতম', createdAt: ago(30) }, { amount: 5, reason: 'post', ref: 'x1', createdAt: ago(20) }, { amount: 15, reason: 'like', ref: 'x2', createdAt: ago(19) }] }),
     chats: get('chats', []),
-    msgSaved: get('msgSaved', []), shared: get('shared', {}), friendMarks: get('friendMarks', {}), friendLists: get('friendLists', []), sugHidden: get('sugHidden', []),             // গ্রুপ চ্যাট { id, name, createdBy, createdAt, members: [{ id, role, lastReadAt }] }
+    msgSaved: get('msgSaved', []), shared: get('shared', {}), friendMarks: get('friendMarks', {}), friendLists: get('friendLists', []), sugHidden: get('sugHidden', []), notifMutes: get('notifMutes', []), notifOff: get('notifOff', []),             // গ্রুপ চ্যাট { id, name, createdBy, createdAt, members: [{ id, role, lastReadAt }] }
     convSet: get('convSet', {}),         // কথোপকথনের সেটিং (মিউট, রিকোয়েস্ট, মুছা)
     votes: get('votes', {}),             // postId -> { userId: অপশন }
     going: get('going', {}),             // postId -> [userId]
@@ -958,7 +964,7 @@ function demoApi() {
     ]),
   };
   let meId = get('me', null);
-  const save = () => { for (const k of ['chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone' }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -1064,6 +1070,7 @@ function demoApi() {
   }
   function notify(to, from, type, postId = null, groupId = null, meta = null) {
     if (!to || (to === from && !SELF_NT.includes(type)) || db.blocks.includes(to + ':' + from)) return;
+    if (to === meId && ((db.notifOff || []).includes(type) || (postId && (db.notifMutes || []).includes(Number(postId))))) return;
     if (type !== 'comment' && type !== 'reply') db.notifs = db.notifs.filter(n => !(n.to === to && n.from === from && n.type === type && n.postId === postId && n.groupId === groupId));
     db.notifs.push({ id: nid(db.notifs), to, from, type, postId, groupId, meta, createdAt: new Date().toISOString(), read: false });
     save(); if (to === meId) notifyListeners.forEach(cb => cb());
@@ -1935,9 +1942,15 @@ function demoApi() {
 
     async notifications(pageId) {
       return wait(db.notifs.filter(n => n.to === meId && !isBlocked(n.from) && inScope(demoN(n), pageId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 60)
-        .map(n => ({ id: n.id, type: n.type, postId: n.postId, groupId: n.groupId || null, groupName: db.groups.find(g => g.id === n.groupId)?.name || '', read: n.read, createdAt: n.createdAt, actor: user(n.from) || { id: n.from, name: 'সদস্য', avatar: '' }, snippet: db.posts.find(p => p.id === n.postId)?.body || '', meta: n.meta || {} })));
+        .map(n => ({ id: n.id, type: n.type, postId: n.postId, groupId: n.groupId || null, groupName: db.groups.find(g => g.id === n.groupId)?.name || '', read: n.read, createdAt: n.createdAt, actor: user(n.from) || { id: n.from, name: 'সদস্য', avatar: '' }, snippet: db.posts.find(p => p.id === n.postId)?.body || '', postImage: demoPic((db.posts.find(p => p.id === n.postId)?.images || [])[0] || db.posts.find(p => p.id === n.postId)?.image || '') || '', postBg: db.posts.find(p => p.id === n.postId)?.bg || '', meta: n.meta || {} })));
     },
     async unreadNotifications(pageId) { return db.notifs.filter(n => n.to === meId && !n.read && !isBlocked(n.from) && inScope(demoN(n), pageId)).length; },
+    async deleteNotification(id) { db.notifs = db.notifs.filter(n => !(n.id === id && n.to === meId)); save(); return wait(); },
+    async markNotificationUnread(id) { const n = db.notifs.find(x => x.id === id && x.to === meId); if (n) n.read = false; save(); return wait(); },
+    async notifMutes() { return new Set(db.notifMutes || []); },
+    async muteNotifPost(postId, on) { db.notifMutes = (db.notifMutes || []).filter(x => x !== Number(postId)); if (on) db.notifMutes.push(Number(postId)); save(); return wait(); },
+    async notifPrefs() { return [...(db.notifOff || [])]; },
+    async setNotifPrefs(off) { db.notifOff = [...off]; save(); return wait(); },
     async markNotificationsRead(ids) { for (const n of db.notifs) if (n.to === meId && (!ids || ids.includes(n.id))) n.read = true; save(); },
     onNotify(cb) { notifyListeners.add(cb); return () => notifyListeners.delete(cb); },
     async search(q) {

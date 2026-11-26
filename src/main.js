@@ -239,7 +239,7 @@ document.addEventListener('click', e => {
   e.stopPropagation(); S.expanded.add(b.dataset.more);
   const host = b.parentElement; const key = b.dataset.more;
   if (key.startsWith('p')) { const f = feedOf(b); if (f) renderFeed(f); }
-  else if (key.startsWith('c')) { const c = (S.comments || []).find(x => 'c' + x.id === key); if (c) host.innerHTML = esc(c.body); }
+  else if (key.startsWith('c')) { const c = cmScope(b).list.find(x => 'c' + x.id === key); if (c) host.innerHTML = esc(c.body); }
   else if (key.startsWith('s')) host.textContent = host.dataset.full || host.textContent;
 }, true);
 
@@ -367,23 +367,36 @@ function postHtml(p) {
 }
 // ================================================================ ফিডেই পোস্টের নিচে মন্তব্য (ফেসবুকের মতো)
 // মন্তব্য বাটনে চাপলে পোস্টের নিচেই কয়েকটি মন্তব্য আর লেখার বক্স খোলে; সব দেখতে আলাদা পাতায়
-S.cmIn = new Map();   // postId → { list, draft, added: Set, ments: Map }
+S.cmIn = new Map();   // postId → { list, draft, added, ments, open, replyTo, limit }
 const CMI_SHOW = 3;
+const kidsOf = list => { const m = new Map(); (list || []).filter(c => c.parentId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).forEach(c => { if (!m.has(c.parentId)) m.set(c.parentId, []); m.get(c.parentId).push(c); }); return m; };
+// কোন জায়গার মন্তব্য: ফিডে পোস্টের নিচে, নাকি আলাদা মন্তব্যের পাতা
+function cmScope(el) {
+  const box = el?.closest?.('.cmi');
+  if (box) {
+    const id = box.dataset.cmi, key = feedOf(box), st = S.cmIn.get(id);
+    return { inline: true, id, key, st, root: box, post: findPost(key, id), list: st?.list || [], kids: st?.kids || new Map(), open: st?.open || new Set(),
+      redraw: () => { renderFeed(key); }, refresh: () => loadCmi(key, id) };
+  }
+  return { inline: false, root: $('#cm-list'), post: S.feeds.post.posts[0], list: S.comments || [], kids: S.cmKids || new Map(), open: S.cmOpen || new Set(), redraw: loadComments, refresh: loadComments };
+}
 function inlineCmHtml(p) {
   const st = S.cmIn.get(String(p.id)), u = me();
-  let shown = [];
+  let shown = [], tops = [];
   if (st.list) {
-    const tops = st.list.filter(c => !c.parentId);
+    st.kids = kidsOf(st.list);
+    tops = st.list.filter(c => !c.parentId);
     const pinned = tops.find(c => c.id === p.pinnedCommentId);
-    const mine = tops.filter(c => st.added.has(c.id));
+    const mine = tops.filter(c => st.added.has(c.id) && c !== pinned);
     const best = tops.filter(c => c !== pinned && !st.added.has(c.id)).sort((a, b) => (b.likes || 0) - (a.likes || 0) || b.createdAt.localeCompare(a.createdAt));
-    shown = [...(pinned ? [pinned] : []), ...best].slice(0, Math.max(CMI_SHOW - mine.length, 1)).concat(mine);
+    shown = [...(pinned ? [pinned] : []), ...best].slice(0, Math.max(st.limit - mine.length, 1)).concat(mine);
   }
-  const total = p.comments || 0;
+  const left = tops.length - shown.length, sc = { kids: st.kids, open: st.open };
   return `<div class="cmi" data-cmi="${esc(p.id)}">
-    ${!st.list ? '<div class="cmi-load mut">মন্তব্য লোড হচ্ছে…</div>' : shown.map(c => `<button class="cmi-c" data-openpost="${esc(p.id)}">${av(c, 'sm')}<span class="cmi-b"><b>${esc(c.author)}${vb(c.badge)}</b><span class="cmi-t">${esc(c.body.length > 160 ? c.body.slice(0, 160) + '…' : c.body)}</span></span><span class="cmi-m mut">${esc(ago(c.createdAt))}${c.likes ? ` · ${ic('thumb', 12)} ${bn(c.likes)}` : ''}</span></button>`).join('')}
-    ${st.list && total > shown.length ? `<button class="cmi-all" data-openpost="${esc(p.id)}">সব মন্তব্য দেখুন (${bn(total)})</button>` : ''}
-    <form class="cmi-form" data-cmiform="${esc(p.id)}">${S.actAs ? entAv(S.actAs) : u ? av(u, 'sm') : ''}<input class="cmi-input" placeholder="${u ? 'মন্তব্য লিখুন…' : 'মন্তব্য করতে লগইন করুন'}" maxlength="300" autocomplete="off" aria-label="মন্তব্য লিখুন" value="${esc(st.draft || '')}"><button class="cmi-send" aria-label="মন্তব্য পাঠান">${ic('send', 20)}</button></form>
+    ${!st.list ? '<div class="cmi-load mut">মন্তব্য লোড হচ্ছে…</div>' : shown.map(c => commentHtml(c, p, c.id === p.pinnedCommentId) + repliesHtml(c, p, sc)).join('')}
+    ${left > 0 ? `<button class="cmi-all" data-cmimore="${esc(p.id)}">আরও ${bn(left)}টি মন্তব্য দেখুন</button>` : ''}
+    ${st.replyTo ? `<div class="cmi-rep">${ic('reply', 14)} <span><b>${esc(st.replyTo.name)}</b>-কে উত্তর দিচ্ছেন</span><button type="button" data-cmirx="${esc(p.id)}" aria-label="উত্তর বাতিল">✕</button></div>` : ''}
+    <form class="cmi-form" data-cmiform="${esc(p.id)}">${S.actAs ? entAv(S.actAs) : u ? av(u, 'sm') : ''}<input class="cmi-input" placeholder="${!u ? 'মন্তব্য করতে লগইন করুন' : st.replyTo ? `${esc(st.replyTo.name)}-কে উত্তর দিন…` : 'মন্তব্য লিখুন…'}" maxlength="300" autocomplete="off" aria-label="মন্তব্য লিখুন" value="${esc(st.draft || '')}"><button class="cmi-send" aria-label="মন্তব্য পাঠান">${ic('send', 20)}</button></form>
   </div>`;
 }
 function focusCmi(id) {
@@ -400,10 +413,16 @@ async function loadCmi(key, id) {
 async function toggleCmi(key, id) {
   id = String(id);
   if (S.cmIn.has(id)) { const i = document.querySelector(`.cmi[data-cmi="${id}"] .cmi-input`); if (i && document.activeElement !== i) return focusCmi(id); if (!S.cmIn.get(id).draft) { S.cmIn.delete(id); renderFeed(key); } return; }
-  S.cmIn.set(id, { list: null, draft: '', added: new Set(), ments: new Map() });
+  S.cmIn.set(id, { list: null, draft: '', added: new Set(), ments: new Map(), open: new Set(), replyTo: null, limit: CMI_SHOW });
   renderFeed(key); focusCmi(id);
   loadCmi(key, id);
 }
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-cmimore],[data-cmirx]'); if (!b) return;
+  const id = b.dataset.cmimore || b.dataset.cmirx, st = S.cmIn.get(id), key = feedOf(b); if (!st || !key) return;
+  if (b.dataset.cmimore) st.limit += 10; else { st.replyTo = null; if (/^@\S/.test(st.draft) && st.ments.size) st.draft = ''; }
+  renderFeed(key); if (b.dataset.cmirx) focusCmi(id);
+});
 document.addEventListener('input', e => { const i = e.target.closest?.('.cmi-input'); if (i) { const st = S.cmIn.get(i.closest('.cmi').dataset.cmi); if (st) st.draft = i.value; } });
 document.addEventListener('focusin', e => { const i = e.target.closest?.('.cmi-input'); if (!i) return; if (!me()) { i.blur(); return needUser(); } if (!i._m) { i._m = true; attachMention(i, S.cmIn.get(i.closest('.cmi').dataset.cmi).ments); } });
 document.addEventListener('submit', e => {
@@ -412,11 +431,11 @@ document.addEventListener('submit', e => {
   const id = f.dataset.cmiform, key = feedOf(f), st = S.cmIn.get(id), post = key && findPost(key, id), i = f.querySelector('input'), body = i.value.trim();
   if (!body || !post || !st) return;
   busy(f.querySelector('button'), async () => {
-    const ments = mentionIds(body, st.ments);
-    await S.api.addComment(post.id, body, null, ments, S.actAs?.id || null);
-    st.draft = ''; st.ments.clear(); post.comments = (post.comments || 0) + 1;
+    const ments = mentionIds(body, st.ments), rt = st.replyTo;
+    await S.api.addComment(post.id, body, rt?.id || null, ments, S.actAs?.id || null);
+    st.draft = ''; st.ments.clear(); st.replyTo = null; post.comments = (post.comments || 0) + 1;
     const list = await S.api.comments(post.id, 'new').catch(() => null);
-    if (list) { const mine = list.find(c => !c.parentId && c.body === body && !st.added.has(c.id)); if (mine) st.added.add(mine.id); st.list = list; }
+    if (list) { if (rt) st.open.add(rt.id); else { const mine = list.find(c => !c.parentId && c.body === body && !st.added.has(c.id)); if (mine) st.added.add(mine.id); } st.list = list; }
     renderFeed(key); focusCmi(id);
   });
 });
@@ -693,7 +712,7 @@ function openPicker(btn) {
   if (!needUser()) return;
   closePicker();
   if (btn.dataset.clike) { // মন্তব্যের রিয়্যাক্ট
-    const c = (S.comments || []).find(x => String(x.id) === btn.dataset.clike); if (!c) return;
+    const c = cmScope(btn).list.find(x => String(x.id) === btn.dataset.clike); if (!c) return;
     const pk = document.createElement('div'); pk.className = 'rpick small'; pk.setAttribute('role', 'menu');
     pk.innerHTML = REACTIONS.map(([k, e, n], i) => `<button data-creact="${k}" data-cid="${esc(c.id)}" class="${c.myReaction === k ? 'on' : ''}" aria-label="${n}" style="--i:${i}"><span class="rx-tip">${n}</span>${rxIcon(k, 34)}</button>`).join('');
     btn.parentElement.appendChild(pk);
@@ -2252,11 +2271,11 @@ async function loadComments() {
       : '<div class="empty" style="padding:20px">এখনো কোনো মন্তব্য নেই।<br>প্রথম মন্তব্যটি আপনিই করুন!</div>';
   } catch (e) { $('#cm-list').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
-function repliesHtml(c, post) {
-  const r = S.cmKids?.get(c.id) || []; if (!r.length) return '';
-  const openAll = r.length <= 1 || S.cmOpen?.has(c.id);
+function repliesHtml(c, post, sc = { kids: S.cmKids, open: S.cmOpen }) {
+  const r = sc.kids?.get(c.id) || []; if (!r.length) return '';
+  const openAll = r.length <= 1 || sc.open?.has(c.id);
   return `<div class="cm-replies" data-rof="${esc(c.id)}">${openAll ? r.map(x => commentHtml(x, post, false)).join('')
-    : `<button class="cm-showrep" data-showrep="${esc(c.id)}">${ic('reply', 15)} ${bn(r.length)}টি উত্তর দেখুন</button>`}</div>`;
+    : `<button class="cm-showrep" data-showrep="${esc(c.id)}">${ic('reply', 15)} সব ${bn(r.length)}টি উত্তর দেখুন</button>`}</div>`;
 }
 function commentHtml(c, post, pinned) {
   const top = Object.entries(c.reactions || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
@@ -2265,10 +2284,10 @@ function commentHtml(c, post, pinned) {
     <div class="cm-row">${c.pageId ? `<button class="avbtn" data-page="${esc(c.pageId)}">${entAv({ name: c.author, avatar: c.avatar })}</button>` : userLink(c.userId, av(c, 'sm'))}
       <div class="cm-main"><div class="cm-bubble">${c.pageId ? `<button class="who-btn" data-page="${esc(c.pageId)}">${esc(c.author)}${vb(c.badge)}</button>` : userLink(c.userId, esc(c.author) + vb(c.badge), 'who-btn')}<div class="cm-text">${moreText(c.body, 'c' + c.id, { chars: 200, lines: 4, mentions: c.mentions })}</div>
         ${c.likes ? `<button class="cm-rx" data-crx="${esc(c.id)}" aria-label="কে কে রিয়্যাক্ট দিয়েছেন">${top.map(([k]) => `<span class="rs-i">${rxIcon(k, 16)}</span>`).join('')}<span>${bn(c.likes)}</span></button>` : ''}</div>
-        <div class="cm-meta"><span>${esc(ago(c.createdAt))}${c.editedAt ? ' · সম্পাদিত' : ''}</span>
-          <button class="cm-react${c.myReaction ? ' on rx-' + c.myReaction : ''}" data-clike="${esc(c.id)}" aria-label="${c.myReaction ? rxName(c.myReaction) + ' দিয়েছেন' : 'রিয়্যাক্ট দিন'}">${c.myReaction ? rxIcon(c.myReaction, 18) : ic('thumb', 17)}</button>
-          <button class="cm-reply" data-creply="${esc(c.id)}" aria-label="উত্তর দিন">${ic('reply', 17)}</button>
-          <button class="cm-more" data-cmenu="${esc(c.id)}" aria-label="আরও অপশন">${ic('dots', 18)}</button></div></div></div></div>`;
+        <div class="cm-meta"><span class="cm-time">${esc(ago(c.createdAt))}${c.editedAt ? ' · সম্পাদিত' : ''}</span>
+          <button class="cm-tl cm-react${c.myReaction ? ' on rx-' + c.myReaction : ''}" data-clike="${esc(c.id)}" aria-label="${c.myReaction ? rxName(c.myReaction) + ' দিয়েছেন, চাপলে তুলে নেবেন' : 'লাইক দিন; চেপে ধরলে অন্য রিয়্যাক্ট'}">${c.myReaction ? rxName(c.myReaction) : 'লাইক'}</button>
+          <button class="cm-tl cm-reply" data-creply="${esc(c.id)}">উত্তর</button>
+          <button class="cm-more" data-cmenu="${esc(c.id)}" aria-label="আরও অপশন">${ic('dots', 16)}</button></div></div></div></div>`;
 }
 document.querySelector('#cm-sort').addEventListener('click', e => { const b = e.target.closest('[data-csort]'); if (b && b.dataset.csort !== S.csort) { S.csort = b.dataset.csort; loadComments(); } });
 $('#cm-form').addEventListener('submit', e => {
@@ -2293,14 +2312,14 @@ function setReplyTo(r) {
 S.cmMentions = new Map(); attachMention($('#cm-input'), S.cmMentions);
 $('#cm-replying button').addEventListener('click', () => { setReplyTo(null); const i = $('#cm-input'); if (S.cmMentions.size && [...S.cmMentions.values()].some(n => i.value === '@' + n + ' ')) i.value = ''; });
 // মন্তব্য এডিট: মন্তব্যের জায়গাতেই লেখার বক্স
-function editCommentInline(c) {
-  const el = document.querySelector(`.cm[data-cid="${c.id}"] .cm-text`); if (!el) return;
+function editCommentInline(c, sc = cmScope(null)) {
+  const el = sc.root?.querySelector(`.cm[data-cid="${c.id}"] .cm-text`); if (!el) return;
   el.innerHTML = `<form class="cm-edit"><textarea maxlength="300" rows="2" aria-label="মন্তব্য এডিট করুন">${esc(c.body)}</textarea>
     <div class="cm-edit-b"><button type="button" class="btn ghost sm" data-ecancel>বাতিল</button><button class="btn sm">সংরক্ষণ</button></div></form>`;
   const f = el.querySelector('form'), ta = f.querySelector('textarea'), store = new Map((c.mentions || []).map(m => [m.id, m.name]));
   attachMention(ta, store);
   ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
-  const cancel = () => loadComments();
+  const cancel = () => sc.redraw();
   f.querySelector('[data-ecancel]').onclick = cancel;
   ta.onkeydown = e => { if (e.key === 'Escape') cancel(); if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } };
   f.onsubmit = e => {
@@ -2308,10 +2327,10 @@ function editCommentInline(c) {
     if (!body) return toast('মন্তব্য খালি রাখা যাবে না');
     const ids = mentionIds(body, store);
     if (body === c.body && ids.sort().join() === (c.mentions || []).map(m => m.id).sort().join()) return cancel();
-    busy(e.submitter, async () => { await S.api.editComment(c.id, body, ids); toast('মন্তব্য আপডেট হয়েছে'); await loadComments(); });
+    busy(e.submitter, async () => { await S.api.editComment(c.id, body, ids); toast('মন্তব্য আপডেট হয়েছে'); await sc.refresh(); });
   };
 }
-async function setCommentReaction(c, reaction) {
+async function setCommentReaction(c, reaction, sc = cmScope(null)) {
   if (!needUser()) return;
   const prev = c.myReaction || ''; if (prev === reaction) return;
   try { await S.api.reactComment(c.id, reaction, prev); } catch (e) { return toast(errText(e)); }
@@ -2319,15 +2338,24 @@ async function setCommentReaction(c, reaction) {
   if (prev) c.reactions[prev] = Math.max((c.reactions[prev] || 0) - 1, 0);
   if (reaction) c.reactions[reaction] = (c.reactions[reaction] || 0) + 1;
   c.likes += (reaction ? 1 : 0) - (prev ? 1 : 0); c.myReaction = reaction;
-  const el = document.querySelector(`.cm[data-cid="${c.id}"]`), post = S.feeds.post.posts[0];
-  if (el) el.outerHTML = commentHtml(c, post, el.classList.contains('pinned'));
+  if (sc.inline) return sc.redraw();
+  const el = sc.root?.querySelector(`.cm[data-cid="${c.id}"]`);
+  if (el) el.outerHTML = commentHtml(c, sc.post, el.classList.contains('pinned'));
 }
-$('#cm-list').addEventListener('click', async e => {
-  const b = e.target.closest('button'); if (!b) return;
-  const findC = id => (S.comments || []).find(x => String(x.id) === String(id));
-  if (b.dataset.clike) { if (S.suppressClick) { S.suppressClick = false; return; } clearTimeout(lpTimer); closePicker(); const c = findC(b.dataset.clike); return setCommentReaction(c, c.myReaction ? '' : 'like'); }
+document.addEventListener('click', async e => {
+  const b = e.target.closest('#cm-list button, .cmi .cm button, .cmi .cm-replies button'); if (!b) return;
+  const sc = cmScope(b);
+  const findC = id => sc.list.find(x => String(x.id) === String(id));
+  if (b.dataset.clike) { if (S.suppressClick) { S.suppressClick = false; return; } clearTimeout(lpTimer); closePicker(); const c = findC(b.dataset.clike); return c && setCommentReaction(c, c.myReaction ? '' : 'like', sc); }
   if (b.dataset.crx) return reactorsSheet('comment', b.dataset.crx);
-  if (b.dataset.showrep) { S.cmOpen.add(Number(b.dataset.showrep) || b.dataset.showrep); return loadComments(); }
+  if (b.dataset.showrep) { sc.open.add(Number(b.dataset.showrep) || b.dataset.showrep); return sc.redraw(); }
+  if (b.dataset.creply && sc.inline) {
+    if (!needUser()) return;
+    const c = findC(b.dataset.creply); if (!c || !sc.st) return;
+    sc.st.replyTo = { id: c.parentId || c.id, name: c.author };
+    if (c.parentId && c.userId !== me().id && !sc.st.draft.trim()) { sc.st.draft = '@' + c.author + ' '; sc.st.ments.set(c.userId, c.author); }
+    sc.redraw(); return focusCmi(sc.id);
+  }
   if (b.dataset.creply) {
     if (!needUser()) return;
     const c = findC(b.dataset.creply), topId = c.parentId || c.id, i = $('#cm-input');
@@ -2336,9 +2364,9 @@ $('#cm-list').addEventListener('click', async e => {
     if (c.parentId && c.userId !== me().id && !i.value.trim()) { i.value = '@' + c.author + ' '; S.cmMentions.set(c.userId, c.author); }
     i.focus(); return;
   }
-  if (b.dataset.creact) { closePicker(); const c = findC(b.dataset.cid); return setCommentReaction(c, b.dataset.creact === c.myReaction ? '' : b.dataset.creact); }
+  if (b.dataset.creact) { closePicker(); const c = findC(b.dataset.cid); return c && setCommentReaction(c, b.dataset.creact === c.myReaction ? '' : b.dataset.creact, sc); }
   if (b.dataset.cmenu) {
-    const c = findC(b.dataset.cmenu), post = S.feeds.post.posts[0], u = me();
+    const c = findC(b.dataset.cmenu), post = sc.post, u = me(); if (!c || !post) return;
     const canPin = u && !c.parentId && (post.userId === u.id || u.admin), canDel = u && (c.userId === u.id || post.userId === u.id || u.admin);
     openSheet(`<div class="menu">
       ${canPin ? `<button data-act="pin">${post.pinnedCommentId === c.id ? 'আনপিন করুন' : 'মন্তব্যটি পিন করুন'}</button>` : ''}
@@ -2352,10 +2380,13 @@ $('#cm-list').addEventListener('click', async e => {
       if (a === 'login') { closeSheet(); return go('me'); }
       if (a === 'rep') return reportSheet('comment', c.id);
       closeSheet();
-      if (a === 'edit') return editCommentInline(c);
-      if (a === 'pin') await busy(null, async () => { const v = post.pinnedCommentId === c.id ? null : c.id; await S.api.pinComment(post.id, v); post.pinnedCommentId = v; toast(v ? 'মন্তব্য পিন করা হয়েছে, সবার উপরে দেখাবে' : 'পিন তুলে নেওয়া হয়েছে'); loadComments(); });
-      const nKids = (S.cmKids?.get(c.id) || []).length;
-      if (a === 'del' && await confirmSheet(nKids ? `মন্তব্যটি আর এর ${bn(nKids)}টি উত্তর মুছে ফেলবেন?` : 'মন্তব্যটি মুছে ফেলবেন?', 'মুছুন', true)) await busy(null, async () => { await S.api.deleteComment(c.id); post.comments -= 1 + nKids; if (S.replyTo?.id === c.id) setReplyTo(null); if (post.pinnedCommentId === c.id) post.pinnedCommentId = null; renderFeed('post'); loadComments(); });
+      if (a === 'edit') return editCommentInline(c, sc);
+      if (a === 'pin') await busy(null, async () => { const v = post.pinnedCommentId === c.id ? null : c.id; await S.api.pinComment(post.id, v); post.pinnedCommentId = v; toast(v ? 'মন্তব্য পিন করা হয়েছে, সবার উপরে দেখাবে' : 'পিন তুলে নেওয়া হয়েছে'); sc.redraw(); });
+      const nKids = (sc.kids.get(c.id) || []).length;
+      if (a === 'del' && await confirmSheet(nKids ? `মন্তব্যটি আর এর ${bn(nKids)}টি উত্তর মুছে ফেলবেন?` : 'মন্তব্যটি মুছে ফেলবেন?', 'মুছুন', true)) await busy(null, async () => {
+        await S.api.deleteComment(c.id); post.comments = Math.max((post.comments || 0) - 1 - nKids, 0); if (post.pinnedCommentId === c.id) post.pinnedCommentId = null;
+        if (sc.inline) { if (sc.st?.replyTo?.id === c.id) sc.st.replyTo = null; return sc.refresh(); }
+        if (S.replyTo?.id === c.id) setReplyTo(null); renderFeed('post'); loadComments(); });
     };
   }
 });

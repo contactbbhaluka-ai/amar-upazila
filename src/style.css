@@ -1061,3 +1061,19 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .cmi-input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:8px 14px;font:inherit;font-size:15px;color:var(--ink);min-height:40px}
 .cmi-send{flex:none;display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:50%;background:none;color:var(--gt,#006a4e);cursor:pointer}
 .cmi-send:disabled{opacity:.5}
+
+/* v42 ফেসবুকের মতো মন্তব্য: সময় · লাইক · উত্তর লেখা আকারে */
+.cm-meta{gap:2px;margin:3px 0 0 8px}
+.cm-meta .cm-time{margin-right:6px}
+.cm-meta button.cm-tl{width:auto;height:28px;padding:0 8px;font:inherit;font-size:13px;font-weight:700;color:var(--mut)}
+.cm-meta .cm-react.rx-like{color:#2f7df6}
+.cm-meta .cm-react.rx-love{color:#e5304a}
+.cm-meta .cm-react.rx-haha,.cm-meta .cm-react.rx-wow,.cm-meta .cm-react.rx-sad{color:#d99a00}
+.cm-meta .cm-react.rx-angry{color:#e9710f}
+.cm-meta button.cm-more{width:28px;height:28px}
+.cmi .cm{padding:4px 0}
+.cmi .cm-replies{margin-left:40px}
+.cmi .cm.pinned{margin:0;padding:6px 8px;border-radius:12px}
+.cmi-rep{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut);padding:0 4px}
+.cmi-rep span{flex:1}
+.cmi-rep button{border:0;background:none;color:var(--mut);width:28px;height:28px;border-radius:50%;cursor:pointer}

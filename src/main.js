@@ -100,8 +100,17 @@ function ago(iso) {
   return new Date(iso).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 const clock = iso => new Date(iso).toLocaleTimeString('bn-BD', { hour: 'numeric', minute: '2-digit' });
+const GENDERS = { male: 'পুরুষ', female: 'নারী', other: 'অন্যান্য' };
+const genderSelect = (id, cur, required) => `<select class="f" id="${id}" ${required ? 'required' : ''}>
+  <option value="" disabled ${cur === undefined ? 'selected' : ''}>বাছাই করুন</option>
+  ${Object.entries(GENDERS).map(([k, l]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${l}</option>`).join('')}
+  <option value="none" ${cur === '' ? 'selected' : ''}>বলতে চাই না</option></select>`;
+// ইউজারনেম: ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . (৩–২০)
+const normUsername = v => (v || '').trim().replace(/^@/, '').toLowerCase();
+const validUsername = u => /^[a-z0-9_.]{3,20}$/.test(u) && !/^\.|\.$|\.\./.test(u);
 function errText(e) {
   const m = String(e?.message || e || '');
+  if (/profiles_username_key/.test(m)) return 'এই ইউজারনেম আগে থেকেই কেউ নিয়েছে, অন্য একটা দিন';
   if (/Invalid login/i.test(m)) return 'ইমেইল বা পাসওয়ার্ড ভুল';
   if (/already registered|already been registered/i.test(m)) return 'এই ইমেইল দিয়ে আগেই অ্যাকাউন্ট আছে। লগইন করুন।';
   if (/Password should be/i.test(m)) return 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের দিন';
@@ -1047,12 +1056,37 @@ document.addEventListener('change', e => {
   if (!e.target.classList?.contains('ed-status')) return;
   const w = e.target.closest('.we-card').querySelector('.ed-yearw'); w.hidden = e.target.value === 'running';
 });
+let unTimer = 0;
+document.addEventListener('input', e => {
+  if (e.target.id !== 'ab-un') return;
+  const msg = $('#ab-un-msg'), u = normUsername(e.target.value);
+  if (e.target.value !== u && e.target.value !== '@' + u) e.target.value = u;
+  clearTimeout(unTimer); msg.className = 'un-msg mut';
+  if (!u) { msg.textContent = 'ইউজারনেম খালি রাখলে কোনো ইউজারনেম থাকবে না।'; return; }
+  if (!validUsername(u)) { msg.textContent = 'শুধু ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . দিয়ে ৩–২০ অক্ষর; শুরুতে বা শেষে . চলবে না।'; msg.className = 'un-msg bad'; return; }
+  msg.textContent = 'যাচাই হচ্ছে…';
+  unTimer = setTimeout(async () => {
+    const free = await S.api.usernameFree(u).catch(() => null);
+    if (normUsername($('#ab-un')?.value) !== u) return;
+    msg.textContent = free === null ? '' : free ? `✓ @${u} পাওয়া যাচ্ছে` : `✗ @${u} আগে থেকেই কেউ নিয়েছে`;
+    msg.className = 'un-msg ' + (free ? 'good' : 'bad');
+  }, 400);
+});
 const ABOUT = [
   { id: 'intro', ic: 'info', t: 'পরিচিতি',
-    sum: u => u.bio || '', empty: 'নিজের সম্পর্কে কিছু লিখুন',
-    form: u => `<label for="ab-name">নাম</label><input id="ab-name" required minlength="2" maxlength="40" value="${esc(u.name)}">
-      <label for="ab-bio">নিজের সম্পর্কে</label><textarea id="ab-bio" maxlength="160" rows="2" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">${esc(u.bio || '')}</textarea>`,
-    read: () => { const name = $('#ab-name').value.trim(); if (name.length < 2) return { err: 'নাম অন্তত ২ অক্ষরের দিন' }; return { name, bio: $('#ab-bio').value.trim() }; } },
+    sum: u => [u.username && '@' + u.username, GENDERS[u.gender], u.bio].filter(Boolean).join(' · '), empty: 'ইউজারনেম, লিঙ্গ ও নিজের সম্পর্কে লিখুন',
+    form: u => `<label for="ab-name">${ic('user', 16)} নাম</label><input id="ab-name" required minlength="2" maxlength="40" value="${esc(u.name)}">
+      <label for="ab-un">@ ইউজারনেম</label><div class="un-wrap"><span class="un-at">@</span><input id="ab-un" maxlength="21" autocomplete="off" autocapitalize="none" spellcheck="false" value="${esc(u.username || '')}" placeholder="যেমন: arif.bhaluka"></div>
+      <small class="un-msg mut" id="ab-un-msg">ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . দিয়ে ৩–২০ অক্ষর। প্রত্যেকের আলাদা।</small>
+      <label for="ab-g">${ic('users', 16)} লিঙ্গ</label>${genderSelect('ab-g', u.gender || '', false)}
+      <label for="ab-bio">${ic('note', 16)} নিজের সম্পর্কে</label><textarea id="ab-bio" maxlength="160" rows="2" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">${esc(u.bio || '')}</textarea>`,
+    read: () => {
+      const name = $('#ab-name').value.trim(); if (name.length < 2) return { err: 'নাম অন্তত ২ অক্ষরের দিন' };
+      const username = normUsername($('#ab-un').value);
+      if (username && !validUsername(username)) return { err: 'ইউজারনেমে শুধু ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . দিন (৩–২০ অক্ষর)' };
+      const g = $('#ab-g').value;
+      return { name, username, gender: g === 'none' ? '' : g, bio: $('#ab-bio').value.trim() };
+    } },
   { id: 'work', ic: 'work', t: 'কাজ ও শিক্ষা', chips: u => visChip(aVis(u, 'works'), 'কাজ') + visChip(aVis(u, 'educations'), 'শিক্ষা'),
     sum: u => [...(u.works || []).map(workText), ...(u.educations || []).map(eduText)].join(' · '), empty: 'কর্মস্থল ও শিক্ষাপ্রতিষ্ঠান যোগ করুন',
     form: u => `<details class="ab-sub"><summary>${ic('work', 16)} কাজ <small class="mut">· ${u.works?.length ? `${bn(u.works.length)}টি কর্মস্থল` : 'এখনো যোগ করা হয়নি'}</small></summary>
@@ -1121,6 +1155,7 @@ function renderAbout(key) {
         ? `<b>${esc(e.school)}</b>-এ ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পড়ছেন`
         : `<b>${esc(e.school)}</b> থেকে ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পাশ করেছেন${e.year ? ` (${bn(e.year)})` : ''}`]),
       u.union && [ic('pin', 18), `থাকেন <b>${esc(u.union)}</b>`],
+      GENDERS[u.gender] && [ic('users', 18), GENDERS[u.gender]],
       u.phone && [ic('mobile', 18), `<a href="tel:${esc(u.phone)}" class="link">${bn(u.phone)}</a>`],
       blood && [ic('drop', 18), esc(blood)],
       u.joinedAt && [ic('calendar', 18), joinedText(u.joinedAt)],
@@ -1183,7 +1218,7 @@ async function openUser(id, silent, keepState) {
   try {
     const p = await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
-    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}</h2><div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
+    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}<div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       ${socialHtml(p, false)}
       ${statsHtml(p)}
@@ -1447,7 +1482,7 @@ async function renderMe(mode = 'login') {
   const u = me();
   if (u) {
     $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
-      <h2 style="margin:6px 0 0">${esc(u.name)}</h2><div class="mut">${ic('pin', 14)} ${esc(u.union)}${u.admin && S.api.mode !== 'demo' ? ' · অ্যাডমিন' : ''}</div>
+      <h2 style="margin:6px 0 0">${esc(u.name)}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}<div class="mut">${ic('pin', 14)} ${esc(u.union)}${u.admin && S.api.mode !== 'demo' ? ' · অ্যাডমিন' : ''}</div>
       <div style="margin-top:6px">${u.bloodGroup ? `${bgBadge(u.bloodGroup)} <span class="mut" style="font-size:13px">${u.donorVisible ? 'ব্লাড ব্যাংকে ডোনার হিসেবে আছেন' : 'ব্লাড ব্যাংকে দেখানো বন্ধ'}</span>
         <div class="mut" style="font-size:14px;margin-top:4px">${ic('calendar', 14)} সর্বশেষ রক্তদান: ${u.lastDonated ? esc(bnDate(u.lastDonated)) : 'দেওয়া নেই'} · ${donateStatus(u.lastDonated)}</div>
         <div class="row" style="margin-top:8px;justify-content:center"><button class="sbtn ghost" data-donor-edit>${ic('edit', 15)} ডোনার তথ্য আপডেট</button><button class="sbtn ghost" id="donated-today">${ic('drop', 15)} আজ রক্ত দিয়েছি</button></div>` : `<span class="mut" style="font-size:13px">ব্লাড গ্রুপ দেওয়া নেই</span> <button class="sbtn ghost" data-add-donor>${ic('drop', 15)} নিজের ডোনার প্রোফাইল যোগ করুন</button>`}</div>
@@ -1466,6 +1501,7 @@ async function renderMe(mode = 'login') {
     <p class="mut">পোস্ট, বন্ধু, মেসেজের জন্য অ্যাকাউন্ট লাগবে। ☰ মেনুর সেবা ডিরেক্টরি লগইন ছাড়াই দেখা যায়।</p>
     <form id="aform">
       ${signup ? `<label for="an">${ic('user', 16)} আপনার নাম</label><input id="an" required minlength="2" maxlength="40" autocomplete="name">
+      <label for="su-g">${ic('users', 16)} লিঙ্গ</label>${genderSelect('su-g', undefined, true)}
       ${addrHtml('su')}
       <label for="su-ph">${ic('mobile', 16)} মোবাইল নম্বর <span class="mut" style="font-weight:400">(WhatsApp থাকলে এই নম্বরেই)</span></label><input id="su-ph" required inputmode="tel" autocomplete="tel" placeholder="০১XXXXXXXXX" maxlength="17">
       ${bloodHtml('su', null)}` : ''}
@@ -1487,7 +1523,8 @@ async function renderMe(mode = 'login') {
       if (!addr.upazila || (addr.upazila === HOME_UPAZILA && !addr.unionId)) return toast('ঠিকানা সম্পূর্ণ বাছাই করুন');
       if (!validPhone(phone)) return toast('সঠিক মোবাইল নম্বর দিন (যেমন ০১৭১২৩৪৫৬৭৮)');
       if (blood.err) return toast(blood.err);
-      extra = { ...addr, phone, bloodGroup: blood.bloodGroup, lastDonated: blood.lastDonated };
+      const g = $('#su-g').value; if (!g) return toast('লিঙ্গ বাছাই করুন');
+      extra = { ...addr, phone, bloodGroup: blood.bloodGroup, lastDonated: blood.lastDonated, gender: g === 'none' ? '' : g };
     }
     busy(e.submitter, async () => {
       if (signup) {

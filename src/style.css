@@ -766,3 +766,15 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .vis-sel span{display:flex;align-items:center;gap:5px}
 .vis-sel select{width:auto;min-width:120px;padding:6px 8px;font-size:13px;margin:0}
 .ab-vis{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--mut);background:var(--g2);border-radius:999px;padding:1px 7px}
+
+/* ===== v24: লিঙ্গ ও ইউজারনেম ===== */
+.uname{color:var(--mut);font-size:14px;margin-top:1px}
+.un-wrap{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden}
+.un-wrap:focus-within{border-color:var(--g);box-shadow:0 0 0 3px color-mix(in srgb,var(--g) 20%,transparent)}
+.un-at{padding:0 4px 0 12px;color:var(--mut);font-weight:700}
+.un-wrap input{border:0;box-shadow:none;margin:0;padding-left:2px;flex:1}
+.un-wrap input:focus{outline:none;box-shadow:none}
+.un-msg{display:block;font-size:12px;margin-top:4px}
+.un-msg.good{color:var(--gt);font-weight:600}
+.un-msg.bad{color:var(--r);font-weight:600}
+.un-wrap input{background:transparent;border-radius:0}

@@ -77,7 +77,15 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug bundleRelease
+          # রিলিজে অপ্রয়োজনীয় কোড ও রিসোর্স ছেঁটে ফেলা (R8): অ্যাপ ছোট হয়
+          cp app/build.gradle /tmp/build.gradle.orig
+          sed -i -E 's/minifyEnabled false/minifyEnabled true\n            shrinkResources true/' app/build.gradle
+          grep -nE "minifyEnabled|shrinkResources" app/build.gradle || true
+          if ! ./gradlew --no-daemon assembleDebug bundleRelease; then
+            echo "::warning::ছোট করা (R8) বিল্ড ব্যর্থ, সাধারণ বিল্ড করা হচ্ছে"
+            cp /tmp/build.gradle.orig app/build.gradle
+            ./gradlew --no-daemon assembleDebug bundleRelease
+          fi
 
       - name: Sign release bundle
         if: env.HAS_KEYSTORE == 'true'

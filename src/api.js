@@ -118,8 +118,9 @@ async function supabaseApi() {
     if (ids.length) ok(await sb.from(t).upsert(ids.map(uid => ({ [col]: id, user_id: uid })), { onConflict: `${col},user_id`, ignoreDuplicates: true }));
   }
   async function upload(blob, kind) {
-    const path = `${me.id}/${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
-    ok(await sb.storage.from('media').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' }));
+    const webp = blob.type === 'image/webp';
+    const path = `${me.id}/${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${webp ? 'webp' : 'jpg'}`;
+    ok(await sb.storage.from('media').upload(path, blob, { contentType: webp ? 'image/webp' : 'image/jpeg', cacheControl: '31536000' }));
     return sb.storage.from('media').getPublicUrl(path).data.publicUrl;
   }
 

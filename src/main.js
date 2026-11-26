@@ -151,8 +151,9 @@ function errText(e) {
   console.error(e);
   return 'সমস্যা হয়েছে, আবার চেষ্টা করুন';
 }
-// ছবি ছোট করে JPEG বানানো (আপলোড দ্রুত হয়, ডেটা কম খরচ হয়)
-async function compress(file, max = 1280, q = 0.8) {
+// ছবি ছোট করে WebP বানানো (JPEG-এর চেয়ে ~৩০% ছোট: আপলোড দ্রুত, ডেটা ও ফোনের জায়গা কম লাগে)
+// পুরোনো ফোনে WebP না হলে JPEG
+async function compress(file, max = 1280, q = 0.75) {
   if (!/^image\//.test(file.type)) throw new Error('not image');
   let src;
   try { src = await createImageBitmap(file); } catch {
@@ -161,7 +162,9 @@ async function compress(file, max = 1280, q = 0.8) {
   const r = Math.min(1, max / Math.max(src.width, src.height));
   const c = document.createElement('canvas'); c.width = Math.round(src.width * r); c.height = Math.round(src.height * r);
   c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
-  return new Promise(res => c.toBlob(res, 'image/jpeg', q));
+  const blob = await new Promise(res => c.toBlob(res, 'image/webp', q));
+  if (blob && blob.type === 'image/webp') return blob;
+  return new Promise(res => c.toBlob(res, 'image/jpeg', q + 0.05));
 }
 
 const SVC_ICONS = { health: '<path d="M12 5v14M5 12h14" stroke-width="3"/>', gov: '<path d="M3 10l9-6 9 6M5 10v9M19 10v9M9 10v9M15 10v9M3 21h18"/>', edu: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/>', police: '<path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/>', doc: '<circle cx="12" cy="7" r="4"/><path d="M5 21c1-4 4-6 7-6s6 2 7 6"/>', fix: '<path d="M14 6a4 4 0 0 0 5 5L10 20l-3-3 9-9z"/>', bus: '<rect x="4" y="4" width="16" height="13" rx="2"/><path d="M4 11h16M7 20v-3M17 20v-3"/>', bank: '<rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="12" cy="13" r="2.5"/>', shop: '<path d="M4 9h16l-1 11H5z"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/>' };
@@ -194,13 +197,13 @@ async function busy(btn, fn) {
 function needUser() { if (me()) return true; toast('আগে লগইন বা নতুন অ্যাকাউন্ট খুলুন'); go('me'); return false; }
 function av(u, cls = '') {
   const name = u?.name || u?.author || '?', src = u?.avatar;
-  return src ? `<img class="av ${cls}" src="${esc(src)}" alt="" loading="lazy">` : `<div class="av ${cls}" aria-hidden="true">${esc(name.charAt(0))}</div>`;
+  return src ? `<img class="av ${cls}" src="${esc(src)}" alt="" loading="lazy" decoding="async">` : `<div class="av ${cls}" aria-hidden="true">${esc(name.charAt(0))}</div>`;
 }
 const userLink = (id, inner, cls = 'avbtn') => `<button class="${cls}" data-user="${esc(id)}">${inner}</button>`;
 // নীল ভেরিফাইড ব্যাজ (পাবলিক ফিগার ও কেনা ব্যাজ দুটোই নীল; প্রোফাইলে চাপলে কোনটা তা লেখা থাকে)
 const VB_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#1d9bf0" d="M12 1.8l2.4 1.9 3-.3 1 2.9 2.6 1.6-.6 3 1.4 2.7-2.2 2.1-.2 3-3 .6-1.8 2.5-2.8-1.1-2.8 1.1-1.8-2.5-3-.6-.2-3-2.2-2.1L2.3 11l-.6-3 2.6-1.6 1-2.9 3 .3z"/><path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const vb = (b, big) => (b ? `<span class="vbadge${big ? ' vb-lg' : ''}" ${big ? `role="button" tabindex="0" data-vbinfo="${b}"` : ''} title="ভেরিফাইড" aria-label="ভেরিফাইড">${VB_SVG}</span>` : '');
-const entAv = (e, icon) => e?.avatar ? `<img class="ent-av" src="${esc(e.avatar)}" alt="">` : `<div class="ent-av" aria-hidden="true">${icon || esc((e?.name || '?').charAt(0))}</div>`;
+const entAv = (e, icon) => e?.avatar ? `<img loading="lazy" decoding="async" class="ent-av" src="${esc(e.avatar)}" alt="">` : `<div class="ent-av" aria-hidden="true">${icon || esc((e?.name || '?').charAt(0))}</div>`;
 const PAGE_CATS = ['দোকান ও ব্যবসা', 'স্বাস্থ্য', 'শিক্ষা', 'সংগঠন ও ক্লাব', 'সরকারি প্রতিষ্ঠান', 'খাবার ও রেস্টুরেন্ট', 'চাকরি ও প্রশিক্ষণ', 'খবর ও মিডিয়া', 'কৃষি', 'ধর্মীয় প্রতিষ্ঠান', 'অন্যান্য'];
 
 // ================================================================ বড় লেখা ছোট করে "আরও দেখুন"
@@ -248,9 +251,9 @@ function tagsLine(p) {
 }
 function photosHtml(p) {
   const im = p.images || (p.image ? [p.image] : []); if (!im.length) return '';
-  if (im.length === 1) return `<button class="ph-one" data-view="${esc(p.id)}" data-i="0" aria-label="ছবি বড় করে দেখুন"><img class="post-img" src="${esc(im[0])}" alt="পোস্টের ছবি" loading="lazy"></button>`;
+  if (im.length === 1) return `<button class="ph-one" data-view="${esc(p.id)}" data-i="0" aria-label="ছবি বড় করে দেখুন"><img class="post-img" src="${esc(im[0])}" alt="পোস্টের ছবি" loading="lazy" decoding="async"></button>`;
   return `<div class="car" data-car="${esc(p.id)}">
-    <div class="car-track">${im.map((src, i) => `<button class="car-item" data-view="${esc(p.id)}" data-i="${i}" aria-label="ছবি ${bn(i + 1)}, বড় করে দেখুন"><img src="${esc(src)}" alt="" loading="lazy"></button>`).join('')}</div>
+    <div class="car-track">${im.map((src, i) => `<button class="car-item" data-view="${esc(p.id)}" data-i="${i}" aria-label="ছবি ${bn(i + 1)}, বড় করে দেখুন"><img src="${esc(src)}" alt="" loading="lazy" decoding="async"></button>`).join('')}</div>
     <span class="car-count">১/${bn(im.length)}</span>
     <button class="car-nav prev" data-carnav="-1" aria-label="আগের ছবি" hidden>${ic('chevL', 20)}</button><button class="car-nav next" data-carnav="1" aria-label="পরের ছবি">${ic('chevR', 20)}</button>
     <div class="car-dots">${im.map((_, i) => `<span class="${i ? '' : 'on'}"></span>`).join('')}</div></div>`;
@@ -293,7 +296,7 @@ function openViewer(p, start = 0) {
   const im = p.images || [p.image]; S.viewer = { p, im, i: start };
   let vp = $('#v-gopost'); if (!vp) { $('#v-save').insertAdjacentHTML('beforebegin', '<button id="v-gopost" class="v-post">পোস্ট দেখুন</button>'); vp = $('#v-gopost'); vp.onclick = () => { const id = S.viewer?.p.postIds?.[S.viewer.i]; if (id) { back(); setTimeout(() => openPost(id), 60); } }; }
   vp.hidden = !p.postIds;
-  $('#v-track').innerHTML = im.map((src, i) => `<div class="v-item"><img src="${esc(src)}" alt="ছবি ${bn(i + 1)}"></div>`).join('');
+  $('#v-track').innerHTML = im.map((src, i) => `<div class="v-item"><img loading="lazy" decoding="async" src="${esc(src)}" alt="ছবি ${bn(i + 1)}"></div>`).join('');
   $('#v-save').innerHTML = ic('download', 22); $('#viewer').hidden = false; document.body.style.overflow = 'hidden';
   $('#v-prev').hidden = $('#v-next').hidden = im.length < 2;
   requestAnimationFrame(() => { $('#v-track').scrollLeft = start * $('#v-track').clientWidth; vSync(); });
@@ -349,7 +352,7 @@ function postHtml(p) {
     <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>
     ${p.body ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
     ${photosHtml(p)}
-    ${p.shared ? `<button class="shared-embed" data-openpost="${esc(p.shared.id)}"><span class="se-top">${av(p.shared, 'sm')}<span><b>${esc(p.shared.author)}${vb(p.shared.badge)}</b><span class="mut"> · ${esc(ago(p.shared.createdAt))}</span></span></span>${p.shared.body ? `<span class="se-body">${esc(p.shared.body)}</span>` : ''}${p.shared.image ? `<img src="${esc(p.shared.image)}" alt="" loading="lazy">` : ''}</button>`
+    ${p.shared ? `<button class="shared-embed" data-openpost="${esc(p.shared.id)}"><span class="se-top">${av(p.shared, 'sm')}<span><b>${esc(p.shared.author)}${vb(p.shared.badge)}</b><span class="mut"> · ${esc(ago(p.shared.createdAt))}</span></span></span>${p.shared.body ? `<span class="se-body">${esc(p.shared.body)}</span>` : ''}${p.shared.image ? `<img src="${esc(p.shared.image)}" alt="" loading="lazy" decoding="async">` : ''}</button>`
       : p.sharedMissing ? '<div class="shared-embed missing">এই পোস্টটি আর দেখা যাচ্ছে না</div>' : ''}
     ${p.likes ? `<div class="rsum"><button class="rsum-l" data-rxlist="${esc(p.id)}" aria-label="কে কে রিয়্যাক্ট দিয়েছেন"><span class="rsum-e">${Object.entries(p.reactions || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => `<span class="rs-i">${rxIcon(k, 18)}</span>`).join('')}</span><span class="rsum-who">কে কে রিয়্যাক্ট দিয়েছেন</span></button></div>` : ''}
     <div class="acts icons">
@@ -515,7 +518,7 @@ async function loadInsights(days) {
         <div class="in-hours">${d.hours.map((n, h) => `<i title="${hourBn(h)}: ${bn(n)}" style="height:${Math.max(3, (n / hmax) * 100)}%"></i>`).join('')}</div>
         <div class="in-hlbl"><span>রাত ১২</span><span>সকাল ৬</span><span>দুপুর ১২</span><span>সন্ধ্যা ৬</span><span>রাত ১১</span></div></div></div>
       <h3 class="res-h">সবচেয়ে বেশি দেখা পোস্ট</h3>
-      <div class="card">${d.top.length ? d.top.map(t => `<button class="bo-row" data-openpost="${t.id}">${t.image ? `<img src="${esc(t.image)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}<span class="bo-tx"><b>${esc(t.body || 'ছবি পোস্ট')}</b><small>${bn(t.people)} জন দেখেছেন · ${bn(t.views)} ভিউ · ${esc(ago(t.createdAt))}</small></span></button>`).join('') : `<p class="mut" style="margin:0">এই সময়ে ${L.you} কোনো পোস্ট কেউ দেখেননি। নতুন পোস্ট করুন!</p>`}</div>
+      <div class="card">${d.top.length ? d.top.map(t => `<button class="bo-row" data-openpost="${t.id}">${t.image ? `<img loading="lazy" decoding="async" src="${esc(t.image)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}<span class="bo-tx"><b>${esc(t.body || 'ছবি পোস্ট')}</b><small>${bn(t.people)} জন দেখেছেন · ${bn(t.views)} ভিউ · ${esc(ago(t.createdAt))}</small></span></button>`).join('') : `<p class="mut" style="margin:0">এই সময়ে ${L.you} কোনো পোস্ট কেউ দেখেননি। নতুন পোস্ট করুন!</p>`}</div>
       <p class="note">${kind === 'group' ? 'এই হিসাব শুধু গ্রুপ অ্যাডমিনরা দেখতে পান।' : kind === 'page' ? 'এই হিসাব শুধু পেইজের মালিক দেখতে পান।' : 'এই হিসাব শুধু আপনি দেখতে পাচ্ছেন।'} কে কে দেখেছেন তা দেখানো হয় না।${kind === 'group' ? '' : ' প্রতিটা পোস্টের বিস্তারিত পোস্টের ⓘ বাটনে।'}</p>`;
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
@@ -831,7 +834,7 @@ function renderComposerSheet() {
       ${d.albumId ? `<span class="pc-priv static" title="অ্যালবামের প্রাইভেসি">${ic(pv[0], 14)} ${pv[1]}</span>` : own ? `<button class="pc-priv" id="pc-priv" aria-label="কারা দেখবে: ${pv[1]}">${ic(pv[0], 14)} ${pv[1]} ▾</button>` : `<span class="pc-priv static">${ic('globe', 14)} পাবলিক</span>`}</div></div>
     ${d.albumId ? `<div class="pc-album">${ic('album', 16)} অ্যালবাম: <b>${esc(d.albumName)}</b></div>` : ''}
     <textarea id="pc-text" maxlength="1000" placeholder="আপনার মনে কী আছে, ${esc(u.name.split(' ')[0])}? (কাউকে উল্লেখ করতে @ লিখুন)">${esc(d.body)}</textarea>
-    ${d.photos.length ? `<div class="pc-photos">${d.photos.map((ph, i) => `<div class="pc-ph"><img src="${esc(ph.url)}" alt="ছবি ${bn(i + 1)}"><button type="button" data-rmph="${i}" aria-label="ছবি বাদ দিন">${ic('close', 14)}</button></div>`).join('')}
+    ${d.photos.length ? `<div class="pc-photos">${d.photos.map((ph, i) => `<div class="pc-ph"><img loading="lazy" decoding="async" src="${esc(ph.url)}" alt="ছবি ${bn(i + 1)}"><button type="button" data-rmph="${i}" aria-label="ছবি বাদ দিন">${ic('close', 14)}</button></div>`).join('')}
       ${d.photos.length < MAX_PHOTOS && photosOk ? `<label class="pc-ph add" aria-label="আরও ছবি">${ic('plus', 24)}<span>${bn(d.photos.length)}/${bn(MAX_PHOTOS)}</span><input type="file" accept="image/*" multiple class="pc-more" hidden></label>` : ''}</div>` : ''}
     <div class="pc-foot"><div class="pc-add"><span class="pc-add-l">যোগ করুন</span>
       ${photosOk ? `<label class="pc-tool" title="ছবি" aria-label="ছবি যোগ করুন">${ic('photo', 22)}<input type="file" id="pc-file" accept="image/*" multiple hidden></label>` : ''}
@@ -1105,7 +1108,7 @@ S.pstate = { me: { tab: 'posts', seg: 'all', album: null }, user: { tab: 'posts'
 function coverHtml(p, own) {
   if (p.lockedOut) p = { ...p, _noview: true };   // লক: বন্ধু ছাড়া বড় করে দেখা যাবে না
   return `<div class="cover${p.cover ? '' : ' empty'}">
-    ${p.cover ? (p._noview ? `<div class="cover-img"><img src="${esc(p.cover)}" alt=""></div>` : `<button class="cover-img" data-viewpic="${esc(p.cover)}" aria-label="কভার ছবি দেখুন"><img src="${esc(p.cover)}" alt=""></button>`) : ''}
+    ${p.cover ? (p._noview ? `<div class="cover-img"><img loading="lazy" decoding="async" src="${esc(p.cover)}" alt=""></div>` : `<button class="cover-img" data-viewpic="${esc(p.cover)}" aria-label="কভার ছবি দেখুন"><img loading="lazy" decoding="async" src="${esc(p.cover)}" alt=""></button>`) : ''}
     ${own ? `<button class="cover-btn" id="cover-btn">${ic('camera', 16)} ${p.cover ? 'কভার বদলান' : 'কভার ছবি যোগ করুন'}</button>` : ''}
   </div>
   <div class="prof-av">${own
@@ -1176,7 +1179,7 @@ async function loadPhotosPane(key) {
       const albums = await S.api.albums(uid, pgid);
       pane.innerHTML = seg + `<div class="al-grid">
         ${own ? `<button class="al-card new" data-albumnew="${key}">${ic('plus', 30)}<b>নতুন অ্যালবাম</b></button>` : ''}
-        ${albums.map(a => `<button class="al-card" data-album="${key}|${esc(a.id)}">${a.cover ? `<img src="${esc(a.cover)}" alt="" loading="lazy">` : `<span class="al-empty">${ic('album', 30)}</span>`}
+        ${albums.map(a => `<button class="al-card" data-album="${key}|${esc(a.id)}">${a.cover ? `<img src="${esc(a.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="al-empty">${ic('album', 30)}</span>`}
           <b>${esc(a.name)}</b><span class="mut">${bn(a.count)}টি ছবি${own && !a.virtual && !isPage ? ` · ${ic(PRIVACY[a.privacy][0], 12)}` : ''}</span></button>`).join('')}
       </div>${!albums.length && !own ? '<div class="empty">কোনো অ্যালবাম নেই।</div>' : ''}`;
     }
@@ -1184,7 +1187,7 @@ async function loadPhotosPane(key) {
 }
 const VIRTUAL_KINDS = ['avatar', 'cover', 'uploads'];
 const photoGrid = (list, emptyText) => list.length
-  ? `<div class="ph-grid">${list.map((ph, i) => `<button class="ph-cell" data-phi="${i}" aria-label="ছবি ${bn(i + 1)}"><img src="${esc(ph.url)}" alt="" loading="lazy"></button>`).join('')}</div>`
+  ? `<div class="ph-grid">${list.map((ph, i) => `<button class="ph-cell" data-phi="${i}" aria-label="ছবি ${bn(i + 1)}"><img src="${esc(ph.url)}" alt="" loading="lazy" decoding="async"></button>`).join('')}</div>`
   : `<div class="empty">${emptyText}</div>`;
 
 function albumSheet(a, then, key = 'me') {
@@ -1212,7 +1215,7 @@ function openAlbum(uid, albumId) {
 function picSheet(kind, blob, page) {
   const url = URL.createObjectURL(blob), cover = kind === 'cover';
   openSheet(`<h2>${cover ? 'নতুন কভার ছবি' : 'নতুন প্রোফাইল ছবি'}</h2>
-    <div class="pic-prev${cover ? ' cover' : ''}"><img src="${url}" alt=""></div>
+    <div class="pic-prev${cover ? ' cover' : ''}"><img loading="lazy" decoding="async" src="${url}" alt=""></div>
     <label class="chk"><input type="checkbox" id="pic-share" checked> <span>${page ? 'পেইজে পোস্ট হিসেবে জানান' : 'নিউজফিডে শেয়ার করুন'} <small class="mut">(${page ? `চালু থাকলে পেইজের "${cover ? 'কভার ছবি' : 'প্রোফাইল ছবি'}" অ্যালবামেও জমা থাকবে` : `বন্ধ রাখলে শুধু আপনার "${cover ? 'কভার ছবি' : 'প্রোফাইল ছবি'}" অ্যালবামে থাকবে, অন্যরা দেখবে না`})</small></span></label>
     <button class="btn wide" id="pic-save" style="margin-top:12px">সংরক্ষণ করুন</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
   $('#pic-save').onclick = e => busy(e.currentTarget, async () => {
@@ -1928,7 +1931,7 @@ $('#me').addEventListener('change', async e => {
   if (e.target.id !== 'avfile' && e.target.id !== 'coverfile') return;
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
   const cover = e.target.id === 'coverfile';
-  try { picSheet(cover ? 'cover' : 'avatar', await compress(file, cover ? 1600 : 640, 0.85)); } catch { toast('ছবিটা পড়া গেল না, অন্য ছবি দিন'); }
+  try { picSheet(cover ? 'cover' : 'avatar', await compress(file, cover ? 1280 : 512, 0.8)); } catch { toast('ছবিটা পড়া গেল না, অন্য ছবি দিন'); }
 });
 document.addEventListener('click', async e => {
   const id = e.target.closest('button')?.id; if (!id) return;
@@ -2357,7 +2360,7 @@ function shareSheet(p) {
 function shareToProfile(orig) {
   openSheet(`<h2>নিজের প্রোফাইলে শেয়ার</h2><form id="spform">
     <textarea id="sp-text" maxlength="1000" placeholder="এ বিষয়ে কিছু লিখুন (ঐচ্ছিক)…"></textarea>
-    <div class="shared-embed static"><span class="se-top">${av(orig, 'sm')}<span><b>${esc(orig.author)}</b></span></span>${orig.body ? `<span class="se-body">${esc(orig.body)}</span>` : ''}${orig.image ? `<img src="${esc(orig.image)}" alt="">` : ''}</div>
+    <div class="shared-embed static"><span class="se-top">${av(orig, 'sm')}<span><b>${esc(orig.author)}</b></span></span>${orig.body ? `<span class="se-body">${esc(orig.body)}</span>` : ''}${orig.image ? `<img loading="lazy" decoding="async" src="${esc(orig.image)}" alt="">` : ''}</div>
     <div class="row" style="margin-top:14px"><button class="btn" style="flex:1">এখনই শেয়ার করুন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div></form>`);
   $('#spform').onsubmit = e => {
     e.preventDefault();
@@ -2672,7 +2675,7 @@ const BOOST_DAYS = [1, 3, 7, 15, 30];
 const daysLeft = d => Math.max(0, Math.ceil((new Date(d) - Date.now()) / 864e5));
 function boostRow(b) {
   const st = boostState(b), [lbl, cls] = BOOST_ST[st] || [st, 'off'];
-  return `<button class="bo-row" data-bopen="${b.postId}">${b.postImage ? `<img src="${esc(b.postImage)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}
+  return `<button class="bo-row" data-bopen="${b.postId}">${b.postImage ? `<img loading="lazy" decoding="async" src="${esc(b.postImage)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}
     <span class="bo-tx"><b>${esc((b.postBody || 'ছবি পোস্ট').slice(0, 60))}</b><small>${bn(b.days)} দিন · ${b.unionName ? esc(b.unionName) : 'পুরো উপজেলা'} · ${coin(b.coins)}${st === 'active' ? ` · আর ${bn(daysLeft(b.endsAt))} দিন` : ''}</small>
     <small><span class="bo-st ${cls}">${lbl}</span>${b.reach || st === 'active' || st === 'ended' ? ` · ${bn(b.reach)} জন দেখেছেন` : ''}${b.adminNote && st === 'rejected' ? ` · কারণ: ${esc(b.adminNote)}` : ''}</small></span></button>`;
 }
@@ -2716,7 +2719,7 @@ async function boostSheet(p) {
 const adminBoostCard = b => `<div class="card vreq-card">
   <div class="person" style="padding:0">${userLink(b.userId, av(b.user || { name: '?' }))}<div class="info">${userLink(b.userId, esc(b.user?.name || 'সদস্য') + vb(b.user?.verified), 'who-btn')}<div class="sub">${esc(ago(b.createdAt))}</div></div>
     <span class="vk paid">${coin(b.coins)}</span></div>
-  <button class="bo-row" data-openpost="${b.postId}" style="margin-top:8px">${b.postImage ? `<img src="${esc(b.postImage)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}<span class="bo-tx"><b>${esc((b.postBody || 'ছবি পোস্ট').slice(0, 80))}</b><small>${bn(b.days)} দিন · ${b.unionName ? esc(b.unionName) : 'পুরো উপজেলা'} · পোস্ট দেখুন ↗</small></span></button>
+  <button class="bo-row" data-openpost="${b.postId}" style="margin-top:8px">${b.postImage ? `<img loading="lazy" decoding="async" src="${esc(b.postImage)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}<span class="bo-tx"><b>${esc((b.postBody || 'ছবি পোস্ট').slice(0, 80))}</b><small>${bn(b.days)} দিন · ${b.unionName ? esc(b.unionName) : 'পুরো উপজেলা'} · পোস্ট দেখুন ↗</small></span></button>
   <div class="row" style="margin-top:8px"><button class="btn sm" style="flex:1" data-bdec="${b.id}" data-ok="1">অনুমোদন</button><button class="btn ghost sm" style="flex:1" data-bdec="${b.id}" data-ok="0">প্রত্যাখ্যান</button></div></div>`;
 function decideBoostUI(id, ok, btn) {
   if (ok) return busy(btn, async () => { await S.api.decideBoost(id, true); toast('বুস্ট চালু হয়েছে'); loadAdmin(); });
@@ -2900,10 +2903,10 @@ document.addEventListener('click', e => {
 });
 
 // ================================================================ ছবি বেছে নেওয়ার সাধারণ ফর্ম অংশ
-const photoField = (label, cur) => `<label>${esc(label)}</label><div class="row"><span class="pf-prev">${cur ? `<img class="av" src="${esc(cur)}" alt="">` : ''}</span><label class="photo-btn" style="margin:0">ছবি বাছুন<input type="file" class="pf-file" accept="image/*"></label></div>`;
+const photoField = (label, cur) => `<label>${esc(label)}</label><div class="row"><span class="pf-prev">${cur ? `<img loading="lazy" decoding="async" class="av" src="${esc(cur)}" alt="">` : ''}</span><label class="photo-btn" style="margin:0">ছবি বাছুন<input type="file" class="pf-file" accept="image/*"></label></div>`;
 function watchPhoto(store, max = 600) {
   const inp = $('#sheet .pf-file'); if (!inp) return;
-  inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { store.blob = await compress(f, max, 0.85); $('#sheet .pf-prev').innerHTML = `<img class="av" src="${URL.createObjectURL(store.blob)}" alt="">`; } catch { toast('ছবিটি খোলা যায়নি'); } };
+  inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { store.blob = await compress(f, max, 0.8); $('#sheet .pf-prev').innerHTML = `<img loading="lazy" decoding="async" class="av" src="${URL.createObjectURL(store.blob)}" alt="">`; } catch { toast('ছবিটি খোলা যায়নি'); } };
 }
 
 // ================================================================ পেইজ বা গ্রুপের ভেতরে নতুন পোস্ট (একই পোস্ট বক্স)
@@ -3050,7 +3053,7 @@ function faqSheet(pg) {
 function pageCoverHtml(pg) {
   const own = pg.isOwner;
   return `<div class="cover${pg.cover ? '' : ' empty'}">
-    ${pg.cover ? `<button class="cover-img" data-viewpic="${esc(pg.cover)}" aria-label="কভার ছবি দেখুন"><img src="${esc(pg.cover)}" alt=""></button>` : ''}
+    ${pg.cover ? `<button class="cover-img" data-viewpic="${esc(pg.cover)}" aria-label="কভার ছবি দেখুন"><img loading="lazy" decoding="async" src="${esc(pg.cover)}" alt=""></button>` : ''}
     ${own ? `<button class="cover-btn" id="pcover-btn">${ic('camera', 16)} ${pg.cover ? 'কভার বদলান' : 'কভার ছবি যোগ করুন'}</button><input type="file" id="pcoverfile" accept="image/*" hidden>` : ''}
   </div>
   <div class="prof-av pg-av">${own

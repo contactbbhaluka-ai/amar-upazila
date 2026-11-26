@@ -1033,3 +1033,6 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .lock-sheet h2{margin:4px 0}
 .lock-list{list-style:none;padding:0;margin:12px 0 16px;text-align:left;display:grid;gap:8px;font-size:14px}
 .lock-list li{padding:8px 10px;border-radius:10px;background:var(--g2)}
+
+/* v39 দ্রুততা: স্ক্রিনের বাইরের পোস্ট আঁকা হয় না (লম্বা ফিডে স্ক্রল মসৃণ, ব্যাটারি কম) */
+.card.post{content-visibility:auto;contain-intrinsic-size:auto 380px}

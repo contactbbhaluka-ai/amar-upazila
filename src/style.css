@@ -674,3 +674,21 @@ button.cm-rx:hover{box-shadow:0 1px 4px rgba(0,0,0,.28)}
 button.pv-opt{background:var(--card);color:var(--ink);font:inherit;text-align:left;width:100%;min-height:0}
 button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .pv-ok{margin-left:auto;color:var(--gt);font-weight:800}
+
+/* ===== v18: প্রাইভেসি অপশন স্পষ্ট বাটন ===== */
+.pv-pick{display:flex;flex-direction:column;gap:10px}
+.pv-opt, button.pv-opt{position:relative;display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);font:inherit;text-align:left;cursor:pointer;min-height:64px;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:border-color .15s,background .15s,transform .08s,box-shadow .15s;font-weight:400}
+.pv-opt:hover{border-color:color-mix(in srgb,var(--g) 45%,var(--line));box-shadow:0 3px 10px rgba(0,0,0,.08)}
+.pv-opt:active{transform:scale(.98)}
+.pv-opt:focus-visible{outline:3px solid color-mix(in srgb,var(--g) 40%,transparent);outline-offset:2px}
+.pv-opt input[type=radio]{position:absolute;opacity:0;pointer-events:none}
+.pv-ic{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--g2);color:var(--gt)}
+.pv-tx{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.pv-tx b{font-size:16px}
+.pv-tx small{color:var(--mut);font-size:13px}
+.pv-radio{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid color-mix(in srgb,var(--mut) 60%,transparent);background:var(--card);transition:all .15s}
+.pv-opt.on, .pv-opt:has(input:checked){border-color:var(--g);background:color-mix(in srgb,var(--g2) 70%,var(--card));box-shadow:0 0 0 1px var(--g) inset}
+.pv-opt.on .pv-radio, .pv-opt:has(input:checked) .pv-radio{border-color:var(--g);background:radial-gradient(circle,var(--g) 0 45%,var(--card) 50%)}
+.pv-opt.on .pv-ic, .pv-opt:has(input:checked) .pv-ic{background:var(--g);color:#fff}
+.pv-ok{display:none}
+.pv-pick label.pv-opt{margin:0}

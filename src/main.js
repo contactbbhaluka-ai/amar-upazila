@@ -783,7 +783,8 @@ function listPrivacySheet() {
 function oneListPrivacy(kind, back) {
   const u = me(), cur = u[kind + 'Visibility'] || 'public';
   openSheet(`<h2>${PLIST[kind]} তালিকা কারা দেখবে</h2>
-    <div class="pv-pick">${Object.entries(PRIVACY).map(([k, [icn, l, sub]]) => `<button class="pv-opt${k === cur ? ' on' : ''}" data-pv1="${k}"><span>${ic(icn, 18)}</span><span><b>${l}</b><small>${sub}</small></span>${k === cur ? '<span class="pv-ok">✓</span>' : ''}</button>`).join('')}</div>
+    <p class="mut" style="margin:-4px 0 10px">একটা বেছে নিন</p>
+    <div class="pv-pick" role="radiogroup">${Object.entries(PRIVACY).map(([k, [icn, l, sub]]) => `<button class="pv-opt${k === cur ? ' on' : ''}" data-pv1="${k}" role="radio" aria-checked="${k === cur}"><span class="pv-ic">${ic(icn, 20)}</span><span class="pv-tx"><b>${l}</b><small>${sub}</small></span><span class="pv-radio" aria-hidden="true"></span></button>`).join('')}</div>
     <button class="btn ghost wide" id="lp-back" style="margin-top:12px">ফিরে যান</button>`);
   $('#lp-back').onclick = () => back();
   $('#sheet').onclick = ev => {
@@ -872,7 +873,7 @@ function albumSheet(a, then) {
   const pv = a?.privacy || 'public';
   openSheet(`<h2>${a ? 'অ্যালবাম এডিট' : 'নতুন অ্যালবাম'}</h2>
     <label for="al-name">অ্যালবামের নাম</label><input id="al-name" maxlength="60" value="${esc(a?.name || '')}" placeholder="যেমন: ঈদ ২০২৬, ভ্রমণ, পরিবার">
-    <label>কারা দেখবে</label><div class="pv-pick">${Object.entries(PRIVACY).map(([k, [icn, l, sub]]) => `<label class="pv-opt"><input type="radio" name="al-pv" value="${k}" ${k === pv ? 'checked' : ''}><span>${ic(icn, 18)}</span><span><b>${l}</b><small>${sub}</small></span></label>`).join('')}</div>
+    <label>কারা দেখবে</label><div class="pv-pick">${Object.entries(PRIVACY).map(([k, [icn, l, sub]]) => `<label class="pv-opt"><input type="radio" name="al-pv" value="${k}" ${k === pv ? 'checked' : ''}><span class="pv-ic">${ic(icn, 20)}</span><span class="pv-tx"><b>${l}</b><small>${sub}</small></span><span class="pv-radio" aria-hidden="true"></span></label>`).join('')}</div>
     ${a ? '<p class="mut" style="font-size:13px">প্রাইভেসি বদলালে অ্যালবামের সব ছবিতেও একই প্রাইভেসি হবে।</p>' : ''}
     <button class="btn wide" id="al-save" style="margin-top:12px">${a ? 'সংরক্ষণ' : 'অ্যালবাম তৈরি করুন'}</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
   $('#al-save').onclick = e => {

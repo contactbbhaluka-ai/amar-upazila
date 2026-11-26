@@ -4555,7 +4555,7 @@ function bindMenuSearch() {
     const t = q.value.trim().toLowerCase(), res = $('#mn-res'), main = $('#mn-main');
     if (!t) { res.hidden = true; main.hidden = false; return; }
     const items = [...main.querySelectorAll('.sc[data-mgo], .setlist button, .setlist a, #logout')].map(el => {
-      const label = (el.querySelector('small') ? el.childNodes[1]?.textContent || el.textContent : el.textContent).replace(/\s+/g, ' ').trim();
+      const label = (el.querySelector('.sc-t b') || el).textContent.replace(/\s+/g, ' ').trim();
       const key = el.dataset.mgo ? MN_SC_KEYS[el.dataset.mgo] || '' : MN_KEYS[el.id] || '';
       return { el, label, hay: (el.textContent + ' ' + key).toLowerCase() };
     }).filter(x => x.hay.includes(t));
@@ -4599,7 +4599,7 @@ function renderMenu() {
   const sc = (go2, icon, label, sub, flag) => {
     if (flag && S.settings[flag] === false && !u?.admin) return '';          // অ্যাডমিন বন্ধ করে রাখলে সাধারণ ব্যবহারকারী দেখেন না
     const off = flag && S.settings[flag] === false;
-    return `<button class="sc${off ? ' off' : ''}" data-mgo="${go2}"><span class="si">${icon}</span>${esc(label)}${off ? '<small>বন্ধ আছে (শুধু অ্যাডমিন দেখছেন)</small>' : sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
+    return `<button class="sc${off ? ' off' : ''}" data-mgo="${go2}"><span class="si">${icon}</span><span class="sc-t"><b>${esc(label)}</b>${off ? '<small>বন্ধ আছে (শুধু অ্যাডমিন দেখছেন)</small>' : sub ? `<small>${esc(sub)}</small>` : ''}</span></button>`;
   };
   $('#menu').innerHTML = `
     ${u ? `<div class="me-wrap"><button class="me-row" data-v="me">${S.actAs ? entAv(S.actAs) : av(u)}<div class="info"><b>${esc(S.actAs ? S.actAs.name : u.name)}</b><div class="sub">${S.actAs ? 'পেইজ দেখুন' : 'আপনার প্রোফাইল দেখুন'}</div></div></button><button class="sw-toggle" id="sw-toggle" aria-label="প্রোফাইল বা পেইজ বদলান" aria-expanded="false" hidden>${ic('users', 16)}<span class="chev">▾</span></button><div id="switcher" class="sw-drop" hidden></div></div>`
@@ -4614,7 +4614,7 @@ function renderMenu() {
       ${sc('dir', '🏥', 'সেবা ডিরেক্টরি', 'উপজেলার সব সেবা')}
       ${sc('blood', '🩸', 'ব্লাড ব্যাংক', 'রক্তদাতা খুঁজুন', 'featBlood')}
       ${sc('sos', '🚨', 'জরুরি নম্বর', '৯৯৯ ও হেল্পলাইন')}
-      ${sc('prayer', '🕌', 'নামাজ ও আবহাওয়া', 'আজকের ওয়াক্ত, ৭ দিনের আবহাওয়া')}
+      ${sc('prayer', '🕌', 'নামাজ ও আবহাওয়া', 'ওয়াক্ত ও ৭ দিনের পূর্বাভাস')}
     </div>
     <h3 class="mn-h">👥 কমিউনিটি</h3>
     <div class="sc-grid">

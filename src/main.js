@@ -515,37 +515,12 @@ function prayerTimes(date, lat, lng, tz = 6) {
 const PRAYERS = [['fajr', 'ফজর'], ['sunrise', 'সূর্যোদয়'], ['dhuhr', 'যোহর'], ['asr', 'আসর'], ['maghrib', 'মাগরিব'], ['isha', 'এশা']];
 const hm = h => { let mm = Math.round(h * 60); const H = Math.floor(mm / 60) % 24; mm %= 60; const per = H < 4 ? 'রাত' : H < 6 ? 'ভোর' : H < 12 ? 'সকাল' : H < 15 ? 'দুপুর' : H < 18 ? 'বিকাল' : H < 20 ? 'সন্ধ্যা' : 'রাত'; return `${per} ${bn(H % 12 || 12)}:${bn(String(mm).padStart(2, '0'))}`; };
 const WX = { 0: ['☀️', 'রোদ'], 1: ['🌤️', 'হালকা মেঘ'], 2: ['⛅', 'আংশিক মেঘলা'], 3: ['☁️', 'মেঘলা'], 45: ['🌫️', 'কুয়াশা'], 48: ['🌫️', 'ঘন কুয়াশা'], 51: ['🌦️', 'গুঁড়ি গুঁড়ি বৃষ্টি'], 53: ['🌦️', 'গুঁড়ি গুঁড়ি বৃষ্টি'], 55: ['🌧️', 'বৃষ্টি'], 61: ['🌧️', 'হালকা বৃষ্টি'], 63: ['🌧️', 'বৃষ্টি'], 65: ['🌧️', 'ভারী বৃষ্টি'], 80: ['🌦️', 'বৃষ্টির ঝাপটা'], 81: ['🌧️', 'বৃষ্টি'], 82: ['⛈️', 'ভারী বৃষ্টি'], 95: ['⛈️', 'বজ্রবৃষ্টি'], 96: ['⛈️', 'বজ্রবৃষ্টি'], 99: ['⛈️', 'বজ্রবৃষ্টি'] };
-// ব্যবহারকারীর লোকেশন (চাইলে): শুধু এই ফোনে রাখা হয়, প্রায় ১ কিমি পর্যন্ত গোল করে; আমাদের সার্ভারে পাঠানো হয় না
-const myLoc = () => local.get('myloc') || null;
-const curLoc = () => myLoc() || HOME_LOC;
-const locTz = () => (myLoc() ? -new Date().getTimezoneOffset() / 60 : 6);   // নিজের লোকেশনে ফোনের সময় অঞ্চল
-const localParts = d => { const x = new Date(new Date(d).getTime() + locTz() * 36e5); return { h: x.getUTCHours(), m: x.getUTCMinutes() }; };
-async function placeName(lat, lng) {
-  try {
-    const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=bn`, { signal: AbortSignal.timeout?.(6000) })).json();
-    return (j.locality || j.city || j.principalSubdivision || '').replace(/\s*(উপজেলা|Upazila)$/i, '').slice(0, 40) || 'আপনার এলাকা';
-  } catch { return 'আপনার এলাকা'; }
-}
-function useMyLocation(btn) {
-  if (!navigator.geolocation) return toast('এই ফোনে লোকেশন পাওয়া যাচ্ছে না');
-  if (btn) { btn.disabled = true; btn.textContent = 'লোকেশন খোঁজা হচ্ছে…'; }
-  navigator.geolocation.getCurrentPosition(async pos => {
-    const lat = Math.round(pos.coords.latitude * 100) / 100, lng = Math.round(pos.coords.longitude * 100) / 100;
-    const name = await placeName(lat, lng);
-    local.set('myloc', { lat, lng, name }); local.set('wx', null); S.wx = null;
-    toast(`📍 ${name} অনুযায়ী নামাজের সময় ও আবহাওয়া দেখাচ্ছে`);
-    renderDaily(); loadWeather().then(v => { if (v) { S.wx = v; renderDaily(); } });
-  }, err => {
-    if (btn?.isConnected) renderDaily();
-    toast(err.code === 1 ? 'লোকেশনের অনুমতি দেওয়া হয়নি। ফোনের সেটিংস থেকে এই অ্যাপের লোকেশন চালু করুন।' : 'লোকেশন পাওয়া যায়নি, একটু পরে আবার চেষ্টা করুন');
-  }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60 * 6e4 });
-}
 // আবহাওয়া (Open-Meteo, চাবি লাগে না); ৩০ মিনিট পর্যন্ত আগের তথ্যই দেখাই, তাই ডেটা কম খরচ
 async function loadWeather() {
-  const L = curLoc(), key = `${L.lat},${L.lng}`;
+  const L = HOME_LOC, key = `${L.lat},${L.lng}`;
   const c = local.get('wx'); if (c && c.k === key && Date.now() - c.t < 30 * 6e4) return c.v;
   try {
-    const u = `https://api.open-meteo.com/v1/forecast?latitude=${L.lat}&longitude=${L.lng}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=1`;
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${L.lat}&longitude=${L.lng}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FDhaka&forecast_days=1`;
     const j = await (await fetch(u, { signal: AbortSignal.timeout?.(6000) })).json();
     const v = { temp: Math.round(j.current.temperature_2m), code: j.current.weather_code, max: Math.round(j.daily.temperature_2m_max[0]), min: Math.round(j.daily.temperature_2m_min[0]), rain: j.daily.precipitation_probability_max?.[0] ?? null };
     local.set('wx', { t: Date.now(), k: key, v }); S.wxErr = false; return v;
@@ -553,9 +528,8 @@ async function loadWeather() {
 }
 function renderDaily() {
   const box = $('#daily'); if (!box) return;
-  if (local.get('daily-off')) { box.innerHTML = ''; return; }
-  const L = curLoc(), tz = locTz(), now = new Date(), pt = prayerTimes(new Date(now.getTime() + tz * 36e5), L.lat, L.lng, tz);
-  const t = localParts(now), nowH = t.h + t.m / 60;
+  const L = HOME_LOC, now = new Date(), pt = prayerTimes(new Date(now.getTime() + 6 * 36e5), L.lat, L.lng, 6);
+  const t = dhakaParts(now), nowH = t.h + t.m / 60;
   const list = PRAYERS.filter(([k]) => k !== 'sunrise');
   let next = list.find(([k]) => pt[k] > nowH), tomorrow = false;
   if (!next) { next = list[0]; tomorrow = true; }
@@ -563,24 +537,17 @@ function renderDaily() {
   const wx = S.wx, w = wx ? (WX[wx.code] || WX[Math.floor(wx.code / 10) * 10] || ['🌡️', '']) : null;
   const open = !!S.dailyOpen;
   box.innerHTML = `<div class="card daily${open ? ' open' : ''}"><button class="dl-top" id="dl-toggle" aria-expanded="${open}">
-      <span class="dl-pr">🕌 <span><small>পরের নামাজ${tomorrow ? ' (কাল)' : ''} · 📍${esc(L.name)}</small><b>${next[1]} ${hm(pt[next[0]])}</b><small>${lh ? `${bn(lh)} ঘণ্টা ` : ''}${lm || !lh ? `${bn(lm)} মিনিট ` : ''}পর</small></span></span>
-      ${w ? `<span class="dl-wx"><span class="dl-wi">${w[0]}</span><span><b>${bn(wx.temp)}°</b><small>${w[1]}</small></span></span>`
+      <span class="dl-pr">🕌 <span><small>পরের নামাজ${tomorrow ? ' (কাল)' : ''}</small><b>${next[1]} ${hm(pt[next[0]])}</b><small>${lh ? `${bn(lh)} ঘণ্টা ` : ''}${lm || !lh ? `${bn(lm)} মিনিট ` : ''}পর</small></span></span>
+      ${w ? `<span class="dl-wx"><span class="dl-wi">${w[0]}</span><span><b>${bn(wx.temp)}°</b><small>${wx.rain != null ? `☔ বৃষ্টি ${bn(wx.rain)}%` : w[1]}</small></span></span>`
         : `<span class="dl-wx"><span class="dl-wi">🌡️</span><span><small>${S.wxErr ? 'আবহাওয়া<br>আনা যায়নি' : 'আবহাওয়া<br>আসছে…'}</small></span></span>`}
       <span class="dl-chev">${open ? '▴' : '▾'}</span></button>
     ${open ? `<div class="dl-more"><div class="dl-grid">${PRAYERS.map(([k, n]) => `<span class="${next[0] === k && !tomorrow ? 'on' : ''}"><small>${n}</small><b>${hm(pt[k])}</b></span>`).join('')}</div>
-      ${!wx && S.wxErr ? `<p class="dl-wxl">আবহাওয়ার তথ্য আনা যায়নি। ইন্টারনেট সংযোগ দেখে <button class="link" id="dl-wxr">আবার চেষ্টা করুন</button></p>` : ''}
-      ${wx ? `<p class="dl-wxl">${esc(L.name)}: আজ সর্বোচ্চ ${bn(wx.max)}°, সর্বনিম্ন ${bn(wx.min)}°${wx.rain != null ? ` · বৃষ্টির সম্ভাবনা ${bn(wx.rain)}%` : ''}</p>` : ''}
-      <div class="dl-loc">${myLoc() ? `<span>📍 আপনার লোকেশন: <b>${esc(L.name)}</b></span><button class="link" id="dl-loc">আবার খুঁজুন</button><button class="link" id="dl-home">${esc(HOME_LOC.of)} সময় দেখান</button>`
-        : `<button class="sbtn" id="dl-loc">📍 আমার লোকেশন অনুযায়ী দেখান</button><span class="mut">এখন ${esc(HOME_LOC.of)} সময় দেখাচ্ছে</span>`}</div>
-      <p class="dl-note mut">নামাজের সময় আনুমানিক (${esc(L.name)}), স্থানীয় মসজিদের সময়সূচি দেখে নিন।${wx ? ' আবহাওয়া: Open-Meteo' : ''}${myLoc() ? ' লোকেশন শুধু এই ফোনে থাকে।' : ''}</p>
-      <button class="link dl-off" id="dl-off">এই কার্ডটি লুকান</button></div>` : ''}</div>`;
+      ${!wx && S.wxErr ? `<p class="dl-wxl">আবহাওয়ার তথ্য আনা যায়নি। <button class="link" id="dl-wxr">আবার চেষ্টা করুন</button></p>` : ''}
+      ${wx ? `<p class="dl-wxl">${w[0]} ${w[1]} · আজ সর্বোচ্চ ${bn(wx.max)}°, সর্বনিম্ন ${bn(wx.min)}°${wx.rain != null ? ` · বৃষ্টির সম্ভাবনা ${bn(wx.rain)}%` : ''}</p>` : ''}</div>` : ''}</div>`;
 }
 $('#daily').addEventListener('click', e => {
   if (e.target.closest('#dl-toggle')) { S.dailyOpen = !S.dailyOpen; renderDaily(); }
-  const lb = e.target.closest('#dl-loc'); if (lb) return useMyLocation(lb);
   if (e.target.closest('#dl-wxr')) { S.wxErr = false; renderDaily(); return loadWeather().then(v => { S.wx = v; renderDaily(); }); }
-  if (e.target.closest('#dl-home')) { local.set('myloc', null); local.set('wx', null); S.wx = null; renderDaily(); loadWeather().then(v => { if (v) { S.wx = v; renderDaily(); } }); return toast(`${HOME_LOC.of} সময় দেখাচ্ছে`); }
-  if (e.target.closest('#dl-off')) { local.set('daily-off', 1); renderDaily(); toast('লুকানো হয়েছে। ☰ মেনু → সেটিংস থেকে আবার চালু করা যাবে'); }
 });
 setInterval(() => { if (S.view === 'home' && !document.hidden) renderDaily(); }, 60000);
 function renderBdays() {
@@ -602,7 +569,7 @@ function renderTrend() {
 }
 async function loadHomeExtras() {
   renderDaily();
-  if (!local.get('daily-off')) loadWeather().then(v => { S.wx = v || S.wx; renderDaily(); });
+  loadWeather().then(v => { S.wx = v || S.wx; renderDaily(); });
   S.api.trendingTags().then(t => { S.trend = t; renderTrend(); }).catch(() => {});
   if (me() && !S.actAs) {
     S.api.birthdays().then(b => { S.bdays = b; renderBdays(); }).catch(() => {});
@@ -1691,7 +1658,6 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-plist]'); if (b) { const [uid, kind] = b.dataset.plist.split('|'); return peopleSheet(uid, kind); }
   if (e.target.closest('#listpriv')) listPrivacySheet();
   if (e.target.closest('#plock, .lock-chip')) lockSheet();
-  if (e.target.closest('#daily-tog')) { const off = !local.get('daily-off'); local.set('daily-off', off ? 1 : 0); toast(off ? 'কার্ডটি লুকানো হয়েছে' : 'হোমে নামাজের সময় ও আবহাওয়া দেখাবে'); renderMenu(); renderDaily(); }
 });
 // ফেসবুকের মতো প্রোফাইল লক: বন্ধু ছাড়া কেউ পোস্ট, ছবি, বিস্তারিত ও তালিকা দেখবে না
 function lockSheet() {
@@ -3133,7 +3099,6 @@ function renderMenu() {
       <button id="edit">প্রোফাইল এডিট</button>
       <button id="chpw">পাসওয়ার্ড পরিবর্তন</button>
       <button id="plock">🔒 প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
-      <button id="daily-tog">🕌 নামাজের সময় ও আবহাওয়া কার্ড<span class="val">${local.get('daily-off') ? 'বন্ধ' : 'চালু'}</span></button>
       <button id="listpriv">বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
       <button id="blocked">ব্লক করা মানুষ</button>
       <button id="theme">থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>

@@ -3732,10 +3732,7 @@ document.addEventListener('click', async e => {
     $('#sheet').onclick = ev => { const b = ev.target.closest('[data-unb]'); if (b) busy(b, async () => { await S.api.unblock(b.dataset.unb); b.closest('.person').remove(); loadFeed('home'); }); };
   }
   if (id === 'edit') return openAbout(null);
-  if (id === 'delacc') {
-    if (!(await confirmSheet('অ্যাকাউন্ট, আপনার সব পোস্ট, ছবি, মন্তব্য ও মেসেজ স্থায়ীভাবে মুছে যাবে। নিশ্চিত?', 'হ্যাঁ, মুছে ফেলুন', true))) return;
-    await busy(null, async () => { await S.api.deleteAccount(); afterAuth(); toast('অ্যাকাউন্ট মুছে ফেলা হয়েছে'); });
-  }
+  if (id === 'delacc') return deleteAccountFlow(1);
 });
 const TAB_ME_ICON = $('#tab-av').innerHTML;
 function renderComposer() {
@@ -5194,6 +5191,46 @@ function phoneSheet() {
     busy(e.currentTarget, async () => { await S.api.changePhone(v); u.phone = v; closeSheet(); toast(v ? 'নম্বর সংরক্ষণ হয়েছে' : 'নম্বর মুছে ফেলা হয়েছে'); renderMenu(); });
   };
 }
+// ================================================================ অ্যাকাউন্ট মুছে ফেলা: তিন ধাপে নিশ্চিত করা, ৩০ দিন পর মুছে যায়
+function deleteAccountFlow(step) {
+  const u = me(); if (!u) return;
+  if (step === 1) {
+    openSheet(`<div class="del-sheet"><div class="lock-ic">⚠️</div><h2>অ্যাকাউন্ট মুছে ফেলবেন?</h2><p class="del-step">ধাপ ১ / ৩</p>
+      <p>মুছে ফেললে এগুলো <b>চিরতরে</b> মুছে যাবে, আর ফেরত পাওয়া যাবে না:</p>
+      <ul class="del-list"><li>আপনার প্রোফাইল, নাম ও ছবি</li><li>সব পোস্ট, মন্তব্য ও রিয়্যাক্ট</li><li>সব মেসেজ ও গ্রুপ চ্যাট</li><li>বন্ধু, ফলোয়ার ও কয়েন</li><li>আপনার তৈরি পেইজ ও গ্রুপ</li></ul>
+      <p class="del-note">🕒 অনুরোধের পর <b>৩০ দিন</b> সময় পাবেন। এর মধ্যে আবার লগইন করলেই মুছে ফেলা বাতিল হয়ে যাবে, সব আগের মতো থাকবে।</p>
+      <button class="btn wide danger-bg" id="del-1">এগিয়ে যান</button><button class="btn ghost wide" data-close style="margin-top:8px">না, থাক</button></div>`);
+    $('#del-1').onclick = () => deleteAccountFlow(2);
+    return;
+  }
+  if (step === 2) {
+    const word = 'মুছে ফেলুন';
+    openSheet(`<div class="del-sheet"><h2>সত্যিই নিশ্চিত?</h2><p class="del-step">ধাপ ২ / ৩</p>
+      <p>নিশ্চিত হলে নিচের বক্সে লিখুন: <b class="del-word">${word}</b></p>
+      <input class="f" id="del-w" autocomplete="off" placeholder="${word}">
+      <button class="btn wide danger-bg" id="del-2" style="margin-top:10px" disabled>পরের ধাপ</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button></div>`);
+    $('#del-w').oninput = () => { $('#del-2').disabled = $('#del-w').value.trim() !== word; };
+    $('#del-2').onclick = () => deleteAccountFlow(3);
+    return;
+  }
+  openSheet(`<div class="del-sheet"><h2>শেষ ধাপ</h2><p class="del-step">ধাপ ৩ / ৩</p>
+    <p>নিরাপত্তার জন্য আপনার পাসওয়ার্ড দিন। এরপর আপনাকে লগআউট করে দেওয়া হবে।</p>
+    ${pwField('del-pw', 'পাসওয়ার্ড', 'current-password')}
+    <button class="btn wide danger-bg" id="del-3" style="margin-top:12px">অ্যাকাউন্ট মুছে ফেলার অনুরোধ করুন</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button></div>`);
+  $('#del-3').onclick = e => {
+    const pw = $('#del-pw').value; if (!pw) return toast('পাসওয়ার্ড দিন');
+    busy(e.currentTarget, async () => {
+      const until = await S.api.requestAccountDeletion(pw);
+      afterAuth();
+      const d = new Date(until || Date.now() + 30 * 864e5), p = dhakaParts(d);
+      openSheet(`<div class="lock-sheet"><div class="lock-ic">🕒</div><h2>অনুরোধ নেওয়া হয়েছে</h2><p class="mut">আপনার অ্যাকাউন্ট <b>${bn(p.day)} ${BN_MON[p.mon]}</b> তারিখে স্থায়ীভাবে মুছে যাবে। মত বদলালে এর আগে যেকোনো সময় আবার লগইন করুন, তাহলেই মুছে ফেলা বাতিল হয়ে যাবে।</p><button class="btn wide" data-close>ঠিক আছে</button></div>`);
+    });
+  };
+}
+// লগইন করলে মুছে ফেলার অনুরোধ বাতিল হলে জানানো
+function deletionCancelledNotice() {
+  openSheet(`<div class="lock-sheet"><div class="lock-ic">🎉</div><h2>আবার স্বাগতম!</h2><p class="mut">আপনি লগইন করায় অ্যাকাউন্ট মুছে ফেলার অনুরোধ বাতিল হয়েছে। আপনার সব পোস্ট, বন্ধু আর মেসেজ আগের মতোই আছে।</p><button class="btn wide" data-close>ঠিক আছে</button></div>`);
+}
 // ================================================================ ছবি বেছে নেওয়ার সাধারণ ফর্ম অংশ
 const photoField = (label, cur) => `<label>${esc(label)}</label><div class="row"><span class="pf-prev">${cur ? `<img loading="lazy" decoding="async" class="av" src="${esc(cur)}" alt="">` : ''}</span><label class="photo-btn" style="margin:0">ছবি বাছুন<input type="file" class="pf-file" accept="image/*"></label></div>`;
 function watchPhoto(store, max = 600) {
@@ -5673,6 +5710,7 @@ function restoreNav() {
     renderDemoBar();
     await S.api.init(() => afterAuth());
     S.api.onPasswordRecovery?.(() => recoverySheet());
+    S.api.onDeletionCancelled?.(() => deletionCancelledNotice());
     renderNetBar(); renderNotices(); checkForceUpdate();
     const [up, unions] = await Promise.all([cachedCall('upazila', () => S.api.upazila()), cachedCall('unions', () => S.api.unions())]);
     S.unions = unions;

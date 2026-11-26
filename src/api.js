@@ -45,7 +45,7 @@ async function supabaseApi() {
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
-  let recoveryPending = false, recoveryCb = null;
+  let recoveryPending = false, recoveryCb = null, delCancelled = false, delCb = null; const delChecked = new Set();
   const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,friend_req_from,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
     id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
@@ -84,6 +84,8 @@ async function supabaseApi() {
     if (!session) { me = null; blocked = new Set(); return null; }
     const p = ok(await sb.from('profiles').select(PROFILE).eq('id', session.user.id).maybeSingle());
     me = p ? { ...toUser(p), email: session.user.email } : null;
+    // মুছে ফেলার অনুরোধের পর আবার লগইন করলে অনুরোধ বাতিল
+    if (me && !delChecked.has(me.id)) { delChecked.add(me.id); sb.rpc('cancel_account_deletion').then(r => { if (r.data) { delCancelled = true; delCb?.(); } }, () => {}); }
     if (me) me.phone = ok(await sb.from('profile_private').select('phone').eq('user_id', me.id).maybeSingle())?.phone || '';
     if (me) {
       // কাজ, শিক্ষা, সোশ্যাল লিংক ও তাদের প্রাইভেসি (এই টেবিল শুধু নিজে পড়তে পারে)
@@ -133,6 +135,11 @@ async function supabaseApi() {
   return {
     mode: 'supabase',
     // ইমেইলের "পাসওয়ার্ড ভুলে গেছেন" লিংক থেকে ফিরলে নতুন পাসওয়ার্ড চাওয়া
+    onDeletionCancelled(cb) { delCb = cb; if (delCancelled) setTimeout(cb, 0); },
+    async requestAccountDeletion(password) {
+      const r = await sb.auth.signInWithPassword({ email: me.email, password }); if (r.error) throw new Error('wrong password');
+      const until = ok(await sb.rpc('request_account_deletion')); delChecked.delete(me.id); await sb.auth.signOut(); me = null; return until;
+    },
     onPasswordRecovery(cb) { recoveryCb = cb; if (recoveryPending) setTimeout(cb, 0); },
     async init(onAuth) {
       const { data } = await sb.auth.getSession();
@@ -1200,11 +1207,13 @@ function demoApi() {
     async signIn({ email, password }) {
       const u = db.users.find(x => x.email === email && x.password === password);
       if (!u) throw new Error('Invalid login credentials');
-      meId = u.id; save(); return meUser();
+      meId = u.id; if (u.deleteAt) { delete u.deleteAt; this._delCancelled = true; setTimeout(() => this._delCb?.(), 0); } save(); return meUser();
     },
+    onDeletionCancelled(cb) { this._delCb = cb; if (this._delCancelled) setTimeout(cb, 0); },
+    async requestAccountDeletion(password) { const p = person(meId); if (p.password !== password) throw new Error('wrong password'); p.deleteAt = new Date(Date.now() + 30 * 864e5).toISOString(); meId = null; save(); return wait(p.deleteAt); },
     async signOut() { meId = null; save(); },
     demoInfo: { email: DEMO_EMAIL, password: DEMO_PASS },
-    async demoLogin({ reset } = {}) { if (reset || !db.users.some(u => u.id === DEMO_ID)) seedDemo(); else { meId = DEMO_ID; save(); } return meUser(); },
+    async demoLogin({ reset } = {}) { if (reset || !db.users.some(u => u.id === DEMO_ID)) seedDemo(); else { meId = DEMO_ID; const p = person(DEMO_ID); if (p?.deleteAt) { delete p.deleteAt; this._delCancelled = true; setTimeout(() => this._delCb?.(), 0); } save(); } return meUser(); },
     async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations, aboutVis, gender, username, birthDate, relationship, religion, orgs, featured }) {
       for (const [k, v] of Object.entries({ relationship, religion, orgs, featured })) if (v !== undefined) person(meId)[k] = v;
       if (birthDate !== undefined) { person(meId).birthDate = birthDate || ''; if (birthDate) person(meId).birthYear = Number(birthDate.slice(0, 4)); }

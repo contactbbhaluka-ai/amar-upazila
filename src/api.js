@@ -24,14 +24,14 @@ async function supabaseApi() {
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
-  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,social,works,educations,created_at,unions!profiles_union_id_fkey(name)';
+  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
     id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
     union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
     bloodGroup: p.blood_group || '', donorVisible: p.donor_visible !== false, lastDonated: p.last_donated || '',
     avatar: p.avatar_url || '', cover: p.cover_url || '', bio: p.bio || '', admin: p.role === 'admin',
-    friendsVisibility: p.friends_visibility || 'public', followersVisibility: p.followers_visibility || 'public', followingVisibility: p.following_visibility || 'public', social: p.social || {},
-    works: p.works || [], educations: p.educations || [], joinedAt: p.created_at || '',
+    friendsVisibility: p.friends_visibility || 'public', followersVisibility: p.followers_visibility || 'public', followingVisibility: p.following_visibility || 'public', joinedAt: p.created_at || '',
+    social: {}, works: [], educations: [],
   });
   const toPost = (r, mine, saved) => ({
     id: r.id, body: r.body, image: r.image_url || '', images: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []),
@@ -60,6 +60,12 @@ async function supabaseApi() {
     const p = ok(await sb.from('profiles').select(PROFILE).eq('id', session.user.id).maybeSingle());
     me = p ? { ...toUser(p), email: session.user.email } : null;
     if (me) me.phone = ok(await sb.from('profile_private').select('phone').eq('user_id', me.id).maybeSingle())?.phone || '';
+    if (me) {
+      // কাজ, শিক্ষা, সোশ্যাল লিংক ও তাদের প্রাইভেসি (এই টেবিল শুধু নিজে পড়তে পারে)
+      const d = ok(await sb.from('profile_details').select('*').eq('user_id', me.id).maybeSingle()) || {};
+      Object.assign(me, { works: d.works || [], educations: d.educations || [], social: d.social || {},
+        aboutVis: { works: d.works_visibility || 'public', educations: d.educations_visibility || 'public', contact: d.contact_visibility || 'only_me', social: d.social_visibility || 'public' } });
+    }
     if (me) blocked = new Set(ok(await sb.from('blocks').select('blocked_id').eq('blocker_id', me.id)).map(b => b.blocked_id));
     return me;
   }
@@ -121,12 +127,14 @@ async function supabaseApi() {
     },
     async signIn({ email, password }) { return loadMe(ok(await sb.auth.signInWithPassword({ email, password })).session); },
     async signOut() { await sb.auth.signOut(); me = null; },
-    async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations }) {
+    async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations, aboutVis }) {
       const row = { name, district, upazila, union_id: unionId || null, bio: bio || null, blood_group: bloodGroup || null, donor_visible: donorVisible !== false, last_donated: (bloodGroup && lastDonated) || null };
-      if (social) row.social = social;   // না দিলে আগের লিংক যেমন আছে থাকে
-      if (works) row.works = works;
-      if (educations) row.educations = educations;
       ok(await sb.from('profiles').update(row).eq('id', me.id));
+      // কাজ/শিক্ষা/সোশ্যাল লিংক ও প্রাইভেসি আলাদা সুরক্ষিত টেবিলে; যা দেওয়া হয়নি তা যেমন আছে থাকে
+      const d = { user_id: me.id };
+      if (social) d.social = social; if (works) d.works = works; if (educations) d.educations = educations;
+      if (aboutVis) for (const [k, col] of [['works', 'works_visibility'], ['educations', 'educations_visibility'], ['contact', 'contact_visibility'], ['social', 'social_visibility']]) if (aboutVis[k]) d[col] = aboutVis[k];
+      if (Object.keys(d).length > 1) ok(await sb.from('profile_details').upsert(d, { onConflict: 'user_id' }));
       ok(await sb.from('profile_private').upsert({ user_id: me.id, phone: phone || null }));
       return loadMe((await sb.auth.getSession()).data.session);
     },
@@ -376,9 +384,11 @@ async function supabaseApi() {
     async profile(id) {
       const p = toUser(ok(await sb.from('profiles').select(PROFILE).eq('id', id).single()));
       // সংখ্যা সবাই দেখে (তালিকা গোপন থাকলেও)
-      const [counts, rel] = await Promise.all([sb.rpc('profile_counts', { uid: id }), relations([id])]);
-      const c = ok(counts) || {};
-      return { ...p, friends: c.friends || 0, followers: c.followers || 0, following: c.following || 0, rel: rel.get(id) };
+      const [counts, rel, about] = await Promise.all([sb.rpc('profile_counts', { uid: id }), relations([id]), sb.rpc('profile_about', { uid: id })]);
+      const c = ok(counts) || {}, a = ok(about) || {};
+      // মালিকের প্রাইভেসি অনুযায়ী যা দেখার অনুমতি আছে শুধু তাই আসে
+      return { ...p, works: a.works || [], educations: a.educations || [], social: a.social || {}, phone: a.phone || '',
+        friends: c.friends || 0, followers: c.followers || 0, following: c.following || 0, rel: rel.get(id) };
     },
     // বন্ধু/ফলোয়ার/ফলো করছেন তালিকা; মালিক গোপন রাখলে { hidden: true, visibility }
     async listPeople(uid, kind) {
@@ -588,7 +598,8 @@ function demoApi() {
   const save = () => { for (const k of ['albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '' }; };
-  const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true } : null);
+  const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public' };
+  const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true, aboutVis: { ...ABOUT_VIS0, ...(person(meId).aboutVis || {}) } } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
   const albumVisible = a => a.privacy === 'public' || a.userId === meId || (a.privacy === 'friends' && meId && friendIds(meId).includes(a.userId));
   const friendRow = (a, b) => db.friendships.find(f => (f.requester === a && f.addressee === b) || (f.requester === b && f.addressee === a));
@@ -729,7 +740,8 @@ function demoApi() {
     async signOut() { meId = null; save(); },
     demoInfo: { email: DEMO_EMAIL, password: DEMO_PASS },
     async demoLogin({ reset } = {}) { if (reset || !db.users.some(u => u.id === DEMO_ID)) seedDemo(); else { meId = DEMO_ID; save(); } return meUser(); },
-    async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations }) {
+    async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations, aboutVis }) {
+      if (aboutVis) person(meId).aboutVis = { ...(person(meId).aboutVis || {}), ...aboutVis };
       if (works) person(meId).works = works;
       if (educations) person(meId).educations = educations;
       Object.assign(person(meId), { name, district, upazila, unionId: unionId ? Number(unionId) : null, bio: bio || '', phone: phone || '', bloodGroup: bloodGroup || '', lastDonated: (bloodGroup && lastDonated) || '', donorVisible: donorVisible !== false }, social ? { social } : {});
@@ -960,6 +972,10 @@ function demoApi() {
     async profile(id) {
       const u = user(id);
       if (!u) throw new Error('not found');
+      // ডেমো: মালিকের প্রাইভেসি মেনে কাজ/শিক্ষা/সোশ্যাল/মোবাইল
+      const vis = { ...ABOUT_VIS0, ...(person(id).aboutVis || {}) };
+      const can = v => id === meId || v === 'public' || (v === 'friends' && meId && friendIds(meId).includes(id));
+      Object.assign(u, { works: can(vis.works) ? u.works : [], educations: can(vis.educations) ? u.educations : [], social: can(vis.social) ? u.social : {}, phone: can(vis.contact) ? (person(id).phone || '') : '' });
       return wait({ ...u, friends: friendIds(id).length, followers: db.follows.filter(f => f.endsWith(':' + id)).length, following: db.follows.filter(f => f.startsWith(id + ':')).length, rel: rel(id) });
     },
     async listPeople(uid, kind) {

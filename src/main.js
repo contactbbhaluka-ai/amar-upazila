@@ -1003,6 +1003,13 @@ document.addEventListener('click', async e => {
 
 // ================================================================ এবাউট (ফেসবুকের মতো): প্রতিটা অংশ চাপলে নিচে এডিট খোলে
 const joinedText = d => { if (!d) return ''; const t = new Date(d); return `${bn(t.getFullYear())} সালের ${['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'][t.getMonth()]} থেকে সদস্য`; };
+// এবাউটের প্রতিটা অংশ কারা দেখবে
+const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public' };
+const aVis = (u, k) => (u.aboutVis || ABOUT_VIS0)[k] || ABOUT_VIS0[k];
+const visSel = (id, cur, label = 'কারা দেখবে') => `<label class="vis-sel" for="${id}"><span>${ic(PRIVACY[cur][0], 14)} ${label}</span><select id="${id}" class="f">${Object.entries(PRIVACY).map(([k, [, l]]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+const visChip = (v, label) => `<span class="ab-vis" title="কারা দেখবে">${ic(PRIVACY[v][0], 11)} ${label ? label + ': ' : ''}${PRIVACY[v][1]}</span>`;
+document.addEventListener('change', e => { const l = e.target.closest('.vis-sel'); if (l) l.querySelector('span').innerHTML = `${ic(PRIVACY[e.target.value][0], 14)} ${l.querySelector('span').textContent.trim()}`; });
+
 // কাজ ও শিক্ষা: একাধিক কর্মস্থল ও শিক্ষাপ্রতিষ্ঠান
 const MAX_WORK = 3, MAX_EDU = 5;
 const SUBJECT_HINTS = ['বিজ্ঞান', 'মানবিক', 'ব্যবসায় শিক্ষা', 'কারিগরি', 'দাখিল', 'আলিম', 'ফাজিল', 'বাংলা', 'ইংরেজি', 'গণিত', 'পদার্থবিজ্ঞান', 'রসায়ন', 'প্রাণিবিজ্ঞান', 'উদ্ভিদবিজ্ঞান', 'হিসাববিজ্ঞান', 'ব্যবস্থাপনা', 'অর্থনীতি', 'রাষ্ট্রবিজ্ঞান', 'ইতিহাস', 'কম্পিউটার সায়েন্স', 'ইলেকট্রিক্যাল ইঞ্জিনিয়ারিং', 'সিভিল ইঞ্জিনিয়ারিং', 'আইন', 'এমবিবিএস', 'নার্সিং', 'কৃষি'];
@@ -1046,12 +1053,12 @@ const ABOUT = [
     form: u => `<label for="ab-name">নাম</label><input id="ab-name" required minlength="2" maxlength="40" value="${esc(u.name)}">
       <label for="ab-bio">নিজের সম্পর্কে</label><textarea id="ab-bio" maxlength="160" rows="2" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">${esc(u.bio || '')}</textarea>`,
     read: () => { const name = $('#ab-name').value.trim(); if (name.length < 2) return { err: 'নাম অন্তত ২ অক্ষরের দিন' }; return { name, bio: $('#ab-bio').value.trim() }; } },
-  { id: 'work', ic: 'work', t: 'কাজ ও শিক্ষা',
+  { id: 'work', ic: 'work', t: 'কাজ ও শিক্ষা', chips: u => visChip(aVis(u, 'works'), 'কাজ') + visChip(aVis(u, 'educations'), 'শিক্ষা'),
     sum: u => [...(u.works || []).map(workText), ...(u.educations || []).map(eduText)].join(' · '), empty: 'কর্মস্থল ও শিক্ষাপ্রতিষ্ঠান যোগ করুন',
     form: u => `<details class="ab-sub"><summary>${ic('work', 16)} কাজ <small class="mut">· ${u.works?.length ? `${bn(u.works.length)}টি কর্মস্থল` : 'এখনো যোগ করা হয়নি'}</small></summary>
-        <div id="we-works">${weList('work', u.works)}</div><button type="button" class="we-add" data-weadd="work">${ic('plus', 15)} আরেকটি কর্মস্থল যোগ করুন</button></details>
+        ${visSel('ab-vis-works', aVis(u, 'works'), 'কাজের তথ্য কারা দেখবে')}<div id="we-works">${weList('work', u.works)}</div><button type="button" class="we-add" data-weadd="work">${ic('plus', 15)} আরেকটি কর্মস্থল যোগ করুন</button></details>
       <details class="ab-sub"><summary>${ic('school', 16)} শিক্ষা <small class="mut">· ${u.educations?.length ? `${bn(u.educations.length)}টি শিক্ষাপ্রতিষ্ঠান` : 'এখনো যোগ করা হয়নি'}</small></summary>
-        <div id="we-edus">${weList('edu', u.educations)}</div><button type="button" class="we-add" data-weadd="edu">${ic('plus', 15)} আরেকটি শিক্ষাপ্রতিষ্ঠান যোগ করুন</button></details>
+        ${visSel('ab-vis-edu', aVis(u, 'educations'), 'শিক্ষার তথ্য কারা দেখবে')}<div id="we-edus">${weList('edu', u.educations)}</div><button type="button" class="we-add" data-weadd="edu">${ic('plus', 15)} আরেকটি শিক্ষাপ্রতিষ্ঠান যোগ করুন</button></details>
       <datalist id="subj-hints">${SUBJECT_HINTS.map(x => `<option value="${x}">`).join('')}</datalist>`,
     after: () => weSyncAdd(),
     read: () => {
@@ -1069,26 +1076,27 @@ const ABOUT = [
         if (e.subject) o.subject = e.subject;
         educations.push(o);
       }
-      return { works, educations };
+      return { works, educations, aboutVis: { works: $('#ab-vis-works').value, educations: $('#ab-vis-edu').value } };
     } },
   { id: 'addr', ic: 'pin', t: 'ঠিকানা',
     sum: u => u.union || '', empty: 'ঠিকানা দিন',
     form: u => addrHtml('ab', u), after: u => addrRefresh('ab', u),
     read: () => { const a = readAddr('ab'); if (!a.upazila || (a.upazila === HOME_UPAZILA && !a.unionId)) return { err: 'ঠিকানা সম্পূর্ণ বাছাই করুন' }; return a; } },
-  { id: 'contact', ic: 'mobile', t: 'যোগাযোগ', own: true,
+  { id: 'contact', ic: 'mobile', t: 'যোগাযোগ', chips: u => visChip(aVis(u, 'contact')),
     sum: u => (u.phone ? bn(u.phone) : ''), empty: 'মোবাইল নম্বর দিন',
     form: u => `<label for="ab-ph">${ic('mobile', 16)} মোবাইল নম্বর</label><input id="ab-ph" required inputmode="tel" maxlength="17" value="${esc(u.phone ? bn(u.phone) : '')}" placeholder="০১XXXXXXXXX">
-      <p class="mut ab-note">${ic('lock', 13)} প্রোফাইলে কেউ দেখে না। ব্লাড ব্যাংকে ডোনার হলে শুধু লগইন করা ব্যবহারকারীরা দেখতে পান।</p>`,
-    read: () => { const phone = normPhone($('#ab-ph').value); return validPhone(phone) ? { phone } : { err: 'সঠিক মোবাইল নম্বর দিন (যেমন ০১৭১২৩৪৫৬৭৮)' }; } },
+      ${visSel('ab-vis-contact', aVis(u, 'contact'), 'প্রোফাইলে নম্বর কারা দেখবে')}
+      <p class="mut ab-note">${ic('drop', 13)} ব্লাড ব্যাংকে ডোনার হিসেবে থাকলে লগইন করা ব্যবহারকারীরা সেখানে নম্বর দেখতে পান, যাতে জরুরি দরকারে যোগাযোগ করা যায়।</p>`,
+    read: () => { const phone = normPhone($('#ab-ph').value); return validPhone(phone) ? { phone, aboutVis: { contact: $('#ab-vis-contact').value } } : { err: 'সঠিক মোবাইল নম্বর দিন (যেমন ০১৭১২৩৪৫৬৭৮)' }; } },
   { id: 'blood', ic: 'drop', t: 'রক্তদান',
     sum: u => (u.bloodGroup ? `${u.bloodGroup} · ${u.donorVisible ? 'ব্লাড ব্যাংকে ডোনার' : 'ব্লাড ব্যাংকে দেখানো বন্ধ'}${u.lastDonated ? ` · সর্বশেষ ${bnDate(u.lastDonated)}` : ''}` : ''), empty: 'ব্লাড গ্রুপ দিন',
     pub: u => (u.bloodGroup && u.donorVisible ? `রক্তের গ্রুপ ${u.bloodGroup}` : ''),
     form: u => bloodHtml('ab', u.bloodGroup || '', u.donorVisible, u.lastDonated || ''),
     after: () => { if ($('#ab-never')?.checked) $('#ab-ld').disabled = true; },
     read: () => { const b = readBlood('ab'); if (b.err) return b; return { ...b, donorVisible: !!$('#ab-donor')?.checked }; } },
-  { id: 'social', ic: 'link', t: 'সোশ্যাল লিংক',
+  { id: 'social', ic: 'link', t: 'সোশ্যাল লিংক', chips: u => visChip(aVis(u, 'social')),
     sum: u => SOCIALS.filter(([k]) => u.social?.[k]).map(([, l]) => l).join(', '), empty: 'Facebook, WhatsApp, TikTok, YouTube, Instagram যোগ করুন',
-    form: u => `<div class="soc-edit flat">${SOCIALS.map(([k, l, ph]) => `<label for="soc-${k}" class="soc-l"><span class="soc-ic">${ic('s_' + k, 16)}</span>${l}</label><input id="soc-${k}" maxlength="200" inputmode="${k === 'whatsapp' ? 'tel' : 'url'}" autocomplete="off" value="${esc(k === 'whatsapp' && u.social?.[k] ? '+' + u.social[k].split('/').pop() : (u.social?.[k] || ''))}" placeholder="${esc(ph)}">`).join('')}</div>`,
+    form: u => `${visSel('ab-vis-social', aVis(u, 'social'), 'সোশ্যাল লিংক কারা দেখবে')}<div class="soc-edit flat">${SOCIALS.map(([k, l, ph]) => `<label for="soc-${k}" class="soc-l"><span class="soc-ic">${ic('s_' + k, 16)}</span>${l}</label><input id="soc-${k}" maxlength="200" inputmode="${k === 'whatsapp' ? 'tel' : 'url'}" autocomplete="off" value="${esc(k === 'whatsapp' && u.social?.[k] ? '+' + u.social[k].split('/').pop() : (u.social?.[k] || ''))}" placeholder="${esc(ph)}">`).join('')}</div>`,
     read: () => {
       const social = {};
       for (const [k, l] of SOCIALS) {
@@ -1096,7 +1104,7 @@ const ABOUT = [
         if (v === null) { $('#soc-' + k).focus(); return { err: k === 'whatsapp' ? 'WhatsApp নম্বর ঠিক নেই (যেমন ০১৭১২৩৪৫৬৭৮)' : `${l} লিংক ঠিক নেই। ${l}-এর নিজের লিংক বা ইউজারনেম দিন।` }; }
         if (v) social[k] = v;
       }
-      return { social };
+      return { social, aboutVis: { social: $('#ab-vis-social').value } };
     } },
   { id: 'lists', ic: 'lock', t: 'বন্ধু ও ফলো তালিকার প্রাইভেসি', own: true, action: () => listPrivacySheet(),
     sum: u => Object.entries(PLIST).map(([k, l]) => `${l}: ${PRIVACY[u[k + 'Visibility'] || 'public'][1]}`).join(' · ') },
@@ -1113,6 +1121,7 @@ function renderAbout(key) {
         ? `<b>${esc(e.school)}</b>-এ ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পড়ছেন`
         : `<b>${esc(e.school)}</b> থেকে ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পাশ করেছেন${e.year ? ` (${bn(e.year)})` : ''}`]),
       u.union && [ic('pin', 18), `থাকেন <b>${esc(u.union)}</b>`],
+      u.phone && [ic('mobile', 18), `<a href="tel:${esc(u.phone)}" class="link">${bn(u.phone)}</a>`],
       blood && [ic('drop', 18), esc(blood)],
       u.joinedAt && [ic('calendar', 18), joinedText(u.joinedAt)],
     ].filter(Boolean);
@@ -1127,7 +1136,7 @@ function renderAbout(key) {
     return `<div class="ab-sec${isOpen ? ' open' : ''}" data-absec="${a.id}">
       <button class="ab-head" data-abopen="${a.id}" aria-expanded="${isOpen}">
         <span class="ab-ic">${ic(a.ic, 18)}</span>
-        <span class="ab-tx"><b>${a.t}${a.own ? ` <span class="ab-only">${ic('lock', 11)} শুধু আপনি</span>` : ''}</b><small class="${sum ? '' : 'ab-empty'}">${esc(sum || (a.empty ? '+ ' + a.empty : ''))}</small></span>
+        <span class="ab-tx"><b>${a.t}${a.chips ? ` ${a.chips(u)}` : a.own ? ` <span class="ab-only">${ic('lock', 11)} শুধু আপনি</span>` : ''}</b><small class="${sum ? '' : 'ab-empty'}">${esc(sum || (a.empty ? '+ ' + a.empty : ''))}</small></span>
         <span class="ab-chev">${a.action ? ic('chevR', 18) : ic('chevD', 18)}</span>
       </button>
       ${isOpen ? `<form class="ab-form" data-abform="${a.id}">${a.form(u)}<div class="ab-btns"><button type="button" class="btn ghost sm" data-abcancel>বাতিল</button><button class="btn sm">সেভ করুন</button></div></form>` : ''}

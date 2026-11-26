@@ -1658,3 +1658,4 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .pl-gone{padding:36px 18px;text-align:center}.pl-gone h3{margin:10px 0 4px}.pl-gone .btn{margin-top:12px}
 
 .lang-row .switch{pointer-events:none;margin-left:8px}.lang-row .switch{margin-left:auto}
+.lang-note{font-size:13px;margin:4px 12px 10px}

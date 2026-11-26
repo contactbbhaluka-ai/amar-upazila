@@ -4681,8 +4681,10 @@ function renderMenu() {
       <button id="msgsnd"><span class="set-ic">🔊</span>শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
     <details class="card"><summary>🎨 দেখতে কেমন</summary><div class="setlist">
       <button id="theme"><span class="set-ic">🌓</span>থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
-      <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button>
-      <button id="lang-tg" class="lang-row"><span class="set-ic">🌐</span>${EN ? 'Language: English' : 'ইংরেজি ভাষা (English)'}<input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${EN ? 'checked' : ''}></button></div></details>
+      <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button></div></details>
+    <details class="card"><summary>🌐 ${EN ? 'Language' : 'ভাষা (Language)'}</summary><div class="setlist">
+      <button id="lang-tg" class="lang-row"><span class="set-ic">🌐</span>${EN ? 'English' : 'ইংরেজি (English)'}<input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${EN ? 'checked' : ''}></button>
+      <p class="mut lang-note">${EN ? 'Turn off to switch back to Bangla. Your posts and messages stay as written.' : 'চালু করলে পুরো অ্যাপ ইংরেজিতে দেখাবে, বন্ধ করলে বাংলায়। পোস্ট ও মেসেজ যেমন লেখা তেমনই থাকবে।'}</p></div></details>
     <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
       ${S.api.demoLogin ? '<button id="demo-guide"><span class="set-ic">🧪</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">🔄</span>ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
       <button id="help"><span class="set-ic">🐞</span>কোনো সমস্যা জানান</button>

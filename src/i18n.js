@@ -144,6 +144,7 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'জনপ্রিয় ক্যাটাগরি': 'Popular categories',
   'কাছের সেবা': 'Nearby', 'আমার কাছের সেবা': 'Services near me', 'লোকেশন দিলে কাছের হাসপাতাল, ডাক্তার, ব্যাংক দূরত্বসহ দেখাবে': 'Share your location to see nearby hospitals, doctors and banks with distance',
   'আবার খুঁজুন': 'Refresh', 'পথ দেখুন': 'Directions', 'অবস্থান দিন': 'Set location', 'অবস্থান বদলান': 'Change location', 'অবস্থান সংরক্ষণ হয়েছে': 'Location saved', 'মিটার': 'm', 'কিমি': 'km',
   '{x} মিটার': '{x} m', '{x} কিমি': '{x} km', 'আপনার অবস্থান খোঁজা হচ্ছে…': 'Finding your location…', 'আপনার অবস্থান খোঁজা হচ্ছে': 'Finding your location',

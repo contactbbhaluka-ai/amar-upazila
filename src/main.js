@@ -4008,6 +4008,13 @@ function bindGeoField(st) {
   $('#geo-clear').onclick = () => { st.geo = null; show(); };
   $('#geo-link').oninput = () => { const c = coordsFrom($('#geo-link').value); if (c) { st.geo = c; show(); } };
 }
+// সবচেয়ে বেশি খোলা ৫টা ক্যাটাগরি (সবার মিলিয়ে)
+function popCatsHtml() {
+  const cats = svcCats(), top = (S.popCats || []).map(r => r.category).filter(k => k === 'sos' || cats.some(c => c[0] === k)).slice(0, 5);
+  if (!top.length) return '';
+  const name = k => k === 'sos' ? 'জরুরি নম্বর' : cats.find(c => c[0] === k)[1];
+  return `<h3 class="svc-sec" style="--c:#e8590c"><i></i>🔥 জনপ্রিয় ক্যাটাগরি</h3><div class="svc-grid pop-cats">${top.map(k => `<button class="svc-tile" data-svc="${k}">${svcIc(k, 22)}<span class="st-n">${esc(name(k))}</span></button>`).join('')}</div>`;
+}
 function renderSvcGrid(list) {
   const n = k => list.filter(x => x.category === k).length;
   const total = list.length, cats = svcCats(), has = k => k === 'sos' || cats.some(c => c[0] === k);
@@ -4015,6 +4022,7 @@ function renderSvcGrid(list) {
     return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
   const favs = list.filter(x => S.svcFav?.has(x.id));
   $('#dir').innerHTML = `<div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div>`
+    + popCatsHtml()
     + `<button class="near-card" data-svc="near">${svcIc('near', 24)}<span><b>আমার কাছের সেবা</b><small>লোকেশন দিলে কাছের হাসপাতাল, ডাক্তার, ব্যাংক দূরত্বসহ দেখাবে</small></span><span class="near-go">›</span></button>`
     + (favs.length ? `<h3 class="svc-sec" style="--c:#e0245e"><i></i>❤️ আমার প্রিয় সেবা <button class="svc-more" data-svc="fav">সব দেখুন</button></h3>${favs.slice(0, 3).map(svcCard).join('')}` : '')
     + SVC_GROUPS.map(([t, col, keys]) => { const ks = keys.filter(has); return ks.length ? `<h3 class="svc-sec" style="--c:${col}"><i></i>${esc(t)}</h3><div class="svc-grid">${ks.map(tile).join('')}</div>` : ''; }).join('');
@@ -4072,13 +4080,15 @@ async function loadDir() {
   if (S.svcAll) { drawDir(); restore(); }   // আগের তালিকা সাথে সাথে দেখাই, পরে চুপচাপ হালনাগাদ
   else $('#dir').innerHTML = '<div class="skel"></div>';
   try {
-    const [list] = await Promise.all([S.api.services({}), ensureSvcFavs()]);
+    const [list, pop] = await Promise.all([S.api.services({}), S.api.popularServiceCats().catch(() => S.popCats || []), ensureSvcFavs()]);
+    const popChanged = JSON.stringify(pop) !== JSON.stringify(S.popCats); S.popCats = pop;
     const changed = JSON.stringify(list) !== JSON.stringify(S.svcAll);
     S.svcAll = list;
-    if (changed || !$('#dir').children.length || $('#dir .skel')) { const y = window.scrollY; drawDir(); window.scrollTo(0, y); restore(); }
+    if (changed || (popChanged && !S.dcat && !$('#q').value.trim()) || !$('#dir').children.length || $('#dir .skel')) { const y = window.scrollY; drawDir(); window.scrollTo(0, y); restore(); }
   } catch (e) { if (!S.svcAll) $('#dir').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 function openSvcCat(k) {
+  if (k && k !== 'near' && k !== 'fav') { S.catSeen = S.catSeen || new Set(); if (!S.catSeen.has(k)) { S.catSeen.add(k); S.api.serviceCatVisit(k).catch(() => {}); } }   // একই সেশনে একবারই গোনা
   const sp = SVC_SPECIAL[k];
   if (sp && sp !== 'blood') {   // ক্রয়বিক্রয় ও চাকরি: ফিডের সেই ধরনের পোস্ট; Back চাপলে ডিরেক্টরির একই জায়গায় ফেরা
     S.dirRet = { tab: S.tab, y: window.scrollY, root: document.body.classList.contains('upz-root') };

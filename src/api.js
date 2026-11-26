@@ -916,6 +916,8 @@ async function supabaseApi() {
     async serviceFavs() { return me ? ok(await sb.from('service_favs').select('service_id').eq('user_id', me.id)).map(r => r.service_id) : []; },
     async setServiceFav(id, on) { if (on) ok(await sb.from('service_favs').upsert({ user_id: me.id, service_id: id }, { ignoreDuplicates: true })); else ok(await sb.from('service_favs').delete().eq('user_id', me.id).eq('service_id', id)); },
     async serviceCalled(id) { await sb.rpc('service_called', { sid: id }); },
+    async popularServiceCats() { return ok(await sb.from('service_cat_visits').select('category,visits').gt('visits', 0).order('visits', { ascending: false }).limit(10)); },
+    async serviceCatVisit(c) { await sb.rpc('svc_cat_visit', { c }); },
     async setServiceLoc(id, lat, lng) { ok(await sb.from('services').update({ lat, lng }).eq('id', id)); },
     async verifyService(id) { ok(await sb.from('services').update({ verified: true }).eq('id', id)); },
     async report(targetType, targetId, reason) {
@@ -975,7 +977,7 @@ function demoApi() {
     settings: get('settings', { publicDonorPhone: false }),
     wallet: get('wallet', { coins: 120, ledger: [{ amount: 100, reason: 'admin', ref: 'স্বাগতম', createdAt: ago(30) }, { amount: 5, reason: 'post', ref: 'x1', createdAt: ago(20) }, { amount: 15, reason: 'like', ref: 'x2', createdAt: ago(19) }] }),
     chats: get('chats', []),
-    svcFavs: get('svcFavs', {}), msgSaved: get('msgSaved', []), shared: get('shared', {}), friendMarks: get('friendMarks', {}), friendLists: get('friendLists', []), sugHidden: get('sugHidden', []), notifMutes: get('notifMutes', []), notifOff: get('notifOff', []), annc: get('annc', []), announcers: get('announcers', []),             // গ্রুপ চ্যাট { id, name, createdBy, createdAt, members: [{ id, role, lastReadAt }] }
+    svcFavs: get('svcFavs', {}), svcCatVisits: get('svcCatVisits', { health: 14, doc: 11, police: 8, blood: 6, edu: 4, bank: 2 }), msgSaved: get('msgSaved', []), shared: get('shared', {}), friendMarks: get('friendMarks', {}), friendLists: get('friendLists', []), sugHidden: get('sugHidden', []), notifMutes: get('notifMutes', []), notifOff: get('notifOff', []), annc: get('annc', []), announcers: get('announcers', []),             // গ্রুপ চ্যাট { id, name, createdBy, createdAt, members: [{ id, role, lastReadAt }] }
     convSet: get('convSet', {}),         // কথোপকথনের সেটিং (মিউট, রিকোয়েস্ট, মুছা)
     votes: get('votes', {}),             // postId -> { userId: অপশন }
     going: get('going', {}),             // postId -> [userId]
@@ -1019,7 +1021,7 @@ function demoApi() {
     ]),
   };
   let meId = get('me', null);
-  const save = () => { for (const k of ['svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['svcCatVisits', 'svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone', gone: !!p.deleteAt && p.id !== meId }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -2062,6 +2064,8 @@ function demoApi() {
     async serviceFavs() { return wait(meId ? (db.svcFavs[meId] || []) : []); },
     async setServiceFav(id, on) { const l = new Set(db.svcFavs[meId] || []); on ? l.add(id) : l.delete(id); db.svcFavs[meId] = [...l]; save(); return wait(); },
     async setServiceLoc(id, lat, lng) { const s = db.services.find(x => x.id === id); if (s) { s.lat = lat; s.lng = lng; s.noGeo = lat == null; } save(); return wait(); },
+    async popularServiceCats() { return wait(Object.entries(db.svcCatVisits).map(([category, visits]) => ({ category, visits })).sort((a, b) => b.visits - a.visits).slice(0, 10)); },
+    async serviceCatVisit(c) { db.svcCatVisits[c] = (db.svcCatVisits[c] || 0) + 1; save(); },
     async serviceCalled(id) { const s = db.services.find(x => x.id === id); if (s) { s.call_count = (s.call_count || 0) + 1; save(); } },
     async verifyService(id) { const s = db.services.find(x => x.id === id); if (s) s.verified = true; save(); },
     async report() { return wait(true); },

@@ -2449,6 +2449,7 @@ async function openUser(id, silent, keepState, preview) {
   try {
     const p = S.preview ? await previewProfile(S.preview) : await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
+    if (p.gone && !S.preview) { $('#user').innerHTML = `<div class="card empty pl-gone">${ic('lock', 38)}<h3>এই প্রোফাইল এখন দেখা যাচ্ছে না</h3><p class="mut">অ্যাকাউন্টটি হয়তো নিষ্ক্রিয় করা হয়েছে, অথবা লিংকটি আর কাজ করছে না।</p><button class="btn ghost" data-back>ফিরে যান</button></div>`; $('#feed-user').innerHTML = ''; $('#user [data-back]').onclick = back; return; }
     if (!silent) S.api.profileVisit?.(id).catch(() => {});
     $('#user').innerHTML = (S.preview ? previewBar() : '') + `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 class="ph-h2" style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}<span class="ph-acts"><button class="pshare-btn" data-pshare="user" title="প্রোফাইল শেয়ার / QR" aria-label="প্রোফাইল শেয়ার বা QR কোড">${ic('share', 16)}</button></span></h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}

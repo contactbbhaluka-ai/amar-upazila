@@ -1654,3 +1654,5 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .del-word{color:var(--r)}
 .danger-bg{background:var(--r)!important;border-color:var(--r)!important;color:#fff!important}
 .danger-bg:disabled{opacity:.45}
+
+.pl-gone{padding:36px 18px;text-align:center}.pl-gone h3{margin:10px 0 4px}.pl-gone .btn{margin-top:12px}

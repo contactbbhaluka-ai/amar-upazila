@@ -46,9 +46,9 @@ async function supabaseApi() {
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
   let recoveryPending = false, recoveryCb = null, delCancelled = false, delCb = null; const delChecked = new Set();
-  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,friend_req_from,unions!profiles_union_id_fkey(name)';
+  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,friend_req_from,delete_requested_at,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
-    id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
+    gone: !!p.delete_requested_at, id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
     union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
     bloodGroup: p.blood_group || '', donorVisible: p.donor_visible !== false, lastDonated: p.last_donated || '',
     avatar: p.avatar_url || '', cover: p.cover_url || '', bio: p.bio || '', admin: p.role === 'admin',
@@ -567,6 +567,7 @@ async function supabaseApi() {
       const [counts, rel, about] = await Promise.all([sb.rpc('profile_counts', { uid: id }), relations([id]), sb.rpc('profile_about', { uid: id })]);
       const c = ok(counts) || {}, a = ok(about) || {};
       // মালিকের প্রাইভেসি অনুযায়ী যা দেখার অনুমতি আছে শুধু তাই আসে
+      if (a.gone) return { ...p, gone: true, lockedOut: true, bio: '', avatar: '', cover: '', bloodGroup: '', works: [], educations: [], social: {}, phone: '', orgs: [], featured: FEATURED0, friends: 0, followers: 0, following: 0, rel: rel.get(id) };
       if (a.locked) return { ...p, locked: true, lockedOut: true, bloodGroup: '', lastDonated: '', works: [], educations: [], social: {}, phone: '', orgs: [], featured: FEATURED0, friends: c.friends || 0, followers: c.followers || 0, following: c.following || 0, rel: rel.get(id) };
       return { ...p, works: a.works || [], educations: a.educations || [], social: a.social || {}, phone: a.phone || '', birthYear: a.birth_year || 0, birthDate: a.birth_date || '', relationship: a.relationship || '', religion: a.religion || '', orgs: a.orgs || [], featured: a.featured || FEATURED0,
         friends: c.friends || 0, followers: c.followers || 0, following: c.following || 0, rel: rel.get(id) };
@@ -599,18 +600,18 @@ async function supabaseApi() {
       else if (me?.unionId) s = s.eq('union_id', me.unionId).order('created_at', { ascending: false });
       else if (me?.upazila) s = s.eq('upazila', me.upazila).order('created_at', { ascending: false });
       else s = s.order('created_at', { ascending: false });
-      const rows = ok(await s).map(toUser).filter(u => u.id !== me?.id && !blocked.has(u.id));
+      const rows = ok(await s).map(toUser).filter(u => u.id !== me?.id && !u.gone && !blocked.has(u.id));
       const rel = await relations(rows.map(u => u.id));
       return rows.map(u => ({ ...u, rel: rel.get(u.id) }));
     },
     async friendRequests() {
       const rows = ok(await sb.from('friendships').select('created_at, p:profiles!friendships_requester_fkey(' + PROFILE + ')').eq('addressee', me.id).eq('status', 'pending').order('created_at', { ascending: false }));
-      return rows.map(r => toUser(r.p)).filter(u => u && !blocked.has(u.id));
+      return rows.map(r => toUser(r.p)).filter(u => u && !u.gone && !blocked.has(u.id));
     },
     async friends(of) {
       const id = of || me.id;
       const rows = ok(await sb.from('friendships').select(`requester,addressee, r:profiles!friendships_requester_fkey(${PROFILE}), a:profiles!friendships_addressee_fkey(${PROFILE})`).eq('status', 'accepted').or(`requester.eq.${id},addressee.eq.${id}`));
-      return rows.map(r => toUser(r.requester === id ? r.a : r.r)).filter(Boolean);
+      return rows.map(r => toUser(r.requester === id ? r.a : r.r)).filter(u => u && !u.gone);
     },
     async sendFriendRequest(id) {
       const r = await sb.from('friendships').insert({ requester: me.id, addressee: id });
@@ -622,7 +623,7 @@ async function supabaseApi() {
     // ---------- বন্ধু (২)
     async sentRequests() {
       const rows = ok(await sb.from('friendships').select('created_at, p:profiles!friendships_addressee_fkey(' + PROFILE + ')').eq('requester', me.id).eq('status', 'pending').order('created_at', { ascending: false }));
-      return rows.map(r => r.p && { ...toUser(r.p), sentAt: r.created_at }).filter(u => u && !blocked.has(u.id));
+      return rows.map(r => r.p && { ...toUser(r.p), sentAt: r.created_at }).filter(u => u && !u.gone && !blocked.has(u.id));
     },
     async friendMeta(ids) {
       if (!me || !ids.length) return new Map();
@@ -993,7 +994,7 @@ function demoApi() {
   let meId = get('me', null);
   const save = () => { for (const k of ['chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
-  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone' }; };
+  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone', gone: !!p.deleteAt && p.id !== meId }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
   const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true, aboutVis: { ...ABOUT_VIS0, ...(person(meId).aboutVis || {}) } } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
@@ -1678,6 +1679,7 @@ function demoApi() {
       const u = user(id);
       if (!u) throw new Error('not found');
       // ডেমো: মালিকের প্রাইভেসি মেনে কাজ/শিক্ষা/সোশ্যাল/মোবাইল
+      if (u.gone) return wait({ ...u, lockedOut: true, bio: '', avatar: '', cover: '', works: [], educations: [], social: {}, phone: '', orgs: [], featured: FEATURED0, friends: 0, followers: 0, following: 0, rel: rel(id) });
       if (lockedOut(id)) return wait({ ...u, lockedOut: true, bloodGroup: '', lastDonated: '', works: [], educations: [], social: {}, phone: '', orgs: [], featured: FEATURED0, friends: friendIds(id).length, followers: db.follows.filter(f => f.endsWith(':' + id)).length, following: db.follows.filter(f => f.startsWith(id + ':')).length, rel: rel(id) });
       const vis = { ...ABOUT_VIS0, ...(person(id).aboutVis || {}) };
       const can = v => id === meId || v === 'public' || (v === 'friends' && meId && friendIds(meId).includes(id));
@@ -1700,14 +1702,14 @@ function demoApi() {
     },
     async people({ q }) {
       const t = (q || '').trim().toLowerCase();
-      const all = [...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u.id !== meId && !isBlocked(u.id));
+      const all = [...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u.id !== meId && !u.gone && !isBlocked(u.id));
       const me = meUser();
       const near = u => (me?.unionId && u.unionId === me.unionId ? 2 : 0) + (u.upazila === me?.upazila ? 1 : 0);
       const rows = t ? all.filter(u => u.name.toLowerCase().includes(t)) : all.sort((a, b) => near(b) - near(a));
       return wait(rows.slice(0, 30).map(u => ({ ...u, rel: rel(u.id) })));
     },
-    async friendRequests() { return wait(db.friendships.filter(f => f.addressee === meId && f.status === 'pending' && !isBlocked(f.requester)).map(f => user(f.requester))); },
-    async friends(of) { return wait(friendIds(of || meId).map(user).filter(Boolean)); },
+    async friendRequests() { return wait(db.friendships.filter(f => f.addressee === meId && f.status === 'pending' && !isBlocked(f.requester)).map(f => user(f.requester)).filter(u => u && !u.gone)); },
+    async friends(of) { return wait(friendIds(of || meId).map(user).filter(u => u && !u.gone)); },
     async sendFriendRequest(id) {
       if (friendRow(meId, id)) throw new Error('already');
       const rule = person(id)?.friendReqFrom || 'everyone', mineF = new Set(friendIds(meId));
@@ -1726,7 +1728,7 @@ function demoApi() {
       db.notifs = db.notifs.filter(n => !(n.to === meId && n.from === id && n.type === 'friend_request')); save();
     },
     // ---------- বন্ধু (২)
-    async sentRequests() { return wait(db.friendships.filter(f => f.requester === meId && f.status === 'pending' && !isBlocked(f.addressee)).map(f => user(f.addressee) && { ...user(f.addressee), sentAt: f.createdAt || '' }).filter(Boolean)); },
+    async sentRequests() { return wait(db.friendships.filter(f => f.requester === meId && f.status === 'pending' && !isBlocked(f.addressee)).map(f => user(f.addressee) && { ...user(f.addressee), sentAt: f.createdAt || '' }).filter(u => u && !u.gone)); },
     async friendMeta(ids) {
       const mine = new Set(friendIds(meId));
       return wait(new Map(ids.map(id => { const u = person(id), f = friendRow(meId, id);
@@ -1735,7 +1737,7 @@ function demoApi() {
     async suggestions() {
       const me0 = meUser(), mine = new Set(friendIds(meId)), hidden = new Set(db.sugHidden || []);
       const mySchools = new Set((me0?.educations || []).map(e => (e.school || '').trim().toLowerCase()).filter(Boolean));
-      const out = [...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u && u.id !== meId && !isBlocked(u.id) && !friendRow(meId, u.id) && !hidden.has(u.id)).map(u => {
+      const out = [...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u && u.id !== meId && !u.gone && !isBlocked(u.id) && !friendRow(meId, u.id) && !hidden.has(u.id)).map(u => {
         const school = (u.educations || []).find(e => mySchools.has((e.school || '').trim().toLowerCase()))?.school || '';
         return { ...u, rel: { friend: 'none' }, mutual: friendIds(u.id).filter(x => mine.has(x)).length, sameArea: !!(me0?.unionId && u.unionId === me0.unionId), school, isNew: !!u.joinedAt && Date.now() - new Date(u.joinedAt) < 7 * 864e5 };
       });
@@ -1744,7 +1746,7 @@ function demoApi() {
     async areaPeople(area) {
       const k = area.slice(0, 1), v = area.slice(2), me0 = meUser(), mine = new Set(friendIds(meId)), hidden = new Set(db.sugHidden || []);
       const mySchools = new Set((me0?.educations || []).map(e => (e.school || '').trim().toLowerCase()).filter(Boolean));
-      return wait([...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u && u.id !== meId && !isBlocked(u.id) && !friendRow(meId, u.id) && !hidden.has(u.id) && (k === 'u' ? String(u.unionId) === v : !u.unionId && u.upazila === v))
+      return wait([...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u && u.id !== meId && !u.gone && !isBlocked(u.id) && !friendRow(meId, u.id) && !hidden.has(u.id) && (k === 'u' ? String(u.unionId) === v : !u.unionId && u.upazila === v))
         .map(u => ({ ...u, rel: { friend: 'none' }, mutual: friendIds(u.id).filter(x => mine.has(x)).length, sameArea: false, school: (u.educations || []).find(e => mySchools.has((e.school || '').trim().toLowerCase()))?.school || '', isNew: !!u.joinedAt && Date.now() - new Date(u.joinedAt) < 7 * 864e5 }))
         .sort((a, b) => b.mutual - a.mutual));
     },

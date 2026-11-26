@@ -4602,7 +4602,7 @@ document.addEventListener('click', e => {
   if (e.target.closest('#mn-dark')) { local.set('theme', isDark() ? 'light' : 'dark'); applyTheme(); renderMenu(); return; }
   if (e.target.closest('#fontsz')) {
     const cur = local.get('fontsz', 'md');
-    openSheet(`<h2>🔠 ফন্ট সাইজ</h2><p class="mut">পুরো অ্যাপের লেখা ও বাটন একসাথে বড় বা ছোট হবে।</p><div class="fs-list">${FONT_SIZES.map(([k, l, z]) => `<button class="fs-opt${k === cur ? ' on' : ''}" data-fs="${k}"><span style="font-size:${Math.round(16 * z)}px">আমার উপজেলা</span><b>${l}</b></button>`).join('')}</div><button class="btn ghost wide" data-close style="margin-top:10px">ঠিক আছে</button>`);
+    openSheet(`<h2>🔠 লেখার আকার</h2><p class="mut">পুরো অ্যাপের লেখা ও বাটন একসাথে বড় বা ছোট হবে।</p><div class="fs-list">${FONT_SIZES.map(([k, l, z]) => `<button class="fs-opt${k === cur ? ' on' : ''}" data-fs="${k}"><span style="font-size:${Math.round(16 * z)}px">আমার উপজেলা</span><b>${l}</b></button>`).join('')}</div><button class="btn ghost wide" data-close style="margin-top:10px">ঠিক আছে</button>`);
     $('#sheet').onclick = ev => { const b = ev.target.closest('[data-fs]'); if (!b) return; local.set('fontsz', b.dataset.fs); applyFont(); document.querySelectorAll('#sheet .fs-opt').forEach(x => x.classList.toggle('on', x === b)); renderMenu(); };
   }
 });
@@ -4681,7 +4681,8 @@ function renderMenu() {
     <details class="card"${u ? '' : ' hidden'}><summary>🔔 নোটিফিকেশন ও শব্দ</summary><div class="setlist">
       <button id="ntset2"><span class="set-ic">🔔</span>নোটিফিকেশন সেটিং</button>
       <button id="msgsnd"><span class="set-ic">🔊</span>শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
-    <div class="card lang-card"><button id="fontsz" class="lang-row"><span class="lang-ic">🔠</span><span class="lang-t">${EN ? 'Font size' : 'ফন্ট সাইজ (Font size)'}<small>${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</small></span><span class="fs-go" aria-hidden="true">›</span></button></div>
+    <details class="card"><summary>🔠 ${EN ? 'Font size' : 'ফন্ট সাইজ (Font size)'}</summary><div class="setlist">
+      <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button></div></details>
     <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
       ${S.api.demoLogin ? '<button id="demo-guide"><span class="set-ic">🧪</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">🔄</span>ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
       <button id="help"><span class="set-ic">🐞</span>কোনো সমস্যা জানান</button>

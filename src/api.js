@@ -177,6 +177,9 @@ async function supabaseApi() {
       const key = SETTING_KEYS[name]?.[0]; if (!key) throw new Error('unknown setting');
       ok(await sb.from('app_settings').upsert({ key, value, updated_by: me.id, updated_at: new Date().toISOString() }));
     },
+    // ---------- পোস্ট কতজন দেখেছেন
+    async postSeen(ids) { if (me && ids.length) await sb.rpc('post_seen', { p_ids: ids }); },
+    async postStats(id) { const r = ok(await sb.rpc('post_stats', { p_id: id })) || {}; return { people: r.people || 0, views: r.views || 0, today: r.today || 0, boostReach: r.boost_reach || 0 }; },
     // ---------- পোস্ট বুস্ট
     async boostedPosts(n = 3) {
       const rows = ok(await sb.rpc('active_boosts', { p_limit: n })) || [];
@@ -851,6 +854,18 @@ function demoApi() {
         .sort(() => Math.random() - 0.5).slice(0, n);
       const posts = await this.posts({ ids: live.map(b => b.post_id) });
       return live.map(b => { const p = posts.find(x => x.id === b.post_id); return p && { ...p, sponsored: true, boostId: b.id }; }).filter(Boolean);
+    },
+    async postSeen(ids) {
+      const v = get('pviews', {}), day = new Date().toISOString().slice(0, 10);
+      for (const id of ids) { const p = db.posts.find(x => x.id === id); if (!p || p.userId === meId) continue; const r = v[id] = v[id] || {}; const m = r[meId]; if (!m) r[meId] = { t: 1, d: day }; else if (m.d < day) { m.t++; m.d = day; } }
+      set('pviews', v);
+    },
+    async postStats(id) {
+      const p = db.posts.find(x => x.id === Number(id)); if (!p) throw new Error('পোস্ট পাওয়া যায়নি');
+      // ডেমো: নমুনা মানুষের দেখা (রিয়্যাক্ট ও মন্তব্যের অনুপাতে) + এই ডিভাইসে গোনা দেখা
+      const real = Object.values(get('pviews', {})[p.id] || {}), base = (p.likes || 0) * 4 + p.cm.length * 3 + (p.userId === meId ? 2 : 6);
+      const boostReach = db.boosts.filter(b => b.post_id === p.id).reduce((t, b) => t + (b.reach || 0), 0);
+      return wait({ people: base + real.length + boostReach, views: Math.round(base * 1.4) + real.reduce((t, r) => t + r.t, 0) + boostReach, today: Math.ceil(base / 3), boostReach });
     },
     async boostSeen(ids) { const seen = get('bseen', {}), day = new Date().toISOString().slice(0, 10); for (const id of ids) { const k = id + ':' + day; if (seen[k]) continue; seen[k] = 1; const b = db.boosts.find(x => x.id === id); if (b) b.reach++; } set('bseen', seen); save(); },
     async requestBoost(postId, days, unionId) {

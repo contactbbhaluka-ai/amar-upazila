@@ -339,10 +339,11 @@ function postHtml(p) {
   const u = me();
   const link = (inner, cls) => p.pageId ? `<button class="${cls}" data-page="${esc(p.pageId)}">${inner}</button>` : userLink(p.userId, inner, cls);
   const via = p.groupId && S.view !== 'group' ? ` <span class="via">▸ <button data-group="${esc(p.groupId)}">${esc(p.groupName)}</button></span>` : '';
-  return `<article class="card post${p.sponsored ? ' sponsored' : ''}">
+  const own = u && p.userId === u.id;
+  return `<article class="card post${p.sponsored ? ' sponsored' : ''}" data-pid="${esc(p.id)}"${own ? ' data-own="1"' : ''}>
     <div class="top">${link(av(p), 'avbtn')}
       <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
-      <button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
+      ${own ? `<button class="pinfo" data-pinfo="${esc(p.id)}" aria-label="পোস্টটি কতজন দেখেছেন" title="পোস্টের হিসাব">${ic('info', 19)}</button>` : ''}<button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
     <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>
     ${p.body ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
     ${photosHtml(p)}
@@ -358,6 +359,50 @@ function postHtml(p) {
 
   </article>`;
 }
+// ================================================================ পোস্ট কতজন দেখেছেন
+// অর্ধেকের বেশি অংশ অন্তত ১ সেকেন্ড স্ক্রিনে থাকলে "দেখা" ধরা হয়; কয়েক সেকেন্ড পরপর একসাথে সার্ভারে পাঠানো হয়
+const seenPosts = new Set(), seenQueue = new Set(), seenTimers = new Map();
+let viewObs = null, seenFlushT = null;
+function flushSeen() {
+  clearTimeout(seenFlushT); seenFlushT = null;
+  const ids = [...seenQueue].slice(0, 30); ids.forEach(id => seenQueue.delete(id));
+  if (ids.length) S.api.postSeen(ids).catch(() => {});
+  if (seenQueue.size) seenFlushT = setTimeout(flushSeen, 4000);
+}
+function watchViews(box) {
+  if (!me() || !('IntersectionObserver' in window)) return;
+  viewObs = viewObs || new IntersectionObserver(entries => {
+    for (const en of entries) {
+      const id = Number(en.target.dataset.pid);
+      if (en.isIntersecting) {
+        if (seenPosts.has(id) || seenTimers.has(id)) continue;
+        seenTimers.set(id, setTimeout(() => { seenTimers.delete(id); seenPosts.add(id); seenQueue.add(id); viewObs.unobserve(en.target); if (!seenFlushT) seenFlushT = setTimeout(flushSeen, 4000); }, 1000));
+      } else if (seenTimers.has(id)) { clearTimeout(seenTimers.get(id)); seenTimers.delete(id); }
+    }
+  }, { threshold: 0.5 });
+  box.querySelectorAll('article.post[data-pid]:not([data-own])').forEach(el => { if (!seenPosts.has(Number(el.dataset.pid))) viewObs.observe(el); });
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && seenQueue.size) flushSeen(); });
+async function postStatsSheet(p) {
+  if (!p) return;
+  openSheet('<div class="skel"></div>');
+  try {
+    const st = await S.api.postStats(p.id), rx = Object.values(p.reactions || {}).reduce((t, n) => t + n, 0) || p.likes || 0;
+    const cell = (icon, n, l) => `<div class="ps-cell"><span>${icon}</span><b>${bn(n)}</b><small>${l}</small></div>`;
+    openSheet(`<h2>পোস্টের হিসাব</h2>
+      <div class="ps-big">${ic('users', 22)}<b>${bn(st.people)}</b><span>জন পোস্টটি দেখেছেন</span></div>
+      <div class="ps-grid">
+        ${cell('👁', st.views, 'মোট দেখা')}${cell('📅', st.today, 'আজ দেখেছেন')}${cell('👍', rx, 'রিয়্যাক্ট')}
+        ${cell('💬', p.comments || 0, 'মন্তব্য')}${cell('↗', p.shares || 0, 'শেয়ার')}${cell('🔖', p.saves || 0, 'সেভ')}
+      </div>
+      ${st.boostReach ? `<p class="ps-boost">🚀 এর মধ্যে বুস্ট থেকে পৌঁছেছে <b>${bn(st.boostReach)}</b> জনের কাছে</p>` : ''}
+      <p class="mut" style="font-size:13px;margin:10px 0 0">এই হিসাব শুধু আপনি দেখতে পাচ্ছেন। একজন মানুষ যতবারই দেখুক, "দেখেছেন"-এ একবার গোনা হয়; মোট দেখা দিনে একবার করে বাড়ে। কে কে দেখেছেন তা দেখানো হয় না।</p>
+      ${(p.privacy || 'public') === 'public' && !p.groupId && feat('featBoost') && !p.sponsored ? `<button class="btn wide" id="ps-boost" style="margin-top:12px">${ic('send', 16)} আরও মানুষের কাছে পৌঁছাতে বুস্ট করুন</button>` : ''}
+      <button class="btn ghost wide" data-close style="margin-top:8px">ঠিক আছে</button>`);
+    $('#ps-boost')?.addEventListener('click', () => boostSheet(p));
+  } catch (e) { closeSheet(); toast(errText(e)); }
+}
+
 // হোম ফিডে ৩, ৮, ১৩… নম্বর জায়গায় একটা করে বুস্ট করা পোস্ট
 function withAds(f) {
   const ads = [...(f.ads || [])];
@@ -376,6 +421,7 @@ function renderFeed(key) {
     : `<div class="empty">${key === 'home' && S.scope === 'friends' ? 'বন্ধু বা যাদের ফলো করছেন তাদের কোনো পোস্ট এখনো নেই।<br>"বন্ধু" ট্যাব থেকে মানুষ খুঁজে যুক্ত হোন।' : key === 'home' ? 'এখানে এখনো কোনো পোস্ট নেই।<br>প্রথম পোস্টটি আপনিই করুন!' : 'এখনো কোনো পোস্ট নেই।'}</div>`;
   const more = $('#more-' + key); if (more) more.hidden = !f.more;
   watchCarousels(box);
+  watchViews(box);
   if (key === 'home') {
     const fresh = list.filter(p => p.sponsored && !S.seenBoosts.has(p.boostId)).map(p => p.boostId);
     if (fresh.length) { fresh.forEach(id => S.seenBoosts.add(id)); S.api.boostSeen(fresh).catch(() => {}); }
@@ -412,6 +458,7 @@ document.addEventListener('click', async e => {
   if (b.dataset.openpost) return openPost(b.dataset.openpost);
   if (b.dataset.group) return openGroup(b.dataset.group);
   const key = feedOf(b); if (!key) return;
+  if (b.dataset.pinfo) return postStatsSheet(findPost(key, b.dataset.pinfo));
   if (b.dataset.like) {
     if (S.suppressClick) { S.suppressClick = false; return; }
     clearTimeout(lpTimer); closePicker();

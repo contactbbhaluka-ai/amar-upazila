@@ -1,0 +1,51 @@
+-- =====================================================================
+--  পোস্ট কতজন দেখেছেন (শুধু পোস্টকারী ও অ্যাডমিন দেখেন)
+--  • ফিডে পোস্ট অন্তত ১ সেকেন্ড স্ক্রিনে থাকলে "দেখা" ধরা হয়
+--  • একজন মানুষ = একবার গোনা (কতজন); প্রতিদিন প্রথমবার দেখলে মোট দেখা +১
+--  • নিজের পোস্ট নিজে দেখলে গোনা হয় না
+-- =====================================================================
+
+create table if not exists public.post_views (
+  post_id   bigint not null references public.posts(id) on delete cascade,
+  user_id   uuid not null references public.profiles(id) on delete cascade,
+  times     int not null default 1,
+  first_at  timestamptz not null default now(),
+  last_day  date not null default ((now() at time zone 'Asia/Dhaka')::date),
+  primary key (post_id, user_id)
+);
+create index if not exists post_views_post on public.post_views(post_id, first_at);
+alter table public.post_views enable row level security;   -- সরাসরি কেউ পড়তে/লিখতে পারে না, শুধু নিচের ফাংশন দিয়ে
+
+create or replace function public.post_seen(p_ids bigint[])
+returns void language plpgsql security definer set search_path = public as $$
+declare today date := (now() at time zone 'Asia/Dhaka')::date;
+begin
+  if auth.uid() is null or p_ids is null then return; end if;
+  insert into public.post_views (post_id, user_id)
+  select p.id, auth.uid() from public.posts p
+   where p.id = any (p_ids[1:30]) and p.user_id <> auth.uid() and public.post_visible(p.user_id, p.group_id, p.privacy)
+  on conflict (post_id, user_id) do update set times = public.post_views.times + 1, last_day = excluded.last_day
+   where public.post_views.last_day < today;
+end $$;
+
+-- পোস্টের হিসাব: শুধু পোস্টকারী (পেইজের পোস্টে পেইজের মালিক) বা অ্যাডমিন
+create or replace function public.post_stats(p_id bigint)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare p public.posts; r jsonb;
+begin
+  select * into p from public.posts where id = p_id;
+  if not found then raise exception 'পোস্ট পাওয়া যায়নি'; end if;
+  if p.user_id is distinct from auth.uid() and not public.is_admin() then raise exception 'শুধু পোস্টকারী দেখতে পারেন'; end if;
+  select jsonb_build_object(
+    'people', count(*),
+    'views', coalesce(sum(times), 0),
+    'today', count(*) filter (where last_day = (now() at time zone 'Asia/Dhaka')::date),
+    'boost_reach', (select coalesce(sum(reach), 0) from public.boosts where post_id = p_id))
+  into r from public.post_views where post_id = p_id;
+  return r;
+end $$;
+
+revoke all on function public.post_seen(bigint[]) from public, anon;
+revoke all on function public.post_stats(bigint) from public, anon;
+grant execute on function public.post_seen(bigint[]) to authenticated;
+grant execute on function public.post_stats(bigint) to authenticated;

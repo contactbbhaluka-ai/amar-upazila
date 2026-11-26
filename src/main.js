@@ -45,6 +45,7 @@ const ICONS = {
   s_youtube: '<rect x="3" y="6" width="18" height="12" rx="3.5"/><path d="M10.5 9.5v5l4-2.5z"/>',
   s_instagram: '<rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="16.8" cy="7.2" r=".6"/>',
   heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
   book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7"/>',
   org: '<rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M12 3l8 6H4z"/><path d="M9 20v-5h6v5"/>',
   work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 12h18"/>',
@@ -144,6 +145,10 @@ function errText(e) {
   const m = String(e?.message || e || '');
   if (/profiles_username_key/.test(m)) return 'এই ইউজারনেম আগে থেকেই কেউ নিয়েছে, অন্য একটা দিন';
   if (/Invalid login/i.test(m)) return 'ইমেইল বা পাসওয়ার্ড ভুল';
+  if (/friend_req:mutual/.test(m)) return 'ইনি শুধু মিউচুয়াল বন্ধু থাকলে ফ্রেন্ড রিকোয়েস্ট নেন। চাইলে ফলো করতে পারেন।';
+  if (/friend_req:upazila/.test(m)) return 'ইনি শুধু নিজের উপজেলার মানুষের কাছ থেকে ফ্রেন্ড রিকোয়েস্ট নেন। চাইলে ফলো করতে পারেন।';
+  if (/lists max 20/.test(m)) return 'সর্বোচ্চ ২০টি তালিকা বানানো যায়';
+  if (/friend_lists_user_id_name_key|duplicate key/.test(m)) return 'এই নামে আগে থেকেই একটা তালিকা আছে';
   if (/admins only/.test(m)) return 'এই গ্রুপে শুধু অ্যাডমিনরা মেসেজ পাঠাতে পারেন';
   if (/last admin/.test(m)) return 'গ্রুপে অন্তত একজন অ্যাডমিন থাকতে হবে';
   if (/invalid link/.test(m)) return 'লিংকটি কাজ করছে না';
@@ -365,7 +370,7 @@ function postHtml(p) {
   const showBg = p.bg && p.body && !p.images.length && !p.shared && !p.poll && p.body.length <= BG_MAX;
   return `<article class="card post${p.sponsored ? ' sponsored' : ''}${p.pinnedPage ? ' pinned-pg' : ''}${urgent ? ' urgent' : ''}${p.urgentTop ? ' urg-top' : ''}" data-pid="${esc(p.id)}"${own ? ' data-own="1"' : ''}${p.shared && p.shared.userId !== u?.id ? ` data-spid="${esc(p.shared.id)}"` : ''}>
     ${p.pinnedPage ? '<div class="pin-lbl">📌 পিন করা পোস্ট</div>' : ''}<div class="top">${!p.pageId && storyUserSet().has(p.userId) ? `<button class="avbtn av-story" data-avstory="${esc(p.userId)}" aria-label="${esc(p.author)}: স্টোরি বা প্রোফাইল">${av(p)}</button>` : link(av(p), 'avbtn')}
-      <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${folBtn(p)}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
+      <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${folBtn(p)}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${(POST_PRIVACY[p.privacy] || PRIVACY.public)[1]}" aria-label="${(POST_PRIVACY[p.privacy] || PRIVACY.public)[1]}">${ic((POST_PRIVACY[p.privacy] || PRIVACY.public)[0], 13)}</span></div></div>
       ${own ? `<button class="pinfo" data-pinfo="${esc(p.id)}" aria-label="পোস্টটি কতজন দেখেছেন" title="পোস্টের হিসাব">${ic('info', 19)}</button>` : ''}<button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
     <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>${urgent ? '<span class="urg-lbl">🚨 জরুরি</span>' : ''}${p.bloodGroup ? `<span class="blood-lbl">🩸 ${esc(p.bloodGroup)} রক্ত দরকার</span>` : ''}${p.resolvedAt && RESOLVE[p.category] ? `<span class="resolved">${RESOLVE[p.category][0]}</span>` : ''}
     ${lifeHtml(p)}
@@ -566,8 +571,15 @@ function renderBdays() {
   const list = (S.bdays || []).filter(x => !hide.has(day + ':' + x.id));
   box.innerHTML = list.length ? `<div class="card bday"><span class="bd-ic">🎂</span><div class="bd-t">আজ ${list.length === 1 ? `<b>${esc(list[0].name)}</b>-এর` : list.length === 2 ? `<b>${esc(list[0].name)}</b> ও <b>${esc(list[1].name)}</b>-এর` : `<b>${esc(list[0].name)}</b> ও আরও ${bn(list.length - 1)} জনের`} জন্মদিন</div>
     <div class="bd-b">${list.slice(0, 3).map(x => `<button class="sbtn" data-bdwish="${esc(x.id)}">${list.length > 1 ? esc(x.name.split(' ')[0]) + '-কে ' : ''}শুভেচ্ছা জানান</button>`).join('')}<button class="bd-x" data-bdx aria-label="লুকান">${ic('close', 16)}</button></div></div>` : '';
+  // বন্ধুত্বের বার্ষিকী
+  const an = (S.annivs || []).filter(x => !hide.has(day + ':a' + x.id));
+  if (an.length) box.innerHTML += `<div class="card bday anniv"><span class="bd-ic">🤝</span><div class="bd-t">আজ <b>${esc(an[0].name)}</b>-এর সাথে আপনার বন্ধুত্বের <b>${bn(an[0].years)} বছর</b> পূর্ণ হলো 🎉${an.length > 1 ? ` (আরও ${bn(an.length - 1)} জনের সাথেও)` : ''}</div>
+    <div class="bd-b"><button class="sbtn" data-anwish="${esc(an[0].id)}">শুভেচ্ছা জানান</button><button class="bd-x" data-anx aria-label="লুকান">${ic('close', 16)}</button></div></div>`;
 }
 $('#bdays').addEventListener('click', async e => {
+  const aw = e.target.closest('[data-anwish]');
+  if (aw) { const x = (S.annivs || []).find(y => y.id === aw.dataset.anwish); await openThread(aw.dataset.anwish); const i = $('#tmsg'); if (i && !i.value) { i.value = `আজ আমাদের বন্ধুত্বের ${bn(x?.years || 1)} বছর পূর্ণ হলো! 🤝 পাশে থাকার জন্য ধন্যবাদ।`; i.focus(); composeState(); } return; }
+  if (e.target.closest('[data-anx]')) { const day = new Date(Date.now() + 6 * 36e5).toISOString().slice(0, 10); local.set('bday-hide', [...local.get('bday-hide', []).filter(x => x.startsWith(day)), ...(S.annivs || []).map(x => day + ':a' + x.id)]); return renderBdays(); }
   const w = e.target.closest('[data-bdwish]');
   if (w) { await openThread(w.dataset.bdwish); const i = $('#tmsg'); if (i && !i.value) { i.value = 'শুভ জন্মদিন! 🎂 অনেক অনেক শুভকামনা।'; i.focus(); } return; }
   if (e.target.closest('[data-bdx]')) { const day = new Date(Date.now() + 6 * 36e5).toISOString().slice(0, 10); local.set('bday-hide', [...local.get('bday-hide', []).filter(x => x.startsWith(day)), ...(S.bdays || []).map(x => day + ':' + x.id)]); renderBdays(); }
@@ -583,24 +595,25 @@ async function loadHomeExtras() {
   S.api.trendingTags().then(t => { S.trend = t; renderTrend(); }).catch(() => {});
   if (me() && !S.actAs) {
     S.api.birthdays().then(b => { S.bdays = b; renderBdays(); }).catch(() => {});
+    S.api.anniversaries().then(a => { S.annivs = a; renderBdays(); }).catch(() => {});
     if (!S.pymkAt || Date.now() - S.pymkAt > 10 * 6e4) {
       S.pymkAt = Date.now();
-      S.api.people({}).then(list => { S.pymk = list.filter(u => (!u.rel || u.rel.friend === 'none' || !u.rel.friend) && !u.rel?.following); if (S.feeds.home.posts.length > 3) renderFeed('home'); }).catch(() => {});
+      S.api.suggestions().then(list => { S.pymk = list; if (S.feeds.home.posts.length > 3) renderFeed('home'); }).catch(() => {});
     }
-  } else { S.bdays = []; S.pymk = []; renderBdays(); }
+  } else { S.bdays = []; S.annivs = []; S.pymk = []; renderBdays(); }
 }
 // ফিডের মাঝে "পরিচিত হতে পারেন"
 function pymkHtml() {
   const hide = new Set(local.get('pymk-hide', [])), list = (S.pymk || []).filter(u => !hide.has(u.id)).slice(0, 10);
   if (!me() || S.actAs || !list.length) return '';
   return `<div class="card pymk"><div class="sec-h"><h3>পরিচিত হতে পারেন</h3><button class="link" data-go="friends">সব দেখুন</button></div>
-    <div class="pymk-row">${list.map(u => `<div class="pymk-c"><button class="pymk-x" data-pymkx="${esc(u.id)}" aria-label="সরিয়ে দিন">${ic('close', 14)}</button>${userLink(u.id, av(u))}${userLink(u.id, esc(u.name) + vb(u.verified), 'who-btn')}<span class="mut">${esc(u.union || '')}</span>
+    <div class="pymk-row">${list.map(u => `<div class="pymk-c"><button class="pymk-x" data-pymkx="${esc(u.id)}" aria-label="সরিয়ে দিন">${ic('close', 14)}</button>${userLink(u.id, av(u))}${userLink(u.id, esc(u.name) + vb(u.verified), 'who-btn')}<span class="mut">${esc(u.mutual != null ? suggWhy(u) : u.union || '')}</span>
       ${u.sent ? '<button class="sbtn ghost" disabled>রিকোয়েস্ট গেছে ✓</button>' : `<button class="sbtn" data-pymkadd="${esc(u.id)}">বন্ধু হোন</button>`}</div>`).join('')}</div></div>`;
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-pymkadd],[data-pymkx]'); if (!b) return;
   e.stopPropagation();
-  if (b.dataset.pymkx) { local.set('pymk-hide', [...local.get('pymk-hide', []), b.dataset.pymkx].slice(-200)); return renderFeed('home'); }
+  if (b.dataset.pymkx) { local.set('pymk-hide', [...local.get('pymk-hide', []), b.dataset.pymkx].slice(-200)); S.api.hideSuggestion?.(b.dataset.pymkx).catch(() => {}); return renderFeed('home'); }
   if (!needUser()) return;
   const u = (S.pymk || []).find(x => String(x.id) === b.dataset.pymkadd); if (!u) return;
   await busy(b, async () => { await S.api.sendFriendRequest(u.id); u.sent = true; toast('ফ্রেন্ড রিকোয়েস্ট পাঠানো হয়েছে'); renderFeed('home'); });
@@ -1017,7 +1030,8 @@ async function loadFeed(key, append) {
     if (adsP) f.ads = await adsP;
     if (key === 'home' && !append) { loadStories(); loadHomeExtras(); if (me()) S.fol = await S.api.followState().catch(() => S.fol); }
     if (key === 'home' && !append) f.urgent = urgP ? (await urgP).map(p => ({ ...p, urgentTop: true })) : [];
-    const rows2 = key === 'user' && S.preview ? rows.filter(p => p.privacy === 'public' || (S.preview === 'friends' && p.privacy === 'friends')) : rows;
+    let rows2 = key === 'user' && S.preview ? rows.filter(p => p.privacy === 'public' || (S.preview === 'friends' && p.privacy === 'friends')) : rows;
+    if (key === 'home' && !append) { const cut = new Date(Date.now() - 2 * 864e5).toISOString(), top = rows2.filter(p => p.closeFriend && p.createdAt > cut); if (top.length) { const ids = new Set(top.map(p => p.id)); rows2.splice(0, rows2.length, ...top, ...rows2.filter(p => !ids.has(p.id))); } }
     f.posts = append ? [...f.posts, ...rows2] : rows2; f.more = !['post', 'saved'].includes(key) && rows.length >= PAGE;
     if (pinP) { const pin = (await pinP)[0]; if (pin) f.posts = [{ ...pin, pinnedPage: true }, ...f.posts.filter(x => x.id !== pin.id)]; }
   } catch (e) { toast(errText(e)); if (!append) f.posts = []; }
@@ -1288,6 +1302,8 @@ document.addEventListener('scroll', e => { if (!MP.hidden && !MP.contains(e.targ
 
 // ================================================================ পোস্ট তৈরি (ফেসবুকের মতো)
 const PRIVACY = { public: ['globe', 'পাবলিক', 'যে কেউ দেখতে পারবে'], friends: ['users', 'বন্ধুরা', 'শুধু আপনার বন্ধুরা'], only_me: ['lock', 'শুধু আমি', 'শুধু আপনি দেখবেন'] };
+// পোস্টে বাড়তি: শুধু ক্লোজ ফ্রেন্ডরা
+const POST_PRIVACY = { public: PRIVACY.public, friends: PRIVACY.friends, close: ['star', 'ক্লোজ ফ্রেন্ড', 'শুধু যাদের ⭐ ক্লোজ ফ্রেন্ড বানিয়েছেন'], only_me: PRIVACY.only_me };
 const MAX_PHOTOS = 10;
 S.draft = null;
 function newDraft(opts = {}) { return { body: '', category: POST_CATS[0], photos: [], tags: [], mentions: new Map(), privacy: local.get('privacy', 'public'), bg: '', poll: null, event: null, link: null, linkOff: '', ...opts }; }
@@ -1323,7 +1339,7 @@ function openEditPost(p) {
 }
 const draftSig = d => JSON.stringify([d.body.trim(), d.category, d.privacy, d.photos.map(x => x.keep || x.url), d.tags.map(t => t.id).sort(), mentionIds(d.body.trim(), d.mentions).sort()]);
 function renderComposerSheet() {
-  const d = S.draft, u = me(), own = !d.pageId && !d.groupId, pv = PRIVACY[d.privacy], photosOk = !d.shared && !d.poll;
+  const d = S.draft, u = me(), own = !d.pageId && !d.groupId, pv = POST_PRIVACY[d.privacy] || PRIVACY.public, photosOk = !d.shared && !d.poll;
   const extras = !d.editId && !d.shared && !d.albumId;
   const tagLine = d.tags.length ? ` <span class="pc-with">— ${d.tags.length === 1 ? `<b>${esc(d.tags[0].name)}</b>-এর সাথে` : d.tags.length === 2 ? `<b>${esc(d.tags[0].name)}</b> ও <b>${esc(d.tags[1].name)}</b>-এর সাথে` : `<b>${esc(d.tags[0].name)}</b> ও আরও ${bn(d.tags.length - 1)} জনের সাথে`}</span>` : '';
   openSheet(`<div class="pc">
@@ -1467,7 +1483,7 @@ async function saveEdit(btn) {
 }
 function privacyPicker() {
   const d = S.draft;
-  openSheet(`<h2>কারা এই পোস্ট দেখতে পারবে?</h2><div class="menu">${Object.entries(PRIVACY).map(([k, [icon, name, desc]]) => `<button data-pv="${k}" class="pv-row${d.privacy === k ? ' on' : ''}"><span class="pv-ic">${ic(icon, 20)}</span><span><b>${name}</b><br><span class="mut">${desc}</span></span>${d.privacy === k ? '<span class="pv-ok">✓</span>' : ''}</button>`).join('')}</div>`);
+  openSheet(`<h2>কারা এই পোস্ট দেখতে পারবে?</h2><div class="menu">${Object.entries(POST_PRIVACY).map(([k, [icon, name, desc]]) => `<button data-pv="${k}" class="pv-row${d.privacy === k ? ' on' : ''}"><span class="pv-ic">${ic(icon, 20)}</span><span><b>${name}</b><br><span class="mut">${desc}</span></span>${d.privacy === k ? '<span class="pv-ok">✓</span>' : ''}</button>`).join('')}</div>`);
   $('#sheet').onclick = e => { const b = e.target.closest('[data-pv]'); if (!b) return; d.privacy = b.dataset.pv; if (!d.editId) local.set('privacy', d.privacy); renderComposerSheet(); };
 }
 async function tagPicker() {
@@ -1543,20 +1559,158 @@ const relBtns = u => {
     : `<button class="sbtn" data-fr="add" data-id="${esc(u.id)}">বন্ধু হোন</button>`;
   return main;
 };
-const personRow = (u, btns) => `<div class="person">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name) + vb(u.verified), 'who-btn')}<div class="sub">${esc(u.union || '')}</div></div><div class="pbtns">${btns}</div></div>`;
-async function loadFriends() {
+const personRow = (u, btns, sub, extra = '') => `<div class="person">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name) + vb(u.verified), 'who-btn')}${extra}<div class="sub">${esc(sub ?? u.union ?? '')}</div></div><div class="pbtns">${btns}</div></div>`;
+// ================================================================ বন্ধু পাতা (ট্যাব: রিকোয়েস্ট · সাজেশন · আমার বন্ধু · পাঠানো)
+const FR_TABS = [['req', 'রিকোয়েস্ট'], ['sugg', 'সাজেশন'], ['mine', 'আমার বন্ধু'], ['sent', 'পাঠানো']];
+const REQ_RULES = { everyone: ['🌐', 'সবাই', 'যে কেউ রিকোয়েস্ট পাঠাতে পারবেন'], mutual: ['👥', 'মিউচুয়াল বন্ধু থাকলে', 'আপনার কোনো বন্ধুর বন্ধু হলে তবেই'], upazila: ['🏡', 'নিজের উপজেলার মানুষ', 'শুধু আপনার উপজেলার মানুষ'] };
+const yearsBn = d => { if (!d) return ''; const days = Math.floor((Date.now() - new Date(d)) / 864e5); if (days >= 365) return `${bn(Math.floor(days / 365))} বছর ধরে বন্ধু`; if (days >= 30) return `${bn(Math.floor(days / 30))} মাস ধরে বন্ধু`; return days >= 1 ? `${bn(days)} দিন ধরে বন্ধু` : 'আজ বন্ধু হয়েছেন'; };
+async function loadFriends(keep) {
   const box = $('#friends');
   if (!me()) { box.innerHTML = `<div class="card empty">বন্ধু খুঁজতে ও যুক্ত হতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
-  box.innerHTML = '<div class="skel"></div>';
+  if (!keep || !S.fr) box.innerHTML = '<div class="skel"></div>';
   try {
-    const [reqs, friends, people] = await Promise.all([S.api.friendRequests(), S.api.friends(), S.api.people({})]);
-    const fids = new Set(friends.map(f => f.id));
-    const sugg = people.filter(p => !fids.has(p.id) && p.rel?.friend !== 'received');
-    box.innerHTML = `
-      ${reqs.length ? `<div class="card"><div class="sec-h"><h3>ফ্রেন্ড রিকোয়েস্ট <span class="badge">${bn(reqs.length)}</span></h3></div>${reqs.map(u => personRow(u, relBtns({ ...u, rel: { friend: 'received' } }))).join('')}</div>` : ''}
-      <div class="card"><div class="sec-h"><h3>পরিচিত হতে পারেন</h3><span class="mut">আপনার এলাকা</span></div>${sugg.length ? sugg.map(u => personRow(u, relBtns(u))).join('') : '<div class="mut">এখন কোনো পরামর্শ নেই</div>'}</div>
-      <div class="card"><div class="sec-h"><h3>আমার বন্ধু (${bn(friends.length)})</h3></div>${friends.length ? friends.map(u => personRow(u, `<button class="sbtn ghost" data-dm="${esc(u.id)}">মেসেজ</button>`)).join('') : '<div class="mut">এখনো কোনো বন্ধু নেই। উপরের তালিকা থেকে "বন্ধু হোন" চাপুন।</div>'}</div>`;
+    const [reqs, friends, sugg, sent, near, marks, lists] = await Promise.all([S.api.friendRequests(), S.api.friends(), S.api.suggestions().catch(() => []), S.api.sentRequests().catch(() => []),
+      S.api.newNearMe().catch(() => 0), S.api.friendMarks(true).catch(() => new Map()), S.api.friendLists().catch(() => [])]);
+    const meta = await S.api.friendMeta([...reqs, ...friends].map(u => u.id)).catch(() => new Map());
+    S.fr = { reqs, friends, sugg, sent, near, marks, lists, meta };
+    if (!S.frTab) S.frTab = reqs.length ? 'req' : 'sugg';
+    renderFriends();
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+}
+function renderFriends() {
+  const box = $('#friends'), F = S.fr; if (!F) return;
+  const cnt = { req: F.reqs.length, sugg: 0, mine: F.friends.length, sent: F.sent.length };
+  const tabs = `<div class="seg fr-tabs">${FR_TABS.map(([k, l]) => `<button data-frtab="${k}" class="${S.frTab === k ? 'on' : ''}">${l}${cnt[k] ? ` <span class="${k === 'req' ? 'badge' : 'fr-n'}">${bn(cnt[k])}</span>` : ''}</button>`).join('')}</div>`;
+  const tools = `<div class="fr-tools"><button class="chip" data-frx="bday">🎂 জন্মদিন</button><button class="chip" data-frx="lists">📋 তালিকা</button><button class="chip" data-frx="rule">🛡️ কে রিকোয়েস্ট পাঠাবে</button></div>`;
+  let body = '';
+  if (S.frTab === 'req') body = reqTabHtml(F);
+  else if (S.frTab === 'sugg') body = suggTabHtml(F);
+  else if (S.frTab === 'mine') body = mineTabHtml(F);
+  else body = `<div class="card">${F.sent.length ? F.sent.map(u => personRow(u, `<button class="sbtn ghost" data-fr="cancel" data-id="${esc(u.id)}">বাতিল করুন</button>`, u.sentAt ? `রিকোয়েস্ট পাঠিয়েছেন ${ago(u.sentAt)}` : '')).join('') : '<div class="mut">আপনি এখন কাউকে রিকোয়েস্ট পাঠিয়ে অপেক্ষায় নেই।</div>'}</div>`;
+  box.innerHTML = tabs + tools + body;
+  const qi = $('#fr-q'); if (qi) qi.oninput = () => { S.frQ = qi.value; const pos = qi.selectionStart; renderFriends(); const n = $('#fr-q'); n.focus(); n.setSelectionRange(pos, pos); };
+}
+// ভুয়া/নতুন অ্যাকাউন্টের সতর্কতা
+function fakeWarn(u, m) {
+  if (!m || m.mutual > 0) return '';
+  const days = m.joinedAt ? Math.floor((Date.now() - new Date(m.joinedAt)) / 864e5) : 999;
+  const bits = [];
+  if (days < 7) bits.push(days < 1 ? 'আজই অ্যাকাউন্ট খোলা' : `${bn(days)} দিন আগে অ্যাকাউন্ট খোলা`);
+  if (!u.avatar) bits.push('প্রোফাইল ছবি নেই');
+  if (!m.posts) bits.push('কোনো পাবলিক পোস্ট নেই');
+  if (days >= 7 && bits.length < 2) return '';
+  return `<div class="fr-warn">⚠️ ${bits.join(' · ')} · কোনো মিউচুয়াল বন্ধু নেই। চিনলে তবেই গ্রহণ করুন।</div>`;
+}
+function reqTabHtml(F) {
+  if (!F.reqs.length) return '<div class="card"><div class="mut">কোনো নতুন ফ্রেন্ড রিকোয়েস্ট নেই।</div></div>';
+  return `<div class="card">${F.reqs.length > 1 ? `<button class="btn wide" data-frx="acceptall" style="margin-bottom:8px">✅ সব গ্রহণ করুন (${bn(F.reqs.length)})</button>` : ''}
+    ${F.reqs.map(u => { const m = F.meta.get(u.id); return `<div class="fr-item">${personRow(u, relBtns({ ...u, rel: { friend: 'received' } }), m?.mutual ? `👥 ${bn(m.mutual)} জন মিউচুয়াল বন্ধু` : u.union)}${fakeWarn(u, m)}</div>`; }).join('')}</div>`;
+}
+const SUGG_F = [['all', 'সব'], ['mutual', '👥 মিউচুয়াল'], ['school', '🎓 সহপাঠী'], ['new', '🆕 নতুন'], ['area', '📍 আমার এলাকা']];
+const suggWhy = u => u.mutual ? `👥 ${bn(u.mutual)} জন মিউচুয়াল বন্ধু` : u.school ? `🎓 একই প্রতিষ্ঠান: ${u.school}` : u.isNew && u.sameArea ? '🆕 আপনার এলাকায় নতুন যোগ দিয়েছেন' : u.sameArea ? `📍 একই এলাকা${u.union ? ': ' + u.union : ''}` : u.isNew ? '🆕 নতুন যোগ দিয়েছেন' : u.union;
+function suggTabHtml(F) {
+  const f = S.suggF || 'all';
+  const list = F.sugg.filter(u => f === 'all' || (f === 'mutual' && u.mutual) || (f === 'school' && u.school) || (f === 'new' && u.isNew) || (f === 'area' && u.sameArea));
+  const myArea = me()?.union?.split(',')[0] || 'আপনার এলাকা';
+  return `${F.near ? `<div class="card fr-near">🏡 এই সপ্তাহে <b>${esc(myArea)}</b> থেকে <b>${bn(F.near)} জন</b> আমার উপজেলায় যোগ দিয়েছেন${F.sugg.some(u => u.isNew && u.sameArea) ? ' <button class="link" data-suggf="new">দেখুন</button>' : ''}</div>` : ''}
+    <div class="chips fr-sf">${SUGG_F.map(([k, l]) => `<button class="chip${f === k ? ' on' : ''}" data-suggf="${k}">${l}</button>`).join('')}</div>
+    <div class="card">${list.length ? list.map(u => `<div class="fr-item">${personRow(u, `${u.sent ? '<button class="sbtn ghost" disabled>রিকোয়েস্ট গেছে ✓</button>' : `<button class="sbtn" data-fr="add" data-id="${esc(u.id)}">বন্ধু হোন</button>`}<button class="sbtn ghost fr-x" data-sgx="${esc(u.id)}" aria-label="সাজেশন থেকে সরান" title="সরিয়ে দিন">✕</button>`, suggWhy(u))}</div>`).join('')
+      : `<div class="mut">${f === 'school' ? 'আপনার স্কুল/কলেজের কাউকে পাওয়া যায়নি। প্রোফাইলে "শিক্ষা" যোগ করলে সহপাঠীদের খুঁজে দেব।' : 'এখন কোনো সাজেশন নেই।'}</div>`}</div>`;
+}
+function mineTabHtml(F) {
+  const q = (S.frQ || '').trim().toLowerCase(), un = S.frUnion || '', lf = S.frList || '';
+  const unions = [...new Set(F.friends.map(u => (u.union || '').split(',')[0].trim()).filter(Boolean))].sort();
+  const list = F.lists.find(l => String(l.id) === lf);
+  const rows = F.friends.filter(u => (!q || u.name.toLowerCase().includes(q)) && (!un || (u.union || '').startsWith(un))
+    && (!lf || (lf === 'close' ? F.marks.get(u.id)?.close : list?.members.includes(u.id))));
+  const nowI = new Date().toISOString();
+  const chips = `<div class="chips fr-sf"><button class="chip${!lf ? ' on' : ''}" data-frl="">সব</button><button class="chip${lf === 'close' ? ' on' : ''}" data-frl="close">⭐ ক্লোজ ফ্রেন্ড</button>${F.lists.map(l => `<button class="chip${String(l.id) === lf ? ' on' : ''}" data-frl="${l.id}">${esc(l.name)} (${bn(l.members.length)})</button>`).join('')}</div>`;
+  return `<div class="fr-filter"><input type="search" id="fr-q" placeholder="বন্ধুর নাম লিখে খুঁজুন…" aria-label="বন্ধু খুঁজুন" value="${esc(S.frQ || '')}">
+      ${unions.length > 1 ? `<select class="f" id="fr-union" aria-label="ইউনিয়ন অনুযায়ী"><option value="">সব এলাকা</option>${unions.map(x => `<option ${x === un ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>` : ''}</div>
+    ${chips}
+    <div class="card">${rows.length ? rows.map(u => { const mk = F.marks.get(u.id) || {}, sn = mk.snoozeUntil > nowI;
+      return personRow(u, `<button class="sbtn ghost" data-dm="${esc(u.id)}">মেসেজ</button><button class="sbtn ghost" data-fr="menu" data-id="${esc(u.id)}" data-name="${esc(u.name)}" aria-label="অপশন">${ic('dots', 16)}</button>`,
+        [u.union, yearsBn(F.meta.get(u.id)?.since)].filter(Boolean).join(' · '), `${mk.close ? ' <span class="fr-star" title="ক্লোজ ফ্রেন্ড">⭐</span>' : ''}${sn ? ' <span class="fr-zz" title="বিরতিতে আছেন">😴</span>' : ''}`); }).join('')
+      : `<div class="mut">${F.friends.length ? 'এই খোঁজে কোনো বন্ধু নেই।' : 'এখনো কোনো বন্ধু নেই। "সাজেশন" থেকে বন্ধু হোন।'}</div>`}</div>`;
+}
+$('#friends').addEventListener('click', async e => {
+  const t = e.target.closest('[data-frtab]'); if (t) { S.frTab = t.dataset.frtab; return renderFriends(); }
+  const sf = e.target.closest('[data-suggf]'); if (sf) { S.suggF = sf.dataset.suggf; S.frTab = 'sugg'; return renderFriends(); }
+  const fl = e.target.closest('[data-frl]'); if (fl) { S.frList = fl.dataset.frl; return renderFriends(); }
+  const sg = e.target.closest('[data-sgx]');
+  if (sg) return busy(sg, async () => { await S.api.hideSuggestion(sg.dataset.sgx); S.fr.sugg = S.fr.sugg.filter(u => u.id !== sg.dataset.sgx); toast('আর এই সাজেশনে দেখাবে না'); renderFriends(); });
+  const x = e.target.closest('[data-frx]')?.dataset.frx; if (!x) return;
+  if (x === 'acceptall') { if (await confirmSheet(`${bn(S.fr.reqs.length)}টি রিকোয়েস্ট একসাথে গ্রহণ করবেন?`, 'সব গ্রহণ করুন')) busy(null, async () => { const n = await S.api.acceptAllFriends(); toast(`${bn(n)} জন এখন আপনার বন্ধু`); S.frTab = 'mine'; loadFriends(true); refreshBadges(); }); return; }
+  if (x === 'bday') return birthdaySheet();
+  if (x === 'lists') return listsSheet();
+  if (x === 'rule') return reqRuleSheet();
+});
+$('#friends').addEventListener('change', e => { if (e.target.id === 'fr-union') { S.frUnion = e.target.value; renderFriends(); } });
+// জন্মদিনের তালিকা: আজ / এই সপ্তাহে / এই মাসে
+async function birthdaySheet() {
+  openSheet('<h2>🎂 বন্ধুদের জন্মদিন</h2><div id="bd-list"><div class="mut">লোড হচ্ছে…</div></div><button class="btn ghost wide" data-close style="margin-top:10px">বন্ধ করুন</button>');
+  $('#sheet').classList.add('tall');
+  try {
+    const l = await S.api.birthdaysUpcoming(31);
+    const grp = [['আজ', l.filter(x => x.days === 0)], ['এই সপ্তাহে', l.filter(x => x.days > 0 && x.days <= 7)], ['এই মাসে', l.filter(x => x.days > 7)]].filter(([, v]) => v.length);
+    const when = x => { const d = new Date(x.nextDate + 'T00:00:00'); return x.days === 1 ? 'আগামীকাল' : `${bn(d.getDate())} ${BN_MON[d.getMonth()]}${x.days > 1 ? ` · ${bn(x.days)} দিন পর` : ''}`; };
+    $('#bd-list').innerHTML = grp.length ? grp.map(([h, v]) => `<h3 class="res-h">${h}</h3>${v.map(x => `<div class="person">${userLink(x.id, av(x))}<div class="info">${userLink(x.id, esc(x.name), 'who-btn')}<div class="sub">${x.days === 0 ? '🎉 আজ জন্মদিন' : when(x)}</div></div><button class="sbtn${x.days === 0 ? '' : ' ghost'}" data-bdw="${esc(x.id)}">${x.days === 0 ? 'শুভেচ্ছা জানান' : 'মেসেজ'}</button></div>`).join('')}`).join('')
+      : '<p class="mut">আগামী এক মাসে কোনো বন্ধুর জন্মদিন নেই (অথবা তারা জন্মতারিখ লুকিয়ে রেখেছেন)।</p>';
+    $('#sheet').onclick = async ev => { const b = ev.target.closest('[data-bdw]'); if (!b) return; const today = l.find(x => x.id === b.dataset.bdw)?.days === 0; closeSheet(); await openThread(b.dataset.bdw); if (today) { const i = $('#tmsg'); if (i && !i.value) { i.value = 'শুভ জন্মদিন! 🎂 অনেক অনেক শুভকামনা।'; i.focus(); composeState(); } } };
+  } catch (er) { $('#bd-list').innerHTML = `<p class="mut">${esc(errText(er))}</p>`; }
+}
+// বন্ধুর তালিকা সামলানো
+async function listsSheet() {
+  const lists = await S.api.friendLists().catch(() => []);
+  openSheet(`<h2>📋 বন্ধুর তালিকা</h2><p class="mut">যেমন পরিবার, অফিস, মসজিদ কমিটি। শুধু আপনি দেখবেন। "আমার বন্ধু" ট্যাবে তালিকা ধরে বন্ধু দেখতে পারবেন।</p>
+    ${lists.map(l => `<div class="person"><div class="info"><b>${esc(l.name)}</b><div class="sub">${bn(l.members.length)} জন</div></div><button class="sbtn ghost" data-lsadd="${l.id}">সদস্য</button><button class="sbtn ghost" data-lsren="${l.id}">✏️</button><button class="sbtn ghost danger-t" data-lsdel="${l.id}">🗑</button></div>`).join('') || '<p class="mut">এখনো কোনো তালিকা নেই।</p>'}
+    <div class="row" style="gap:6px;margin-top:10px"><input class="f" id="ls-name" maxlength="40" placeholder="নতুন তালিকার নাম"><button class="sbtn" id="ls-new">তৈরি করুন</button></div>`);
+  $('#sheet').classList.add('tall');
+  $('#ls-new').onclick = e => { const n = $('#ls-name').value.trim(); if (!n) return toast('নাম দিন'); busy(e.currentTarget, async () => { await S.api.createFriendList(n); toast('তালিকা তৈরি হয়েছে'); listsSheet(); if (S.view === 'friends') loadFriends(true); }); };
+  $('#sheet').onclick = async ev => {
+    const d = ev.target.closest('[data-lsdel]'), r = ev.target.closest('[data-lsren]'), a = ev.target.closest('[data-lsadd]');
+    if (d) { const l = lists.find(x => String(x.id) === d.dataset.lsdel); if (await confirmSheet(`"${l.name}" তালিকা মুছবেন? বন্ধুরা ঠিকই থাকবেন।`, 'মুছুন', true)) busy(null, async () => { await S.api.deleteFriendList(l.id); if (S.frList === String(l.id)) S.frList = ''; listsSheet(); loadFriends(true); }); else listsSheet(); return; }
+    if (r) { const l = lists.find(x => String(x.id) === r.dataset.lsren); openSheet(`<h2>তালিকার নাম</h2><input class="f" id="lr" maxlength="40" value="${esc(l.name)}"><button class="btn wide" id="lr-go" style="margin-top:10px">সংরক্ষণ</button>`); $('#lr-go').onclick = e2 => { const n = $('#lr').value.trim(); if (!n) return; busy(e2.currentTarget, async () => { await S.api.renameFriendList(l.id, n); listsSheet(); loadFriends(true); }); }; return; }
+    if (a) { const l = lists.find(x => String(x.id) === a.dataset.lsadd); return listMembersSheet(l); }
+  };
+}
+async function listMembersSheet(l) {
+  const friends = S.fr?.friends || await S.api.friends();
+  openSheet(`<h2>${esc(l.name)}</h2><input type="search" id="lm-q" placeholder="বন্ধু খুঁজুন…" aria-label="বন্ধু খুঁজুন"><div id="lm-list" style="margin-top:8px"></div><button class="btn wide" id="lm-done" style="margin-top:12px">হয়ে গেছে</button>`);
+  $('#sheet').classList.add('tall');
+  const sel = new Set(l.members);
+  const draw = () => { const q = ($('#lm-q').value || '').trim().toLowerCase(); $('#lm-list').innerHTML = friends.filter(f => !q || f.name.toLowerCase().includes(q)).map(f => `<label class="person tg-row">${av(f)}<div class="info"><b>${esc(f.name)}</b><div class="sub">${esc(f.union || '')}</div></div><input type="checkbox" data-lm="${esc(f.id)}" ${sel.has(f.id) ? 'checked' : ''} aria-label="${esc(f.name)}"></label>`).join('') || '<p class="mut">কোনো বন্ধু নেই</p>'; };
+  draw(); $('#lm-q').oninput = draw;
+  $('#sheet').onchange = e => { const id = e.target.dataset?.lm; if (!id) return; const on = e.target.checked; if (on) sel.add(id); else sel.delete(id); S.api.setListMember(l.id, id, on).catch(er => toast(errText(er))); };
+  $('#lm-done').onclick = () => { closeSheet(); loadFriends(true); };
+}
+// কে রিকোয়েস্ট পাঠাতে পারবে
+function reqRuleSheet() {
+  const cur = me()?.friendReqFrom || 'everyone';
+  openSheet(`<h2>🛡️ কে আপনাকে ফ্রেন্ড রিকোয়েস্ট পাঠাতে পারবে?</h2><div class="pv-pick" role="radiogroup">${Object.entries(REQ_RULES).map(([k, [i, l, sub]]) => `<button class="pv-opt${k === cur ? ' on' : ''}" data-rr="${k}" role="radio" aria-checked="${k === cur}"><span class="pv-ic">${i}</span><span class="pv-tx"><b>${l}</b><small>${sub}</small></span><span class="pv-radio" aria-hidden="true"></span></button>`).join('')}</div>
+    <p class="mut" style="font-size:13px">অচেনা বা ভুয়া অ্যাকাউন্ট থেকে রিকোয়েস্ট কমাতে "মিউচুয়াল বন্ধু থাকলে" ভালো।</p>`);
+  $('#sheet').onclick = e => { const b = e.target.closest('[data-rr]'); if (!b) return; busy(b, async () => { await S.api.setFriendReqFrom(b.dataset.rr); if (me()) me().friendReqFrom = b.dataset.rr; closeSheet(); toast(`এখন থেকে: ${REQ_RULES[b.dataset.rr][1]}`); }); };
+}
+// বন্ধুর অপশন: ক্লোজ ফ্রেন্ড, ৩০ দিন বিরতি, তালিকায় যোগ, আনফ্রেন্ড
+async function friendMenu(id, name) {
+  const marks = await S.api.friendMarks(true).catch(() => new Map()), mk = marks.get(id) || {}, sn = mk.snoozeUntil > new Date().toISOString();
+  const lists = await S.api.friendLists().catch(() => []);
+  openSheet(`<h2>${esc(name)}</h2><div class="menu"><button data-act="dm">💬 মেসেজ পাঠান</button>
+    <button data-act="close">${mk.close ? '⭐ ক্লোজ ফ্রেন্ড থেকে সরান' : '⭐ ক্লোজ ফ্রেন্ড বানান'}<small class="mut"> · তার পোস্ট ফিডে আগে আসবে</small></button>
+    <button data-act="snooze">${sn ? `😴 বিরতি তুলে নিন <small class="mut">(${esc(bnWhen(mk.snoozeUntil))} পর্যন্ত)</small>` : '😴 ৩০ দিন বিরতি <small class="mut">· বন্ধু থাকবেন, পোস্ট ফিডে আসবে না</small>'}</button>
+    ${lists.length ? `<div class="fm-lists"><b>📋 তালিকায় রাখুন:</b>${lists.map(l => `<label class="chip"><input type="checkbox" data-fml="${l.id}" ${l.members.includes(id) ? 'checked' : ''}> ${esc(l.name)}</label>`).join('')}</div>` : '<button data-act="lists">📋 বন্ধুর তালিকা বানান</button>'}
+    <button data-act="unf" class="danger">${esc(name)}-কে আনফ্রেন্ড করুন</button><button data-close>বন্ধ করুন</button></div>`);
+  const after = () => { if (S.view === 'friends') loadFriends(true); if (S.view === 'home') loadFeed('home'); };
+  $('#sheet').onchange = e => { const l = e.target.dataset?.fml; if (l) S.api.setListMember(Number(l), id, e.target.checked).then(() => toast(e.target.checked ? 'তালিকায় রাখা হয়েছে' : 'তালিকা থেকে সরানো হয়েছে')).catch(er => toast(errText(er))); };
+  $('#sheet').onclick = async ev => {
+    const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    if (a === 'lists') return listsSheet();
+    closeSheet();
+    if (a === 'dm') return openThread(id);
+    if (a === 'close') return busy(null, async () => { await S.api.setFriendMark(id, { close: !mk.close }); toast(mk.close ? 'ক্লোজ ফ্রেন্ড থেকে সরানো হয়েছে' : `${name} এখন ক্লোজ ফ্রেন্ড ⭐`); after(); });
+    if (a === 'snooze') return busy(null, async () => { await S.api.setFriendMark(id, { snoozeUntil: sn ? null : new Date(Date.now() + 30 * 864e5).toISOString() }); toast(sn ? 'বিরতি তুলে নেওয়া হয়েছে' : `৩০ দিন ${name}-এর পোস্ট ফিডে আসবে না`); after(); });
+    if (a === 'unf' && await confirmSheet('আনফ্রেন্ড করবেন?', 'আনফ্রেন্ড', true)) busy(null, async () => { await S.api.removeFriend(id); if (S.view === 'friends') loadFriends(true); if (S.view === 'user') openUser(S.userId, true); refreshBadges(); });
+  };
 }
 
 // বন্ধু/ফলো/মেসেজ বাটন — যেকোনো জায়গা থেকে
@@ -1566,10 +1720,11 @@ document.addEventListener('click', async e => {
   if (!needUser()) return;
   const id = b.dataset.id || b.dataset.fo || b.dataset.dm;
   if (b.dataset.dm) return openThread(id);
-  const refresh = () => { if (S.view === 'friends') loadFriends(); if (S.view === 'user') openUser(S.userId, true); if (S.view === 'search') runSearch(); if (S.view === 'notif') loadNotifs(true); refreshBadges(); };
+  const refresh = () => { if (S.view === 'friends') loadFriends(true); if (S.view === 'user') openUser(S.userId, true); if (S.view === 'search') runSearch(); if (S.view === 'notif') loadNotifs(true); refreshBadges(); };
   if (b.dataset.fo) return busy(b, async () => { await (b.dataset.on === '1' ? S.api.unfollow(id) : S.api.follow(id)); refresh(); });
   const act = b.dataset.fr;
-  if (act === 'menu') {
+  if (act === 'menu') return friendMenu(id, b.dataset.name || '');
+  if (act === 'menu-old') {
     openSheet(`<div class="menu"><button data-act="dm">মেসেজ পাঠান</button><button data-act="unf" class="danger">${esc(b.dataset.name)}-কে আনফ্রেন্ড করুন</button><button data-close>বন্ধ করুন</button></div>`);
     $('#sheet').onclick = async ev => {
       const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
@@ -1580,7 +1735,7 @@ document.addEventListener('click', async e => {
     return;
   }
   busy(b, async () => {
-    if (act === 'add') { await S.api.sendFriendRequest(id); toast('ফ্রেন্ড রিকোয়েস্ট পাঠানো হয়েছে'); }
+    if (act === 'add') { await S.api.sendFriendRequest(id); toast('ফ্রেন্ড রিকোয়েস্ট পাঠানো হয়েছে'); const sgu = S.fr?.sugg.find(x => x.id === id); if (sgu) sgu.sent = true; }
     if (act === 'accept') { await S.api.acceptFriend(id); toast('আপনারা এখন বন্ধু'); }
     if (act === 'remove' || act === 'cancel') await S.api.removeFriend(id);
     refresh();

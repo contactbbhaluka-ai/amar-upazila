@@ -45,14 +45,14 @@ async function supabaseApi() {
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
-  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,unions!profiles_union_id_fkey(name)';
+  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,friend_req_from,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
     id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
     union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
     bloodGroup: p.blood_group || '', donorVisible: p.donor_visible !== false, lastDonated: p.last_donated || '',
     avatar: p.avatar_url || '', cover: p.cover_url || '', bio: p.bio || '', admin: p.role === 'admin',
     friendsVisibility: p.friends_visibility || 'public', followersVisibility: p.followers_visibility || 'public', followingVisibility: p.following_visibility || 'public', joinedAt: p.created_at || '',
-    gender: p.gender || '', username: p.username || '', verified: badgeOf(p), verifiedUntil: p.verified_until || null, locked: !!p.locked, pinnedPostId: p.pinned_post_id || null, donorReady: !!p.donor_ready,
+    gender: p.gender || '', username: p.username || '', verified: badgeOf(p), verifiedUntil: p.verified_until || null, locked: !!p.locked, pinnedPostId: p.pinned_post_id || null, donorReady: !!p.donor_ready, friendReqFrom: p.friend_req_from || 'everyone',
     social: {}, works: [], educations: [],
   });
   const toPost = (r, mine, saved) => ({
@@ -355,7 +355,11 @@ async function supabaseApi() {
       if (blocked.size && !userId) q = q.not('user_id', 'in', inList([...blocked]));
       if (category) q = q.eq('category', category);
       if (before) q = q.lt('created_at', before);
-      const rows = ok(await q);
+      let rows = ok(await q);
+      // ৩০ দিনের বিরতি দেওয়া বন্ধুর পোস্ট ফিডে নয়; ক্লোজ ফ্রেন্ডের পোস্ট চিহ্নিত (ফিডে আগে দেখাতে)
+      const feedScope = !urgent && !postId && !ids && !saved && !text && !groupId && !pageId && !userId;
+      const marks = me && feedScope ? await this.friendMarks().catch(() => new Map()) : new Map();
+      if (marks.size) rows = rows.filter(r => r.page_id || !(marks.get(r.user_id)?.snoozeUntil > new Date().toISOString()));
       let mine = new Map(), sv = new Set(), views = new Map(), ex = {};
       const exIds = rows.filter(r => r.poll || r.event_at).map(r => r.id);
       const exP = exIds.length ? sb.rpc('post_extras', { p_ids: exIds }).then(r => r.data || {}, () => ({})) : Promise.resolve({});
@@ -368,7 +372,7 @@ async function supabaseApi() {
         views = new Map((vc.data || []).map(x => [x.post_id, Number(x.views)]));   // নিজের পোস্টের মোট ভিউ (না এলে ০)
       }
       ex = await exP;
-      return rows.map(r => { const e = ex[r.id]; return { ...toPost(r, mine, sv), views: views.get(r.id) || 0, ...(e ? { votes: e.votes || [], myVote: e.my ?? null, going: Number(e.going) || 0, meGoing: !!e.me_going } : {}) }; });
+      return rows.map(r => { const e = ex[r.id]; return { ...toPost(r, mine, sv), closeFriend: !r.page_id && !!marks.get(r.user_id)?.close, views: views.get(r.id) || 0, ...(e ? { votes: e.votes || [], myVote: e.my ?? null, going: Number(e.going) || 0, meGoing: !!e.me_going } : {}) }; });
     },
     async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions, albumId, kind = 'normal', imageUrls, bg, poll, eventAt, eventPlace, link, bloodGroup, lifeEvent, lifeDate }) {
       const files = images?.length ? images.slice(0, 10) : image ? [image] : [];
@@ -588,10 +592,51 @@ async function supabaseApi() {
       return rows.map(r => toUser(r.requester === id ? r.a : r.r)).filter(Boolean);
     },
     async sendFriendRequest(id) {
-      ok(await sb.from('friendships').insert({ requester: me.id, addressee: id }));
+      const r = await sb.from('friendships').insert({ requester: me.id, addressee: id });
+      if (r.error && /row-level security/i.test(r.error.message)) { const rule = ok(await sb.rpc('friend_req_rule', { uid: id })); throw new Error('friend_req:' + (rule || 'everyone')); }
+      ok(r);
       ok(await sb.from('follows').upsert({ follower_id: me.id, followee_id: id }, { ignoreDuplicates: true }));
     },
     async acceptFriend(id) { ok(await sb.rpc('accept_friend', { from_user: id })); },
+    // ---------- বন্ধু (২)
+    async sentRequests() {
+      const rows = ok(await sb.from('friendships').select('created_at, p:profiles!friendships_addressee_fkey(' + PROFILE + ')').eq('requester', me.id).eq('status', 'pending').order('created_at', { ascending: false }));
+      return rows.map(r => r.p && { ...toUser(r.p), sentAt: r.created_at }).filter(u => u && !blocked.has(u.id));
+    },
+    async friendMeta(ids) {
+      if (!me || !ids.length) return new Map();
+      const out = new Map();
+      for (let i = 0; i < ids.length; i += 200) ok(await sb.rpc('friend_meta', { p_ids: ids.slice(i, i + 200) })).forEach(r => out.set(r.id, { mutual: r.mutual, joinedAt: r.joined_at, since: r.friends_since, posts: r.posts }));
+      return out;
+    },
+    async suggestions() {
+      const sg = ok(await sb.rpc('friend_suggestions', { p_limit: 60 })).filter(r => !blocked.has(r.id));
+      if (!sg.length) return [];
+      const ps = new Map(ok(await sb.from('profiles').select(PROFILE).in('id', sg.map(r => r.id))).map(p => [p.id, toUser(p)]));
+      return sg.filter(r => ps.has(r.id)).map(r => ({ ...ps.get(r.id), rel: { friend: 'none' }, mutual: r.mutual, sameArea: r.same_area, school: r.school || '', isNew: r.is_new }));
+    },
+    async hideSuggestion(id) { ok(await sb.from('friend_suggest_hidden').upsert({ user_id: me.id, other_id: id }, { ignoreDuplicates: true })); },
+    async newNearMe() { return me ? Number(ok(await sb.rpc('new_near_me'))) || 0 : 0; },
+    async birthdaysUpcoming(days = 31) { return ok(await sb.rpc('friends_birthdays_upcoming', { p_days: days })).filter(r => !blocked.has(r.id)).map(r => ({ id: r.id, name: r.name, avatar: r.avatar_url || '', nextDate: r.next_date, days: r.days })); },
+    async anniversaries() { if (!me) return []; return ok(await sb.rpc('friend_anniversaries')).filter(r => !blocked.has(r.id)).map(r => ({ id: r.id, name: r.name, avatar: r.avatar_url || '', years: r.years })); },
+    async acceptAllFriends() { return Number(ok(await sb.rpc('accept_all_friends'))) || 0; },
+    async friendMarks(force) {
+      if (!me) return new Map();
+      if (!force && this._marks && Date.now() - this._marksAt < 60000) return this._marks;
+      this._marks = new Map(ok(await sb.from('friend_marks').select('other_id,close,snooze_until').eq('user_id', me.id)).map(r => [r.other_id, { close: r.close, snoozeUntil: r.snooze_until }]));
+      this._marksAt = Date.now(); return this._marks;
+    },
+    async setFriendMark(id, patch) {
+      const cur = (await this.friendMarks(true)).get(id) || { close: false, snoozeUntil: null };
+      const row = { user_id: me.id, other_id: id, close: patch.close ?? cur.close, snooze_until: patch.snoozeUntil !== undefined ? patch.snoozeUntil : cur.snoozeUntil };
+      ok(await sb.from('friend_marks').upsert(row, { onConflict: 'user_id,other_id' })); this._marksAt = 0;
+    },
+    async friendLists() { return ok(await sb.from('friend_lists').select('id,name,friend_list_members(member_id)').eq('user_id', me.id).order('created_at')).map(l => ({ id: l.id, name: l.name, members: (l.friend_list_members || []).map(m => m.member_id) })); },
+    async createFriendList(name) { return ok(await sb.from('friend_lists').insert({ user_id: me.id, name: name.trim() }).select('id').single()).id; },
+    async renameFriendList(id, name) { ok(await sb.from('friend_lists').update({ name: name.trim() }).eq('id', id)); },
+    async deleteFriendList(id) { ok(await sb.from('friend_lists').delete().eq('id', id)); },
+    async setListMember(listId, uid, on) { if (on) ok(await sb.from('friend_list_members').upsert({ list_id: listId, member_id: uid }, { ignoreDuplicates: true })); else ok(await sb.from('friend_list_members').delete().eq('list_id', listId).eq('member_id', uid)); },
+    async setFriendReqFrom(v) { ok(await sb.from('profiles').update({ friend_req_from: v }).eq('id', me.id)); me.friendReqFrom = v; },
     async removeFriend(id) { ok(await sb.from('friendships').delete().or(`and(requester.eq.${me.id},addressee.eq.${id}),and(requester.eq.${id},addressee.eq.${me.id})`)); },
     // ফিডে "ফলো করুন" দেখানোর জন্য: কাদের বন্ধু/ফলো করছি, কোন পেইজ ফলো করছি
     async followState() {
@@ -828,11 +873,11 @@ function demoApi() {
   const PEOPLE = [
     { id: 'd1', name: 'রাশেদুল হক', ...BH, unionId: 2, bio: 'শিক্ষক, উথুরা উচ্চ বিদ্যালয়', bloodGroup: 'A+', phone: '01700000101', lastDonated: daysAgo(150) },
     { id: 'd2', name: 'সুমি আক্তার', ...BH, unionId: 2, bio: '', bloodGroup: 'O+', phone: '01700000102', lastDonated: '' },
-    { id: 'd3', name: 'নাসরিন সুলতানা', verified: 'authentic', ...BH, unionId: 3, bio: 'স্বেচ্ছাসেবী, রক্তদান ক্লাব', bloodGroup: 'B+', phone: '01700000103', lastDonated: daysAgo(40) },
-    { id: 'd4', name: 'তানভীর আহমেদ', ...BH, unionId: 3, bio: 'নিয়মিত রক্তদাতা', bloodGroup: 'B+', phone: '01700000104', lastDonated: daysAgo(120) },
+    { id: 'd3', name: 'নাসরিন সুলতানা', joinedAt: '2025-03-10T08:00:00.000Z', verified: 'authentic', ...BH, unionId: 3, bio: 'স্বেচ্ছাসেবী, রক্তদান ক্লাব', bloodGroup: 'B+', phone: '01700000103', lastDonated: daysAgo(40) },
+    { id: 'd4', name: 'তানভীর আহমেদ', ...BH, unionId: 3, bio: 'নিয়মিত রক্তদাতা', bloodGroup: 'B+', phone: '01700000104', lastDonated: daysAgo(120), joinedAt: daysAgo(2) + 'T08:00:00.000Z' },
     { id: 'd5', name: 'মিজানুর রহমান', verified: 'paid', verifiedUntil: new Date(Date.now() + 20 * 864e5).toISOString(), ...BH, unionId: 4, bio: 'ব্যবসায়ী, ডাকাতিয়া বাজার', bloodGroup: 'AB+', phone: '01700000105', lastDonated: daysAgo(200) },
     { id: 'd6', name: 'উপজেলা যুব উন্নয়ন', ...BH, unionId: 1, bio: 'প্রশিক্ষণ ও চাকরির খবর', bloodGroup: '', phone: '' },
-    { id: 'd7', name: 'রুমানা আক্তার', locked: true, ...BH, unionId: 12, bio: '', bloodGroup: 'A-', phone: '01700000107', lastDonated: daysAgo(20) },
+    { id: 'd7', name: 'রুমানা আক্তার', locked: true, ...BH, unionId: 12, bio: '', bloodGroup: 'A-', phone: '01700000107', lastDonated: daysAgo(20), joinedAt: daysAgo(3) + 'T08:00:00.000Z' },
     { id: 'd8', name: 'জাহিদ হাসান', district: 'ময়মনসিংহ', upazila: 'ত্রিশাল', unionId: null, bio: '', bloodGroup: 'O-', phone: '01700000108', lastDonated: daysAgo(95) },
     { id: 'd9', name: 'শফিকুল ইসলাম', district: 'ঢাকা', upazila: 'সাভার', unionId: null, bio: 'ভালুকার কারখানায় কাজ করি', bloodGroup: 'AB-', phone: '01700000109', lastDonated: '' },
   ];
@@ -861,7 +906,8 @@ function demoApi() {
     saved: get('saved', []),             // "userId:postId"
     settings: get('settings', { publicDonorPhone: false }),
     wallet: get('wallet', { coins: 120, ledger: [{ amount: 100, reason: 'admin', ref: 'স্বাগতম', createdAt: ago(30) }, { amount: 5, reason: 'post', ref: 'x1', createdAt: ago(20) }, { amount: 15, reason: 'like', ref: 'x2', createdAt: ago(19) }] }),
-    chats: get('chats', []),             // গ্রুপ চ্যাট { id, name, createdBy, createdAt, members: [{ id, role, lastReadAt }] }
+    chats: get('chats', []),
+    msgSaved: get('msgSaved', []), shared: get('shared', {}), friendMarks: get('friendMarks', {}), friendLists: get('friendLists', []), sugHidden: get('sugHidden', []),             // গ্রুপ চ্যাট { id, name, createdBy, createdAt, members: [{ id, role, lastReadAt }] }
     convSet: get('convSet', {}),         // কথোপকথনের সেটিং (মিউট, রিকোয়েস্ট, মুছা)
     votes: get('votes', {}),             // postId -> { userId: অপশন }
     going: get('going', {}),             // postId -> [userId]
@@ -905,9 +951,9 @@ function demoApi() {
     ]),
   };
   let meId = get('me', null);
-  const save = () => { for (const k of ['chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
-  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady }; };
+  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone' }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
   const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true, aboutVis: { ...ABOUT_VIS0, ...(person(meId).aboutVis || {}) } } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
@@ -1052,8 +1098,9 @@ function demoApi() {
 
     db.users.push({ id, email: DEMO_EMAIL, password: DEMO_PASS, name: 'ডেমো ব্যবহারকারী', district: 'ময়মনসিংহ', upazila: 'ভালুকা', unionId: 12, phone: '01700000100', bloodGroup: 'B+', lastDonated: daysAgo(100), donorVisible: true, avatar: '', bio: 'অ্যাপের সব ফিচার চেক করার প্রোফাইল' });
     // বন্ধু, রিকোয়েস্ট, ফলো
-    db.friendships.push({ requester: 'd1', addressee: id, status: 'accepted' }, { requester: id, addressee: 'd2', status: 'accepted' },
-      { requester: 'd3', addressee: id, status: 'pending' }, { requester: 'd4', addressee: id, status: 'pending' }, { requester: id, addressee: 'd5', status: 'pending' });
+    { const yr = new Date(); yr.setFullYear(yr.getFullYear() - 2); const ann = yr.toISOString();   // ডেমো: রাশেদুলের সাথে আজ বন্ধুত্বের ২ বছর
+    db.friendships.push({ requester: 'd1', addressee: id, status: 'accepted', acceptedAt: ann }, { requester: id, addressee: 'd2', status: 'accepted', acceptedAt: daysAgo(200) + 'T10:00:00.000Z' }, 
+      { requester: 'd3', addressee: id, status: 'pending' }, { requester: 'd4', addressee: id, status: 'pending' }, { requester: id, addressee: 'd5', status: 'pending' }); }
     db.follows.push(`${id}:d1`, `d1:${id}`, `${id}:d2`, `d2:${id}`, `d6:${id}`, `${id}:d5`);
     // নিজের পোস্ট (একটিতে ছবি)
     const p1 = { id: nid(db.posts), userId: id, unionId: 2, category: 'খবর', createdAt: t(3), body: 'আমাদের সদর ইউনিয়নের নতুন রাস্তার কাজ শেষ হয়েছে। সবাইকে ধন্যবাদ যারা সহযোগিতা করেছেন।', image: demoImg('#8fd0f0', '#7cc36b', 'সদর ইউনিয়ন'), likes: 2, cm: [] };
@@ -1348,8 +1395,10 @@ function demoApi() {
           : userId ? p.userId === userId && !p.pageId && !p.groupId
           : !p.groupId && (circle ? (p.pageId ? myPages.has(p.pageId) : circle.has(p.userId)) : (!unionId || p.unionId === unionId)) && !isBlocked(p.userId))
         && (!category || p.category === category) && (!before || p.createdAt < before))
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, PAGE);
-      return this.__map(rows);
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const marks = db.friendMarks || {}, feed = !groupId && !pageId && !userId, nowI = new Date().toISOString();
+      const rows2 = (feed ? rows.filter(p => p.pageId || !(marks[p.userId]?.snoozeUntil > nowI)) : rows).slice(0, PAGE);
+      return this.__map(rows2).then(list => list.map(x => ({ ...x, closeFriend: feed && !x.pageId && !!marks[x.userId]?.close })));
     },
     __map(rows) {
       return wait(rows.map(p => {
@@ -1607,7 +1656,10 @@ function demoApi() {
     async friends(of) { return wait(friendIds(of || meId).map(user).filter(Boolean)); },
     async sendFriendRequest(id) {
       if (friendRow(meId, id)) throw new Error('already');
-      db.friendships.push({ requester: meId, addressee: id, status: 'pending' });
+      const rule = person(id)?.friendReqFrom || 'everyone', mineF = new Set(friendIds(meId));
+      if (rule === 'mutual' && !friendIds(id).some(x => mineF.has(x))) throw new Error('friend_req:mutual');
+      if (rule === 'upazila' && !(person(id)?.unionId && meUser()?.unionId)) throw new Error('friend_req:upazila');
+      db.friendships.push({ requester: meId, addressee: id, status: 'pending', createdAt: new Date().toISOString() });
       if (!db.follows.includes(meId + ':' + id)) db.follows.push(meId + ':' + id); save();
       // ডেমোতে নমুনা মানুষেরা কিছুক্ষণ পর রিকোয়েস্ট গ্রহণ করে
       const uid = meId;
@@ -1616,9 +1668,53 @@ function demoApi() {
     async acceptFriend(id) {
       const f = db.friendships.find(x => x.requester === id && x.addressee === meId && x.status === 'pending');
       if (!f) throw new Error('no pending request');
-      f.status = 'accepted'; if (!db.follows.includes(meId + ':' + id)) db.follows.push(meId + ':' + id);
+      f.status = 'accepted'; f.acceptedAt = new Date().toISOString(); if (!db.follows.includes(meId + ':' + id)) db.follows.push(meId + ':' + id);
       db.notifs = db.notifs.filter(n => !(n.to === meId && n.from === id && n.type === 'friend_request')); save();
     },
+    // ---------- বন্ধু (২)
+    async sentRequests() { return wait(db.friendships.filter(f => f.requester === meId && f.status === 'pending' && !isBlocked(f.addressee)).map(f => user(f.addressee) && { ...user(f.addressee), sentAt: f.createdAt || '' }).filter(Boolean)); },
+    async friendMeta(ids) {
+      const mine = new Set(friendIds(meId));
+      return wait(new Map(ids.map(id => { const u = person(id), f = friendRow(meId, id);
+        return [id, { mutual: friendIds(id).filter(x => mine.has(x)).length, joinedAt: u?.joinedAt || '', since: f?.status === 'accepted' ? f.acceptedAt || f.createdAt || '' : null, posts: db.posts.filter(p => p.userId === id && !p.pageId && !p.groupId).length }]; })));
+    },
+    async suggestions() {
+      const me0 = meUser(), mine = new Set(friendIds(meId)), hidden = new Set(db.sugHidden || []);
+      const mySchools = new Set((me0?.educations || []).map(e => (e.school || '').trim().toLowerCase()).filter(Boolean));
+      const out = [...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u && u.id !== meId && !isBlocked(u.id) && !friendRow(meId, u.id) && !hidden.has(u.id)).map(u => {
+        const school = (u.educations || []).find(e => mySchools.has((e.school || '').trim().toLowerCase()))?.school || '';
+        return { ...u, rel: { friend: 'none' }, mutual: friendIds(u.id).filter(x => mine.has(x)).length, sameArea: !!(me0?.unionId && u.unionId === me0.unionId), school, isNew: !!u.joinedAt && Date.now() - new Date(u.joinedAt) < 7 * 864e5 };
+      });
+      return wait(out.sort((a, b) => b.mutual - a.mutual || (!!b.school - !!a.school) || (b.sameArea - a.sameArea)).slice(0, 60));
+    },
+    async hideSuggestion(id) { db.sugHidden = [...new Set([...(db.sugHidden || []), id])]; save(); return wait(); },
+    async newNearMe() { const me0 = meUser(); return wait([...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u && u.id !== meId && me0?.unionId && u.unionId === me0.unionId && u.joinedAt && Date.now() - new Date(u.joinedAt) < 7 * 864e5).length); },
+    async birthdaysUpcoming(days = 31) {
+      const t0 = new Date(Date.now() + 6 * 36e5), today = Date.UTC(t0.getUTCFullYear(), t0.getUTCMonth(), t0.getUTCDate());
+      return wait(friendIds(meId).map(user).filter(u => u && u.birthDate).map(u => {
+        const [, m, d] = u.birthDate.split('-').map(Number); let y = t0.getUTCFullYear(), nd = Date.UTC(y, m - 1, d);
+        if (nd < today) nd = Date.UTC(y + 1, m - 1, d);
+        return { id: u.id, name: u.name, avatar: u.avatar, nextDate: new Date(nd).toISOString().slice(0, 10), days: Math.round((nd - today) / 864e5) };
+      }).filter(x => x.days <= days).sort((a, b) => a.days - b.days));
+    },
+    async anniversaries() {
+      const t0 = new Date(Date.now() + 6 * 36e5), md = t0.toISOString().slice(5, 10);
+      return wait(db.friendships.filter(f => f.status === 'accepted' && (f.requester === meId || f.addressee === meId) && f.acceptedAt && f.acceptedAt.slice(5, 10) === md && t0.getUTCFullYear() - Number(f.acceptedAt.slice(0, 4)) >= 1)
+        .map(f => { const u = user(f.requester === meId ? f.addressee : f.requester); return u && { id: u.id, name: u.name, avatar: u.avatar, years: t0.getUTCFullYear() - Number(f.acceptedAt.slice(0, 4)) }; }).filter(Boolean));
+    },
+    async acceptAllFriends() {
+      const now = new Date().toISOString(); let n = 0;
+      for (const f of db.friendships) if (f.addressee === meId && f.status === 'pending' && !isBlocked(f.requester)) { f.status = 'accepted'; f.acceptedAt = now; n++; if (!db.follows.includes(meId + ':' + f.requester)) db.follows.push(meId + ':' + f.requester); }
+      save(); return wait(n);
+    },
+    async friendMarks() { db.friendMarks = db.friendMarks || {}; return new Map(Object.entries(db.friendMarks)); },
+    async setFriendMark(id, patch) { db.friendMarks = db.friendMarks || {}; const cur = db.friendMarks[id] || { close: false, snoozeUntil: null }; db.friendMarks[id] = { close: patch.close ?? cur.close, snoozeUntil: patch.snoozeUntil !== undefined ? patch.snoozeUntil : cur.snoozeUntil }; save(); return wait(); },
+    async friendLists() { return wait((db.friendLists || []).map(l => ({ ...l, members: [...l.members] }))); },
+    async createFriendList(name) { db.friendLists = db.friendLists || []; if (db.friendLists.length >= 20) throw new Error('lists max 20'); if (db.friendLists.some(l => l.name === name.trim())) throw new Error('duplicate key'); const l = { id: nid(db.friendLists), name: name.trim(), members: [] }; db.friendLists.push(l); save(); return wait(l.id); },
+    async renameFriendList(id, name) { const l = (db.friendLists || []).find(x => x.id === id); if (l) l.name = name.trim(); save(); return wait(); },
+    async deleteFriendList(id) { db.friendLists = (db.friendLists || []).filter(x => x.id !== id); save(); return wait(); },
+    async setListMember(listId, uid, on) { const l = (db.friendLists || []).find(x => x.id === listId); if (!l) return; l.members = l.members.filter(x => x !== uid); if (on) l.members.push(uid); save(); return wait(); },
+    async setFriendReqFrom(v) { const p = person(meId); if (p) p.friendReqFrom = v; save(); return wait(); },
     async removeFriend(id) { const f = friendRow(meId, id); db.friendships = db.friendships.filter(x => x !== f); save(); },
     async followState() {
       if (!meId) return null;
@@ -1676,7 +1772,7 @@ function demoApi() {
         return { id: m.id, mine: m.from === meId, senderId: m.from, sender: { id: u.id, name: u.name, avatar: u.avatar }, body: m.body || '', createdAt: m.createdAt, read: !!m.read, auto: !!m.auto,
           image: m.image || '', voice: m.voice || '', voiceSecs: m.voiceSecs || 0, deleted: !!m.deletedAt, reactions: counts, myReaction: (m.rx || {})[meId] || '',
           reply: r ? { id: r.id, body: r.body || '', mine: r.from === meId, image: !!r.image, voice: !!r.voice, deleted: !!r.deletedAt } : null,
-          editedAt: m.editedAt || null, forwarded: !!m.forwarded, pinnedAt: m.pinnedAt || null, sticker: m.sticker || '', loc: m.loc || null, mentions: m.mentions || [], expiresAt: m.expiresAt || null, saved: (db.saved || []).includes(m.id),
+          editedAt: m.editedAt || null, forwarded: !!m.forwarded, pinnedAt: m.pinnedAt || null, sticker: m.sticker || '', loc: m.loc || null, mentions: m.mentions || [], expiresAt: m.expiresAt || null, saved: (db.msgSaved || []).includes(m.id),
           poll: m.poll ? { q: m.poll.q, options: m.poll.options, votes: m.poll.options.map((_, i) => Object.values(m.votes || {}).filter(v => v === i).length), my: (m.votes || {})[meId] ?? null } : null };
       });
       const g = t.kind === 'group' && db.chats.find(x => x.id === Number(t.id));
@@ -1736,9 +1832,9 @@ function demoApi() {
       Object.assign(m, { body: body.trim(), editedAt: new Date().toISOString() }); save(); listeners.forEach(cb => cb({ type: 'update', id })); return wait();
     },
     async pinMessage(id, on) { const m = db.messages.find(x => x.id === id); if (m) { m.pinnedAt = on ? new Date().toISOString() : null; save(); } return wait(); },
-    async saveMessage(id, on) { db.saved = (db.saved || []).filter(x => x !== id); if (on) db.saved.unshift(id); save(); return wait(); },
+    async saveMessage(id, on) { db.msgSaved = (db.msgSaved || []).filter(x => x !== id); if (on) db.msgSaved.unshift(id); save(); return wait(); },
     async savedMessages() {
-      return wait((db.saved || []).map(id => db.messages.find(m => m.id === id)).filter(Boolean).map(m => {
+      return wait((db.msgSaved || []).map(id => db.messages.find(m => m.id === id)).filter(Boolean).map(m => {
         const u = user(m.from) || { name: 'সদস্য', avatar: '' };
         return { id: m.id, body: m.body || '', mine: m.from === meId, sender: u.name, avatar: u.avatar, createdAt: m.createdAt, image: !!m.image, sticker: m.sticker || '', loc: !!m.loc, deleted: !!m.deletedAt,
           t: m.chatId ? { kind: 'group', id: m.chatId } : { kind: m.pageId ? 'page' : 'dm', id: m.from === meId ? m.to : m.from, pageId: m.pageId || null } };

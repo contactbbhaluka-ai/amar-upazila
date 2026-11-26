@@ -2236,7 +2236,7 @@ async function openUser(id, silent, keepState, preview) {
     const p = S.preview ? await previewProfile(S.preview) : await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
     if (!silent) S.api.profileVisit?.(id).catch(() => {});
-    $('#user').innerHTML = (S.preview ? previewBar() : '') + `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
+    $('#user').innerHTML = (S.preview ? previewBar() : '') + `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}${S.preview ? '' : `<button class="pshare-btn" data-pshare="user" title="প্রোফাইল শেয়ার / QR" aria-label="প্রোফাইল শেয়ার বা QR কোড">${ic('share', 16)}</button>`}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       <div id="mutual"></div>
       ${p.lockedOut ? `<div class="lock-banner">🔒 <div><b>${esc(p.name)} প্রোফাইল লক করে রেখেছেন</b><small>শুধু বন্ধুরা পোস্ট, ছবি ও বিস্তারিত দেখতে পারেন।</small></div></div>` : introCard(p, false)}
@@ -2523,11 +2523,11 @@ async function renderMe(mode = 'login') {
   const u = me();
   if (u) {
     $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
-      <h2 style="margin:6px 0 0">${esc(u.name)}${u.verified ? vb(u.verified, true) : vbGet('me')}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.locked ? '<button class="lock-chip">🔒 প্রোফাইল লক করা</button>' : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
+      <h2 style="margin:6px 0 0">${esc(u.name)}${u.verified ? vb(u.verified, true) : vbGet('me')}<button class="pshare-btn" data-pshare="me" title="প্রোফাইল শেয়ার / QR" aria-label="প্রোফাইল শেয়ার বা QR কোড">${ic('share', 16)}</button></h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.locked ? '<button class="lock-chip">🔒 প্রোফাইল লক করা</button>' : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
-      <div class="prof-tools"><button class="pt-btn" data-pshare="me">${ic('link', 14)} শেয়ার / QR</button><button class="pt-btn" data-frames>🖼️ ফ্রেম</button><button class="pt-btn" data-viewas="public">👁️ অন্যরা কেমন দেখে</button></div>
+      <div class="prof-tools"><button class="pt-btn" data-frames>🖼️ ফ্রেম</button><button class="pt-btn" data-viewas="public">👁️ অন্যরা কেমন দেখে</button></div>
       <div class="row"><button class="btn ghost" id="edit">${ic('edit', 15)} এবাউট এডিট</button><button class="btn ghost" data-insights="1">${ic('eye', 15)} ড্যাশবোর্ড</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
       ${profTabs('me')}`;
     S.api.profile(u.id).then(p => { if ($('#mystats')) $('#mystats').innerHTML = statsHtml(p); }).catch(() => {});

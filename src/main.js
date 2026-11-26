@@ -1619,24 +1619,32 @@ function suggTabHtml(F) {
 }
 function mineTabHtml(F) {
   const q = (S.frQ || '').trim().toLowerCase(), un = S.frUnion || '', lf = S.frList || '';
-  const unions = [...new Set(F.friends.map(u => (u.union || '').split(',')[0].trim()).filter(Boolean))].sort();
+  // এলাকা: ভালুকার সব ইউনিয়ন/পৌরসভা, আর বন্ধুদের মধ্যে অন্য উপজেলার যারা আছেন
+  const areaOf = u => (u.unionId ? 'u:' + u.unionId : u.upazila ? 'x:' + u.upazila : '');
+  const nIn = k => F.friends.filter(u => areaOf(u) === k).length;
+  const others = [...new Set(F.friends.filter(u => !u.unionId && u.upazila).map(u => u.upazila))].sort();
+  const areaSel = `<select class="f" id="fr-union" aria-label="এলাকা অনুযায়ী বন্ধু"><option value="">📍 সব এলাকা</option>
+    <optgroup label="ভালুকা">${(S.unions || []).map(x => `<option value="u:${esc(x.id)}" ${un === 'u:' + x.id ? 'selected' : ''}>${esc(x.name)} (${bn(nIn('u:' + x.id))})</option>`).join('')}</optgroup>
+    ${others.length ? `<optgroup label="অন্য উপজেলা">${others.map(x => `<option value="x:${esc(x)}" ${un === 'x:' + x ? 'selected' : ''}>${esc(x)} (${bn(nIn('x:' + x))})</option>`).join('')}</optgroup>` : ''}</select>`;
   const list = F.lists.find(l => String(l.id) === lf);
-  const rows = F.friends.filter(u => (!q || u.name.toLowerCase().includes(q)) && (!un || (u.union || '').startsWith(un))
+  const rows = F.friends.filter(u => (!q || u.name.toLowerCase().includes(q)) && (!un || areaOf(u) === un)
     && (!lf || (lf === 'close' ? F.marks.get(u.id)?.close : list?.members.includes(u.id))));
   const nowI = new Date().toISOString();
   const chips = `<div class="chips fr-sf"><button class="chip${!lf ? ' on' : ''}" data-frl="">সব</button><button class="chip${lf === 'close' ? ' on' : ''}" data-frl="close">⭐ ক্লোজ ফ্রেন্ড</button>${F.lists.map(l => `<button class="chip${String(l.id) === lf ? ' on' : ''}" data-frl="${l.id}">${esc(l.name)} (${bn(l.members.length)})</button>`).join('')}</div>`;
   return `<div class="fr-filter"><input type="search" id="fr-q" placeholder="বন্ধুর নাম লিখে খুঁজুন…" aria-label="বন্ধু খুঁজুন" value="${esc(S.frQ || '')}">
-      ${unions.length > 1 ? `<select class="f" id="fr-union" aria-label="ইউনিয়ন অনুযায়ী"><option value="">সব এলাকা</option>${unions.map(x => `<option ${x === un ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>` : ''}</div>
+      ${areaSel}</div>
+    ${un ? `<p class="mut fr-areanote">📍 ${esc(un.startsWith('u:') ? (S.unions || []).find(x => 'u:' + x.id === un)?.name || '' : un.slice(2))}-এর বন্ধু: ${bn(rows.length)} জন <button class="link" data-frarea="">সব দেখুন</button></p>` : ''}
     ${chips}
     <div class="card">${rows.length ? rows.map(u => { const mk = F.marks.get(u.id) || {}, sn = mk.snoozeUntil > nowI;
       return personRow(u, `<button class="sbtn ghost" data-dm="${esc(u.id)}">মেসেজ</button><button class="sbtn ghost" data-fr="menu" data-id="${esc(u.id)}" data-name="${esc(u.name)}" aria-label="অপশন">${ic('dots', 16)}</button>`,
         [u.union, yearsBn(F.meta.get(u.id)?.since)].filter(Boolean).join(' · '), `${mk.close ? ' <span class="fr-star" title="ক্লোজ ফ্রেন্ড">⭐</span>' : ''}${sn ? ' <span class="fr-zz" title="বিরতিতে আছেন">😴</span>' : ''}`); }).join('')
-      : `<div class="mut">${F.friends.length ? 'এই খোঁজে কোনো বন্ধু নেই।' : 'এখনো কোনো বন্ধু নেই। "সাজেশন" থেকে বন্ধু হোন।'}</div>`}</div>`;
+      : `<div class="mut">${!F.friends.length ? 'এখনো কোনো বন্ধু নেই। "সাজেশন" থেকে বন্ধু হোন।' : un && !q && !lf ? 'এই এলাকায় আপনার এখনো কোনো বন্ধু নেই। <button class="link" data-suggf="area">আপনার এলাকার সাজেশন দেখুন</button>' : 'এই খোঁজে কোনো বন্ধু নেই।'}</div>`}</div>`;
 }
 $('#friends').addEventListener('click', async e => {
   const t = e.target.closest('[data-frtab]'); if (t) { S.frTab = t.dataset.frtab; return renderFriends(); }
   const sf = e.target.closest('[data-suggf]'); if (sf) { S.suggF = sf.dataset.suggf; S.frTab = 'sugg'; return renderFriends(); }
   const fl = e.target.closest('[data-frl]'); if (fl) { S.frList = fl.dataset.frl; return renderFriends(); }
+  const fa = e.target.closest('[data-frarea]'); if (fa) { S.frUnion = ''; return renderFriends(); }
   const sg = e.target.closest('[data-sgx]');
   if (sg) return busy(sg, async () => { await S.api.hideSuggestion(sg.dataset.sgx); S.fr.sugg = S.fr.sugg.filter(u => u.id !== sg.dataset.sgx); toast('আর এই সাজেশনে দেখাবে না'); renderFriends(); });
   const x = e.target.closest('[data-frx]')?.dataset.frx; if (!x) return;

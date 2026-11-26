@@ -1519,3 +1519,4 @@ img.av{aspect-ratio:1/1}
 .fm-lists{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line);font-size:14px}
 .fm-lists .chip{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
 .bday.anniv{background:light-dark(#eff6ff,#0c1a33)}
+.fr-areanote{margin:-2px 4px 8px;font-size:13.5px}

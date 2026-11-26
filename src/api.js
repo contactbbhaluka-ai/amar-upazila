@@ -68,7 +68,7 @@ async function supabaseApi() {
       author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '', badge: r.sp.page_id ? badgeOf(r.sp.pages) : badgeOf(r.sp.profiles) } : null,
   });
   const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url,verified,verified_until),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until)),kind,album_id,al:albums!posts_album_id_fkey(id,name),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila,verified,verified_until),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until),groups!posts_group_id_fkey(name)';
-  const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count, verified: badgeOf(r), verifiedUntil: r.verified_until || null, cover: r.cover_url || '', autoReply: r.auto_reply || '', autoReplyOn: !!r.auto_reply_on });
+  const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count, verified: badgeOf(r), verifiedUntil: r.verified_until || null, cover: r.cover_url || '', autoReply: r.auto_reply || '', autoReplyOn: !!r.auto_reply_on, pinnedPostId: r.pinned_post_id || null, faqs: r.faqs || [], address: r.address || '', lat: r.lat ?? null, lng: r.lng ?? null });
   const toGroup = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, about: r.about || '', privacy: r.privacy, avatar: r.avatar_url || '', members: r.member_count });
   const inList = ids => `(${ids.join(',')})`;
 
@@ -382,7 +382,16 @@ async function supabaseApi() {
     async changePassword(password) { ok(await sb.auth.updateUser({ password })); },
 
     // ---------- পেইজ
-    async myPages() { return ok(await sb.from('pages').select('*').eq('owner_id', me.id).order('created_at')).map(toPage); },
+    async myPages() {
+      const [own, adm] = await Promise.all([sb.from('pages').select('*').eq('owner_id', me.id).order('created_at'), sb.from('page_admins').select('p:pages(*)').eq('user_id', me.id)]);
+      return [...ok(own).map(toPage), ...ok(adm).map(r => toPage(r.p)).filter(Boolean).map(x => ({ ...x, isAdmin: true }))];
+    },
+    async pageAdmins(pageId) { return ok(await sb.from('page_admins').select('created_at, p:profiles!page_admins_user_id_fkey(' + PROFILE + ')').eq('page_id', pageId).order('created_at')).map(r => toUser(r.p)).filter(Boolean); },
+    async addPageAdmin(pageId, uid) { ok(await sb.rpc('add_page_admin', { p_page: pageId, p_user: uid })); },
+    async removePageAdmin(pageId, uid) { ok(await sb.rpc('remove_page_admin', { p_page: pageId, p_user: uid })); },
+    async pinPagePost(pageId, postId) { ok(await sb.rpc('pin_page_post', { p_page: pageId, p_post: postId || null })); },
+    async setFaqs(pageId, faqs) { ok(await sb.from('pages').update({ faqs }).eq('id', pageId)); },
+    async askFaq(pageId, idx) { ok(await sb.rpc('ask_page_faq', { p_page: pageId, p_idx: idx })); },
     async followedPages() { return ok(await sb.from('page_follows').select('p:pages(*)').eq('user_id', me.id).order('created_at', { ascending: false })).map(r => toPage(r.p)).filter(Boolean); },
     async discoverPages({ q } = {}) {
       let s = sb.from('pages').select('*').order('follower_count', { ascending: false }).limit(40);
@@ -391,15 +400,16 @@ async function supabaseApi() {
     },
     async page(id) {
       const p = toPage(ok(await sb.from('pages').select('*').eq('id', id).single()));
-      const f = me ? ok(await sb.from('page_follows').select('page_id').eq('page_id', id).eq('user_id', me.id)) : [];
-      return { ...p, following: f.length > 0, isOwner: !!me && p.ownerId === me.id };
+      const [f, a] = me ? await Promise.all([sb.from('page_follows').select('page_id').eq('page_id', id).eq('user_id', me.id), sb.from('page_admins').select('page_id').eq('page_id', id).eq('user_id', me.id)]) : [{ data: [] }, { data: [] }];
+      const isOwner = !!me && p.ownerId === me.id, isAdmin = !isOwner && (a.data || []).length > 0;
+      return { ...p, following: (f.data || []).length > 0, isOwner, isAdmin, canManage: isOwner || isAdmin };
     },
     async createPage({ name, category, about, phone, avatar }) {
       const avatar_url = avatar ? await upload(avatar, 'page') : null;
       return toPage(ok(await sb.from('pages').insert({ owner_id: me.id, name, category, about: about || null, phone: phone || null, avatar_url }).select().single()));
     },
-    async updatePage(id, { name, category, about, phone, avatar }) {
-      const v = { name, category, about: about || null, phone: phone || null };
+    async updatePage(id, { name, category, about, phone, avatar, address, lat, lng }) {
+      const v = { name, category, about: about || null, phone: phone || null, address: address || null, lat: lat ?? null, lng: lng ?? null };
       if (avatar) v.avatar_url = await upload(avatar, 'page');
       ok(await sb.from('pages').update(v).eq('id', id));
     },
@@ -548,19 +558,21 @@ async function supabaseApi() {
         .map(c => ({ userId: c.partner_id, pageId: c.page_id || null, asPage: !!c.as_page, pageName: c.page_name || '', name: c.name, avatar: c.avatar_url || '', last: c.last_body, lastAt: c.last_at, lastMine: c.last_mine, unread: Number(c.unread) }));
     },
     // pageId থাকলে শুধু ওই পেইজের কথোপকথন; না থাকলে সাধারণ (পেইজ ছাড়া) মেসেজ
-    async messages(id, pageId) {
-      let q = sb.from('messages').select('id,sender_id,body,created_at,read_at,is_auto')
-        .or(`and(sender_id.eq.${me.id},recipient_id.eq.${id}),and(sender_id.eq.${id},recipient_id.eq.${me.id})`);
-      q = pageId ? q.eq('page_id', pageId) : q.is('page_id', null);
+    // পেইজের কথোপকথন: asPage হলে id = গ্রাহক (পেইজের পক্ষ থেকে দেখা), না হলে আমি গ্রাহক
+    async messages(id, pageId, asPage) {
+      let q = sb.from('messages').select('id,sender_id,body,created_at,read_at,is_auto');
+      const cust = asPage ? id : me.id;
+      q = pageId ? q.eq('page_id', pageId).or(`sender_id.eq.${cust},recipient_id.eq.${cust}`)
+        : q.is('page_id', null).or(`and(sender_id.eq.${me.id},recipient_id.eq.${id}),and(sender_id.eq.${id},recipient_id.eq.${me.id})`);
       const rows = ok(await q.order('created_at', { ascending: false }).limit(200));
-      return rows.reverse().map(m => ({ id: m.id, mine: m.sender_id === me.id, body: m.body, createdAt: m.created_at, read: !!m.read_at, auto: !!m.is_auto }));
+      return rows.reverse().map(m => ({ id: m.id, mine: pageId ? (asPage ? m.sender_id !== cust : m.sender_id === me.id) : m.sender_id === me.id, body: m.body, createdAt: m.created_at, read: !!m.read_at, auto: !!m.is_auto }));
     },
     async sendMessage(id, body, pageId) { ok(await sb.from('messages').insert({ sender_id: me.id, recipient_id: id, body, page_id: pageId || null })); },
     async markRead(id, pageId) { ok(await sb.rpc('mark_read2', { partner: id, p_page: pageId || null })); },
     async setAutoReply(pageId, { on, text }) { ok(await sb.from('pages').update({ auto_reply_on: !!on, auto_reply: (text || '').trim() || null }).eq('id', pageId)); },
     async unreadCount() {
       if (!me) return 0;
-      return ok(await sb.from('messages').select('id', { count: 'exact', head: true }).eq('recipient_id', me.id).is('read_at', null)) || 0;
+      return Number(ok(await sb.rpc('my_unread'))) || 0;   // নিজের আর যেসব পেইজ চালান সেগুলোর না-পড়া মেসেজ
     },
     onMessage(cb) {
       if (!me) return () => {};
@@ -666,6 +678,7 @@ function demoApi() {
     saved: get('saved', []),             // "userId:postId"
     settings: get('settings', { publicDonorPhone: false }),
     wallet: get('wallet', { coins: 120, ledger: [{ amount: 100, reason: 'admin', ref: 'স্বাগতম', createdAt: ago(30) }, { amount: 5, reason: 'post', ref: 'x1', createdAt: ago(20) }, { amount: 15, reason: 'like', ref: 'x2', createdAt: ago(19) }] }),
+    pageAdmins: get('pageAdmins', []),   // "pageId:userId"
     boosts: get('boosts', [{ id: 1, post_id: 3, user_id: 'd5', days: 7, coins: 350, union_id: null, status: 'active', starts_at: ago(24), ends_at: new Date(Date.now() + 6 * 864e5).toISOString(), reach: 214, created_at: ago(25) }]),
     vreqs: get('vreqs', [{ id: 1, user_id: 'd7', kind: 'public_figure', full_name: 'রুমানা আক্তার', category: 'সাংবাদিক', links: 'https://example.com/rumana', note: 'স্থানীয় পত্রিকার প্রতিবেদক', status: 'pending', coins_held: 0, created_at: ago(5) }]),
     albums: get('albums', []),           // { id, userId, name, privacy, createdAt }
@@ -673,7 +686,7 @@ function demoApi() {
       { id: 1, createdBy: 'd3', name: 'আব্দুল করিম', district: 'ময়মনসিংহ', upazila: 'ভালুকা', unionId: 7, phone: '01700000140', bloodGroup: 'O-', lastDonated: '' },
     ]),
     pages: get('pages', [
-      { id: 1, ownerId: 'd1', verified: 'authentic', autoReplyOn: true, autoReply: 'আসসালামু আলাইকুম! জননী ডায়াগনস্টিকে মেসেজ করার জন্য ধন্যবাদ। আমরা সকাল ৯টা থেকে রাত ১০টা পর্যন্ত খোলা। শীঘ্রই উত্তর দেব।', name: 'জননী ডায়াগনস্টিক সেন্টার', category: 'স্বাস্থ্য', about: 'সব ধরনের পরীক্ষা ও বিশেষজ্ঞ ডাক্তার। শুক্রবার খোলা।', phone: '01700-000020', avatar: '' },
+      { id: 1, ownerId: 'd1', verified: 'authentic', address: 'বাজার রোড, ভালুকা, ময়মনসিংহ', lat: 24.3814, lng: 90.3816, faqs: [{ q: 'রক্ত পরীক্ষার খরচ কত?', a: 'CBC ৪০০ টাকা, সুগার ১৫০ টাকা, লিপিড প্রোফাইল ১২০০ টাকা।' }, { q: 'কখন খোলা থাকে?', a: 'প্রতিদিন সকাল ৯টা থেকে রাত ১০টা, শুক্রবারও খোলা।' }, { q: 'রিপোর্ট কখন পাব?', a: 'বেশিরভাগ রিপোর্ট একই দিন বিকাল ৫টার মধ্যে।' }], autoReplyOn: true, autoReply: 'আসসালামু আলাইকুম! জননী ডায়াগনস্টিকে মেসেজ করার জন্য ধন্যবাদ। আমরা সকাল ৯টা থেকে রাত ১০টা পর্যন্ত খোলা। শীঘ্রই উত্তর দেব।', name: 'জননী ডায়াগনস্টিক সেন্টার', category: 'স্বাস্থ্য', about: 'সব ধরনের পরীক্ষা ও বিশেষজ্ঞ ডাক্তার। শুক্রবার খোলা।', phone: '01700-000020', avatar: '' },
       { id: 2, ownerId: 'd6', name: 'উপজেলা চাকরির খবর', category: 'চাকরি ও প্রশিক্ষণ', about: 'উপজেলার সরকারি-বেসরকারি চাকরি ও প্রশিক্ষণের খবর।', phone: '', avatar: '' },
     ]),
     pageFollows: get('pageFollows', ['d2:1', 'd3:1', 'd4:2']),
@@ -703,7 +716,7 @@ function demoApi() {
     ]),
   };
   let meId = get('me', null);
-  const save = () => { for (const k of ['boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -1135,15 +1148,34 @@ function demoApi() {
     async unsavePost(id) { db.saved = db.saved.filter(x => x !== meId + ':' + id); save(); },
     async changePassword(pw) { person(meId).password = pw; save(); },
 
-    async myPages() { return wait(db.pages.filter(x => x.ownerId === meId).map(pageOut)); },
+    async myPages() { return wait([...db.pages.filter(x => x.ownerId === meId).map(pageOut), ...db.pages.filter(x => db.pageAdmins.includes(x.id + ':' + meId)).map(x => ({ ...pageOut(x), isAdmin: true }))]); },
     async followedPages() { return wait(db.pageFollows.filter(f => f.startsWith(meId + ':')).map(f => pageOf(f.split(':')[1])).filter(Boolean).map(pageOut)); },
     async discoverPages({ q } = {}) { const t = (q || '').toLowerCase(); return wait(db.pages.filter(x => !t || x.name.toLowerCase().includes(t)).map(pageOut).sort((a, b) => b.followers - a.followers)); },
-    async page(id) { const pg = pageOf(id); if (!pg) throw new Error('not found'); return wait({ ...pageOut(pg), following: db.pageFollows.includes(meId + ':' + pg.id), isOwner: pg.ownerId === meId }); },
+    async page(id) {
+      const pg = pageOf(id); if (!pg) throw new Error('not found');
+      const isOwner = pg.ownerId === meId, isAdmin = !isOwner && db.pageAdmins.includes(pg.id + ':' + meId);
+      return wait({ ...pageOut(pg), following: db.pageFollows.includes(meId + ':' + pg.id), isOwner, isAdmin, canManage: isOwner || isAdmin });
+    },
+    async pageAdmins(pageId) { return wait(db.pageAdmins.filter(k => k.startsWith(pageId + ':')).map(k => user(k.split(':')[1])).filter(Boolean)); },
+    async addPageAdmin(pageId, uid) {
+      const pg = pageOf(pageId); if (!pg || pg.ownerId !== meId) throw new Error('শুধু পেইজের মালিক অ্যাডমিন যোগ করতে পারেন');
+      if (db.pageAdmins.filter(k => k.startsWith(pageId + ':')).length >= 10) throw new Error('সর্বোচ্চ ১০ জন অ্যাডমিন রাখা যায়');
+      if (!db.pageAdmins.includes(pageId + ':' + uid)) db.pageAdmins.push(pageId + ':' + uid); save();
+    },
+    async removePageAdmin(pageId, uid) { db.pageAdmins = db.pageAdmins.filter(k => k !== pageId + ':' + uid); save(); },
+    async pinPagePost(pageId, postId) { const pg = pageOf(pageId); if (pg) pg.pinnedPostId = postId || null; save(); },
+    async setFaqs(pageId, faqs) { const pg = pageOf(pageId); if (pg) pg.faqs = faqs; save(); },
+    async askFaq(pageId, idx) {
+      const pg = pageOf(pageId), it = pg?.faqs?.[idx]; if (!it) throw new Error('প্রশ্ন পাওয়া যায়নি');
+      const t = Date.now();
+      db.messages.push({ id: nid(db.messages), from: meId, to: pg.ownerId, body: it.q, pageId: pg.id, createdAt: new Date(t).toISOString(), read: false });
+      db.messages.push({ id: nid(db.messages) + 1, from: pg.ownerId, to: meId, body: it.a, pageId: pg.id, auto: true, createdAt: new Date(t + 1).toISOString(), read: false }); save();
+    },
     async createPage({ name, category, about, phone, avatar }) {
       const pg = { id: nid(db.pages), ownerId: meId, name, category, about: about || '', phone: phone || '', avatar: avatar ? await toBlobUrl(avatar) : '' };
       db.pages.push(pg); save(); return pageOut(pg);
     },
-    async updatePage(id, v) { const pg = pageOf(id); Object.assign(pg, { name: v.name, category: v.category, about: v.about || '', phone: v.phone || '' }); if (v.avatar) pg.avatar = await toBlobUrl(v.avatar); save(); },
+    async updatePage(id, v) { const pg = pageOf(id); Object.assign(pg, { name: v.name, category: v.category, about: v.about || '', phone: v.phone || '', address: v.address || '', lat: v.lat ?? null, lng: v.lng ?? null }); if (v.avatar) pg.avatar = await toBlobUrl(v.avatar); save(); },
     async deletePage(id) { db.pages = db.pages.filter(x => x.id !== Number(id)); db.posts = db.posts.filter(p => p.pageId !== Number(id)); save(); },
     async followPage(id) { if (!db.pageFollows.includes(meId + ':' + id)) db.pageFollows.push(meId + ':' + id); save(); },
     async unfollowPage(id) { db.pageFollows = db.pageFollows.filter(f => f !== meId + ':' + id); save(); },

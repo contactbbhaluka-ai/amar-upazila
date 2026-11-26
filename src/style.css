@@ -976,3 +976,20 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .ar-samples{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .ar-s{text-align:left;border:1px dashed var(--line);background:none;border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;color:inherit;cursor:pointer;min-height:0}
 .ar-s:hover{border-color:var(--g)}
+
+/* ===== v35: পেইজের অ্যাডমিন, পিন, প্রশ্ন-উত্তর, শেয়ার, ঠিকানা ===== */
+.pin-lbl{font-size:12.5px;font-weight:700;color:var(--gt);margin:-2px 0 8px}
+.post.pinned-pg{box-shadow:inset 0 3px 0 var(--g)}
+.pg-addr{margin:10px 0 2px;text-align:left}
+.pg-addr p{margin:0 0 6px;font-size:14px}
+.pg-map{width:100%;height:170px;border:0;border-radius:12px;display:block;margin-bottom:6px;background:var(--line)}
+.pg-dir{display:inline-flex;align-items:center;text-decoration:none}
+.geo-box{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;font-size:14px}
+.geo-box #geo-val{flex:1;min-width:140px;color:var(--mut)}
+.share-url{display:flex;gap:6px}
+.share-url .f{flex:1;font-size:13px}
+.faq-row{display:flex;flex-direction:column;gap:4px;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:12px}
+.faq-row b{font-size:13px}
+.tfaq{position:sticky;bottom:64px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 10px;background:var(--bg,#f4f6f5)}
+.tfaq button{border:1px solid var(--g);background:var(--card);color:var(--gt);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;min-height:0}
+.pa-list .person{padding:6px 0}

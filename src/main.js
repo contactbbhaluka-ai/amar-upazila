@@ -83,8 +83,9 @@ const rxEmoji = k => rxIcon(k, 18);
 const rxName = k => (REACTIONS.find(r => r[0] === k) || REACTIONS[0])[2];
 const FB_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-7.5h2.6l.4-3h-3V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4a21 21 0 0 0-2.4-.1c-2.3 0-3.9 1.4-3.9 4v2.2H7.7v3h2.6V21z"/></svg>';
 const postLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#post-${id}`;
+const pageLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#page-${id}`;
 // মেসেজে লিংক থাকলে চাপা যায়; অ্যাপের পোস্টের লিংক অ্যাপের ভেতরেই খোলে
-const linkify = t => esc(t).replace(/https?:\/\/[^\s<]+/g, u => { const m = u.match(/#post-(\d+)$/); return m ? `<a href="${u}" data-openpost="${m[1]}">পোস্টটি দেখুন ↗</a>` : `<a href="${u}" target="_blank" rel="noopener">${u}</a>`; });
+const linkify = t => esc(t).replace(/https?:\/\/[^\s<]+/g, u => { const m = u.match(/#post-(\d+)$/), pm = u.match(/#page-(\d+)$/); return pm ? `<a href="${u}" data-page="${pm[1]}">পেইজটি দেখুন ↗</a>` : m ? `<a href="${u}" data-openpost="${m[1]}">পোস্টটি দেখুন ↗</a>` : `<a href="${u}" target="_blank" rel="noopener">${u}</a>`; });
 
 // ================================================================ সহায়ক
 const $ = s => document.querySelector(s);
@@ -341,8 +342,8 @@ function postHtml(p) {
   const link = (inner, cls) => p.pageId ? `<button class="${cls}" data-page="${esc(p.pageId)}">${inner}</button>` : userLink(p.userId, inner, cls);
   const via = p.groupId && S.view !== 'group' ? ` <span class="via">▸ <button data-group="${esc(p.groupId)}">${esc(p.groupName)}</button></span>` : '';
   const own = u && p.userId === u.id;
-  return `<article class="card post${p.sponsored ? ' sponsored' : ''}" data-pid="${esc(p.id)}"${own ? ' data-own="1"' : ''}${p.shared && p.shared.userId !== u?.id ? ` data-spid="${esc(p.shared.id)}"` : ''}>
-    <div class="top">${link(av(p), 'avbtn')}
+  return `<article class="card post${p.sponsored ? ' sponsored' : ''}${p.pinnedPage ? ' pinned-pg' : ''}" data-pid="${esc(p.id)}"${own ? ' data-own="1"' : ''}${p.shared && p.shared.userId !== u?.id ? ` data-spid="${esc(p.shared.id)}"` : ''}>
+    ${p.pinnedPage ? '<div class="pin-lbl">📌 পিন করা পোস্ট</div>' : ''}<div class="top">${link(av(p), 'avbtn')}
       <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
       ${own ? `<button class="pinfo" data-pinfo="${esc(p.id)}" aria-label="পোস্টটি কতজন দেখেছেন" title="পোস্টের হিসাব">${ic('info', 19)}</button>` : ''}<button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
     <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>
@@ -563,9 +564,11 @@ async function loadFeed(key, append) {
     const plainHome = key === 'home' && !append && S.scope === 'area' && !q.unionId && !q.category && !S.api.demoLogin;
     const call = () => S.api.posts({ ...q, before: append ? f.posts.at(-1)?.createdAt : undefined });
     const adsP = key === 'home' && !append && !q.category && feat('featBoost') ? S.api.boostedPosts(3).catch(() => []) : null;
+    const pinP = key === 'page' && !append && S.curPage?.pinnedPostId ? S.api.posts({ postId: S.curPage.pinnedPostId }).catch(() => []) : null;
     const rows = plainHome ? await cachedCall('feed', async () => (await call()).slice(0, PAGE)) : await call();
     if (adsP) f.ads = await adsP;
     f.posts = append ? [...f.posts, ...rows] : rows; f.more = !['post', 'saved'].includes(key) && rows.length >= PAGE;
+    if (pinP) { const pin = (await pinP)[0]; if (pin) f.posts = [{ ...pin, pinnedPage: true }, ...f.posts.filter(x => x.id !== pin.id)]; }
   } catch (e) { toast(errText(e)); if (!append) f.posts = []; }
   renderFeed(key);
 }
@@ -681,6 +684,7 @@ function postMenu(key, p) {
   openSheet(`<div class="menu">
     ${u && (p.tags || []).some(t => t.id === u.id) ? '<button data-act="untag">আমার ট্যাগ সরিয়ে দিন</button>' : ''}
     ${u && p.userId === u.id && (p.privacy || 'public') === 'public' && !p.groupId && feat('featBoost') ? `<button data-act="boost">${ic('send', 16)} পোস্ট বুস্ট করুন</button>` : ''}
+    ${p.pageId && S.curPage?.id === p.pageId && S.curPage.canManage ? `<button data-act="pinpg">📌 ${S.curPage.pinnedPostId === p.id ? 'পিন সরান' : 'পেইজের উপরে পিন করুন'}</button>` : ''}
     ${u && p.userId === u.id ? '<button data-act="edit">পোস্ট এডিট করুন</button>' : ''}
     ${mine ? '<button data-act="del" class="danger">পোস্টটি মুছে ফেলুন</button>' : ''}
     ${u && p.userId !== u.id ? `<button data-act="report">পোস্টটি রিপোর্ট করুন</button>${p.pageId ? '' : `<button data-act="block" class="danger">${esc(p.author)}-কে ব্লক করুন</button>`}` : ''}
@@ -700,6 +704,7 @@ function postMenu(key, p) {
     if (a === 'report') reportSheet('post', p.id);
     if (a === 'edit') { closeSheet(); openEditPost(p); }
     if (a === 'boost') boostSheet(p);
+    if (a === 'pinpg') { closeSheet(); const pg = S.curPage, un = pg.pinnedPostId === p.id; return busy(null, async () => { await S.api.pinPagePost(pg.id, un ? null : p.id); pg.pinnedPostId = un ? null : p.id; await openPage(pg.id, true); toast(un ? 'পিন সরানো হয়েছে' : 'পোস্টটি পেইজের উপরে পিন হয়েছে'); }); }
     if (a === 'untag') { closeSheet(); await busy(null, async () => { await S.api.untagMe(p.id); p.tags = p.tags.filter(t => t.id !== me().id); renderFeed(key); toast('ট্যাগ সরানো হয়েছে'); }); }
     if (a === 'block') { closeSheet(); blockUser(p.userId, p.author); }
     if (a === 'del') {
@@ -1100,7 +1105,7 @@ function showProfPane(key) {
   if (!pane) return;
   const own = key === 'me';
   if (st.tab === 'posts') {
-    pane.innerHTML = own ? profComposer() + '<h2 class="sec-h">আমার পোস্ট</h2>' : key === 'page' && S.curPage?.isOwner ? pageComposer(S.curPage) : '';
+    pane.innerHTML = own ? profComposer() + '<h2 class="sec-h">আমার পোস্ট</h2>' : key === 'page' && S.curPage?.canManage ? pageComposer(S.curPage) : '';
     feed.hidden = false; loadFeed(key);
   } else if (st.tab === 'about') {
     feed.hidden = true; if (more) more.hidden = true;
@@ -1575,11 +1580,12 @@ async function loadConvs() {
   try {
     const list = await S.api.conversations();
     const f = S.convPage, rows = f ? list.filter(c => c.asPage && c.pageId === f.id) : list;
-    const head = f ? `<div class="card conv-filter">${entAv(f)}<div class="info"><b>${esc(f.name)}</b><small>পেইজের মেসেজ · আপনি পেইজের নামে উত্তর দেবেন</small></div><button class="sbtn ghost" id="auto-reply">⚡ অটো মেসেজ${f.autoReplyOn ? ' ✓' : ''}</button><button class="link" id="conv-all">সব মেসেজ</button></div>` : '';
+    const head = f ? `<div class="card conv-filter">${entAv(f)}<div class="info"><b>${esc(f.name)}</b><small>পেইজের মেসেজ · আপনি পেইজের নামে উত্তর দেবেন</small></div>${f.isOwner ? `<button class="sbtn ghost" id="auto-reply">⚡ অটো মেসেজ${f.autoReplyOn ? ' ✓' : ''}</button><button class="sbtn ghost" id="faq-btn">❓ প্রশ্ন-উত্তর${f.faqs?.length ? ' ✓' : ''}</button>` : ''}<button class="link" id="conv-all">সব মেসেজ</button></div>` : '';
     box.innerHTML = head + (rows.length ? rows.map(c => `<button class="conv${c.unread ? ' unread' : ''}" data-thread="${esc(c.userId)}" data-tpage="${esc(c.pageId || '')}">${c.pageId && !c.asPage ? entAv({ name: c.name, avatar: c.avatar }) : av(c)}<div class="info"><b>${esc(c.name)}</b>${c.pageId ? `<span class="conv-tag">${c.asPage ? `📄 ${esc(c.pageName)} পেইজে` : '📄 পেইজ'}</span>` : ''}<div class="last">${c.lastMine ? (c.asPage ? 'পেইজ: ' : 'আপনি: ') : ''}${esc(c.last)}</div></div><div style="text-align:right"><div class="time">${esc(ago(c.lastAt))}</div>${c.unread ? `<span class="badge">${bn(c.unread)}</span>` : ''}</div></button>`).join('')
       : `<div class="empty">${f ? 'এই পেইজে এখনো কেউ মেসেজ পাঠাননি।' : 'এখনো কোনো মেসেজ নেই।<br>কারও প্রোফাইলে গিয়ে "মেসেজ" চাপুন।'}</div>`);
     $('#conv-all')?.addEventListener('click', () => { S.convPage = null; loadConvs(); });
     $('#auto-reply')?.addEventListener('click', () => autoReplySheet(f));
+    $('#faq-btn')?.addEventListener('click', () => faqSheet(f));
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 $('#convs').addEventListener('click', e => { const b = e.target.closest('[data-thread]'); if (b) openThread(b.dataset.thread, false, b.dataset.tpage ? Number(b.dataset.tpage) : null); });
@@ -1588,17 +1594,24 @@ async function openThread(id, silent, pageId = null) {
   if (!silent) { S.threadId = id; S.threadPage = pageId || null; open('thread'); $('#thread').innerHTML = '<div class="mut">লোড হচ্ছে…</div>'; }
   const pid = S.threadPage;
   try {
-    const [p, msgs, pg] = await Promise.all([silent ? null : S.api.profile(id), S.api.messages(id, pid), !silent && pid ? S.api.page(pid) : null]);
-    const asPage = pg && pg.isOwner;
+    if (!silent) S.threadPg = pid ? await S.api.page(pid) : null;
+    const pg = S.threadPg, asPage = !!(pg && pg.canManage);
+    const [p, msgs] = await Promise.all([silent ? null : S.api.profile(id), S.api.messages(id, pid, asPage)]);
     if (p && pg && !asPage) $('#t-head').innerHTML = `<button class="ent-btn" data-page="${esc(pg.id)}">${entAv(pg)}</button><button class="who-btn" data-page="${esc(pg.id)}">${esc(pg.name)}${vb(pg.verified)}</button>`;
     else if (p) $('#t-head').innerHTML = `${userLink(p.id, av(p, 'sm'))}<span class="t-who">${userLink(p.id, esc(p.name), 'who-btn')}${asPage ? `<small>📄 ${esc(pg.name)}-এর পক্ষে উত্তর দিচ্ছেন</small>` : ''}</span>`;
     if (p?.rel?.blocked) { $('#thread').innerHTML = '<div class="empty">আপনি এই ব্যক্তিকে ব্লক করেছেন।</div>'; return; }
     $('#thread').innerHTML = msgs.length ? msgs.map(m => `<div class="bub${m.mine ? ' mine' : ''}">${linkify(m.body)}<small>${m.auto ? '⚡ অটো মেসেজ · ' : ''}${esc(clock(m.createdAt))}</small></div>`).join('')
       : `<div class="empty">${pid && !asPage ? 'পেইজকে মেসেজ পাঠান 👋<br><small>পেইজের মালিক উত্তর দেবেন।</small>' : 'কথোপকথন শুরু করুন 👋'}</div>`;
+    $('#tfaq').innerHTML = pg && !asPage && pg.faqs?.length ? `<small class="mut">দ্রুত প্রশ্ন:</small>${pg.faqs.map((f, i) => `<button type="button" data-faq="${i}">${esc(f.q)}</button>`).join('')}` : '';
+    $('#tfaq').hidden = !$('#tfaq').innerHTML;
     window.scrollTo(0, document.body.scrollHeight);
     if (msgs.some(m => !m.mine && !m.read)) { await S.api.markRead(id, pid); refreshBadges(); }
   } catch (e) { $('#thread').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
+$('#tfaq').addEventListener('click', e => {
+  const b = e.target.closest('[data-faq]'); if (!b || !S.threadPage) return;
+  busy(b, async () => { await S.api.askFaq(S.threadPage, Number(b.dataset.faq)); await openThread(S.threadId, true); });
+});
 $('#tform').addEventListener('submit', e => {
   e.preventDefault(); const body = $('#tmsg').value.trim(); if (!body) return;
   busy(e.submitter, async () => { await S.api.sendMessage(S.threadId, body, S.threadPage); $('#tmsg').value = ''; await openThread(S.threadId, true); $('#tmsg').focus(); });
@@ -2022,6 +2035,7 @@ const NT = {
   verify_no: ['✖', 'আপনার ভেরিফাইড ব্যাজের আবেদন গ্রহণ করেননি'],
   boost_ok: ['🚀', 'আপনার পোস্টের বুস্ট অনুমোদন করেছেন, এখন চলছে'],
   boost_no: ['✖', 'আপনার পোস্টের বুস্ট গ্রহণ করেননি, কয়েন ফেরত গেছে'],
+  page_admin: ['📄', 'আপনাকে একটি পেইজের অ্যাডমিন বানিয়েছেন'],
 };
 // নিজের অর্জনের নোটিফিকেশন (মাইলফলক, সাপ্তাহিক রিপোর্ট): কারো নাম নয়, শুধু খবরটা
 const SELF_TYPES = ['milestone', 'follower_milestone', 'weekly'];
@@ -2048,11 +2062,11 @@ async function loadNotifs(keep) {
     box.innerHTML = list.length ? list.map(n => {
       if (SELF_TYPES.includes(n.type)) return selfNotif(n);
       const [ic, txt0] = NT[n.type] || ['•', ''];
-      const txt = n.meta?.page && (n.type === 'verify_ok' || n.type === 'verify_no') ? `আপনার পেইজ "${n.meta.page}"-এর ভেরিফাইড ব্যাজের আবেদন ${n.type === 'verify_ok' ? 'অনুমোদন করেছেন' : 'গ্রহণ করেননি'}` : txt0;
+      const txt = n.type === 'page_admin' && n.meta?.page ? `আপনাকে "${n.meta.page}" পেইজের অ্যাডমিন বানিয়েছেন` : n.meta?.page && (n.type === 'verify_ok' || n.type === 'verify_no') ? `আপনার পেইজ "${n.meta.page}"-এর ভেরিফাইড ব্যাজের আবেদন ${n.type === 'verify_ok' ? 'অনুমোদন করেছেন' : 'গ্রহণ করেননি'}` : txt0;
       const snip = n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
       const reqBtns = n.type === 'friend_request' && pending.has(n.actor.id)
         ? `<div class="acts2"><button class="sbtn" data-fr="accept" data-id="${esc(n.actor.id)}">গ্রহণ করুন</button><button class="sbtn ghost" data-fr="remove" data-id="${esc(n.actor.id)}">মুছুন</button></div>` : '';
-      return `<div class="notif${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="${esc(n.groupId ?? '')}" data-n-user="${esc(n.actor.id)}" role="button" tabindex="0">
+      return `<div class="notif${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="${esc(n.groupId ?? '')}" data-n-user="${esc(n.actor.id)}" data-n-page="${esc(n.meta?.page_id ?? '')}" role="button" tabindex="0">
         <span class="ico">${av(n.actor)}<i>${ic}</i></span>
         <span class="txt"><b>${esc(n.actor.name)}</b> ${esc(txt)}${snip}<span class="time">${esc(ago(n.createdAt))}</span>${reqBtns}</span></div>`;
     }).join('') : '<div class="empty">এখনো কোনো নোটিফিকেশন নেই।<br>কেউ আপনার পোস্টে লাইক বা মন্তব্য করলে, বা ফ্রেন্ড রিকোয়েস্ট পাঠালে এখানে দেখাবে।</div>';
@@ -2066,6 +2080,7 @@ function openNotif(el) {
   else if (t === 'friend_request') go('friends');
   else if (t === 'verify_ok' || t === 'verify_no') { open('wallet'); loadWallet(); }
   else if (t === 'milestone' && el.dataset.nPost) openPost(el.dataset.nPost);
+  else if (t === 'page_admin' && el.dataset.nPage) openPage(el.dataset.nPage);
   else if (t === 'weekly' || t === 'follower_milestone' || t === 'milestone') { S.insTarget = null; open('insights'); loadInsights(); }
   else if (t.startsWith('group_') && el.dataset.nGroup) openGroup(el.dataset.nGroup);
   else openUser(el.dataset.nUser);
@@ -2826,9 +2841,10 @@ async function openPage(id, silent) {
     S.curPage = pg;
     $('#page').innerHTML = `<div class="card ent-head prof-fb pg-head">${pageCoverHtml(pg)}<h2 style="margin:8px 0 0">${esc(pg.name)}${vb(pg.verified, true)}</h2><div class="meta">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div>
       ${pg.about ? `<p class="about">${esc(pg.about)}</p>` : ''}${pg.phone ? `<p class="meta" style="margin:6px 0 0">📞 ${esc(bn(pg.phone))}</p>` : ''}
-      <div class="row">${pg.isOwner
-        ? `<button class="sbtn" id="pg-inbox">💬 মেসেজ</button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button><button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button><button class="sbtn ghost" id="pg-edit">এডিট</button><button class="sbtn ghost" id="pg-del" style="color:var(--r)">মুছুন</button>`
-        : `<button class="sbtn ${pg.following ? 'ghost' : ''}" data-pf="${esc(pg.id)}" data-on="${pg.following ? 1 : 0}">${pg.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" id="pg-msg">💬 মেসেজ</button>${tel ? `<a class="sbtn ghost" style="text-decoration:none;display:inline-grid;place-items:center" href="tel:${esc(tel)}">কল করুন</a>` : ''}<button class="more" id="pg-more" aria-label="আরও">⋯</button>`}</div></div>${profTabs('page')}`;
+      ${pageAddrHtml(pg)}
+      <div class="row">${pg.canManage
+        ? `<button class="sbtn" id="pg-inbox">💬 মেসেজ</button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button>${pg.isOwner ? `<button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button>` : ''}<button class="sbtn ghost" id="pg-share">🔗 শেয়ার</button><button class="more" id="pg-set" aria-label="পেইজের সেটিং">⚙️</button>`
+        : `<button class="sbtn ${pg.following ? 'ghost' : ''}" data-pf="${esc(pg.id)}" data-on="${pg.following ? 1 : 0}">${pg.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" id="pg-msg">💬 মেসেজ</button><button class="sbtn ghost" id="pg-share">🔗</button>${tel ? `<a class="sbtn ghost" style="text-decoration:none;display:inline-grid;place-items:center" href="tel:${esc(tel)}">কল করুন</a>` : ''}<button class="more" id="pg-more" aria-label="আরও">⋯</button>`}</div></div>${profTabs('page')}`;
     if (!pg.isOwner && !silent) S.api.entVisit?.('page', pg.id).catch(() => {});
     $('#pg-badge')?.addEventListener('click', () => pageBadgeSheet(pg));
     $('#pg-msg')?.addEventListener('click', () => { if (needUser()) openThread(pg.ownerId, false, pg.id); });
@@ -2837,8 +2853,8 @@ async function openPage(id, silent) {
     $('#pavfile')?.addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) picSheet('avatar', f, pg); });
     $('#pcoverfile')?.addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) picSheet('cover', f, pg); });
     $('#pcover-btn')?.addEventListener('click', () => pageCoverMenu(pg));
-    $('#pg-edit')?.addEventListener('click', () => pageForm(pg));
-    $('#pg-del')?.addEventListener('click', async () => { if (await confirmSheet(`"${pg.name}" পেইজ ও এর সব পোস্ট মুছে ফেলবেন?`, 'মুছুন', true)) busy(null, async () => { await S.api.deletePage(pg.id); toast('পেইজ মুছে ফেলা হয়েছে'); back(); }); });
+    $('#pg-share')?.addEventListener('click', () => sharePage(pg));
+    $('#pg-set')?.addEventListener('click', () => pageSettingsMenu(pg));
     $('#pg-more')?.addEventListener('click', () => { if (!needUser()) return; openSheet(`<div class="menu">${me()?.admin ? `<button data-act="ab">${ic('shield', 16)} অ্যাডমিন: পেইজের ব্যাজ</button>` : ''}<button data-act="r">পেইজ রিপোর্ট করুন</button><button data-close>বন্ধ করুন</button></div>`); $('#sheet').onclick = ev => { if (ev.target.closest('[data-act=r]')) reportSheet('user', 'page:' + pg.id); if (ev.target.closest('[data-act=ab]')) adminPageBadgeSheet(pg); }; });
     showProfPane('page');
   } catch (e) { $('#page').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
@@ -2857,6 +2873,87 @@ function autoReplySheet(pg) {
     const on = $('#ar-on').checked, text = $('#ar-text').value.trim();
     if (on && !text) return toast('অটো মেসেজ লিখুন');
     busy(ev.currentTarget, async () => { await S.api.setAutoReply(pg.id, { on, text }); Object.assign(pg, { autoReplyOn: on, autoReply: text }); closeSheet(); toast(on ? 'অটো মেসেজ চালু হয়েছে' : 'অটো মেসেজ বন্ধ হয়েছে'); if (S.view === 'msgs') loadConvs(); });
+  };
+}
+// ---------- পেইজের ঠিকানা ও ম্যাপ
+const dirUrl = pg => pg.lat != null && pg.lng != null ? `https://www.google.com/maps/dir/?api=1&destination=${pg.lat},${pg.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pg.address)}`;
+function pageAddrHtml(pg) {
+  if (!pg.address && pg.lat == null) return '';
+  const d = 0.004, map = pg.lat != null && pg.lng != null
+    ? `<iframe class="pg-map" title="ম্যাপে অবস্থান" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${pg.lng - d},${pg.lat - d},${pg.lng + d},${pg.lat + d}&layer=mapnik&marker=${pg.lat},${pg.lng}"></iframe>` : '';
+  return `<div class="pg-addr">${pg.address ? `<p>📍 ${esc(pg.address)}</p>` : ''}${map}<a class="sbtn ghost pg-dir" href="${esc(dirUrl(pg))}" target="_blank" rel="noopener">🧭 দিক নির্দেশনা</a></div>`;
+}
+// গুগল ম্যাপের লিংক থেকে অক্ষাংশ-দ্রাঘিমাংশ বের করা (যেমন …@24.38,90.38… বা …q=24.38,90.38 বা !3d24.38!4d90.38)
+function coordsFrom(text) {
+  const t = String(text || ''), m = t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || t.match(/[?&](?:q|query|ll|destination)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/) || t.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || t.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
+  if (!m) return null;
+  const lat = Number(m[1]), lng = Number(m[2]);
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 ? { lat, lng } : null;
+}
+// ---------- শেয়ার
+function sharePage(pg) {
+  const url = pageLink(pg.id), text = `${pg.name} — আমার উপজেলা অ্যাপে দেখুন`;
+  if (navigator.share) return navigator.share({ title: pg.name, text, url }).catch(() => {});
+  openSheet(`<h2>পেইজ শেয়ার করুন</h2><div class="share-url"><input class="f" readonly value="${esc(url)}" id="sh-url"><button class="sbtn" id="sh-copy">কপি</button></div>
+    <div class="menu" style="margin-top:10px"><a href="https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}" target="_blank" rel="noopener">🟢 WhatsApp-এ পাঠান</a><a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}" target="_blank" rel="noopener">🔵 Facebook-এ শেয়ার করুন</a><button data-close>বন্ধ করুন</button></div>`);
+  $('#sh-copy').onclick = async () => { try { await navigator.clipboard.writeText(url); } catch { $('#sh-url').select(); document.execCommand?.('copy'); } toast('লিংক কপি হয়েছে'); };
+}
+// ---------- পেইজের সেটিং (মালিক সব, অ্যাডমিন শুধু সরে যেতে পারেন)
+function pageSettingsMenu(pg) {
+  openSheet(`<div class="menu">${pg.isOwner ? `
+    <button data-act="edit">${ic('edit', 18)} পেইজ এডিট (নাম, ঠিকানা, ম্যাপ…)</button>
+    <button data-act="admins">👥 পেইজের অ্যাডমিন</button>
+    <button data-act="faq">❓ মেসেজে প্রশ্নের তৈরি উত্তর</button>
+    <button data-act="auto">⚡ অটো মেসেজ</button>
+    <button data-act="del" class="danger">পেইজ মুছে ফেলুন</button>` : `
+    <button data-act="leave" class="danger">অ্যাডমিন থেকে সরে যান</button>`}<button data-close>বন্ধ করুন</button></div>`);
+  $('#sheet').onclick = async ev => {
+    const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    if (a === 'edit') return pageForm(pg);
+    if (a === 'admins') return pageAdminsSheet(pg);
+    if (a === 'faq') return faqSheet(pg);
+    if (a === 'auto') return autoReplySheet(pg);
+    closeSheet();
+    if (a === 'del' && await confirmSheet(`"${pg.name}" পেইজ ও এর সব পোস্ট মুছে ফেলবেন?`, 'মুছুন', true)) busy(null, async () => { await S.api.deletePage(pg.id); toast('পেইজ মুছে ফেলা হয়েছে'); back(); });
+    if (a === 'leave' && await confirmSheet(`"${pg.name}" পেইজের অ্যাডমিন থেকে সরে যাবেন?`, 'সরে যান', true)) busy(null, async () => { await S.api.removePageAdmin(pg.id, me().id); toast('আপনি আর এই পেইজের অ্যাডমিন নন'); openPage(pg.id, true); });
+  };
+}
+async function pageAdminsSheet(pg) {
+  openSheet('<div class="skel"></div>');
+  try {
+    const list = await S.api.pageAdmins(pg.id);
+    openSheet(`<h2>👥 ${esc(pg.name)}-এর অ্যাডমিন</h2>
+      <p class="mut" style="margin-top:0">অ্যাডমিনরা পেইজের নামে পোস্ট করতে, মেসেজের উত্তর দিতে, পোস্ট পিন করতে আর ড্যাশবোর্ড দেখতে পারেন। পেইজ এডিট, মুছে ফেলা আর অ্যাডমিন যোগ শুধু আপনি পারবেন। সর্বোচ্চ ১০ জন।</p>
+      <div class="pa-list">${list.length ? list.map(u => personRow(u, `<button class="sbtn ghost" data-parm="${esc(u.id)}" style="color:var(--r)">বাদ দিন</button>`)).join('') : '<p class="mut">এখনো কোনো অ্যাডমিন নেই।</p>'}</div>
+      <label for="pa-q" style="margin-top:12px">অ্যাডমিন যোগ করুন</label><input class="f" id="pa-q" placeholder="নাম লিখে খুঁজুন…" autocomplete="off">
+      <div id="pa-res"></div>
+      <button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
+    let t;
+    $('#pa-q').oninput = () => { clearTimeout(t); t = setTimeout(async () => {
+      const q = $('#pa-q').value.trim(); if (q.length < 2) { $('#pa-res').innerHTML = ''; return; }
+      const ids = new Set(list.map(u => u.id)), res = (await S.api.people({ q })).filter(u => !ids.has(u.id) && u.id !== me().id).slice(0, 6);
+      $('#pa-res').innerHTML = res.length ? res.map(u => personRow(u, `<button class="sbtn" data-paadd="${esc(u.id)}">যোগ করুন</button>`)).join('') : '<p class="mut">কাউকে পাওয়া যায়নি।</p>';
+    }, 300); };
+    $('#sheet').onclick = ev => {
+      const add = ev.target.closest('[data-paadd]'), rm = ev.target.closest('[data-parm]');
+      if (add) busy(add, async () => { await S.api.addPageAdmin(pg.id, add.dataset.paadd); toast('অ্যাডমিন যোগ হয়েছে, তিনি নোটিফিকেশন পাবেন'); pageAdminsSheet(pg); });
+      if (rm) busy(rm, async () => { await S.api.removePageAdmin(pg.id, rm.dataset.parm); toast('অ্যাডমিন বাদ দেওয়া হয়েছে'); pageAdminsSheet(pg); });
+    };
+  } catch (e) { closeSheet(); toast(errText(e)); }
+}
+function faqSheet(pg) {
+  const rows = [...(pg.faqs || [])]; while (rows.length < 4) rows.push({ q: '', a: '' });
+  openSheet(`<h2>❓ প্রশ্নের তৈরি উত্তর</h2><p class="mut" style="margin-top:0">কেউ পেইজকে মেসেজ করতে গেলে এই প্রশ্নগুলো বাটন হিসেবে দেখবেন। চাপলেই প্রশ্ন আর আপনার লেখা উত্তর সাথে সাথে চলে যাবে। সর্বোচ্চ ৪টা।</p>
+    ${rows.map((r, i) => `<div class="faq-row"><b>প্রশ্ন ${bn(i + 1)}</b><input class="f" data-fq="${i}" maxlength="80" placeholder="যেমন: দাম কত?" value="${esc(r.q)}"><textarea class="f" data-fa="${i}" rows="2" maxlength="1000" placeholder="উত্তর লিখুন">${esc(r.a)}</textarea></div>`).join('')}
+    <button class="btn wide" id="faq-save" style="margin-top:12px">সংরক্ষণ</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
+  $('#faq-save').onclick = ev => {
+    const faqs = [];
+    for (let i = 0; i < 4; i++) {
+      const q = document.querySelector(`[data-fq="${i}"]`).value.trim(), a = document.querySelector(`[data-fa="${i}"]`).value.trim();
+      if (q && !a) return toast(`প্রশ্ন ${bn(i + 1)}-এর উত্তর লিখুন`);
+      if (q) faqs.push({ q, a });
+    }
+    busy(ev.currentTarget, async () => { await S.api.setFaqs(pg.id, faqs); pg.faqs = faqs; closeSheet(); toast(faqs.length ? 'প্রশ্ন-উত্তর সংরক্ষণ হয়েছে' : 'প্রশ্ন-উত্তর সরানো হয়েছে'); });
   };
 }
 function pageCoverHtml(pg) {
@@ -2888,12 +2985,29 @@ function pageForm(pg) {
     <label for="pga">বিবরণ (ঐচ্ছিক)</label><textarea id="pga" maxlength="300" placeholder="কী করেন, কখন খোলা থাকে…">${esc(pg?.about || '')}</textarea>
     <label for="pgp">ফোন নম্বর (ঐচ্ছিক)</label><input id="pgp" inputmode="tel" maxlength="20" value="${esc(pg?.phone || '')}">
     ${photoField('পেইজের ছবি / লোগো (ঐচ্ছিক)', pg?.avatar)}
+    <label for="pgad">ঠিকানা (ঐচ্ছিক)</label><input id="pgad" maxlength="200" value="${esc(pg?.address || '')}" placeholder="যেমন: বাজার রোড, ভালুকা পৌরসভা">
+    <label>ম্যাপে অবস্থান (ঐচ্ছিক)</label>
+    <div class="geo-box"><span id="geo-val">${pg?.lat != null ? `📌 ${pg.lat.toFixed(5)}, ${pg.lng.toFixed(5)}` : 'এখনো দেওয়া নেই'}</span>
+      <button type="button" class="sbtn ghost" id="geo-here">📍 আমি এখন যেখানে আছি</button>${pg?.lat != null ? '<button type="button" class="link" id="geo-clear">মুছুন</button>' : ''}</div>
+    <input class="f" id="geo-link" placeholder="অথবা গুগল ম্যাপের লিংক বা 24.38, 90.38 পেস্ট করুন" style="margin-top:6px">
     <div class="row" style="margin-top:16px"><button class="btn" style="flex:1">${pg ? 'সেভ করুন' : 'পেইজ তৈরি করুন'}</button><button class="btn ghost" type="button" data-close>বাতিল</button></div></form>`);
   watchPhoto(st);
+  st.geo = pg?.lat != null ? { lat: pg.lat, lng: pg.lng } : null;
+  const showGeo = () => { $('#geo-val').textContent = st.geo ? `📌 ${st.geo.lat.toFixed(5)}, ${st.geo.lng.toFixed(5)}` : 'এখনো দেওয়া নেই'; };
+  $('#geo-here').onclick = () => {
+    if (!navigator.geolocation) return toast('এই ডিভাইসে লোকেশন পাওয়া যাচ্ছে না');
+    $('#geo-val').textContent = 'লোকেশন খুঁজছি…';
+    navigator.geolocation.getCurrentPosition(p => { st.geo = { lat: +p.coords.latitude.toFixed(6), lng: +p.coords.longitude.toFixed(6) }; showGeo(); toast('লোকেশন নেওয়া হয়েছে'); },
+      () => { showGeo(); toast('লোকেশন পাওয়া যায়নি। অনুমতি দিন বা ম্যাপের লিংক পেস্ট করুন।'); }, { enableHighAccuracy: true, timeout: 15000 });
+  };
+  $('#geo-clear')?.addEventListener('click', () => { st.geo = null; showGeo(); });
+  $('#geo-link').oninput = () => { const c = coordsFrom($('#geo-link').value); if (c) { st.geo = c; showGeo(); } };
   $('#pgform').onsubmit = e => {
     e.preventDefault();
     const toEn = x => x.replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
-    const v = { name: $('#pgn').value.trim(), category: $('#pgc').value, about: $('#pga').value.trim(), phone: toEn($('#pgp').value.trim()), avatar: st.blob || null };
+    if ($('#geo-link').value.trim() && !coordsFrom($('#geo-link').value)) return toast('ম্যাপের লিংক থেকে লোকেশন বোঝা যায়নি। লিংকটা আবার দেখুন বা "আমি এখন যেখানে আছি" চাপুন।');
+    const v = { name: $('#pgn').value.trim(), category: $('#pgc').value, about: $('#pga').value.trim(), phone: toEn($('#pgp').value.trim()), avatar: st.blob || null,
+      address: $('#pgad').value.trim(), lat: st.geo?.lat ?? null, lng: st.geo?.lng ?? null };
     busy(e.submitter, async () => {
       if (pg) { await S.api.updatePage(pg.id, v); closeSheet(); openPage(pg.id, true); toast('সেভ হয়েছে'); }
       else { const n = await S.api.createPage(v); closeSheet(); toast('পেইজ তৈরি হয়েছে'); openPage(n.id); }
@@ -3141,7 +3255,7 @@ async function cachedCall(key, fn) {
     refreshSettings(); setTimeout(checkLiveUpdate, 8000);
     await loadFeed('home');
     setInterval(() => { if (document.visibilityState === 'visible') refreshBadges(); }, 60000);
-    const deep = () => { const m = location.hash.match(/^#post-(\d+)$/); if (m && !(S.view === 'post' && String(S.postId) === m[1])) openPost(m[1]); };
+    const deep = () => { const m = location.hash.match(/^#post-(\d+)$/), pm = location.hash.match(/^#page-(\d+)$/); if (m && !(S.view === 'post' && String(S.postId) === m[1])) openPost(m[1]); if (pm && !(S.view === 'page' && String(S.pageId) === pm[1])) openPage(pm[1]); };
     deep(); window.addEventListener('hashchange', deep);
   } catch (e) {
     $('#feed-home').innerHTML = `<div class="empty">${esc(errText(e))}<br><button class="btn" id="retry">আবার চেষ্টা করুন</button></div>`;

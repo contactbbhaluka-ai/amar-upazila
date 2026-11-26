@@ -1616,3 +1616,19 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .nt-sum-i{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px}
 .ann-h1{display:flex;flex-direction:column;border-top:1px solid var(--line);padding:8px 0;font-size:14px}.ann-h1 small{color:var(--mut)}
 .ann-as{margin:0 0 10px;color:var(--mut);font-size:14px}
+/* মেনু (২) */
+.mn-top{display:flex;gap:8px;align-items:center;margin:4px 0 10px}
+.mn-top input{flex:1;min-width:0;border-radius:999px;padding:10px 16px}
+.mn-dark{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--card);font-size:20px;cursor:pointer;padding:0;display:grid;place-items:center}
+.mn-h{font-size:15px;margin:14px 4px 8px;color:var(--ink)}
+.mn-hit{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;font-size:15px;text-align:left;padding:12px 6px;cursor:pointer;color:inherit}
+.mn-hit:last-child{border-bottom:0}.mn-hit span{color:var(--mut)}
+.fs-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.fs-opt{display:flex;justify-content:space-between;align-items:center;border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:12px 14px;cursor:pointer;font:inherit;color:inherit}
+.fs-opt.on{border-color:var(--g);background:light-dark(#ecfdf5,#052e1f)}.fs-opt b{font-size:14px;color:var(--mut)}
+.pw-list{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.pw-row{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line);font-size:16px}
+.pw-row:last-child{border-bottom:0}.pw-row.on{background:light-dark(#ecfdf5,#052e1f);font-weight:700}.pw-row small{font-size:11.5px;color:var(--gt,#006a4e);margin-left:6px}
+.wx7{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.wx7-r{display:grid;grid-template-columns:1fr 36px auto 64px;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:15px}
+.wx7-r:last-child{border-bottom:0}.wx7-i{font-size:22px;text-align:center}.wx7-r2{text-align:right;font-size:13px;color:#2563eb}

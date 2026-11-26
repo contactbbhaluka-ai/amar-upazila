@@ -4539,6 +4539,61 @@ document.addEventListener('click', async e => {
 const THEMES = [['', 'ফোনের মতো'], ['light', 'লাইট'], ['dark', 'ডার্ক']];
 function applyTheme() { const t = local.get('theme', ''); if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
 applyTheme();
+const isDark = () => { const t = local.get('theme', ''); return t ? t === 'dark' : !!window.matchMedia?.('(prefers-color-scheme: dark)').matches; };
+// লেখার আকার: পুরো অ্যাপ একসাথে বড়/ছোট (বয়স্কদের জন্য সুবিধা)
+const FONT_SIZES = [['sm', 'ছোট', 0.92], ['md', 'মাঝারি', 1], ['lg', 'বড়', 1.12], ['xl', 'অনেক বড়', 1.25]];
+function applyFont() { const z = FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[2] || 1; document.body.style.zoom = z === 1 ? '' : String(z); document.documentElement.style.setProperty('--zoom', z); }
+applyFont();
+// মেনুতে খোঁজা: শর্টকাট আর সেটিং দুটোই
+const MN_KEYS = { chpw: 'password পাসওয়ার্ড গোপন', edit: 'profile প্রোফাইল নাম ছবি এডিট', delacc: 'delete account মুছে অ্যাকাউন্ট', plock: 'lock লক', listpriv: 'privacy তালিকা বন্ধু ফলোয়ার', showact: 'active online সক্রিয় অনলাইন',
+  blocked: 'block ব্লক', ntset2: 'notification নোটিফিকেশন', msgsnd: 'sound শব্দ আওয়াজ', theme: 'dark light ডার্ক লাইট থিম রং', fontsz: 'font size লেখা অক্ষর বড় ছোট', help: 'help সমস্যা সাহায্য অভিযোগ', about: 'version ভার্সন সম্পর্কে',
+  logout: 'logout লগআউট বের', 'demo-guide': 'demo ডেমো' };
+const MN_SC_KEYS = { dir: 'হাসপাতাল ফার্মেসি ডাক্তার থানা service', blood: 'রক্ত ডোনার blood', sos: '৯৯৯ পুলিশ ফায়ার অ্যাম্বুলেন্স emergency', prayer: 'নামাজ আজান ওয়াক্ত আবহাওয়া বৃষ্টি weather', groups: 'group', pages: 'page দোকান ব্যবসা', saved: 'save সেভ', bday: 'birthday জন্মদিন', wallet: 'coin কয়েন ব্যাজ verify', insights: 'dashboard ড্যাশবোর্ড ভিউ' };
+function bindMenuSearch() {
+  const q = $('#mn-q'); if (!q) return;
+  q.oninput = () => {
+    const t = q.value.trim().toLowerCase(), res = $('#mn-res'), main = $('#mn-main');
+    if (!t) { res.hidden = true; main.hidden = false; return; }
+    const items = [...main.querySelectorAll('.sc[data-mgo], .setlist button, .setlist a, #logout')].map(el => {
+      const label = (el.querySelector('small') ? el.childNodes[1]?.textContent || el.textContent : el.textContent).replace(/\s+/g, ' ').trim();
+      const key = el.dataset.mgo ? MN_SC_KEYS[el.dataset.mgo] || '' : MN_KEYS[el.id] || '';
+      return { el, label, hay: (el.textContent + ' ' + key).toLowerCase() };
+    }).filter(x => x.hay.includes(t));
+    main.hidden = true; res.hidden = false;
+    res.innerHTML = items.length ? items.map((x, i) => `<button class="mn-hit" data-mnhit="${i}">${esc(x.label)}<span>›</span></button>`).join('') : `<p class="mut" style="margin:6px">"${esc(q.value.trim())}" দিয়ে কিছু পাওয়া যায়নি</p>`;
+    res.onclick = e => { const b = e.target.closest('[data-mnhit]'); if (!b) return; const x = items[Number(b.dataset.mnhit)]; q.value = ''; res.hidden = true; main.hidden = false; x.el.closest('details')?.setAttribute('open', ''); x.el.click(); };
+  };
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('#mn-dark')) { local.set('theme', isDark() ? 'light' : 'dark'); applyTheme(); renderMenu(); return; }
+  if (e.target.closest('#fontsz')) {
+    const cur = local.get('fontsz', 'md');
+    openSheet(`<h2>🔠 লেখার আকার</h2><p class="mut">পুরো অ্যাপের লেখা ও বাটন একসাথে বড় বা ছোট হবে।</p><div class="fs-list">${FONT_SIZES.map(([k, l, z]) => `<button class="fs-opt${k === cur ? ' on' : ''}" data-fs="${k}"><span style="font-size:${Math.round(16 * z)}px">আমার উপজেলা</span><b>${l}</b></button>`).join('')}</div><button class="btn ghost wide" data-close style="margin-top:10px">ঠিক আছে</button>`);
+    $('#sheet').onclick = ev => { const b = ev.target.closest('[data-fs]'); if (!b) return; local.set('fontsz', b.dataset.fs); applyFont(); document.querySelectorAll('#sheet .fs-opt').forEach(x => x.classList.toggle('on', x === b)); renderMenu(); };
+  }
+});
+// নামাজের সময় ও ৭ দিনের আবহাওয়া
+async function loadWeather7() {
+  const L = HOME_LOC, c = local.get('wx7'); if (c && Date.now() - c.t < 60 * 6e4) return c.v;
+  const u = `https://api.open-meteo.com/v1/forecast?latitude=${L.lat}&longitude=${L.lng}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FDhaka&forecast_days=7`;
+  const j = await (await fetch(u, { signal: AbortSignal.timeout?.(7000) })).json();
+  const v = j.daily.time.map((d, i) => ({ d, code: j.daily.weather_code[i], max: Math.round(j.daily.temperature_2m_max[i]), min: Math.round(j.daily.temperature_2m_min[i]), rain: j.daily.precipitation_probability_max?.[i] ?? null }));
+  local.set('wx7', { t: Date.now(), v }); return v;
+}
+async function prayerWeatherSheet() {
+  const L = HOME_LOC, now = new Date(), pt = prayerTimes(new Date(now.getTime() + 6 * 36e5), L.lat, L.lng, 6), t = dhakaParts(now), nowH = t.h + t.m / 60;
+  const next = PRAYERS.filter(([k]) => k !== 'sunrise').find(([k]) => pt[k] > nowH)?.[0];
+  const days = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+  openSheet(`<h2>🕌 আজকের নামাজের সময়</h2><p class="mut" style="margin-top:-4px">ভালুকা · ${bn(t.day)} ${BN_MON[t.mon]} · আনুমানিক, স্থানীয় মসজিদের সময় দেখে নিন</p>
+    <div class="pw-list">${PRAYERS.map(([k, n]) => `<div class="pw-row${next === k ? ' on' : ''}"><span>${n}${next === k ? ' <small>পরের ওয়াক্ত</small>' : ''}</span><b>${hm(pt[k])}</b></div>`).join('')}</div>
+    <h2 style="margin-top:16px">☁️ ৭ দিনের আবহাওয়া</h2><div id="wx7"><div class="mut">লোড হচ্ছে…</div></div><button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
+  $('#sheet').classList.add('tall');
+  try {
+    const v = await loadWeather7(), box = $('#wx7'); if (!box) return;
+    box.innerHTML = `<div class="wx7">${v.map((x, i) => { const w = WX[x.code] || WX[Math.floor(x.code / 10) * 10] || ['🌡️', '']; const dt = new Date(x.d + 'T12:00:00');
+      return `<div class="wx7-r"><span class="wx7-d">${i === 0 ? 'আজ' : i === 1 ? 'আগামীকাল' : days[dt.getDay()]}</span><span class="wx7-i" title="${esc(w[1])}">${w[0]}</span><span class="wx7-t"><b>${bn(x.max)}°</b> / ${bn(x.min)}°</span><span class="wx7-r2">${x.rain != null ? `💧 ${bn(x.rain)}%` : ''}</span></div>`; }).join('')}</div>`;
+  } catch { const box = $('#wx7'); if (box) box.innerHTML = '<p class="mut">আবহাওয়া আনা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।</p>'; }
+}
 function renderMenu() {
   const u = me(), wasOpen = [...document.querySelectorAll('#menu details')].map(d => d.open);
   const sc = (go2, icon, label, sub, flag) => {
@@ -4551,34 +4606,53 @@ function renderMenu() {
       : `${demoCard()}<div class="card"><b>আপনি লগইন করেননি</b><p class="mut" style="margin:4px 0 10px">পোস্ট, বন্ধু, গ্রুপ ও পেইজ ব্যবহার করতে লগইন করুন।</p><button class="btn wide" data-v="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`}
     ${!u?.admin && S.announcer ? `<button class="me-row admin-row" data-mgo="announce"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:20px">📢</span><div class="info"><b>জরুরি ঘোষণা পাঠান</b><div class="sub">${esc(S.announcer.title)} হিসেবে</div></div></button>` : ''}
     ${u?.admin ? `<button class="me-row admin-row" data-mgo="admin"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('shield', 22)}</span><div class="info"><b>অ্যাডমিন ড্যাশবোর্ড</b><div class="sub">অ্যাপের সংখ্যা ও সেটিংস</div></div></button>` : ''}
+    <div class="mn-top"><input type="search" id="mn-q" placeholder="মেনুতে খুঁজুন… (যেমন: পাসওয়ার্ড, ব্লক, রক্ত)" aria-label="মেনুতে খুঁজুন" autocomplete="off"><button class="mn-dark" id="mn-dark" aria-label="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}" title="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}">${isDark() ? '☀️' : '🌙'}</button></div>
+    <div id="mn-res" class="card" hidden></div>
+    <div id="mn-main">
+    <h3 class="mn-h">🏡 উপজেলার সেবা</h3>
     <div class="sc-grid">
       ${sc('dir', '🏥', 'সেবা ডিরেক্টরি', 'উপজেলার সব সেবা')}
       ${sc('blood', '🩸', 'ব্লাড ব্যাংক', 'রক্তদাতা খুঁজুন', 'featBlood')}
       ${sc('sos', '🚨', 'জরুরি নম্বর', '৯৯৯ ও হেল্পলাইন')}
-      ${sc('saved', '🔖', 'সেভ করা পোস্ট', '')}
-      ${sc('wallet', '🪙', 'কয়েন ও ব্যাজ', 'ভেরিফাইড ব্যাজ নিন')}
-      ${sc('insights', '📊', 'ড্যাশবোর্ড', 'পোস্ট কতজন দেখছেন')}
+      ${sc('prayer', '🕌', 'নামাজ ও আবহাওয়া', 'আজকের ওয়াক্ত, ৭ দিনের আবহাওয়া')}
+    </div>
+    <h3 class="mn-h">👥 কমিউনিটি</h3>
+    <div class="sc-grid">
       ${sc('groups', '👥', 'গ্রুপ', 'যোগ দিন বা তৈরি করুন', 'featGroups')}
       ${sc('pages', '🏳️', 'পেইজ', 'ব্যবসা ও প্রতিষ্ঠান', 'featPages')}
     </div>
-    <details class="card"${u ? '' : ' hidden'}><summary>⚙️ সেটিংস ও প্রাইভেসি</summary><div class="setlist">
+    ${u ? `<h3 class="mn-h">⭐ আমার</h3>
+    <div class="sc-grid">
+      ${sc('saved', '🔖', 'সেভ করা পোস্ট', '')}
+      ${sc('bday', '🎂', 'জন্মদিন', 'বন্ধুদের জন্মদিন')}
+      ${sc('wallet', '🪙', 'কয়েন ও ব্যাজ', 'ভেরিফাইড ব্যাজ নিন')}
+      ${sc('insights', '📊', 'ড্যাশবোর্ড', 'পোস্ট কতজন দেখছেন')}
+    </div>` : ''}
+    <h3 class="mn-h">⚙️ সেটিংস</h3>
+    <details class="card"${u ? '' : ' hidden'}><summary>👤 অ্যাকাউন্ট</summary><div class="setlist">
       <button id="edit">প্রোফাইল এডিট</button>
       <button id="chpw">পাসওয়ার্ড পরিবর্তন</button>
+      <button id="delacc" style="color:var(--r)">অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলুন</button></div></details>
+    <details class="card"${u ? '' : ' hidden'}><summary>🔒 প্রাইভেসি</summary><div class="setlist">
       <button id="plock">🔒 প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
       <button id="listpriv">বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
       <button id="showact">🟢 সক্রিয় অবস্থা দেখান (মেসেজে)</button>
-      <button id="msgsnd">🔊 শব্দ (মেসেজ ও নোটিফিকেশন)</button>
+      <button id="blocked">ব্লক করা মানুষ</button></div></details>
+    <details class="card"${u ? '' : ' hidden'}><summary>🔔 নোটিফিকেশন ও শব্দ</summary><div class="setlist">
       <button id="ntset2">🔔 নোটিফিকেশন সেটিং</button>
-      <button id="blocked">ব্লক করা মানুষ</button>
+      <button id="msgsnd">🔊 শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
+    <details class="card"><summary>🎨 দেখতে কেমন</summary><div class="setlist">
       <button id="theme">থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
-      <a href="./privacy.html">গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>
-      <button id="delacc" style="color:var(--r)">অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলুন</button></div></details>
+      <button id="fontsz">🔠 লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button></div></details>
     <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
       ${S.api.demoLogin ? '<button id="demo-guide">🧪 ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset">🔄 ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
       <button id="help">কোনো সমস্যা জানান</button>
+      <a href="./privacy.html">গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>
       <button id="about">অ্যাপ সম্পর্কে<span class="val">${esc(versionLabel())}</span></button></div></details>
-    ${u ? '<button class="btn ghost wide" id="logout" style="margin-top:4px">লগআউট</button>' : ''}`;
+    ${u ? '<button class="btn ghost wide" id="logout" style="margin-top:4px">লগআউট</button>' : ''}
+    </div>`;
   document.querySelectorAll('#menu details').forEach((d, i) => { d.open = !!wasOpen[i]; });
+  bindMenuSearch();
   if (u) switcherHtml().then(h => { const el = $('#switcher'), t = $('#sw-toggle'); if (!el || !h) return; el.innerHTML = h; t.hidden = false; });
 }
 // ফেসবুকের মতো: নামের পাশের ▾ চাপলে প্রোফাইল/পেইজের তালিকা নামে
@@ -4592,9 +4666,11 @@ $('#menu').addEventListener('click', e => {
   const t = b.dataset.mgo;
   if (t === 'blood' && !featGuard('featBlood')) return;
   if (t === 'dir' || t === 'sos' || t === 'blood') { S.dcat = t === 'dir' ? '' : t; $('#q').value = ''; open('dir'); loadDir(); }
+  else if (t === 'prayer') prayerWeatherSheet();
   else if (t === 'friends') go('friends');
   else if (!needUser()) return;
   else if (t === 'announce') announceSheet();
+  else if (t === 'bday') birthdaySheet();
   else if (t === 'saved') { open('saved'); loadFeed('saved'); }
   else if (t === 'wallet') { open('wallet'); loadWallet(); }
   else if (t === 'insights') { S.insTarget = null; open('insights'); loadInsights(); }

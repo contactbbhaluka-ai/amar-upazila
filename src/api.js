@@ -9,7 +9,9 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, UPAZILA_ID, DEMO, SETTING_KEYS } from './config.js';
 // অ্যালবামের ছবি: পোস্টের তালিকা থেকে একেকটা ছবি আলাদা করে [{ url, postId, i, createdAt }]
 const flattenPhotos = rows => rows.flatMap(r => (r.images || []).map((url, i) => ({ url, postId: r.id, i, createdAt: r.createdAt })));
-const VIRTUAL_ALBUMS = { avatar: 'প্রোফাইল ছবি', cover: 'কভার ছবি' };
+// নিজে থেকে তৈরি অ্যালবাম: প্রোফাইল ছবি, কভার ছবি, আর বাকি সব ছবি "মোবাইল আপলোড"-এ (ফেসবুকের মতো)
+const VIRTUAL_ALBUMS = { avatar: 'প্রোফাইল ছবি', cover: 'কভার ছবি', uploads: 'মোবাইল আপলোড' };
+const inVirtual = (k, p) => (k === 'uploads' ? (p.kind || 'normal') === 'normal' && !p.albumId : p.kind === k);
 const settingDefaults = () => Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d]));
 
 export const PAGE = 20;
@@ -178,18 +180,19 @@ async function supabaseApi() {
     async photos(userId, { albumId, kind } = {}) {
       let q = sb.from('posts').select('id,image_url,image_urls,created_at').eq('user_id', userId).is('page_id', null).is('group_id', null)
         .order('created_at', { ascending: false }).limit(300);
-      if (albumId) q = q.eq('album_id', albumId); if (kind) q = q.eq('kind', kind);
+      if (albumId) q = q.eq('album_id', albumId);
+      if (kind === 'uploads') q = q.eq('kind', 'normal').is('album_id', null); else if (kind) q = q.eq('kind', kind);
       return flattenPhotos(ok(await q).map(r => ({ id: r.id, createdAt: r.created_at, images: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []) })));
     },
     async albums(userId) {
       const [al, ps] = await Promise.all([
         sb.from('albums').select('id,name,privacy,created_at').eq('user_id', userId).order('created_at', { ascending: false }),
         sb.from('posts').select('id,image_url,image_urls,album_id,kind,created_at').eq('user_id', userId).is('page_id', null).is('group_id', null)
-          .or('album_id.not.is.null,kind.neq.normal').order('created_at', { ascending: false }).limit(500),
+          .order('created_at', { ascending: false }).limit(500),
       ]);
       const posts = ok(ps).map(r => ({ id: r.id, albumId: r.album_id, kind: r.kind, createdAt: r.created_at, images: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []) }));
       const pack = (id, name, privacy, rows, own) => { const ph = flattenPhotos(rows); return { id, name, privacy, count: ph.length, cover: ph[0]?.url || '', virtual: !own }; };
-      const out = Object.entries(VIRTUAL_ALBUMS).map(([k, name]) => pack(k, name, 'public', posts.filter(p => p.kind === k), false)).filter(a => a.count);
+      const out = Object.entries(VIRTUAL_ALBUMS).map(([k, name]) => pack(k, name, 'public', posts.filter(p => inVirtual(k, p)), false)).filter(a => a.count);
       return [...out, ...ok(al).map(a => pack(a.id, a.name, a.privacy, posts.filter(p => p.albumId === a.id), true))];
     },
     async createAlbum({ name, privacy }) { return ok(await sb.from('albums').insert({ user_id: me.id, name, privacy: privacy || 'public' }).select('id').single()).id; },
@@ -741,14 +744,14 @@ function demoApi() {
     async setCover(blob, share = true) { const url = await toBlobUrl(blob); person(meId).cover = url; save(); await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', privacy: share ? 'public' : 'only_me' }); return url; },
     async removeCover() { person(meId).cover = ''; save(); },
     async photos(userId, { albumId, kind } = {}) {
-      const mine = this.__visiblePosts().filter(p => p.userId === userId && !p.pageId && !p.groupId && (!albumId || p.albumId === Number(albumId)) && (!kind || (p.kind || 'normal') === kind));
+      const mine = this.__visiblePosts().filter(p => p.userId === userId && !p.pageId && !p.groupId && (!albumId || p.albumId === Number(albumId)) && (!kind || inVirtual(kind, p)));
       return wait(flattenPhotos(mine.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(p => ({ id: p.id, createdAt: p.createdAt, images: (p.images?.length ? p.images : (p.image ? [p.image] : [])).map(demoPic) }))));
     },
     async albums(userId) {
       const posts = this.__visiblePosts().filter(p => p.userId === userId && !p.pageId && !p.groupId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .map(p => ({ id: p.id, kind: p.kind || 'normal', albumId: p.albumId || null, createdAt: p.createdAt, images: (p.images?.length ? p.images : (p.image ? [p.image] : [])).map(demoPic) }));
       const pack = (id, name, privacy, rows, own) => { const ph = flattenPhotos(rows); return { id, name, privacy, count: ph.length, cover: ph[0]?.url || '', virtual: !own }; };
-      const out = Object.entries(VIRTUAL_ALBUMS).map(([k, name]) => pack(k, name, 'public', posts.filter(p => p.kind === k), false)).filter(a => a.count);
+      const out = Object.entries(VIRTUAL_ALBUMS).map(([k, name]) => pack(k, name, 'public', posts.filter(p => inVirtual(k, p)), false)).filter(a => a.count);
       const own = db.albums.filter(a => a.userId === userId && albumVisible(a)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return wait([...out, ...own.map(a => pack(a.id, a.name, a.privacy, posts.filter(p => p.albumId === a.id), true))]);
     },

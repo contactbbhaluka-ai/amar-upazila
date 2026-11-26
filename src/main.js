@@ -795,7 +795,7 @@ async function loadPhotosPane(key) {
       const list = await S.api.photos(uid, VIRTUAL_KINDS.includes(a.id) ? { kind: a.id } : { albumId: a.id });
       S.phList = list;
       pane.innerHTML = `<div class="album-head"><button class="back" data-albumback="${key}" aria-label="সব অ্যালবাম">←</button>
-          <div class="ah-t"><b>${esc(a.name)}</b><span class="mut">${bn(a.count)}টি ছবি · ${ic(PRIVACY[a.privacy][0], 13)} ${PRIVACY[a.privacy][1]}</span></div>
+          <div class="ah-t"><b>${esc(a.name)}</b><span class="mut">${bn(a.count)}টি ছবি${a.virtual ? '' : ` · ${ic(PRIVACY[a.privacy][0], 13)} ${PRIVACY[a.privacy][1]}`}</span></div>
           ${own && !a.virtual ? `<button class="sbtn" data-albumadd="${esc(a.id)}">${ic('plus', 16)} ছবি যোগ করুন</button><button class="more" data-albummenu="${esc(a.id)}" aria-label="অ্যালবামের অপশন">⋯</button>` : ''}</div>
         ${photoGrid(list, own && !a.virtual ? 'এখনো কোনো ছবি নেই। "ছবি যোগ করুন" চেপে শুরু করুন।' : 'এখনো কোনো ছবি নেই।')}`;
       S.curAlbum = a;
@@ -814,7 +814,7 @@ async function loadPhotosPane(key) {
     }
   } catch (e) { pane.innerHTML = seg + `<div class="empty">${esc(errText(e))}</div>`; }
 }
-const VIRTUAL_KINDS = ['avatar', 'cover'];
+const VIRTUAL_KINDS = ['avatar', 'cover', 'uploads'];
 const photoGrid = (list, emptyText) => list.length
   ? `<div class="ph-grid">${list.map((ph, i) => `<button class="ph-cell" data-phi="${i}" aria-label="ছবি ${bn(i + 1)}"><img src="${esc(ph.url)}" alt="" loading="lazy"></button>`).join('')}</div>`
   : `<div class="empty">${emptyText}</div>`;

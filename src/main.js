@@ -365,6 +365,14 @@ function postHtml(p) {
     ${S.view !== 'post' && S.cmIn.has(String(p.id)) ? inlineCmHtml(p) : ''}
   </article>`;
 }
+// পোস্টের লেখা বা ফাঁকা জায়গায় চাপলে শুধু ঐ পোস্ট আর তার সব মন্তব্য (বাছাই সহ) আলাদা পাতায়
+document.addEventListener('click', e => {
+  if (S.view === 'post' || e.defaultPrevented) return;
+  const art = e.target.closest('article.post[data-pid]'); if (!art || !art.closest('[data-feed]')) return;
+  if (e.target.closest('button, a, input, textarea, select, label, form, .cmi, .rpick, [data-more]')) return;
+  if (String(getSelection?.() || '').trim()) return;   // লেখা সিলেক্ট করলে নয়
+  openPost(art.dataset.pid);
+});
 // ================================================================ ফিডেই পোস্টের নিচে মন্তব্য (ফেসবুকের মতো)
 // মন্তব্য বাটনে চাপলে পোস্টের নিচেই কয়েকটি মন্তব্য আর লেখার বক্স খোলে; সব দেখতে আলাদা পাতায়
 S.cmIn = new Map();   // postId → { list, draft, added, ments, open, replyTo, limit }

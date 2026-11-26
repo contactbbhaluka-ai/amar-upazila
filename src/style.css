@@ -1077,3 +1077,4 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .cmi-rep{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut);padding:0 4px}
 .cmi-rep span{flex:1}
 .cmi-rep button{border:0;background:none;color:var(--mut);width:28px;height:28px;border-radius:50%;cursor:pointer}
+[data-feed]:not(#feed-post) .card.post > p{cursor:pointer}

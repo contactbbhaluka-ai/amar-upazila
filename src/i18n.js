@@ -7,7 +7,13 @@ const DIG = '০১২৩৪৫৬৭৮৯';
 const SKIP = '[translate="no"],textarea,script,style,.m-t,.cm-text,.pbg,.ptext,.se-body,.st-cap,.bio,.ann-full,.n-txt,.more-t,.who-btn b,.avbtn b,.cmention,.mention';
 const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
 
+// বাংলায় ফেরার জন্য আসল লেখা মনে রাখি
+let ST = null;
+const touched = new Set(), orig = new WeakMap(), origA = new WeakMap();
+const OBS = { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS };
+
 export async function startI18n() {
+  if (ST) { ST.walk(document.body); ST.mo.observe(document.body, OBS); return; }
   const D = (await import('./i18n-en.js')).default;
   Object.assign(D, EXTRA, PLACES);
   const exact = new Map(), pats = [];
@@ -70,12 +76,12 @@ export async function startI18n() {
     const t = n.nodeValue;
     if (!t || !BEN.test(t) || skip(n.parentElement)) return;
     const v = tr(t);
-    if (v != null && v !== t) n.nodeValue = v;
+    if (v != null && v !== t) { orig.set(n, t); touched.add(n); n.nodeValue = v; }
   }
   function attrs(el) {
     for (const a of ATTRS) {
       const t = el.getAttribute(a);
-      if (t && BEN.test(t)) { const v = tr(t); if (v != null && v !== t) el.setAttribute(a, v); }
+      if (t && BEN.test(t)) { const v = tr(t); if (v != null && v !== t) { const o = origA.get(el) || {}; o[a] = t; origA.set(el, o); touched.add(el); el.setAttribute(a, v); } }
     }
   }
   function walk(root) {
@@ -95,13 +101,27 @@ export async function startI18n() {
         else if (m.type === 'attributes') { if (!skip(m.target)) attrs(m.target); }
         else m.addedNodes.forEach(walk);
       }
+      if (touched.size > 3000) touched.forEach(n => { if (!n.isConnected) touched.delete(n); });
     } finally { busy = false; }
   });
   walk(document.body);
   if (BEN.test(document.title)) document.title = tr(document.title) || document.title;
-  mo.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+  mo.observe(document.body, OBS);
+  ST = { walk, mo };
   document.documentElement.classList.remove('i18n-wait');
   window.__tr = tr;
+}
+
+// ইংরেজি থেকে বাংলায়: অনুবাদ থামিয়ে আসল বাংলা লেখা ফিরিয়ে দিই
+export function stopI18n() {
+  if (!ST) return;
+  ST.mo.disconnect();
+  touched.forEach(n => {
+    if (!n.isConnected) return;
+    if (n.nodeType === 3) { const o = orig.get(n); if (o != null) n.nodeValue = o; }
+    else { const o = origA.get(n); if (o) for (const a in o) n.setAttribute(a, o[a]); }
+  });
+  touched.clear();
 }
 
 // জায়গার নাম (ভালুকার ইউনিয়ন, ময়মনসিংহের উপজেলা, ৬৪ জেলা)

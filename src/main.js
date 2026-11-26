@@ -3,9 +3,9 @@ import { createApi, PAGE, boostState } from './api.js';
 import { POST_CATS, CAT_ICON, SERVICE_CATS, EMERGENCY, PUBLIC_URL, SETTING_KEYS, PLAY_URL } from './config.js';
 import { DISTRICTS, DISTRICT_ORDER, HOME_UPAZILA, HOME_DISTRICT, BLOOD_GROUPS } from './bd-geo.js';
 // ভাষা: ডিফল্ট বাংলা; ইংরেজি বাছাই করলে অনুবাদক লোড হয় (মেনু → দেখতে কেমন → ভাষা)
-const EN = (() => { try { return localStorage.getItem('au_lang') === '"en"'; } catch { return false; } })();
-const LOC = EN ? 'en-GB' : 'bn-BD';
-if (EN) import('./i18n.js').then(m => m.startI18n()).catch(() => document.documentElement.classList.remove('i18n-wait'));
+let EN = (() => { try { return localStorage.getItem('au_lang') === '"en"'; } catch { return false; } })();
+let LOC = EN ? 'en-GB' : 'bn-BD';
+if (EN) import('./i18n.js').then(m => { I18N = m; return m.startI18n(); }).catch(() => document.documentElement.classList.remove('i18n-wait'));
 
 // সাধারণ এক রঙের রেখার আইকন (লেখার রং-ই আইকনের রং)
 const ICONS = {
@@ -641,8 +641,8 @@ function pollHtml(p) {
 }
 const DHAKA = { timeZone: 'Asia/Dhaka' };
 // বাংলায় তারিখ-সময় (ঢাকার সময়): "শুক্রবার, ২৭ নভেম্বর · বিকাল ৫:০০"
-const BN_WD = EN ? ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] : ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
-const BN_MON = EN ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] : ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+let BN_WD = EN ? ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] : ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+let BN_MON = EN ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] : ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
 function dhakaParts(d) {
   const x = new Date(new Date(d).getTime() + 6 * 36e5);   // ঢাকা UTC+6, দিবালোক সময় নেই
   return { wd: x.getUTCDay(), day: x.getUTCDate(), mon: x.getUTCMonth(), h: x.getUTCHours(), m: x.getUTCMinutes() };
@@ -1558,6 +1558,11 @@ addEventListener('scroll', () => {
     if (!ind?.classList.contains('ready')) return hide();
     ind.classList.add('spin'); ind.style.transform = 'translate(-50%, 60px)';
     try {
+      await reloadView();
+    } finally { hide(); }
+  });
+})();
+async function reloadView() {
       const v = S.view;
       if (v === 'home') await loadFeed('home');
       else if (v === 'notif') await loadNotifs();
@@ -1567,9 +1572,31 @@ addEventListener('scroll', () => {
       else if (v === 'friends') await loadFriends(true);
       else if (RELOAD[v]) await RELOAD[v]();
       refreshBadges();
-    } finally { hide(); }
-  });
-})();
+}
+
+// ভাষা বদল রিস্টার্ট ছাড়াই: ইংরেজিতে অনুবাদক চালু, বাংলায় আসল লেখা ফেরত
+let langBusy = false;
+async function setLang(en) {
+  if (langBusy || en === EN) return; langBusy = true;
+  try {
+    const BWD = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+    const BMON = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+    const m = en ? await import('./i18n.js') : I18N;
+    if (en && !EWD.length) EWD.push(...['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
+    EN = en; LOC = en ? 'en-GB' : 'bn-BD';
+    BN_WD = en ? EWD : BWD;
+    BN_MON = en ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] : BMON;
+    local.set('lang', en ? 'en' : 'bn');
+    document.documentElement.lang = en ? 'en' : 'bn';
+    if (en) { I18N = m; await m.startI18n(); } else m?.stopI18n();
+    renderMenu();
+    try { renderComposer(); } catch { /* ignore */ }
+    reloadView().catch(() => {});
+    toast(en ? 'Language: English' : 'ভাষা: বাংলা');
+  } finally { langBusy = false; }
+}
+const EWD = [];
+let I18N = null;
 
 // ================================================================ বন্ধু
 const relBtns = u => {
@@ -5117,7 +5144,7 @@ document.addEventListener('click', e => {
   if (id === 'chpw') return passwordSheet();
   if (id === 'acc-name') return nameSheet();
   if (id === 'acc-un') return usernameSheet();
-  if (id === 'lang-tg') { local.set('lang', EN ? 'bn' : 'en'); try { saveNav(); } catch { /* ignore */ } location.reload(); return; }
+  if (id === 'lang-tg') return setLang(!EN);
   if (id === 'acc-email') return emailSheet();
   if (id === 'acc-phone') return phoneSheet();
   if (id === 'theme') {

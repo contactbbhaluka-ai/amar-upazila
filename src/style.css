@@ -781,3 +781,6 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 
 .date3{display:grid;grid-template-columns:0.8fr 1.3fr 1fr;gap:6px}
 .date3 select{margin:0}
+
+.ab-sub>input,.ab-sub>textarea,.ab-sub>select,.ab-sub>.un-wrap,.ab-sub>.date3{margin-top:2px}
+.ab-sub summary small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}

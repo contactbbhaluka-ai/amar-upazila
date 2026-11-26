@@ -1099,14 +1099,17 @@ const ABOUT = [
   { id: 'intro', ic: 'info', t: 'পরিচিতি',
     chips: u => (u.birthDate || u.birthYear ? visChip(aVis(u, 'birth'), 'জন্মতারিখ') : ''),
     sum: u => [u.username && '@' + u.username, GENDERS[u.gender], birthText(u) && `জন্ম ${birthText(u)}`, u.bio].filter(Boolean).join(' · '), empty: 'ইউজারনেম, লিঙ্গ, জন্মতারিখ ও নিজের সম্পর্কে লিখুন',
-    form: u => `<label for="ab-name">${ic('user', 16)} নাম</label><input id="ab-name" required minlength="2" maxlength="40" value="${esc(u.name)}">
-      <label for="ab-un">@ ইউজারনেম</label><div class="un-wrap"><span class="un-at">@</span><input id="ab-un" maxlength="21" autocomplete="off" autocapitalize="none" spellcheck="false" value="${esc(u.username || '')}" placeholder="যেমন: arif.bhaluka"></div>
-      <small class="un-msg mut" id="ab-un-msg">ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . দিয়ে ৩–২০ অক্ষর। প্রত্যেকের আলাদা।</small>
-      <label for="ab-g">${ic('users', 16)} লিঙ্গ</label>${genderSelect('ab-g', u.gender || '', false)}
-      <label for="ab-bd-d">${ic('calendar', 16)} জন্মতারিখ</label>${dateSelect('ab-bd', u.birthDate || '', false)}
-      ${!u.birthDate && u.birthYear ? `<small class="mut">আগে শুধু সাল (${bn(u.birthYear)}) দেওয়া আছে, পুরো তারিখ দিন।</small>` : ''}
-      ${visSel('ab-vis-birth', aVis(u, 'birth'), 'জন্মতারিখ কারা দেখবে')}
-      <label for="ab-bio">${ic('note', 16)} নিজের সম্পর্কে</label><textarea id="ab-bio" maxlength="160" rows="2" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">${esc(u.bio || '')}</textarea>`,
+    form: u => {
+      const sub = (icn, label, val, body) => `<details class="ab-sub"><summary>${ic(icn, 16)} ${label} <small class="mut">· ${val ? esc(val) : 'দেওয়া নেই'}</small></summary>${body}</details>`;
+      return sub('user', 'নাম', u.name, `<input id="ab-name" required minlength="2" maxlength="40" aria-label="নাম" value="${esc(u.name)}">`)
+        + sub('info', 'ইউজারনেম', u.username && '@' + u.username, `<div class="un-wrap"><span class="un-at">@</span><input id="ab-un" maxlength="21" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="ইউজারনেম" value="${esc(u.username || '')}" placeholder="যেমন: arif.bhaluka"></div>
+          <small class="un-msg mut" id="ab-un-msg">ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . দিয়ে ৩–২০ অক্ষর। প্রত্যেকের আলাদা।</small>`)
+        + sub('users', 'লিঙ্গ', GENDERS[u.gender] || (u.gender === '' ? '' : ''), genderSelect('ab-g', u.gender || '', false))
+        + sub('calendar', 'জন্মতারিখ', birthText(u), `${dateSelect('ab-bd', u.birthDate || '', false)}
+          ${!u.birthDate && u.birthYear ? `<small class="mut">আগে শুধু সাল (${bn(u.birthYear)}) দেওয়া আছে, পুরো তারিখ দিন।</small>` : ''}
+          ${visSel('ab-vis-birth', aVis(u, 'birth'), 'জন্মতারিখ কারা দেখবে')}`)
+        + sub('note', 'নিজের সম্পর্কে', u.bio && (u.bio.length > 30 ? u.bio.slice(0, 30) + '…' : u.bio), `<textarea id="ab-bio" maxlength="160" rows="2" aria-label="নিজের সম্পর্কে" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">${esc(u.bio || '')}</textarea>`);
+    },
     read: () => {
       const name = $('#ab-name').value.trim(); if (name.length < 2) return { err: 'নাম অন্তত ২ অক্ষরের দিন' };
       const username = normUsername($('#ab-un').value);
@@ -1210,7 +1213,7 @@ function renderAbout(key) {
   ${u.joinedAt ? `<div class="ab-joined">${ic('calendar', 15)} ${joinedText(u.joinedAt)}</div>` : ''}</div>`;
   const a = ABOUT.find(x => x.id === open);
   if (a?.after) a.after(u);
-  if (a && a.id !== 'work') setTimeout(() => pane.querySelector('.ab-form input, .ab-form select, .ab-form textarea')?.focus({ preventScroll: true }), 30);
+  if (a && a.id !== 'work' && a.id !== 'intro') setTimeout(() => pane.querySelector('.ab-form input, .ab-form select, .ab-form textarea')?.focus({ preventScroll: true }), 30);
 }
 function openAbout(section) {
   Object.assign(S.pstate.me, { tab: 'about', open: section || null, album: null });

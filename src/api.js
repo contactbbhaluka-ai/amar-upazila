@@ -21,6 +21,11 @@ const toBoost = r => r && ({ id: r.id, postId: r.post_id, userId: r.user_id, day
   startsAt: r.starts_at || null, endsAt: r.ends_at || null, reach: r.reach || 0, createdAt: r.created_at, postBody: r.po?.body ?? r.postBody ?? '', postImage: r.po?.image_urls?.[0] || r.po?.image_url || r.postImage || '' });
 // চালু = অনুমোদিত এবং মেয়াদ শেষ হয়নি; মেয়াদ পার হলে "শেষ"
 export const boostState = b => (b.status === 'active' ? (new Date(b.endsAt) > Date.now() ? 'active' : 'ended') : b.status);
+const toStats = r => ({ people: r.people || 0, views: r.views || 0, today: r.today || 0, close: r.close || 0, others: r.others || 0, newFollowers: r.new_followers || 0, boostReach: r.boost_reach || 0,
+  sources: r.sources || {}, areas: r.areas || [], genders: r.genders || null, ages: r.ages || null, daily: r.daily || [], clicks: r.clicks || { profile: 0, photo: 0, more: 0 } });
+const toInsights = r => ({ days: r.days || 7, people: r.people || 0, views: r.views || 0, close: r.close || 0, others: r.others || 0, newFollowers: r.new_followers || 0, posts: r.posts || 0,
+  sources: r.sources || {}, daily: r.daily || [], hours: r.hours || Array(24).fill(0), top: (r.top || []).map(t => ({ id: t.id, body: t.body || '', image: t.image || '', createdAt: t.created_at, people: t.people || 0, views: t.views || 0 })) });
+const lastDays = n => Array.from({ length: n }, (_, i) => { const d = new Date(Date.now() + 6 * 3600e3 - (n - 1 - i) * 864e5); return d.toISOString().slice(0, 10); });
 const toReq = r => r && ({ id: r.id, userId: r.user_id, kind: r.kind, name: r.full_name, category: r.category || '', links: r.links || '', note: r.note || '', status: r.status, adminNote: r.admin_note || '', coinsHeld: r.coins_held || 0, createdAt: r.created_at, decidedAt: r.decided_at || null });
 const settingDefaults = () => Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d]));
 
@@ -178,8 +183,10 @@ async function supabaseApi() {
       ok(await sb.from('app_settings').upsert({ key, value, updated_by: me.id, updated_at: new Date().toISOString() }));
     },
     // ---------- পোস্ট কতজন দেখেছেন
-    async postSeen(ids) { if (me && ids.length) await sb.rpc('post_seen', { p_ids: ids }); },
-    async postStats(id) { const r = ok(await sb.rpc('post_stats', { p_id: id })) || {}; return { people: r.people || 0, views: r.views || 0, today: r.today || 0, close: r.close || 0, others: r.others || 0, newFollowers: r.new_followers || 0, boostReach: r.boost_reach || 0 }; },
+    async postSeen(items) { if (me && items.length) await sb.rpc('post_seen2', { p_ids: items.map(x => x.id), p_src: items.map(x => x.src) }); },
+    async postClick(id, kind) { if (me) await sb.rpc('post_click', { p_post: id, p_kind: kind }); },
+    async postStats(id) { return toStats(ok(await sb.rpc('post_stats', { p_id: id })) || {}); },
+    async myInsights(days) { return toInsights(ok(await sb.rpc('my_insights', { p_days: days })) || {}); },
     // ---------- পোস্ট বুস্ট
     async boostedPosts(n = 3) {
       const rows = ok(await sb.rpc('active_boosts', { p_limit: n })) || [];
@@ -690,8 +697,14 @@ function demoApi() {
   function demoViews(p) {
     const real = Object.values(get('pviews', {})[p.id] || {}), base = (p.likes || 0) * 4 + p.cm.length * 3 + (p.userId === meId ? 2 : 6);
     const boostReach = db.boosts.filter(b => b.post_id === p.id).reduce((t, b) => t + (b.reach || 0), 0);
-    const people = base + real.length + boostReach, close = Math.round(people * 0.6), others = people - close;
-    return { people, views: Math.round(base * 1.4) + real.reduce((t, r) => t + r.t, 0) + boostReach, today: Math.ceil(base / 3), close, others, newFollowers: Math.floor(others / 6), boostReach };
+    const people = base + real.length + boostReach, close = Math.round(people * 0.6), others = people - close, f = k => Math.round(people * k);
+    const days = lastDays(7), share = days.map((_, i) => (i === 6 ? 0.35 : i === 5 ? 0.3 : 0.35 / 5));
+    return toStats({ people, views: Math.round(base * 1.4) + real.reduce((t, r) => t + r.t, 0) + boostReach, today: Math.ceil(base / 3), close, others, new_followers: Math.floor(others / 6), boost_reach: boostReach,
+      sources: { feed: f(0.55), profile: f(0.15), share: f(0.12), group: f(0.03), boost: boostReach, post: people - f(0.55) - f(0.15) - f(0.12) - f(0.03) - boostReach },
+      areas: [{ name: 'উথুরা ইউনিয়ন', n: f(0.4) }, { name: 'ভালুকা পৌরসভা', n: f(0.25) }, { name: 'কাচিনা ইউনিয়ন', n: f(0.15) }, { name: 'অন্যান্য', n: people - f(0.4) - f(0.25) - f(0.15) }],
+      genders: people >= 10 ? { male: f(0.58), female: f(0.37), unknown: people - f(0.58) - f(0.37) } : null,
+      ages: people >= 10 ? { '13-17': f(0.06), '18-24': f(0.34), '25-34': f(0.31), '35-44': f(0.16), '45+': f(0.08), unknown: people - f(0.06) - f(0.34) - f(0.31) - f(0.16) - f(0.08) } : null,
+      daily: days.map((day, i) => ({ day, n: Math.round(people * share[i]) })), clicks: { profile: f(0.12), photo: (p.images?.length || p.image) ? f(0.3) : 0, more: (p.body || '').length > 200 ? f(0.18) : 0 } });
   }
   const addCoins = (amount, reason, ref) => { db.wallet.coins += amount; db.wallet.ledger.unshift({ amount, reason, ref: String(ref), createdAt: new Date().toISOString() }); };
   const albumVisible = a => a.privacy === 'public' || a.userId === meId || (a.privacy === 'friends' && meId && friendIds(meId).includes(a.userId));
@@ -865,8 +878,19 @@ function demoApi() {
       const posts = await this.posts({ ids: live.map(b => b.post_id) });
       return live.map(b => { const p = posts.find(x => x.id === b.post_id); return p && { ...p, sponsored: true, boostId: b.id }; }).filter(Boolean);
     },
-    async postSeen(ids) {
-      const v = get('pviews', {}), day = new Date().toISOString().slice(0, 10);
+    async postClick() { return true; },
+    async myInsights(days) {
+      const d = days >= 30 ? 30 : 7, mine = db.posts.filter(p => p.userId === meId), st = mine.map(p => ({ p, v: demoViews(p) }));
+      const people = st.reduce((t, x) => t + x.v.people, 0), close = st.reduce((t, x) => t + x.v.close, 0);
+      const seed = n => (Math.sin(n * 9301 + 49297) + 1) / 2;
+      return wait(toInsights({ days: d, people, views: st.reduce((t, x) => t + x.v.views, 0), close, others: people - close, new_followers: st.reduce((t, x) => t + x.v.newFollowers, 0),
+        posts: mine.length, sources: { feed: Math.round(people * 0.55), profile: Math.round(people * 0.2), share: Math.round(people * 0.12), group: Math.round(people * 0.05), boost: Math.round(people * 0.08) },
+        daily: lastDays(d).map((day, i) => ({ day, n: Math.round(seed(i + d) * people / 3) })),
+        hours: Array.from({ length: 24 }, (_, h) => Math.round((h >= 19 && h <= 22 ? 12 : h >= 7 && h <= 9 ? 7 : h >= 12 && h <= 14 ? 5 : h < 6 ? 0 : 3) * (0.6 + seed(h)))),
+        top: st.sort((a, b) => b.v.people - a.v.people).slice(0, 5).map(x => ({ id: x.p.id, body: (x.p.body || '').slice(0, 80), image: demoPic(x.p.images?.[0] || x.p.image || ''), created_at: x.p.createdAt, people: x.v.people, views: x.v.views })) }));
+    },
+    async postSeen(items) {
+      const v = get('pviews', {}), day = new Date().toISOString().slice(0, 10), ids = items.map(x => x.id);
       for (const id of ids) { const p = db.posts.find(x => x.id === id); if (!p || p.userId === meId) continue; const r = v[id] = v[id] || {}; const m = r[meId]; if (!m) r[meId] = { t: 1, d: day }; else if (m.d < day) { m.t++; m.d = day; } }
       set('pviews', v);
     },

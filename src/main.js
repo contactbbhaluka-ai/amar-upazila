@@ -341,7 +341,7 @@ function postHtml(p) {
   const link = (inner, cls) => p.pageId ? `<button class="${cls}" data-page="${esc(p.pageId)}">${inner}</button>` : userLink(p.userId, inner, cls);
   const via = p.groupId && S.view !== 'group' ? ` <span class="via">▸ <button data-group="${esc(p.groupId)}">${esc(p.groupName)}</button></span>` : '';
   const own = u && p.userId === u.id;
-  return `<article class="card post${p.sponsored ? ' sponsored' : ''}" data-pid="${esc(p.id)}"${own ? ' data-own="1"' : ''}>
+  return `<article class="card post${p.sponsored ? ' sponsored' : ''}" data-pid="${esc(p.id)}"${own ? ' data-own="1"' : ''}${p.shared && p.shared.userId !== u?.id ? ` data-spid="${esc(p.shared.id)}"` : ''}>
     <div class="top">${link(av(p), 'avbtn')}
       <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
       ${own ? `<button class="pinfo" data-pinfo="${esc(p.id)}" aria-label="পোস্টটি কতজন দেখেছেন" title="পোস্টের হিসাব">${ic('info', 19)}</button>` : ''}<button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
@@ -363,28 +363,60 @@ function postHtml(p) {
 }
 // ================================================================ পোস্ট কতজন দেখেছেন
 // অর্ধেকের বেশি অংশ অন্তত ১ সেকেন্ড স্ক্রিনে থাকলে "দেখা" ধরা হয়; কয়েক সেকেন্ড পরপর একসাথে সার্ভারে পাঠানো হয়
-const seenPosts = new Set(), seenQueue = new Set(), seenTimers = new Map();
+const seenPosts = new Set(), seenQueue = new Map(), seenTimers = new Map();
 let viewObs = null, seenFlushT = null;
 function flushSeen() {
   clearTimeout(seenFlushT); seenFlushT = null;
-  const ids = [...seenQueue].slice(0, 30); ids.forEach(id => seenQueue.delete(id));
-  if (ids.length) S.api.postSeen(ids).catch(() => {});
+  const items = [...seenQueue].slice(0, 30).map(([id, src]) => ({ id, src })); items.forEach(x => seenQueue.delete(x.id));
+  if (items.length) S.api.postSeen(items).catch(() => {});
   if (seenQueue.size) seenFlushT = setTimeout(flushSeen, 4000);
 }
-function watchViews(box) {
+const VIEW_SRC = { home: 'feed', me: 'profile', user: 'profile', group: 'group', page: 'page', post: 'post', saved: 'saved', search: 'search' };
+const markSeen = (id, src) => { if (seenPosts.has(id)) return; seenPosts.add(id); seenQueue.set(id, src); if (!seenFlushT) seenFlushT = setTimeout(flushSeen, 4000); };
+function watchViews(box, key) {
   if (!me() || !('IntersectionObserver' in window)) return;
+  box.querySelectorAll('article.post[data-pid]').forEach(el => { el.dataset.src = el.classList.contains('sponsored') ? 'boost' : (VIEW_SRC[key] || 'other'); });
   viewObs = viewObs || new IntersectionObserver(entries => {
     for (const en of entries) {
       const id = Number(en.target.dataset.pid);
       if (en.isIntersecting) {
         if (seenPosts.has(id) || seenTimers.has(id)) continue;
-        seenTimers.set(id, setTimeout(() => { seenTimers.delete(id); seenPosts.add(id); seenQueue.add(id); viewObs.unobserve(en.target); if (!seenFlushT) seenFlushT = setTimeout(flushSeen, 4000); }, 1000));
+        seenTimers.set(id, setTimeout(() => {
+          seenTimers.delete(id); viewObs.unobserve(en.target);
+          if (!en.target.dataset.own) markSeen(id, en.target.dataset.src || 'other');
+          const sp = Number(en.target.dataset.spid); if (sp) markSeen(sp, 'share');   // শেয়ার করা পোস্টের ভেতরের আসল পোস্টটিও দেখা হলো
+        }, 1000));
       } else if (seenTimers.has(id)) { clearTimeout(seenTimers.get(id)); seenTimers.delete(id); }
     }
   }, { threshold: 0.5 });
-  box.querySelectorAll('article.post[data-pid]:not([data-own])').forEach(el => { if (!seenPosts.has(Number(el.dataset.pid))) viewObs.observe(el); });
+  box.querySelectorAll('article.post[data-pid]').forEach(el => { if ((!el.dataset.own && !seenPosts.has(Number(el.dataset.pid))) || (el.dataset.spid && !seenPosts.has(Number(el.dataset.spid)))) viewObs.observe(el); });
 }
+// পোস্ট থেকে প্রোফাইলে যাওয়া, ছবি খোলা, "আরও দেখুন" চাপা (প্রতি পোস্টে একবার)
+const clickSent = new Set();
+document.addEventListener('click', e => {
+  const art = e.target.closest('article.post[data-pid]'); if (!art || art.dataset.own || !me()) return;
+  const kind = e.target.closest('.top [data-user], .top [data-page]') ? 'profile' : e.target.closest('[data-view]') ? 'photo' : e.target.closest('[data-more^="p"]') ? 'more' : '';
+  const k = art.dataset.pid + ':' + kind;
+  if (!kind || clickSent.has(k)) return;
+  clickSent.add(k); S.api.postClick(Number(art.dataset.pid), kind).catch(() => {});
+}, true);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && seenQueue.size) flushSeen(); });
+const SRC_NAME = { feed: 'হোম ফিড', profile: 'আপনার প্রোফাইল', share: 'কারো শেয়ার থেকে', group: 'গ্রুপ', page: 'পেইজ', boost: 'বুস্ট (স্পন্সরড)', post: 'সরাসরি লিংক বা নোটিফিকেশন', search: 'সার্চ', saved: 'সেভ করা পোস্ট', other: 'অন্যান্য' };
+const AGE_ORDER = ['13-17', '18-24', '25-34', '35-44', '45+', 'unknown'];
+const srcRows = o => Object.entries(o || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).map(([k, n]) => [SRC_NAME[k] || k, n]);
+const WD = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
+function chartBlock(title, daily) {
+  const max = Math.max(1, ...daily.map(d => d.n)), many = daily.length > 10;
+  return `<div class="ps-box"><b>${title}</b><div class="ps-chart${many ? ' many' : ''}">${daily.map((d, i) => {
+    const dt = new Date(d.day + 'T00:00:00'), lbl = many ? (i % 5 === 0 || i === daily.length - 1 ? bn(dt.getDate()) : '') : WD[dt.getDay()];
+    return `<div class="pc-col" title="${bn(dt.getDate())} তারিখ: ${bn(d.n)}"><small>${d.n && !many ? bn(d.n) : ''}</small><i style="height:${Math.max(3, (d.n / max) * 100)}%"></i><span>${lbl}</span></div>`;
+  }).join('')}</div></div>`;
+}
+function listBlock(title, rows) {
+  const total = rows.reduce((t, r) => t + r[1], 0);
+  if (!total) return '';
+  return `<div class="ps-box"><b>${title}</b>${rows.map(([l, n]) => `<div class="pl-row"><span>${esc(l)}</span><span class="pl-bar"><i style="width:${(n / total) * 100}%"></i></span><b>${bn(n)}</b></div>`).join('')}</div>`;
+}
 async function postStatsSheet(p) {
   if (!p) return;
   openSheet('<div class="skel"></div>');
@@ -403,6 +435,16 @@ async function postStatsSheet(p) {
         <div class="ps-bar" role="img" aria-label="বন্ধু বা ফলোয়ার ${bn(st.close)} জন, অন্যরা ${bn(st.others)} জন"><i style="width:${st.people ? (st.close / st.people) * 100 : 0}%"></i></div>
         <div class="ps-leg"><span><i class="c1"></i>বন্ধু / ফলোয়ার <b>${bn(st.close)}</b></span><span><i class="c2"></i>অন্যরা (ফলো করেন না) <b>${bn(st.others)}</b></span></div>
       </div>
+      ${chartBlock('গত ৭ দিন', st.daily)}
+      <div class="ps-rate">${ic('thumb', 18)}<span>সাড়ার হার <b>${st.people ? bn(Math.round(((rx + (p.comments || 0) + (p.shares || 0)) / st.people) * 100)) : '০'}%</b><small>যারা দেখেছেন তাদের মধ্যে কতজন রিয়্যাক্ট, মন্তব্য বা শেয়ার করেছেন</small></span></div>
+      ${listBlock('কোথা থেকে দেখেছেন', srcRows(st.sources))}
+      ${listBlock('কোন এলাকার মানুষ', st.areas.map(a => [a.name, a.n]))}
+      ${st.genders ? listBlock('লিঙ্গ', Object.entries(st.genders).map(([k, n]) => [GENDERS[k] || 'জানা নেই', n])) + listBlock('বয়স', AGE_ORDER.filter(k => st.ages?.[k]).map(k => [k === 'unknown' ? 'জানা নেই' : bn(k) + ' বছর', st.ages[k]])) : `<div class="ps-note">লিঙ্গ ও বয়সের ভাগ দেখাবে অন্তত ১০ জন দেখলে, যাতে কে দেখেছেন তা আন্দাজ করা না যায়।</div>`}
+      <div class="ps-clicks"><b>পোস্টে যা যা করেছেন</b>
+        <div><span>${ic('user', 16)} প্রোফাইলে গেছেন</span><b>${bn(st.clicks.profile)}</b></div>
+        <div><span>${ic('photo', 16)} ছবি খুলে দেখেছেন</span><b>${bn(st.clicks.photo)}</b></div>
+        <div><span>${ic('post', 16)} "আরও দেখুন" চেপেছেন</span><b>${bn(st.clicks.more)}</b></div>
+      </div>
       <div class="ps-newf">${ic('user', 18)}<span>${st.newFollowers ? `পোস্টটি দেখার পর <b>${bn(st.newFollowers)} জন</b> নতুন করে আপনাকে ফলো করেছেন` : 'এই পোস্ট থেকে এখনো নতুন ফলোয়ার আসেনি'}</span></div>
       ${st.boostReach ? `<p class="ps-boost">🚀 এর মধ্যে বুস্ট থেকে পৌঁছেছে <b>${bn(st.boostReach)}</b> জনের কাছে</p>` : ''}
       <p class="mut" style="font-size:13px;margin:10px 0 0">এই হিসাব শুধু আপনি দেখতে পাচ্ছেন। একজন মানুষ যতবারই দেখুক, "দেখেছেন"-এ একবার গোনা হয়; মোট দেখা দিনে একবার করে বাড়ে। কে কে দেখেছেন তা দেখানো হয় না।</p>
@@ -411,6 +453,43 @@ async function postStatsSheet(p) {
     $('#ps-boost')?.addEventListener('click', () => boostSheet(p));
   } catch (e) { closeSheet(); toast(errText(e)); }
 }
+
+// ================================================================ ড্যাশবোর্ড: সব পোস্ট মিলিয়ে
+const hourBn = h => { const n = h % 12 || 12, part = h < 4 ? 'রাত' : h < 6 ? 'ভোর' : h < 12 ? 'সকাল' : h < 15 ? 'দুপুর' : h < 18 ? 'বিকাল' : h < 20 ? 'সন্ধ্যা' : 'রাত'; return `${part} ${bn(n)}টা`; };
+function bestWindow(hours) {
+  let best = -1, at = 0;
+  for (let h = 0; h < 24; h++) { const s2 = hours[h] + hours[(h + 1) % 24]; if (s2 > best) { best = s2; at = h; } }
+  return best > 0 ? `${hourBn(at)} থেকে ${hourBn((at + 2) % 24)}` : '';
+}
+async function loadInsights(days) {
+  const box = $('#insights');
+  if (!me()) { box.innerHTML = '<div class="empty">ড্যাশবোর্ড দেখতে লগইন করুন।</div>'; return; }
+  S.insDays = days || S.insDays || 7;
+  box.innerHTML = '<div class="skel"></div><div class="skel"></div>';
+  try {
+    const d = await S.api.myInsights(S.insDays), best = bestWindow(d.hours), hmax = Math.max(1, ...d.hours);
+    const tile = (icon, n, l) => `<div class="in-tile"><span>${icon}</span><b>${bn(n)}</b><small>${l}</small></div>`;
+    box.innerHTML = `
+      <div class="seg in-seg" role="tablist">${[7, 30].map(n => `<button role="tab" data-indays="${n}" class="${S.insDays === n ? 'on' : ''}" aria-selected="${S.insDays === n}">গত ${bn(n)} দিন</button>`).join('')}</div>
+      <div class="in-tiles">${tile('👥', d.people, 'জন দেখেছেন')}${tile('👁', d.views, 'মোট ভিউ')}${tile('➕', d.newFollowers, 'নতুন ফলোয়ার')}${tile('📝', d.posts, 'পোস্ট করেছেন')}</div>
+      <div class="card">${chartBlock('প্রতিদিনের ভিউ', d.daily)}</div>
+      <div class="card"><div class="ps-aud" style="margin:0;border:0;padding:0"><b>কারা দেখেছেন</b>
+        <div class="ps-bar"><i style="width:${d.people ? (d.close / d.people) * 100 : 0}%"></i></div>
+        <div class="ps-leg"><span><i class="c1"></i>বন্ধু / ফলোয়ার <b>${bn(d.close)}</b></span><span><i class="c2"></i>অন্যরা <b>${bn(d.others)}</b></span></div></div></div>
+      ${srcRows(d.sources).length ? `<div class="card">${listBlock('কোথা থেকে দেখেছেন', srcRows(d.sources))}</div>` : ''}
+      <div class="card"><div class="ps-box" style="border:0;padding:0;margin:0"><b>পোস্ট করার সেরা সময়</b>
+        <p class="mut" style="margin:2px 0 8px;font-size:13px">${best ? `গত ৩০ দিনে আপনার পোস্ট সবচেয়ে বেশি দেখা হয়েছে <b class="in-best">${best}</b>-এর মধ্যে। এই সময়ের একটু আগে পোস্ট করলে বেশি মানুষ দেখবেন।` : 'আরও কিছু মানুষ আপনার পোস্ট দেখলে এখানে সেরা সময় দেখাবে।'}</p>
+        <div class="in-hours">${d.hours.map((n, h) => `<i title="${hourBn(h)}: ${bn(n)}" style="height:${Math.max(3, (n / hmax) * 100)}%"></i>`).join('')}</div>
+        <div class="in-hlbl"><span>রাত ১২</span><span>সকাল ৬</span><span>দুপুর ১২</span><span>সন্ধ্যা ৬</span><span>রাত ১১</span></div></div></div>
+      <h3 class="res-h">সবচেয়ে বেশি দেখা পোস্ট</h3>
+      <div class="card">${d.top.length ? d.top.map(t => `<button class="bo-row" data-openpost="${t.id}">${t.image ? `<img src="${esc(t.image)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}<span class="bo-tx"><b>${esc(t.body || 'ছবি পোস্ট')}</b><small>${bn(t.people)} জন দেখেছেন · ${bn(t.views)} ভিউ · ${esc(ago(t.createdAt))}</small></span></button>`).join('') : '<p class="mut" style="margin:0">এই সময়ে আপনার কোনো পোস্ট কেউ দেখেননি। নতুন পোস্ট করুন!</p>'}</div>
+      <p class="note">এই হিসাব শুধু আপনি দেখতে পাচ্ছেন। কে কে দেখেছেন তা দেখানো হয় না। প্রতিটা পোস্টের বিস্তারিত পোস্টের ⓘ বাটনে।</p>`;
+  } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-insights]')) { open('insights'); loadInsights(); return; }
+  const dd = e.target.closest('[data-indays]'); if (dd) loadInsights(Number(dd.dataset.indays));
+});
 
 // হোম ফিডে ৩, ৮, ১৩… নম্বর জায়গায় একটা করে বুস্ট করা পোস্ট
 function withAds(f) {
@@ -430,7 +509,7 @@ function renderFeed(key) {
     : `<div class="empty">${key === 'home' && S.scope === 'friends' ? 'বন্ধু বা যাদের ফলো করছেন তাদের কোনো পোস্ট এখনো নেই।<br>"বন্ধু" ট্যাব থেকে মানুষ খুঁজে যুক্ত হোন।' : key === 'home' ? 'এখানে এখনো কোনো পোস্ট নেই।<br>প্রথম পোস্টটি আপনিই করুন!' : 'এখনো কোনো পোস্ট নেই।'}</div>`;
   const more = $('#more-' + key); if (more) more.hidden = !f.more;
   watchCarousels(box);
-  watchViews(box);
+  watchViews(box, key);
   if (key === 'home') {
     const fresh = list.filter(p => p.sponsored && !S.seenBoosts.has(p.boostId)).map(p => p.boostId);
     if (fresh.length) { fresh.forEach(id => S.seenBoosts.add(id)); S.api.boostSeen(fresh).catch(() => {}); }
@@ -1692,7 +1771,7 @@ async function renderMe(mode = 'login') {
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
-      <div class="row"><button class="btn ghost" id="edit">${ic('edit', 15)} এবাউট এডিট</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
+      <div class="row"><button class="btn ghost" id="edit">${ic('edit', 15)} এবাউট এডিট</button><button class="btn ghost" data-insights="1">${ic('eye', 15)} ড্যাশবোর্ড</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
       ${profTabs('me')}`;
     S.api.profile(u.id).then(p => { if ($('#mystats')) $('#mystats').innerHTML = statsHtml(p); }).catch(() => {});
     showProfPane('me');
@@ -2239,6 +2318,7 @@ function renderMenu() {
       ${sc('sos', '🚨', 'জরুরি নম্বর', '৯৯৯ ও হেল্পলাইন')}
       ${sc('saved', '🔖', 'সেভ করা পোস্ট', '')}
       ${sc('wallet', '🪙', 'কয়েন ও ব্যাজ', 'ভেরিফাইড ব্যাজ নিন')}
+      ${sc('insights', '📊', 'ড্যাশবোর্ড', 'পোস্ট কতজন দেখছেন')}
       ${sc('groups', '👥', 'গ্রুপ', 'যোগ দিন বা তৈরি করুন', 'featGroups')}
       ${sc('pages', '🏳️', 'পেইজ', 'ব্যবসা ও প্রতিষ্ঠান', 'featPages')}
     </div>
@@ -2266,6 +2346,7 @@ $('#menu').addEventListener('click', e => {
   else if (!needUser()) return;
   else if (t === 'saved') { open('saved'); loadFeed('saved'); }
   else if (t === 'wallet') { open('wallet'); loadWallet(); }
+  else if (t === 'insights') { open('insights'); loadInsights(); }
   else if (t === 'pages') { if (featGuard('featPages')) { open('pages'); loadPages(); } }
   else if (t === 'groups') { if (featGuard('featGroups')) { open('groups'); loadGroups(); } }
   else if (t === 'admin') { open('admin'); loadAdmin(); }

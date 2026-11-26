@@ -899,3 +899,33 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .ps-leg .c1{background:var(--g)} .ps-leg .c2{background:#f59e0b}
 .ps-newf{display:flex;align-items:center;gap:8px;margin-top:8px;padding:9px 12px;border-radius:12px;background:color-mix(in srgb,var(--g2) 45%,var(--card));font-size:14px;color:var(--gt)}
 .ps-newf span{color:var(--ink,inherit)}
+
+/* ===== v30: পোস্টের বিস্তারিত হিসাব ও ড্যাশবোর্ড ===== */
+.ps-box{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.ps-box>b{font-size:14px;display:block;margin-bottom:6px}
+.ps-chart{display:flex;align-items:flex-end;gap:6px;height:120px}
+.ps-chart.many{gap:2px}
+.pc-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.pc-col i{display:block;width:100%;max-width:30px;background:var(--g);border-radius:5px 5px 2px 2px}
+.pc-col small{font-size:11px;color:var(--mut);min-height:14px}
+.pc-col span{font-size:11px;color:var(--mut);margin-top:3px;min-height:14px;white-space:nowrap}
+.pl-row{display:grid;grid-template-columns:minmax(90px,1.2fr) 2fr auto;align-items:center;gap:8px;font-size:13.5px;padding:3px 0}
+.pl-row span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.pl-bar i{display:block;height:100%;background:var(--g);border-radius:99px}
+.ps-rate{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:9px 12px;border-radius:12px;border:1px solid var(--line);font-size:14px}
+.ps-rate span{display:flex;flex-direction:column}
+.ps-rate small{color:var(--mut);font-size:12px}
+.ps-note{margin-top:10px;padding:9px 12px;border-radius:12px;background:color-mix(in srgb,var(--line) 40%,var(--card));font-size:13px;color:var(--mut)}
+.ps-clicks{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
+.ps-clicks>div{display:flex;justify-content:space-between;align-items:center;padding:4px 0}
+.ps-clicks>div span{display:inline-flex;align-items:center;gap:6px;color:var(--mut)}
+.in-seg{margin-bottom:10px}
+.in-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.in-tile{display:flex;flex-direction:column;align-items:center;gap:1px;padding:12px 6px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.in-tile span{font-size:18px} .in-tile b{font-size:24px} .in-tile small{color:var(--mut);font-size:12.5px}
+.in-hours{display:flex;align-items:flex-end;gap:2px;height:70px}
+.in-hours i{flex:1;background:#f59e0b;border-radius:3px 3px 1px 1px;opacity:.85}
+.in-hlbl{display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:4px}
+.in-best{color:var(--gt)}
+.card>.ps-box{border:0;padding:0;margin:0}

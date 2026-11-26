@@ -4671,6 +4671,7 @@ function renderMenu() {
       <button id="chpw"><span class="set-ic">🔑</span>পাসওয়ার্ড পরিবর্তন</button>
       <button id="edit"><span class="set-ic">📝</span>প্রোফাইলের বাকি তথ্য<span class="val">ঠিকানা, রক্তের গ্রুপ…</span></button>
       <button id="delacc" style="color:var(--r)"><span class="set-ic">🗑️</span>অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলুন</button></div></details>
+    <div class="card lang-card"><button id="lang-tg" class="lang-row"><span class="lang-ic">🌐</span><span class="lang-t">${EN ? 'Language: English' : 'ভাষা: ইংরেজি (English)'}<small>${EN ? 'Turn off for Bangla' : 'চালু করলে পুরো অ্যাপ ইংরেজিতে'}</small></span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${EN ? 'checked' : ''}></button></div>
     <details class="card"${u ? '' : ' hidden'}><summary>🔒 প্রাইভেসি</summary><div class="setlist">
       <button id="plock"><span class="set-ic">🔒</span>প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
       <button id="listpriv"><span class="set-ic">👁️</span>বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
@@ -4682,9 +4683,6 @@ function renderMenu() {
     <details class="card"><summary>🎨 দেখতে কেমন</summary><div class="setlist">
       <button id="theme"><span class="set-ic">🌓</span>থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
       <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button></div></details>
-    <details class="card"><summary>🌐 ${EN ? 'Language' : 'ভাষা (Language)'}</summary><div class="setlist">
-      <button id="lang-tg" class="lang-row"><span class="set-ic">🌐</span>${EN ? 'English' : 'ইংরেজি (English)'}<input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${EN ? 'checked' : ''}></button>
-      <p class="mut lang-note">${EN ? 'Turn off to switch back to Bangla. Your posts and messages stay as written.' : 'চালু করলে পুরো অ্যাপ ইংরেজিতে দেখাবে, বন্ধ করলে বাংলায়। পোস্ট ও মেসেজ যেমন লেখা তেমনই থাকবে।'}</p></div></details>
     <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
       ${S.api.demoLogin ? '<button id="demo-guide"><span class="set-ic">🧪</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">🔄</span>ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
       <button id="help"><span class="set-ic">🐞</span>কোনো সমস্যা জানান</button>

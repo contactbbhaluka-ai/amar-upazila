@@ -1263,12 +1263,6 @@ body{overscroll-behavior-y:contain}
 
 /* v50 প্রোফাইল: পূর্ণতা, মিউচুয়াল, QR, ফ্রেম, জীবনের ঘটনা, রক্ত দিতে প্রস্তুত */
 .prof-tools{margin-top:8px}
-.pmeter{margin:10px 0 2px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);text-align:left}
-.pm-top{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline}
-.pm-top .mut{font-size:12.5px}
-.pm-bar{height:8px;border-radius:99px;background:var(--g2);margin:8px 0;overflow:hidden}
-.pm-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--g),#22c1c3);border-radius:99px}
-.pm-chips{display:flex;flex-wrap:wrap;gap:6px}
 .mutual{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 2px;font-size:13.5px}
 .mu-avs{display:flex}
 .mu-avs .avbtn+.avbtn{margin-left:-10px}
@@ -1293,3 +1287,9 @@ body{overscroll-behavior-y:contain}
 .life-row{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:8px 2px;font:inherit;color:inherit;text-align:left;cursor:pointer;border-bottom:1px solid var(--line)}
 .life-row small{display:block}
 .pc-life{font-size:18px}
+
+/* v51 অন্যরা কেমন দেখে */
+.pv-bar{display:grid;gap:8px;text-align:center;background:light-dark(#eff6ff,#0f1d33);border:1px solid light-dark(#bfdbfe,#1e3a5f)}
+.pv-t{font-size:14.5px}
+.pv-bar .seg{margin:0 auto}
+.pv-bar .link{justify-self:center;font-size:14px}

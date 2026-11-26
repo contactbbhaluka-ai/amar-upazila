@@ -354,7 +354,7 @@ function postHtml(p) {
   const u = me();
   const link = (inner, cls) => p.pageId ? `<button class="${cls}" data-page="${esc(p.pageId)}">${inner}</button>` : userLink(p.userId, inner, cls);
   const via = p.groupId && S.view !== 'group' ? ` <span class="via">▸ <button data-group="${esc(p.groupId)}">${esc(p.groupName)}</button></span>` : '';
-  const own = u && p.userId === u.id;
+  const own = u && p.userId === u.id && !(S.preview && S.view === 'user');   // "অন্যরা কেমন দেখে"-তে নিজের বোতাম লুকানো
   const urgent = p.category === 'সাহায্য চাই' && !p.resolvedAt && !p.groupId && Date.now() - new Date(p.createdAt) < 864e5;
   const showBg = p.bg && p.body && !p.images.length && !p.shared && !p.poll && p.body.length <= BG_MAX;
   return `<article class="card post${p.sponsored ? ' sponsored' : ''}${p.pinnedPage ? ' pinned-pg' : ''}${urgent ? ' urgent' : ''}${p.urgentTop ? ' urg-top' : ''}" data-pid="${esc(p.id)}"${own ? ' data-own="1"' : ''}${p.shared && p.shared.userId !== u?.id ? ` data-spid="${esc(p.shared.id)}"` : ''}>
@@ -1011,7 +1011,8 @@ async function loadFeed(key, append) {
     if (adsP) f.ads = await adsP;
     if (key === 'home' && !append) { loadStories(); loadHomeExtras(); if (me()) S.fol = await S.api.followState().catch(() => S.fol); }
     if (key === 'home' && !append) f.urgent = urgP ? (await urgP).map(p => ({ ...p, urgentTop: true })) : [];
-    f.posts = append ? [...f.posts, ...rows] : rows; f.more = !['post', 'saved'].includes(key) && rows.length >= PAGE;
+    const rows2 = key === 'user' && S.preview ? rows.filter(p => p.privacy === 'public' || (S.preview === 'friends' && p.privacy === 'friends')) : rows;
+    f.posts = append ? [...f.posts, ...rows2] : rows2; f.more = !['post', 'saved'].includes(key) && rows.length >= PAGE;
     if (pinP) { const pin = (await pinP)[0]; if (pin) f.posts = [{ ...pin, pinnedPage: true }, ...f.posts.filter(x => x.id !== pin.id)]; }
   } catch (e) { toast(errText(e)); if (!append) f.posts = []; }
   renderFeed(key);
@@ -2173,29 +2174,31 @@ document.addEventListener('submit', e => {
   });
 });
 
-async function openUser(id, silent, keepState) {
-  if (me() && id === me().id) return go('me');
+async function openUser(id, silent, keepState, preview) {
+  if (!preview) S.preview = null;
+  if (me() && id === me().id && !S.preview) return go('me');
   if (!keepState && S.pstate.user.uid !== id) Object.assign(S.pstate.user, { tab: 'posts', seg: 'all', album: null });
   S.pstate.user.uid = id;
   if (!silent) { S.userId = id; open('user'); $('#user').innerHTML = '<div class="skel"></div>'; S.feeds.user.posts = []; $('#feed-user').innerHTML = ''; }
   try {
-    const p = await S.api.profile(id), r = p.rel || {};
+    const p = S.preview ? await previewProfile(S.preview) : await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
     if (!silent) S.api.profileVisit?.(id).catch(() => {});
-    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
+    $('#user').innerHTML = (S.preview ? previewBar() : '') + `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       <div id="mutual"></div>
       ${p.lockedOut ? `<div class="lock-banner">🔒 <div><b>${esc(p.name)} প্রোফাইল লক করে রেখেছেন</b><small>শুধু বন্ধুরা পোস্ট, ছবি ও বিস্তারিত দেখতে পারেন।</small></div></div>` : introCard(p, false)}
       ${statsHtml(p)}
       ${r.blocked ? `<p class="mut">আপনি এই ব্যক্তিকে ব্লক করেছেন।</p><button class="btn ghost" id="unblock">আনব্লক করুন</button>`
-      : `<div class="row">${relBtns(p)}<button class="sbtn ${r.following ? 'ghost' : ''}" data-fo="${esc(p.id)}" data-on="${r.following ? 1 : 0}">${r.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" data-dm="${esc(p.id)}">মেসেজ</button><button class="more" id="umore" aria-label="আরও">⋯</button></div>`}</div>${r.blocked || p.lockedOut ? '' : profTabs('user')}`;
-    if (me() && id !== me().id) S.api.mutualFriends(id).then(m => { if ($('#mutual') && S.viewProfile?.id === id) $('#mutual').innerHTML = mutualHtml(m); }).catch(() => {});
+      : S.preview ? '' : `<div class="row">${relBtns(p)}<button class="sbtn ${r.following ? 'ghost' : ''}" data-fo="${esc(p.id)}" data-on="${r.following ? 1 : 0}">${r.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" data-dm="${esc(p.id)}">মেসেজ</button><button class="more" id="umore" aria-label="আরও">⋯</button></div>`}</div>${r.blocked || p.lockedOut ? '' : profTabs('user')}`;
+    if (me() && id !== me().id && !S.preview) S.api.mutualFriends(id).then(m => { if ($('#mutual') && S.viewProfile?.id === id) $('#mutual').innerHTML = mutualHtml(m); }).catch(() => {});
     $('#unblock')?.addEventListener('click', e => busy(e.currentTarget, async () => { await S.api.unblock(p.id); openUser(p.id, true); loadFeed('user'); }));
     $('#umore')?.addEventListener('click', () => {
       if (!needUser()) return;
       openSheet(`<div class="menu"><button data-act="share">${ic('link', 16)} প্রোফাইল শেয়ার / QR</button>${me()?.admin ? `<button data-act="admin">${ic('shield', 16)} অ্যাডমিন: কয়েন ও ব্যাজ</button>` : ''}<button data-act="report">প্রোফাইল রিপোর্ট করুন</button><button data-act="block" class="danger">ব্লক করুন</button><button data-close>বন্ধ করুন</button></div>`);
       $('#sheet').onclick = ev => { const a = ev.target.closest('[data-act]')?.dataset.act; if (a === 'share') return profileShareSheet(p); if (a === 'admin') adminUserSheet(p, () => openUser(p.id, true)); if (a === 'report') reportSheet('user', p.id); if (a === 'block') { closeSheet(); blockUser(p.id, p.name); } };
     });
+    if (S.preview) $('#user [data-ptab="user|photos"]')?.remove();
     if (r.blocked || p.lockedOut) $('#feed-user').hidden = true; else showProfPane('user');
   } catch (e) { $('#user').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
@@ -2472,11 +2475,10 @@ async function renderMe(mode = 'login') {
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
-      <div id="pmeter"></div>
-      <div class="row prof-tools"><button class="btn ghost" data-pshare="me">${ic('link', 15)} প্রোফাইল শেয়ার / QR</button><button class="btn ghost" data-frames>🖼️ ছবিতে ফ্রেম</button></div>
+      <div class="row prof-tools"><button class="btn ghost" data-pshare="me">${ic('link', 15)} প্রোফাইল শেয়ার / QR</button><button class="btn ghost" data-frames>🖼️ ছবিতে ফ্রেম</button><button class="btn ghost" data-viewas="public">👁️ অন্যরা কেমন দেখে</button></div>
       <div class="row"><button class="btn ghost" id="edit">${ic('edit', 15)} এবাউট এডিট</button><button class="btn ghost" data-insights="1">${ic('eye', 15)} ড্যাশবোর্ড</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
       ${profTabs('me')}`;
-    S.api.profile(u.id).then(p => { if ($('#mystats')) $('#mystats').innerHTML = statsHtml(p); if ($('#pmeter')) $('#pmeter').innerHTML = meterHtml({ ...u, ...p }); }).catch(() => {});
+    S.api.profile(u.id).then(p => { if ($('#mystats')) $('#mystats').innerHTML = statsHtml(p); }).catch(() => {});
     showProfPane('me');
     return;
   }
@@ -3029,26 +3031,32 @@ $('#open-search').addEventListener('click', openSearch);
 $('#sq').addEventListener('input', () => { clearTimeout(sqTimer); sqTimer = setTimeout(runSearch, 350); });
 
 // ================================================================ প্রোফাইল: পূর্ণতা, মিউচুয়াল, QR, ফ্রেম, জীবনের ঘটনা, রক্ত দিতে প্রস্তুত
-// ---------- প্রোফাইল কতটা পূর্ণ (শুধু নিজে দেখেন)
-const METER = [
-  ['avatar', 'প্রোফাইল ছবি', 15, u => !!u.avatar, () => $('#avfile')?.click()],
-  ['cover', 'কভার ছবি', 10, u => !!u.cover, () => $('#coverfile')?.click()],
-  ['bio', 'নিজের সম্পর্কে', 10, u => !!u.bio, () => openAbout('intro')],
-  ['work', 'কাজ বা শিক্ষা', 15, u => !!(u.works?.length || u.educations?.length), () => openAbout('work')],
-  ['addr', 'ঠিকানা', 10, u => !!(u.unionId || u.union), () => openAbout('addr')],
-  ['birth', 'জন্মতারিখ', 10, u => !!(u.birthDate || u.birthYear), () => openAbout('intro')],
-  ['un', 'ইউজারনেম', 10, u => !!u.username, () => openAbout('intro')],
-  ['social', 'সোশ্যাল লিংক', 10, u => Object.values(u.social || {}).some(Boolean), () => openAbout('social')],
-  ['blood', 'ব্লাড গ্রুপ', 10, u => !!u.bloodGroup, () => openAbout('blood')],
-];
-function meterHtml(u) {
-  const miss = METER.filter(m => !m[3](u)), pct = 100 - miss.reduce((a, m) => a + m[2], 0);
-  if (!miss.length) return '';
-  return `<div class="pmeter"><div class="pm-top"><b>প্রোফাইল ${bn(pct)}% পূর্ণ</b><span class="mut">আরও তথ্য দিলে মানুষ সহজে চিনবে</span></div>
-    <div class="pm-bar"><i style="width:${pct}%"></i></div>
-    <div class="pm-chips">${miss.slice(0, 4).map(m => `<button class="chip" data-pmeter="${m[0]}">+ ${m[1]}</button>`).join('')}</div></div>`;
+// ---------- অন্যরা কেমন দেখে: নিজের প্রোফাইল অচেনা মানুষ বা বন্ধুর চোখে
+async function previewProfile(mode) {
+  const u = me(), full = await S.api.profile(u.id);
+  const p = { ...u, ...full, id: u.id, rel: {}, aboutVis: u.aboutVis };
+  const ok = k => { const v = aVis(u, k); return v === 'public' || (mode === 'friends' && v === 'friends'); };
+  if (!ok('works')) p.works = [];
+  if (!ok('educations')) p.educations = [];
+  if (!ok('contact')) p.phone = '';
+  if (!ok('social')) p.social = {};
+  if (!ok('birth')) { p.birthDate = ''; p.birthYear = 0; }
+  if (!ok('relationship')) p.relationship = '';
+  if (!ok('religion')) p.religion = '';
+  if (!ok('orgs')) p.orgs = [];
+  if (mode === 'public' && u.locked) p.lockedOut = true;
+  return p;
 }
-document.addEventListener('click', e => { const b = e.target.closest('[data-pmeter]'); if (b) METER.find(m => m[0] === b.dataset.pmeter)?.[4](); });
+const previewBar = () => `<div class="card pv-bar"><div class="pv-t">👁️ ${S.preview === 'friends' ? 'আপনার <b>বন্ধুরা</b>' : '<b>যারা আপনার বন্ধু নন</b> তারা'} আপনার প্রোফাইল এভাবে দেখেন</div>
+  <div class="seg"><button data-viewas="public" class="${S.preview === 'public' ? 'on' : ''}">সাধারণ মানুষ</button><button data-viewas="friends" class="${S.preview === 'friends' ? 'on' : ''}">বন্ধু</button></div>
+  <button class="link" data-viewas-exit>← নিজের প্রোফাইলে ফিরুন</button></div>`;
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-viewas-exit]')) { S.preview = null; return go('me'); }
+  const b = e.target.closest('[data-viewas]'); if (!b || !me()) return;
+  S.preview = b.dataset.viewas; S.userId = me().id;
+  Object.assign(S.pstate.user, { tab: 'posts', seg: 'all', album: null, uid: me().id });
+  openUser(me().id, false, true, true);
+});
 // ---------- মিউচুয়াল বন্ধু
 function mutualHtml(m) {
   if (!m?.count) return '';

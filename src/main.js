@@ -13,6 +13,7 @@ const ICONS = {
   phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
   drop: '<path d="M12 3s-6 7-6 11a6 6 0 0 0 12 0c0-4-6-11-6-11z"/>',
   calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  poll: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   message: '<path d="M4 5h16v11H9l-5 4z"/>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
@@ -345,13 +346,16 @@ function postHtml(p) {
   const link = (inner, cls) => p.pageId ? `<button class="${cls}" data-page="${esc(p.pageId)}">${inner}</button>` : userLink(p.userId, inner, cls);
   const via = p.groupId && S.view !== 'group' ? ` <span class="via">▸ <button data-group="${esc(p.groupId)}">${esc(p.groupName)}</button></span>` : '';
   const own = u && p.userId === u.id;
-  return `<article class="card post${p.sponsored ? ' sponsored' : ''}${p.pinnedPage ? ' pinned-pg' : ''}" data-pid="${esc(p.id)}"${own ? ' data-own="1"' : ''}${p.shared && p.shared.userId !== u?.id ? ` data-spid="${esc(p.shared.id)}"` : ''}>
+  const urgent = p.category === 'সাহায্য চাই' && !p.resolvedAt && !p.groupId && Date.now() - new Date(p.createdAt) < 864e5;
+  const showBg = p.bg && p.body && !p.images.length && !p.shared && !p.poll && p.body.length <= BG_MAX;
+  return `<article class="card post${p.sponsored ? ' sponsored' : ''}${p.pinnedPage ? ' pinned-pg' : ''}${urgent ? ' urgent' : ''}${p.urgentTop ? ' urg-top' : ''}" data-pid="${esc(p.id)}"${own ? ' data-own="1"' : ''}${p.shared && p.shared.userId !== u?.id ? ` data-spid="${esc(p.shared.id)}"` : ''}>
     ${p.pinnedPage ? '<div class="pin-lbl">📌 পিন করা পোস্ট</div>' : ''}<div class="top">${link(av(p), 'avbtn')}
       <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
       ${own ? `<button class="pinfo" data-pinfo="${esc(p.id)}" aria-label="পোস্টটি কতজন দেখেছেন" title="পোস্টের হিসাব">${ic('info', 19)}</button>` : ''}<button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
-    <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>
-    ${p.body ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
+    <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>${urgent ? '<span class="urg-lbl">🚨 জরুরি</span>' : ''}${p.resolvedAt && RESOLVE[p.category] ? `<span class="resolved">${RESOLVE[p.category][0]}</span>` : ''}
+    ${showBg ? `<div class="pbg ${esc(p.bg)}">${esc(p.body)}</div>` : p.body ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
     ${photosHtml(p)}
+    ${p.poll ? pollHtml(p) : ''}${p.eventAt ? eventHtml(p) : ''}${p.link && !p.images.length && !p.shared ? linkCardHtml(p.link) : ''}
     ${p.shared ? `<button class="shared-embed" data-openpost="${esc(p.shared.id)}"><span class="se-top">${av(p.shared, 'sm')}<span><b>${esc(p.shared.author)}${vb(p.shared.badge)}</b><span class="mut"> · ${esc(ago(p.shared.createdAt))}</span></span></span>${p.shared.body ? `<span class="se-body">${esc(p.shared.body)}</span>` : ''}${p.shared.image ? `<img src="${esc(p.shared.image)}" alt="" loading="lazy" decoding="async">` : ''}</button>`
       : p.sharedMissing ? '<div class="shared-embed missing">এই পোস্টটি আর দেখা যাচ্ছে না</div>' : ''}
     ${p.likes ? `<div class="rsum"><button class="rsum-l" data-rxlist="${esc(p.id)}" aria-label="কে কে রিয়্যাক্ট দিয়েছেন"><span class="rsum-e">${Object.entries(p.reactions || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => `<span class="rs-i">${rxIcon(k, 18)}</span>`).join('')}</span><span class="rsum-who">কে কে রিয়্যাক্ট দিয়েছেন</span></button></div>` : ''}
@@ -447,6 +451,201 @@ document.addEventListener('submit', e => {
     renderFeed(key); focusCmi(id);
   });
 });
+// পোল: ভোট দিলে (বা নিজের পোস্টে) ফলাফল দেখায়
+function pollHtml(p) {
+  const votes = p.poll.map((_, i) => Number(p.votes?.[i]) || 0), total = votes.reduce((a, b) => a + b, 0);
+  const voted = p.myVote != null, show = voted || p.userId === me()?.id;
+  return `<div class="poll">${p.poll.map((o, i) => {
+    const pct = total ? Math.round(votes[i] * 100 / total) : 0;
+    return show ? `<button class="po res${p.myVote === i ? ' mine' : ''}" data-vote="${esc(p.id)}|${i}" aria-label="${esc(o)}: ${bn(pct)}%${p.myVote === i ? ', আপনার ভোট' : ''}"><span class="po-bar" style="width:${pct}%"></span><span class="po-t">${p.myVote === i ? '✓ ' : ''}${esc(o)}</span><span class="po-p">${bn(pct)}%</span></button>`
+      : `<button class="po" data-vote="${esc(p.id)}|${i}"><span class="po-t">${esc(o)}</span></button>`;
+  }).join('')}<div class="po-foot mut">${bn(total)} ভোট${voted ? ' · বদলাতে অন্য অপশনে, তুলে নিতে নিজের ভোটে চাপুন' : show ? '' : ' · ভোট দিলে ফলাফল দেখবেন'}</div></div>`;
+}
+const DHAKA = { timeZone: 'Asia/Dhaka' };
+// বাংলায় তারিখ-সময় (ঢাকার সময়): "শুক্রবার, ২৭ নভেম্বর · বিকাল ৫:০০"
+const BN_WD = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+const BN_MON = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+function dhakaParts(d) {
+  const x = new Date(new Date(d).getTime() + 6 * 36e5);   // ঢাকা UTC+6, দিবালোক সময় নেই
+  return { wd: x.getUTCDay(), day: x.getUTCDate(), mon: x.getUTCMonth(), h: x.getUTCHours(), m: x.getUTCMinutes() };
+}
+function bnWhen(d, short) {
+  const t = dhakaParts(d), per = t.h < 4 ? 'রাত' : t.h < 6 ? 'ভোর' : t.h < 12 ? 'সকাল' : t.h < 15 ? 'দুপুর' : t.h < 18 ? 'বিকাল' : t.h < 20 ? 'সন্ধ্যা' : 'রাত';
+  const time = `${per} ${bn(t.h % 12 || 12)}:${bn(String(t.m).padStart(2, '0'))}`;
+  return short ? `${BN_WD[t.wd]} ${time}` : `${BN_WD[t.wd]}, ${bn(t.day)} ${BN_MON[t.mon]} · ${time}`;
+}
+function eventHtml(p) {
+  const at = new Date(p.eventAt), past = at < Date.now();
+  const t = dhakaParts(at), day = bn(t.day), mon = BN_MON[t.mon], when = bnWhen(at);
+  return `<div class="evt${past ? ' past' : ''}"><div class="evt-d"><b>${day}</b><span>${mon}</span></div>
+    <div class="evt-i"><b>${esc(when)}</b>${p.eventPlace ? `<span>📍 ${esc(p.eventPlace)}</span>` : ''}<span class="mut">${p.going ? `${bn(p.going)} জন ${past ? 'গিয়েছিলেন' : 'যাচ্ছেন'}` : past ? 'অনুষ্ঠানটি শেষ হয়েছে' : 'প্রথম "যাব" আপনিই দিন'}</span></div>
+    ${past ? '<span class="evt-past">শেষ</span>' : `<button class="evt-go${p.meGoing ? ' on' : ''}" data-going="${esc(p.id)}" aria-pressed="${!!p.meGoing}">${p.meGoing ? '✓ যাচ্ছি' : 'যাব'}</button>`}</div>`;
+}
+// ================================================================ স্টোরি (২৪ ঘণ্টা)
+// ২৪ ঘণ্টা পর সার্ভার থেকে লেখা ও ছবিসহ চিরতরে মুছে যায়। ফোনেও ছবি জমা রাখা হয় না (দেখা শেষে মেমরি থেকে ফেলে দেওয়া হয়)।
+S.stories = []; S.stImg = new Map();
+const stSeen = () => new Set(local.get('stseen', []));
+function markStSeen(id) { const s0 = stSeen(); if (s0.has(id)) return; s0.add(id); const live = new Set(S.stories.map(x => x.id)); local.set('stseen', [...s0].filter(x => live.has(x)).slice(-400)); }
+async function loadStories() {
+  try { S.stories = await S.api.stories(); } catch { S.stories = []; }
+  renderStories();
+}
+function storyGroups() {
+  const m = new Map(), myId = me()?.id, seen = stSeen();
+  for (const st of S.stories) { if (!m.has(st.userId)) m.set(st.userId, { userId: st.userId, name: st.name, avatar: st.avatar, items: [] }); m.get(st.userId).items.push(st); }
+  const arr = [...m.values()];
+  arr.forEach(g => { g.seen = g.items.every(x => seen.has(x.id)); g.last = g.items.at(-1).createdAt; });
+  return arr.sort((a, b) => (b.userId === myId) - (a.userId === myId) || a.seen - b.seen || b.last.localeCompare(a.last));
+}
+function renderStories() {
+  const box = $('#stories'); if (!box) return;
+  const u = me(), groups = storyGroups(), myId = u?.id;
+  if (S.actAs || (!u && !groups.length)) { box.hidden = true; return; }
+  box.hidden = false;
+  const mineHas = groups[0]?.userId === myId;
+  box.innerHTML = (u && !mineHas ? `<button class="st-u st-add" id="st-add" aria-label="স্টোরি দিন"><span class="st-ring add">${av(u)}<i>+</i></span><span class="st-n">স্টোরি দিন</span></button>` : '')
+    + groups.map((g, i) => `<button class="st-u${g.seen ? ' seen' : ''}" data-stg="${i}" aria-label="${esc(g.name)}-এর স্টোরি"><span class="st-ring">${av(g)}${g.userId === myId ? '<i class="st-plus" data-stadd="1" role="button" aria-label="আরেকটি স্টোরি দিন">+</i>' : ''}</span><span class="st-n">${g.userId === myId ? 'আপনার স্টোরি' : esc(g.name.split(' ')[0])}</span></button>`).join('');
+}
+$('#stories').addEventListener('click', e => {
+  if (e.target.closest('#st-add, [data-stadd]')) { e.stopPropagation(); return storyCreator(); }
+  const b = e.target.closest('[data-stg]'); if (b) openStories(Number(b.dataset.stg));
+});
+// ---------- দেখা
+function openStories(gi) {
+  const groups = storyGroups(); if (!groups[gi]) return;
+  const seen = stSeen(), g = groups[gi];
+  const si = Math.max(0, g.items.findIndex(x => !seen.has(x.id)));
+  S.stv = { groups, gi, si, t0: 0, left: 0, timer: null, paused: false };
+  document.querySelector('.st-ov')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div class="st-ov" role="dialog" aria-label="স্টোরি"><div class="st-frame"><div class="st-bars"></div><div class="st-head"></div><div class="st-body"></div><div class="st-foot"></div></div></div>`);
+  const ov = document.querySelector('.st-ov');
+  let downAt = 0;
+  ov.addEventListener('pointerdown', e => { if (e.target.closest('button,a')) return; downAt = Date.now(); stPause(true); });
+  ov.addEventListener('pointerup', e => {
+    if (e.target.closest('button,a') || !downAt) return;
+    const held = Date.now() - downAt; downAt = 0;
+    if (held > 300) return stPause(false);
+    const r = ov.querySelector('.st-frame').getBoundingClientRect();
+    (e.clientX - r.left < r.width / 3) ? stStep(-1) : stStep(1);
+  });
+  ov.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.user) return closeStories();   // প্রোফাইলে যাওয়ার আগে স্টোরি বন্ধ
+    if (b.dataset.stx !== undefined) return closeStories();
+    if (b.dataset.stviews !== undefined) return storyViewersSheet();
+    if (b.dataset.stdel !== undefined) return deleteStoryNow();
+  });
+  document.addEventListener('keydown', stKeys);
+  showStory();
+}
+function stKeys(e) { if (!S.stv) return; if (e.key === 'Escape') closeStories(); if (e.key === 'ArrowRight') stStep(1); if (e.key === 'ArrowLeft') stStep(-1); }
+function closeStories() {
+  clearTimeout(S.stv?.timer); S.stv = null; document.removeEventListener('keydown', stKeys);
+  document.querySelector('.st-ov')?.remove(); S.stImg.clear();   // দেখা শেষ, ছবি মেমরি থেকেও ফেলে দেওয়া
+  renderStories();
+}
+function stStep(d) {
+  const v = S.stv; if (!v) return; clearTimeout(v.timer);
+  let { gi, si } = v; si += d;
+  if (si < 0) { if (gi === 0) si = 0; else { gi--; si = v.groups[gi].items.length - 1; } }
+  else if (si >= v.groups[gi].items.length) { gi++; si = 0; if (gi >= v.groups.length) return closeStories(); }
+  v.gi = gi; v.si = si; showStory();
+}
+function stPause(on) {
+  const v = S.stv; if (!v || v.paused === on) return; v.paused = on;
+  const bar = document.querySelector('.st-bars .cur i');
+  if (on) { clearTimeout(v.timer); v.left = Math.max(v.left - (Date.now() - v.t0), 300); if (bar) { bar.style.width = getComputedStyle(bar).width; bar.style.transition = 'none'; } }
+  else stRun(v.left);
+}
+function stRun(ms) {
+  const v = S.stv; if (!v) return; v.t0 = Date.now(); v.left = ms; v.paused = false;
+  const bar = document.querySelector('.st-bars .cur i');
+  if (bar) { bar.style.transition = `width ${ms}ms linear`; requestAnimationFrame(() => { bar.style.width = '100%'; }); }
+  clearTimeout(v.timer); v.timer = setTimeout(() => stStep(1), ms);
+}
+async function showStory() {
+  const v = S.stv; if (!v) return; const ov = document.querySelector('.st-ov'); if (!ov) return;
+  const g = v.groups[v.gi], st = g.items[v.si], mine = st.userId === me()?.id;
+  ov.querySelector('.st-bars').innerHTML = g.items.map((x, i) => `<span class="${i === v.si ? 'cur' : ''}"><i style="width:${i < v.si ? 100 : 0}%"></i></span>`).join('');
+  ov.querySelector('.st-head').innerHTML = `<button class="st-who" data-user="${esc(g.userId)}">${av(g, 'sm')}<b>${esc(g.name)}</b><span>${esc(ago(st.createdAt))}${st.privacy === 'friends' ? ' · 👥' : ''}</span></button>
+    ${mine ? '<button class="st-hb" data-stdel aria-label="স্টোরি মুছে ফেলুন">' + ic('trash', 20) + '</button>' : ''}<button class="st-hb" data-stx aria-label="বন্ধ করুন">${ic('close', 22)}</button>`;
+  ov.querySelector('.st-foot').innerHTML = mine ? `<button class="st-views" data-stviews>${ic('eye', 18)} <span id="st-vc">…</span> জন দেখেছেন</button>` : '';
+  const body = ov.querySelector('.st-body');
+  markStSeen(st.id); if (!mine) S.api.storySeen([st.id]).catch(() => {});
+  if (mine) S.api.myStoryViews().then(m => { const el = $('#st-vc'); if (el && S.stv && v.groups[v.gi].items[v.si] === st) el.textContent = bn(m.get(st.id) || 0); }).catch(() => {});
+  if (st.kind === 'text') { body.innerHTML = `<div class="st-text ${esc(st.bg)}">${esc(st.body)}</div>`; return stRun(5000); }
+  body.innerHTML = '<div class="st-load">লোড হচ্ছে…</div>';
+  let src = S.stImg.get(st.id);
+  if (!src) { src = await S.api.storyImage(st.id).catch(() => ''); if (src) S.stImg.set(st.id, src); }
+  if (!S.stv || v.groups[v.gi].items[v.si] !== st) return;
+  body.innerHTML = src ? `<img class="st-img" src="${esc(src)}" alt="">${st.body ? `<div class="st-cap">${esc(st.body)}</div>` : ''}` : '<div class="st-load">স্টোরিটি আর নেই</div>';
+  // পরের ছবি আগেই এনে রাখা (শুধু মেমরিতে)
+  const nx = g.items[v.si + 1]; if (nx?.kind === 'photo' && !S.stImg.has(nx.id)) S.api.storyImage(nx.id).then(x => x && S.stv && S.stImg.set(nx.id, x)).catch(() => {});
+  stRun(6000);
+}
+async function storyViewersSheet() {
+  const v = S.stv; if (!v) return; const st = v.groups[v.gi].items[v.si];
+  stPause(true);
+  openSheet(`<h2>${ic('eye', 20)} কারা দেখেছেন</h2><div id="stv-list"><div class="mut">লোড হচ্ছে…</div></div><button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
+  $('#sheet').addEventListener('click', e => { if (e.target.closest('[data-close]')) setTimeout(() => stPause(false), 50); });
+  const list = await S.api.storyViewers(st.id).catch(() => []);
+  $('#stv-list').innerHTML = list.length ? list.map(x => `<div class="person">${av(x)}<div class="info"><b>${esc(x.name)}</b><div class="sub">${esc(ago(x.seenAt))}</div></div></div>`).join('') : '<p class="mut">এখনো কেউ দেখেননি।</p>';
+}
+async function deleteStoryNow() {
+  const v = S.stv; if (!v) return; const st = v.groups[v.gi].items[v.si];
+  stPause(true);
+  if (!(await confirmSheet('স্টোরিটি এখনই মুছে ফেলবেন?', 'মুছুন', true))) return stPause(false);
+  await busy(null, async () => {
+    await S.api.deleteStory(st.id); S.stories = S.stories.filter(x => x.id !== st.id); S.stImg.delete(st.id);
+    toast('স্টোরি মুছে ফেলা হয়েছে'); closeStories();
+  });
+}
+// ---------- তৈরি
+function storyCreator() {
+  if (!needUser()) return;
+  S.stDraft = { kind: 'text', body: '', bg: 'g1', blob: null, url: '', privacy: local.get('stpriv', 'public') };
+  renderStoryCreator();
+}
+function renderStoryCreator() {
+  const d = S.stDraft;
+  openSheet(`<div class="stc"><div class="pc-head"><b>স্টোরি তৈরি করুন</b><button class="pc-x" data-close aria-label="বন্ধ করুন">${ic('close', 20)}</button></div>
+    <div class="seg stc-kind"><button data-stk="text" class="${d.kind === 'text' ? 'on' : ''}">Aa লেখা</button><button data-stk="photo" class="${d.kind === 'photo' ? 'on' : ''}">${ic('photo', 16)} ছবি</button></div>
+    ${d.kind === 'text' ? `<div class="stc-prev ${d.bg}"><textarea id="stc-text" maxlength="250" placeholder="কিছু লিখুন…">${esc(d.body)}</textarea></div>
+      <div class="pc-bgs">${BGS.map(g => `<button type="button" class="pc-sw ${g}${d.bg === g ? ' on' : ''}" data-stbg="${g}" aria-label="রং ${g.slice(1)}"></button>`).join('')}</div>`
+    : `<label class="stc-photo">${d.url ? `<img src="${d.url}" alt="">` : `${ic('photo', 36)}<span>ছবি বাছাই করুন</span>`}<input type="file" accept="image/*" id="stc-file" hidden></label>
+      <input class="f" id="stc-cap" maxlength="250" placeholder="ছবির সাথে কিছু লিখতে চাইলে (ঐচ্ছিক)" value="${esc(d.body)}">`}
+    <label class="stc-pv">কারা দেখবে <select class="f" id="stc-priv"><option value="public" ${d.privacy === 'public' ? 'selected' : ''}>সবাই</option><option value="friends" ${d.privacy === 'friends' ? 'selected' : ''}>শুধু বন্ধুরা</option></select></label>
+    <p class="stc-note">⏳ ২৪ ঘণ্টা পর স্টোরি চিরতরে মুছে যাবে। লেখা বা ছবি কোথাও রেখে দেওয়া হয় না।</p>
+    <button class="btn wide" id="stc-go">স্টোরি শেয়ার করুন</button></div>`);
+  const keep = () => { d.body = ($('#stc-text') || $('#stc-cap'))?.value ?? d.body; d.privacy = $('#stc-priv').value; };
+  $('#sheet').oninput = keep; $('#sheet').onchange = async e => {
+    keep();
+    if (e.target.id === 'stc-file' && e.target.files[0]) {
+      try {
+        let blob = await compress(e.target.files[0], 1080, 0.72);
+        if (blob.size > 270000) blob = await compress(e.target.files[0], 800, 0.6);
+        if (d.url) URL.revokeObjectURL(d.url);
+        d.blob = blob; d.url = URL.createObjectURL(blob); renderStoryCreator();
+      } catch { toast('ছবিটি খোলা যায়নি'); }
+    }
+  };
+  $('#sheet').onclick = e => {
+    const k = e.target.closest('[data-stk]'); if (k) { keep(); d.kind = k.dataset.stk; d.body = ''; return renderStoryCreator(); }
+    const bgb = e.target.closest('[data-stbg]'); if (bgb) { keep(); d.bg = bgb.dataset.stbg; return renderStoryCreator(); }
+  };
+  $('#stc-go').onclick = e => {
+    keep();
+    if (d.kind === 'text' && !d.body.trim()) return toast('কিছু লিখুন');
+    if (d.kind === 'photo' && !d.blob) return toast('একটি ছবি বাছাই করুন');
+    local.set('stpriv', d.privacy);
+    busy(e.currentTarget, async () => {
+      try { await S.api.createStory({ kind: d.kind, body: d.body.trim(), bg: d.bg, blob: d.blob, privacy: d.privacy }); }
+      catch (err) { if (/story limit/.test(err.message)) return toast('একসাথে সর্বোচ্চ ১৫টি স্টোরি রাখা যায়'); throw err; }
+      if (d.url) URL.revokeObjectURL(d.url);
+      S.stDraft = null; closeSheet(); toast('স্টোরি দেওয়া হয়েছে, ২৪ ঘণ্টা থাকবে'); loadStories();
+    });
+  };
+}
 // ================================================================ পোস্ট কতজন দেখেছেন
 // অর্ধেকের বেশি অংশ অন্তত ১ সেকেন্ড স্ক্রিনে থাকলে "দেখা" ধরা হয়; কয়েক সেকেন্ড পরপর একসাথে সার্ভারে পাঠানো হয়
 const seenPosts = new Set(), seenQueue = new Map(), seenTimers = new Map();
@@ -620,7 +819,9 @@ function withAds(f) {
   return out;
 }
 function renderFeed(key) {
-  const f = S.feeds[key], box = $('#feed-' + key), list = key === 'home' ? withAds(f) : f.posts;
+  const f = S.feeds[key], box = $('#feed-' + key);
+  let list = key === 'home' ? withAds(f) : f.posts;
+  if (key === 'home' && f.urgent?.length) { const top = f.urgent.filter(p => !p.resolvedAt), ids = new Set(top.map(p => String(p.id))); list = [...top, ...list.filter(p => !ids.has(String(p.id)))]; }
   box.innerHTML = f.posts.length ? list.map(postHtml).join('')
     : key === 'search' ? '' : key === 'post' ? '<div class="empty">পোস্টটি আর নেই।</div>'
     : key === 'saved' ? '<div class="empty">কোনো সেভ করা পোস্ট নেই।<br>পোস্টের ⋯ মেনু থেকে "পোস্ট সেভ করুন" চাপুন।</div>'
@@ -649,16 +850,19 @@ async function loadFeed(key, append) {
     const plainHome = key === 'home' && !append && S.scope === 'area' && !q.unionId && !q.category && !S.api.demoLogin;
     const call = () => S.api.posts({ ...q, before: append ? f.posts.at(-1)?.createdAt : undefined });
     const adsP = key === 'home' && !append && !q.category && feat('featBoost') ? S.api.boostedPosts(3).catch(() => []) : null;
+    const urgP = key === 'home' && !append && S.scope === 'area' && (!q.category || q.category === 'সাহায্য চাই') ? S.api.posts({ urgent: true, unionId: q.unionId }).catch(() => []) : null;
     const pinP = key === 'page' && !append && S.curPage?.pinnedPostId ? S.api.posts({ postId: S.curPage.pinnedPostId }).catch(() => []) : null;
     const rows = plainHome ? await cachedCall('feed', async () => (await call()).slice(0, PAGE)) : await call();
     if (adsP) f.ads = await adsP;
+    if (key === 'home' && !append) loadStories();
+    if (key === 'home' && !append) f.urgent = urgP ? (await urgP).map(p => ({ ...p, urgentTop: true })) : [];
     f.posts = append ? [...f.posts, ...rows] : rows; f.more = !['post', 'saved'].includes(key) && rows.length >= PAGE;
     if (pinP) { const pin = (await pinP)[0]; if (pin) f.posts = [{ ...pin, pinnedPage: true }, ...f.posts.filter(x => x.id !== pin.id)]; }
   } catch (e) { toast(errText(e)); if (!append) f.posts = []; }
   renderFeed(key);
 }
 const feedOf = el => el.closest('[data-feed]')?.dataset.feed;
-const findPost = (key, id) => S.feeds[key].posts.find(p => String(p.id) === String(id)) || (S.feeds[key].ads || []).find(p => String(p.id) === String(id));
+const findPost = (key, id) => (S.feeds[key].urgent || []).find(p => String(p.id) === String(id)) || S.feeds[key].posts.find(p => String(p.id) === String(id)) || (S.feeds[key].ads || []).find(p => String(p.id) === String(id));
 
 document.addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -668,6 +872,24 @@ document.addEventListener('click', async e => {
   if (b.dataset.group) return openGroup(b.dataset.group);
   const key = feedOf(b); if (!key) return;
   if (b.dataset.pinfo) return postStatsSheet(findPost(key, b.dataset.pinfo));
+  if (b.dataset.vote) {
+    if (!needUser()) return;
+    const [id, i] = b.dataset.vote.split('|'), p = findPost(key, id), opt = Number(i); if (!p) return;
+    const before = { votes: [...(p.votes || p.poll.map(() => 0))], myVote: p.myVote };
+    const next = p.myVote === opt ? null : opt;
+    p.votes = before.votes.slice(); if (p.myVote != null) p.votes[p.myVote] = Math.max((p.votes[p.myVote] || 0) - 1, 0); if (next != null) p.votes[next] = (p.votes[next] || 0) + 1;
+    p.myVote = next; renderFeed(key);
+    try { await S.api.votePoll(p.id, next); } catch (err) { Object.assign(p, before); renderFeed(key); toast(errText(err)); }
+    return;
+  }
+  if (b.dataset.going) {
+    if (!needUser()) return;
+    const p = findPost(key, b.dataset.going); if (!p) return;
+    const on = !p.meGoing; p.meGoing = on; p.going = Math.max((p.going || 0) + (on ? 1 : -1), 0); renderFeed(key);
+    try { await S.api.setGoing(p.id, on); if (on) toast('ঠিক আছে! অনুষ্ঠানের আগের দিন মনে করিয়ে দেওয়া হবে'); }
+    catch (err) { p.meGoing = !on; p.going = Math.max((p.going || 0) + (on ? -1 : 1), 0); renderFeed(key); toast(errText(err)); }
+    return;
+  }
   if (b.dataset.like) {
     if (S.suppressClick) { S.suppressClick = false; return; }
     clearTimeout(lpTimer); closePicker();
@@ -770,6 +992,7 @@ function postMenu(key, p) {
     ${u && (p.tags || []).some(t => t.id === u.id) ? '<button data-act="untag">আমার ট্যাগ সরিয়ে দিন</button>' : ''}
     ${u && p.userId === u.id && (p.privacy || 'public') === 'public' && !p.groupId && feat('featBoost') ? `<button data-act="boost">${ic('send', 16)} পোস্ট বুস্ট করুন</button>` : ''}
     ${p.pageId && S.curPage?.id === p.pageId && S.curPage.canManage ? `<button data-act="pinpg">📌 ${S.curPage.pinnedPostId === p.id ? 'পিন সরান' : 'পেইজের উপরে পিন করুন'}</button>` : ''}
+    ${u && p.userId === u.id && RESOLVE[p.category] ? `<button data-act="resolve">${p.resolvedAt ? 'চিহ্নটি তুলে নিন' : '✅ ' + RESOLVE[p.category][1]}</button>` : ''}
     ${u && p.userId === u.id ? '<button data-act="edit">পোস্ট এডিট করুন</button>' : ''}
     ${mine ? '<button data-act="del" class="danger">পোস্টটি মুছে ফেলুন</button>' : ''}
     ${u && p.userId !== u.id ? `<button data-act="report">পোস্টটি রিপোর্ট করুন</button>${p.pageId ? '' : `<button data-act="block" class="danger">${esc(p.author)}-কে ব্লক করুন</button>`}` : ''}
@@ -788,6 +1011,15 @@ function postMenu(key, p) {
     }
     if (a === 'report') reportSheet('post', p.id);
     if (a === 'edit') { closeSheet(); openEditPost(p); }
+    if (a === 'resolve') {
+      closeSheet(); const on = !p.resolvedAt;
+      await busy(null, async () => {
+        await S.api.resolvePost(p.id, on); const at = on ? new Date().toISOString() : null;
+        for (const k in S.feeds) for (const x of [...(S.feeds[k].posts || []), ...(S.feeds[k].urgent || [])]) if (x.id === p.id) x.resolvedAt = at;
+        p.resolvedAt = at; renderFeed(key); if (key !== 'home' && S.feeds.home.posts.length) renderFeed('home');
+        toast(on ? 'চিহ্ন দেওয়া হয়েছে। সবাই জানবে বিষয়টির সমাধান হয়েছে।' : 'চিহ্ন তুলে নেওয়া হয়েছে');
+      });
+    }
     if (a === 'boost') boostSheet(p);
     if (a === 'pinpg') { closeSheet(); const pg = S.curPage, un = pg.pinnedPostId === p.id; return busy(null, async () => { await S.api.pinPagePost(pg.id, un ? null : p.id); pg.pinnedPostId = un ? null : p.id; await openPage(pg.id, true); toast(un ? 'পিন সরানো হয়েছে' : 'পোস্টটি পেইজের উপরে পিন হয়েছে'); }); }
     if (a === 'untag') { closeSheet(); await busy(null, async () => { await S.api.untagMe(p.id); p.tags = p.tags.filter(t => t.id !== me().id); renderFeed(key); toast('ট্যাগ সরানো হয়েছে'); }); }
@@ -887,7 +1119,18 @@ document.addEventListener('scroll', e => { if (!MP.hidden && !MP.contains(e.targ
 const PRIVACY = { public: ['globe', 'পাবলিক', 'যে কেউ দেখতে পারবে'], friends: ['users', 'বন্ধুরা', 'শুধু আপনার বন্ধুরা'], only_me: ['lock', 'শুধু আমি', 'শুধু আপনি দেখবেন'] };
 const MAX_PHOTOS = 10;
 S.draft = null;
-function newDraft(opts = {}) { return { body: '', category: POST_CATS[0], photos: [], tags: [], mentions: new Map(), privacy: local.get('privacy', 'public'), ...opts }; }
+function newDraft(opts = {}) { return { body: '', category: POST_CATS[0], photos: [], tags: [], mentions: new Map(), privacy: local.get('privacy', 'public'), bg: '', poll: null, event: null, link: null, linkOff: '', ...opts }; }
+const BGS = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8'];
+const BG_MAX = 150;
+const canBg = d => !d.photos.length && !d.poll && !d.shared && (d.body || '').trim().length <= BG_MAX;
+const URL_RE = /https?:\/\/[^\s<>"']+/i;
+const RESOLVE = { 'সাহায্য চাই': ['✅ সমাধান হয়েছে', 'সমাধান হয়েছে চিহ্ন দিন'], 'হারানো-প্রাপ্তি': ['✅ পাওয়া গেছে', 'পাওয়া গেছে চিহ্ন দিন'], 'কেনা-বেচা': ['✅ বিক্রি হয়ে গেছে', 'বিক্রি হয়ে গেছে চিহ্ন দিন'] };
+const localDT = d => { const z = new Date(d.getTime() - d.getTimezoneOffset() * 6e4); return z.toISOString().slice(0, 16); };
+function linkCardHtml(l, rm) {
+  if (!l?.url || !/^https?:\/\//i.test(l.url)) return '';
+  const img = l.image && /^https:\/\//i.test(l.image) ? `<img src="${esc(l.image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
+  return `<div class="lnk-wrap">${rm ? `<button type="button" class="lnk-x" data-rmlink aria-label="লিংকের প্রিভিউ বাদ দিন">${ic('close', 14)}</button>` : ''}<a class="lnk" href="${esc(l.url)}" target="_blank" rel="noopener nofollow ugc">${img}<span class="lnk-b"><span class="lnk-site">${esc(l.site || '')}</span><b>${esc(l.title || l.url)}</b>${l.desc ? `<span class="lnk-d">${esc(l.desc)}</span>` : ''}</span></a></div>`;
+}
 function openPostComposer(opts = {}, then) {
   if (!needUser()) return;
   if (!S.draft || S.draft.editId || S.draft.albumId !== opts.albumId || S.draft.pageId !== opts.pageId || S.draft.groupId !== opts.groupId) S.draft = newDraft(opts);
@@ -908,24 +1151,59 @@ function openEditPost(p) {
 }
 const draftSig = d => JSON.stringify([d.body.trim(), d.category, d.privacy, d.photos.map(x => x.keep || x.url), d.tags.map(t => t.id).sort(), mentionIds(d.body.trim(), d.mentions).sort()]);
 function renderComposerSheet() {
-  const d = S.draft, u = me(), own = !d.pageId && !d.groupId, pv = PRIVACY[d.privacy], photosOk = !d.shared;
+  const d = S.draft, u = me(), own = !d.pageId && !d.groupId, pv = PRIVACY[d.privacy], photosOk = !d.shared && !d.poll;
+  const extras = !d.editId && !d.shared && !d.albumId;
   const tagLine = d.tags.length ? ` <span class="pc-with">— ${d.tags.length === 1 ? `<b>${esc(d.tags[0].name)}</b>-এর সাথে` : d.tags.length === 2 ? `<b>${esc(d.tags[0].name)}</b> ও <b>${esc(d.tags[1].name)}</b>-এর সাথে` : `<b>${esc(d.tags[0].name)}</b> ও আরও ${bn(d.tags.length - 1)} জনের সাথে`}</span>` : '';
   openSheet(`<div class="pc">
     <div class="pc-head"><b>${esc(d.title || 'পোস্ট তৈরি করুন')}</b><button class="pc-x" data-close aria-label="বন্ধ করুন">${ic('close', 20)}</button></div>
     <div class="pc-author">${d.pageId && d.authorName ? entAv({ name: d.authorName, avatar: d.authorAvatar }) : av(u)}<div><div class="pc-name"><b>${esc(d.authorName || u.name)}</b>${tagLine}</div>
       ${d.albumId ? `<span class="pc-priv static" title="অ্যালবামের প্রাইভেসি">${ic(pv[0], 14)} ${pv[1]}</span>` : own ? `<button class="pc-priv" id="pc-priv" aria-label="কারা দেখবে: ${pv[1]}">${ic(pv[0], 14)} ${pv[1]} ▾</button>` : `<span class="pc-priv static">${ic('globe', 14)} পাবলিক</span>`}</div></div>
     ${d.albumId ? `<div class="pc-album">${ic('album', 16)} অ্যালবাম: <b>${esc(d.albumName)}</b></div>` : ''}
-    <textarea id="pc-text" maxlength="1000" placeholder="আপনার মনে কী আছে, ${esc(u.name.split(' ')[0])}? (কাউকে উল্লেখ করতে @ লিখুন)">${esc(d.body)}</textarea>
+    <textarea id="pc-text" class="${d.bg && canBg(d) ? 'pc-bg ' + d.bg : ''}" maxlength="1000" placeholder="${d.poll ? 'প্রশ্নটি লিখুন… (যেমন: কোন রাস্তা আগে মেরামত হওয়া দরকার?)' : `আপনার মনে কী আছে, ${esc(u.name.split(' ')[0])}? (কাউকে উল্লেখ করতে @ লিখুন)`}">${esc(d.body)}</textarea>
+    ${extras && d.bgOpen && !d.photos.length && !d.poll ? `<div class="pc-bgs" role="radiogroup" aria-label="ব্যাকগ্রাউন্ড রং"><button type="button" class="pc-sw none${d.bg ? '' : ' on'}" data-bg="" aria-label="কোনো রং নয়">✕</button>${BGS.map(g => `<button type="button" class="pc-sw ${g}${d.bg === g ? ' on' : ''}" data-bg="${g}" aria-label="রং ${g.slice(1)}"></button>`).join('')}${(d.body || '').trim().length > BG_MAX ? `<span class="mut pc-bgnote">রঙিন পোস্ট ${bn(BG_MAX)} অক্ষরের মধ্যে হয়</span>` : ''}</div>` : ''}
+    ${d.poll ? `<div class="pc-poll"><div class="pc-blk-h">${ic('poll', 16)} পোল<button type="button" class="link" data-rmpoll>বাদ দিন</button></div>${d.poll.map((o, i) => `<div class="pc-po"><input class="f pc-poll-opt" data-pi="${i}" maxlength="80" placeholder="অপশন ${bn(i + 1)}" value="${esc(o)}">${d.poll.length > 2 ? `<button type="button" data-rmopt="${i}" aria-label="অপশন বাদ দিন">${ic('close', 14)}</button>` : ''}</div>`).join('')}${d.poll.length < 4 ? '<button type="button" class="link pc-addopt" data-addopt>+ আরেকটি অপশন</button>' : ''}</div>` : ''}
+    ${d.event ? `<div class="pc-ev"><div class="pc-blk-h">${ic('calendar', 16)} অনুষ্ঠানের সময় ও জায়গা<button type="button" class="link" data-rmev>বাদ দিন</button></div><label class="pc-evl">কবে, কখন<input type="datetime-local" class="f" id="pc-ev-at" min="${localDT(new Date())}" value="${esc(d.event.at || '')}"></label><label class="pc-evl">কোথায়<input class="f" id="pc-ev-place" maxlength="120" placeholder="যেমন: উথুরা স্কুল মাঠ" value="${esc(d.event.place || '')}"></label><p class="mut pc-evn">যারা "যাব" চাপবেন তারা অনুষ্ঠানের আগের দিন রিমাইন্ডার পাবেন।</p></div>` : ''}
+    <div id="pc-link">${!d.photos.length && d.link ? linkCardHtml(d.link, true) : ''}</div>
     ${d.photos.length ? `<div class="pc-photos">${d.photos.map((ph, i) => `<div class="pc-ph"><img loading="lazy" decoding="async" src="${esc(ph.url)}" alt="ছবি ${bn(i + 1)}"><button type="button" data-rmph="${i}" aria-label="ছবি বাদ দিন">${ic('close', 14)}</button></div>`).join('')}
       ${d.photos.length < MAX_PHOTOS && photosOk ? `<label class="pc-ph add" aria-label="আরও ছবি">${ic('plus', 24)}<span>${bn(d.photos.length)}/${bn(MAX_PHOTOS)}</span><input type="file" accept="image/*" multiple class="pc-more" hidden></label>` : ''}</div>` : ''}
     <div class="pc-foot"><div class="pc-add"><span class="pc-add-l">যোগ করুন</span>
       ${photosOk ? `<label class="pc-tool" title="ছবি" aria-label="ছবি যোগ করুন">${ic('photo', 22)}<input type="file" id="pc-file" accept="image/*" multiple hidden></label>` : ''}
       ${own ? `<button class="pc-tool" id="pc-tag" title="বন্ধুদের ট্যাগ করুন" aria-label="বন্ধুদের ট্যাগ করুন">${ic('tag', 22)}</button>` : ''}
+      ${extras && !d.photos.length && !d.poll ? `<button class="pc-tool pc-aa${d.bgOpen ? ' on' : ''}" id="pc-bgt" title="রঙিন ব্যাকগ্রাউন্ড" aria-label="রঙিন ব্যাকগ্রাউন্ড">Aa</button>` : ''}
+      ${extras && !d.photos.length && !d.poll ? `<button class="pc-tool" id="pc-pollt" title="পোল" aria-label="পোল যোগ করুন">${ic('poll', 22)}</button>` : ''}
+      ${extras && !d.event ? `<button class="pc-tool" id="pc-evt" title="অনুষ্ঠান" aria-label="অনুষ্ঠানের তারিখ যোগ করুন">${ic('calendar', 22)}</button>` : ''}
       <select class="f pc-cat" id="pc-cat" aria-label="পোস্টের ধরন">${POST_CATS.map(c => `<option ${c === d.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
     <button class="btn wide" id="pc-post">${d.editId ? 'সংরক্ষণ করুন' : 'পোস্ট করুন'}</button></div></div>`);
   $('#sheet').classList.add('tall');
-  const keep = () => { d.body = $('#pc-text')?.value ?? d.body; d.category = $('#pc-cat')?.value || d.category; };
-  $('#pc-text').oninput = keep; $('#pc-cat').onchange = keep;
+  const keep = () => {
+    d.body = $('#pc-text')?.value ?? d.body; d.category = $('#pc-cat')?.value || d.category;
+    if (d.poll) document.querySelectorAll('#sheet .pc-poll-opt').forEach(x => { d.poll[Number(x.dataset.pi)] = x.value; });
+    if (d.event) { d.event.at = $('#pc-ev-at')?.value ?? d.event.at; d.event.place = $('#pc-ev-place')?.value ?? d.event.place; }
+  };
+  // লিংক দিলে নিচে প্রিভিউ (শিরোনাম, ছবি)
+  const linkCheck = () => {
+    clearTimeout(S.linkT);
+    S.linkT = setTimeout(async () => {
+      if (S.draft !== d || d.photos.length || d.editId || d.shared) return;
+      const url = (d.body.match(URL_RE) || [])[0]?.replace(/[).,!?।]+$/, '');
+      if (!url) { if (d.link) { d.link = null; $('#pc-link') && ($('#pc-link').innerHTML = ''); } return; }
+      if (url === d.link?.url || url === d.linkOff || url === S.linkBusy) return;
+      S.linkBusy = url;
+      const r = await S.api.linkPreview(url).catch(() => null);
+      S.linkBusy = '';
+      if (S.draft !== d || !r || !(d.body || '').includes(url)) return;
+      d.link = { url: r.url || url, title: r.title || '', desc: r.desc || '', image: r.image || '', site: r.site || '' };
+      if ($('#pc-link')) $('#pc-link').innerHTML = linkCardHtml(d.link, true);
+    }, 800);
+  };
+  $('#pc-text').oninput = () => {
+    keep(); linkCheck();
+    const t = $('#pc-text'), on = !!d.bg && canBg(d);
+    t.classList.toggle('pc-bg', on); BGS.forEach(g => t.classList.toggle(g, on && d.bg === g));
+  };
+  $('#pc-cat').onchange = () => { keep(); if (d.category === 'অনুষ্ঠান' && !d.event && extras) { d.event = { at: '', place: '' }; renderComposerSheet(); } };
+  $('#sheet').oninput = e => { if (e.target.closest('.pc-poll-opt, #pc-ev-at, #pc-ev-place')) keep(); };
+  if (!d.link && !d.photos.length) linkCheck();
   attachMention($('#pc-text'), d.mentions);
   const addFiles = async files => {
     keep();
@@ -938,6 +1216,23 @@ function renderComposerSheet() {
   if ($('#pc-file')) $('#pc-file').onchange = e => addFiles(e.target.files);
   $('#sheet .pc-more')?.addEventListener('change', e => addFiles(e.target.files));
   $('#sheet').onclick = e => {
+    const x = e.target.closest('[data-bg],[data-rmpoll],[data-addopt],[data-rmopt],[data-rmev],[data-rmlink],#pc-bgt,#pc-pollt,#pc-evt');
+    if (x) {
+      keep();
+      if (x.id === 'pc-bgt') d.bgOpen = !d.bgOpen;
+      else if (x.dataset.bg !== undefined) d.bg = x.dataset.bg;
+      else if (x.id === 'pc-pollt') { d.poll = ['', '']; d.bg = ''; d.bgOpen = false; if (d.category === POST_CATS[0]) d.category = 'প্রশ্ন'; }
+      else if (x.dataset.rmpoll !== undefined) d.poll = null;
+      else if (x.dataset.addopt !== undefined) { if (d.poll.length < 4) d.poll.push(''); }
+      else if (x.dataset.rmopt !== undefined) d.poll.splice(Number(x.dataset.rmopt), 1);
+      else if (x.id === 'pc-evt') { d.event = { at: '', place: '' }; d.category = 'অনুষ্ঠান'; }
+      else if (x.dataset.rmev !== undefined) d.event = null;
+      else if (x.dataset.rmlink !== undefined) { d.linkOff = d.link?.url || ''; d.link = null; }
+      renderComposerSheet();
+      if (x.dataset.addopt !== undefined) document.querySelectorAll('#sheet .pc-poll-opt')[d.poll.length - 1]?.focus();
+      if (x.id === 'pc-pollt') $('#sheet .pc-poll-opt')?.focus();
+      return;
+    }
     const rm = e.target.closest('[data-rmph]'); if (rm) { keep(); const [x] = d.photos.splice(Number(rm.dataset.rmph), 1); if (x.blob) URL.revokeObjectURL(x.url); return renderComposerSheet(); }
     if (e.target.closest('#pc-priv')) { keep(); return privacyPicker(); }
     if (e.target.closest('#pc-tag')) { keep(); return tagPicker(); }
@@ -945,11 +1240,19 @@ function renderComposerSheet() {
   };
   $('#pc-post').onclick = e => {
     keep();
-    if (!d.body.trim() && !d.photos.length && !d.shared) return toast('কিছু লিখুন বা ছবি দিন');
+    if (!d.body.trim() && !d.photos.length && !d.shared) return toast(d.poll ? 'পোলের প্রশ্নটি লিখুন' : 'কিছু লিখুন বা ছবি দিন');
     if (d.editId) return saveEdit(e.currentTarget);
+    const poll = d.poll ? d.poll.map(o => o.trim()).filter(Boolean) : null;
+    if (d.poll && poll.length < 2) return toast('পোলে অন্তত ২টি অপশন লিখুন');
+    if (poll && new Set(poll).size !== poll.length) return toast('একই অপশন দুইবার দেওয়া যাবে না');
+    if (d.event && !d.event.at) return toast('অনুষ্ঠানের তারিখ ও সময় দিন');
+    const evAt = d.event?.at ? new Date(d.event.at) : null;
+    if (evAt && (isNaN(evAt) || evAt < Date.now() - 6e4)) return toast('অনুষ্ঠানের সময় ভবিষ্যতের হতে হবে');
     busy(e.currentTarget, async () => {
       if (d.albumId && !d.photos.length) return toast('অ্যালবামে যোগ করতে অন্তত একটা ছবি দিন');
-      await S.api.createPost({ body: d.body.trim(), category: d.category, images: d.photos.map(p => p.blob), pageId: d.pageId, groupId: d.groupId, privacy: d.privacy, tags: d.tags.map(t => t.id), mentions: mentionIds(d.body, d.mentions), albumId: d.albumId || null });
+      await S.api.createPost({ body: d.body.trim(), category: d.category, images: d.photos.map(p => p.blob), pageId: d.pageId, groupId: d.groupId, privacy: d.privacy, tags: d.tags.map(t => t.id), mentions: mentionIds(d.body, d.mentions), albumId: d.albumId || null,
+        bg: d.bg && canBg(d) ? d.bg : null, poll, eventAt: evAt ? evAt.toISOString() : null, eventPlace: d.event?.place?.trim() || null,
+        link: !d.photos.length && d.link ? d.link : null });
       d.photos.forEach(p => URL.revokeObjectURL(p.url));
       const where = d.pageId ? 'page' : d.groupId ? 'group' : 'home';
       S.draft = null; $('#sheet').classList.remove('tall'); closeSheet(); toast('পোস্ট হয়েছে');
@@ -1016,6 +1319,35 @@ $('#scope').addEventListener('click', e => {
 });
 $('#loc').addEventListener('change', e => { S.union = e.target.value; local.set('union', S.union); loadFeed('home'); });
 $('#more-home').addEventListener('click', e => busy(e.currentTarget, () => loadFeed('home', true)));
+// নিচে পৌঁছানোর আগেই পরের পোস্টগুলো নিজে থেকে লোড (বাটনটা থাকে, দরকার হলে চাপা যায়)
+let autoMoreT = 0;
+addEventListener('scroll', () => {
+  if (S.view !== 'home' || Date.now() - autoMoreT < 800) return;
+  const b = $('#more-home'); if (!b || b.hidden || b.disabled) return;
+  if (innerHeight + scrollY < document.documentElement.scrollHeight - 900) return;
+  autoMoreT = Date.now(); b.click();
+}, { passive: true });
+// নিচে টেনে ছেড়ে দিলে রিফ্রেশ (হোম ও নোটিফিকেশন)
+(function pullToRefresh() {
+  let y0 = null, ind = null;
+  const can = () => (S.view === 'home' || S.view === 'notif') && scrollY <= 0 && !$('#modal').classList.contains('on') && !document.querySelector('.st-ov');
+  const hide = () => { ind?.remove(); ind = null; };
+  addEventListener('touchstart', e => { y0 = e.touches.length === 1 && can() ? e.touches[0].clientY : null; }, { passive: true });
+  addEventListener('touchmove', e => {
+    if (y0 == null) return;
+    const dy = e.touches[0].clientY - y0;
+    if (dy <= 0 || scrollY > 0) { hide(); return; }
+    if (!ind) { ind = document.createElement('div'); ind.className = 'ptr'; ind.setAttribute('role', 'status'); ind.setAttribute('aria-label', 'রিফ্রেশ'); ind.innerHTML = ic('refresh', 22); document.body.append(ind); }
+    const d = Math.min(dy * 0.5, 90);
+    ind.style.transform = `translate(-50%, ${d}px) rotate(${d * 4}deg)`; ind.classList.toggle('ready', d >= 60);
+  }, { passive: true });
+  addEventListener('touchend', async () => {
+    if (y0 == null) return; y0 = null;
+    if (!ind?.classList.contains('ready')) return hide();
+    ind.classList.add('spin'); ind.style.transform = 'translate(-50%, 60px)';
+    try { if (S.view === 'home') await loadFeed('home'); else await loadNotifs(); refreshBadges(); } finally { hide(); }
+  });
+})();
 
 // ================================================================ বন্ধু
 const relBtns = u => {
@@ -2199,6 +2531,7 @@ const NT = {
   boost_ok: ['🚀', 'আপনার পোস্টের বুস্ট অনুমোদন করেছেন, এখন চলছে'],
   boost_no: ['✖', 'আপনার পোস্টের বুস্ট গ্রহণ করেননি, কয়েন ফেরত গেছে'],
   page_admin: ['📄', 'আপনাকে একটি পেইজের অ্যাডমিন বানিয়েছেন'],
+  event_reminder: ['📅', '-এর অনুষ্ঠান আগামী ২৪ ঘণ্টার মধ্যে, আপনি যাচ্ছেন'],
 };
 // নিজের অর্জনের নোটিফিকেশন (মাইলফলক, সাপ্তাহিক রিপোর্ট): কারো নাম নয়, শুধু খবরটা
 const SELF_TYPES = ['milestone', 'follower_milestone', 'weekly'];
@@ -2232,7 +2565,7 @@ async function loadNotifs(keep) {
         ? `<div class="acts2"><button class="sbtn" data-fr="accept" data-id="${esc(n.actor.id)}">গ্রহণ করুন</button><button class="sbtn ghost" data-fr="remove" data-id="${esc(n.actor.id)}">মুছুন</button></div>` : '';
       return `<div class="notif${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="${esc(n.groupId ?? '')}" data-n-user="${esc(n.actor.id)}" data-n-page="${esc(n.meta?.page_id ?? '')}" role="button" tabindex="0">
         <span class="ico">${av(n.actor)}<i>${ic}</i></span>
-        <span class="txt"><b>${esc(n.actor.name)}</b> ${esc(txt)}${snip}<span class="time">${esc(ago(n.createdAt))}</span>${reqBtns}</span></div>`;
+        <span class="txt"><b>${esc(n.actor.name)}</b>${n.type === 'event_reminder' ? '' : ' '}${esc(txt)}${n.type === 'event_reminder' && n.meta?.at ? ` <span class="q">${esc(bnWhen(n.meta.at, true))}${n.meta.place ? ' · ' + esc(n.meta.place) : ''}</span>` : snip}<span class="time">${esc(ago(n.createdAt))}</span>${reqBtns}</span></div>`;
     }).join('') : (S.actAs ? `<div class="empty">${esc(S.actAs.name)} পেইজের এখনো কোনো নোটিফিকেশন নেই।<br>কেউ পেইজের পোস্টে রিয়্যাক্ট বা মন্তব্য করলে এখানে দেখাবে।</div>` : '<div class="empty">এখনো কোনো নোটিফিকেশন নেই।<br>কেউ আপনার পোস্টে লাইক বা মন্তব্য করলে, বা ফ্রেন্ড রিকোয়েস্ট পাঠালে এখানে দেখাবে।</div>');
     if (list.some(n => !n.read)) { await S.api.markNotificationsRead(list.filter(n => !n.read).map(n => n.id)); $('#b-notif').hidden = true; }
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
@@ -2240,7 +2573,7 @@ async function loadNotifs(keep) {
 function openNotif(el) {
   if (!el || el.closest('button')) return;
   const t = el.dataset.nType;
-  if ((t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag' || t === 'boost_ok' || t === 'boost_no') && el.dataset.nPost) openPost(el.dataset.nPost);
+  if ((t === 'event_reminder' || t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag' || t === 'boost_ok' || t === 'boost_no') && el.dataset.nPost) openPost(el.dataset.nPost);
   else if (t === 'friend_request') go('friends');
   else if (t === 'verify_ok' || t === 'verify_no') { open('wallet'); loadWallet(); }
   else if (t === 'milestone' && el.dataset.nPost) openPost(el.dataset.nPost);

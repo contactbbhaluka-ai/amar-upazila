@@ -67,10 +67,12 @@ async function supabaseApi() {
     shares: r.share_count || 0, saves: r.save_count || 0, pinnedCommentId: r.pinned_comment_id || null,
     sharedPostId: r.shared_post_id || null, sharedMissing: !!r.shared_post_id && !r.sp,
     kind: r.kind || 'normal', albumId: r.album_id || null, albumName: r.al?.name || '',
+    bg: r.bg || '', poll: r.poll || null, eventAt: r.event_at || null, eventPlace: r.event_place || '', link: r.link || null, resolvedAt: r.resolved_at || null,
+    votes: [], myVote: null, going: 0, meGoing: false,
     shared: r.sp ? { id: r.sp.id, body: r.sp.body, image: r.sp.image_urls?.[0] || r.sp.image_url || '', createdAt: r.sp.created_at, userId: r.sp.user_id, pageId: r.sp.page_id || null,
       author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '', badge: r.sp.page_id ? badgeOf(r.sp.pages) : badgeOf(r.sp.profiles) } : null,
   });
-  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url,verified,verified_until),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until)),kind,album_id,al:albums!posts_album_id_fkey(id,name),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila,verified,verified_until),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until),groups!posts_group_id_fkey(name)';
+  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url,verified,verified_until),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until)),kind,album_id,bg,poll,event_at,event_place,link,resolved_at,al:albums!posts_album_id_fkey(id,name),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila,verified,verified_until),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until),groups!posts_group_id_fkey(name)';
   const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count, verified: badgeOf(r), verifiedUntil: r.verified_until || null, cover: r.cover_url || '', autoReply: r.auto_reply || '', autoReplyOn: !!r.auto_reply_on, pinnedPostId: r.pinned_post_id || null, faqs: r.faqs || [], address: r.address || '', lat: r.lat ?? null, lng: r.lng ?? null });
   const toGroup = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, about: r.about || '', privacy: r.privacy, avatar: r.avatar_url || '', members: r.member_count });
   const inList = ids => `(${ids.join(',')})`;
@@ -321,9 +323,12 @@ async function supabaseApi() {
     },
 
     // ---------- পোস্ট
-    async posts({ scope = 'area', unionId, category, before, userId, postId, q: text, groupId, pageId, saved, ids }) {
+    async posts({ scope = 'area', unionId, category, before, userId, postId, q: text, groupId, pageId, saved, ids, urgent }) {
       let q = sb.from('posts').select(POST_COLS).order('created_at', { ascending: false }).limit(PAGE);
-      if (postId) q = q.eq('id', postId);
+      if (urgent) {   // জরুরি সাহায্য: ২৪ ঘণ্টার মধ্যে, এখনো সমাধান হয়নি
+        q = q.eq('category', 'সাহায্য চাই').is('resolved_at', null).is('group_id', null).gt('created_at', new Date(Date.now() - 864e5).toISOString()).limit(3);
+        if (unionId) q = q.eq('union_id', unionId);
+      } else if (postId) q = q.eq('id', postId);
       else if (ids) q = q.in('id', ids.length ? ids : [0]).limit(10);
       else if (saved) {
         const ids = ok(await sb.from('saved_posts').select('post_id').eq('user_id', me.id).order('created_at', { ascending: false }).limit(100)).map(r => r.post_id);
@@ -346,7 +351,9 @@ async function supabaseApi() {
       if (category) q = q.eq('category', category);
       if (before) q = q.lt('created_at', before);
       const rows = ok(await q);
-      let mine = new Map(), sv = new Set(), views = new Map();
+      let mine = new Map(), sv = new Set(), views = new Map(), ex = {};
+      const exIds = rows.filter(r => r.poll || r.event_at).map(r => r.id);
+      const exP = exIds.length ? sb.rpc('post_extras', { p_ids: exIds }).then(r => r.data || {}, () => ({})) : Promise.resolve({});
       if (me && rows.length) {
         const ids = rows.map(r => r.id);
         const ownIds = rows.filter(r => r.user_id === me.id).map(r => r.id);
@@ -355,21 +362,44 @@ async function supabaseApi() {
         mine = new Map(ok(l).map(x => [x.post_id, x.reaction])); sv = new Set(ok(s2).map(x => x.post_id));
         views = new Map((vc.data || []).map(x => [x.post_id, Number(x.views)]));   // নিজের পোস্টের মোট ভিউ (না এলে ০)
       }
-      return rows.map(r => ({ ...toPost(r, mine, sv), views: views.get(r.id) || 0 }));
+      ex = await exP;
+      return rows.map(r => { const e = ex[r.id]; return { ...toPost(r, mine, sv), views: views.get(r.id) || 0, ...(e ? { votes: e.votes || [], myVote: e.my ?? null, going: Number(e.going) || 0, meGoing: !!e.me_going } : {}) }; });
     },
-    async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions, albumId, kind = 'normal', imageUrls }) {
+    async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions, albumId, kind = 'normal', imageUrls, bg, poll, eventAt, eventPlace, link }) {
       const files = images?.length ? images.slice(0, 10) : image ? [image] : [];
       const urls = [...(imageUrls || [])];
       for (const f of files) urls.push(await upload(f, 'post'));   // একটার পর একটা আপলোড
       const row = ok(await sb.from('posts').insert({
         user_id: me.id, union_id: me.unionId, body: body || '', category, image_url: urls[0] || null, image_urls: urls,
         privacy: pageId || groupId ? 'public' : (privacy || 'public'), page_id: pageId || null, group_id: groupId || null, shared_post_id: sharedPostId || null,
-        album_id: albumId || null, kind,
+        album_id: albumId || null, kind, bg: bg || null, poll: poll?.length ? poll : null, event_at: eventAt || null, event_place: eventPlace || null, link: link || null,
       }).select('id').single());
       if (tags?.length) ok(await sb.from('post_tags').insert(tags.map(uid => ({ post_id: row.id, user_id: uid }))));
       await setMentions('post', row.id, mentions);
       return row.id;
     },
+    async resolvePost(id, on) { ok(await sb.rpc('resolve_post', { p_post: id, p_on: !!on })); },
+    async votePoll(id, opt) { ok(await sb.rpc('vote_poll', { p_post: id, p_opt: opt == null ? -1 : opt })); },
+    async setGoing(id, on) { ok(await sb.rpc('set_going', { p_post: id, p_on: !!on })); },
+    async linkPreview(url) {
+      const { data, error } = await sb.functions.invoke('link-preview', { body: { url } });
+      if (error || !data || data.error) return null;
+      return data.title || data.image ? data : null;
+    },
+    // ---------- স্টোরি (২৪ ঘণ্টা)
+    async stories() {
+      const rows = ok(await sb.from('stories').select('id,user_id,kind,body,bg,privacy,created_at,expires_at,profiles!stories_user_id_fkey(name,avatar_url)').order('created_at').limit(300));
+      return rows.filter(r => !blocked.has(r.user_id)).map(r => ({ id: r.id, userId: r.user_id, kind: r.kind, body: r.body || '', bg: r.bg || 'g1', privacy: r.privacy, createdAt: r.created_at, expiresAt: r.expires_at, name: r.profiles?.name || 'সদস্য', avatar: r.profiles?.avatar_url || '' }));
+    },
+    async storyImage(id) { const r = ok(await sb.from('stories').select('image').eq('id', id).maybeSingle()); return r?.image || ''; },
+    async createStory({ kind, body, bg, blob, privacy }) {
+      const image = blob ? await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); }) : null;
+      ok(await sb.from('stories').insert({ user_id: me.id, kind, body: body || null, bg: kind === 'text' ? bg : null, image, privacy: privacy || 'public' }));
+    },
+    async deleteStory(id) { ok(await sb.from('stories').delete().eq('id', id)); },
+    async storySeen(ids) { if (me && ids.length) await sb.rpc('story_seen', { p_ids: ids }); },
+    async storyViewers(id) { return ok(await sb.rpc('story_viewers', { p_story: id })).map(r => ({ id: r.user_id, name: r.name, avatar: r.avatar_url || '', seenAt: r.seen_at })); },
+    async myStoryViews() { return new Map(ok(await sb.rpc('my_story_view_counts')).map(r => [r.story_id, Number(r.views)])); },
     async untagMe(postId) { ok(await sb.from('post_tags').delete().eq('post_id', postId).eq('user_id', me.id)); },
     // images: আগের ছবির URL (string) বা নতুন ছবি (Blob), যে ক্রমে দেখাবে সেই ক্রমে
     async updatePost(id, { body, category, images = [], privacy, tags = [], mentions = [] }, removed = []) {
@@ -687,6 +717,10 @@ function demoApi() {
     saved: get('saved', []),             // "userId:postId"
     settings: get('settings', { publicDonorPhone: false }),
     wallet: get('wallet', { coins: 120, ledger: [{ amount: 100, reason: 'admin', ref: 'স্বাগতম', createdAt: ago(30) }, { amount: 5, reason: 'post', ref: 'x1', createdAt: ago(20) }, { amount: 15, reason: 'like', ref: 'x2', createdAt: ago(19) }] }),
+    votes: get('votes', {}),             // postId -> { userId: অপশন }
+    going: get('going', {}),             // postId -> [userId]
+    stories: get('stories', []),         // ২৪ ঘণ্টার স্টোরি
+    storyViews: get('storyViews', {}),   // storyId -> [{ id, at }]
     pageAdmins: get('pageAdmins', []),   // "pageId:userId"
     boosts: get('boosts', [{ id: 1, post_id: 3, user_id: 'd5', days: 7, coins: 350, union_id: null, status: 'active', starts_at: ago(24), ends_at: new Date(Date.now() + 6 * 864e5).toISOString(), reach: 214, created_at: ago(25) }]),
     vreqs: get('vreqs', [{ id: 1, user_id: 'd7', kind: 'public_figure', full_name: 'রুমানা আক্তার', category: 'সাংবাদিক', links: 'https://example.com/rumana', note: 'স্থানীয় পত্রিকার প্রতিবেদক', status: 'pending', coins_held: 0, created_at: ago(5) }]),
@@ -725,7 +759,7 @@ function demoApi() {
     ]),
   };
   let meId = get('me', null);
-  const save = () => { for (const k of ['pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -760,6 +794,28 @@ function demoApi() {
   // প্রোফাইল লক: বন্ধু ছাড়া অন্যরা প্রোফাইলের কিছু দেখবে না
   const lockedOut = uid => !!person(uid)?.locked && uid !== meId && !(meId && friendIds(meId).includes(uid));
   const albumVisible = a => (a.pageId || !lockedOut(a.userId)) && a.privacy === 'public' || a.userId === meId || (a.privacy === 'friends' && meId && friendIds(meId).includes(a.userId));
+  // স্টোরি: ২৪ ঘণ্টা পেরোলেই ছবি/লেখাসহ মুছে ফেলা
+  function purgeStories() {
+    const now = new Date().toISOString(), n = db.stories.length;
+    db.stories = db.stories.filter(x => x.expiresAt > now);
+    for (const k in db.storyViews) if (!db.stories.some(x => String(x.id) === k)) delete db.storyViews[k];
+    if (db.stories.length !== n) save();
+  }
+  // ডেমোর নমুনা: পোল, অনুষ্ঠান, রঙিন পোস্ট, স্টোরি
+  (function seedExtras() {
+    const h = n => new Date(Date.now() - n * 36e5).toISOString();
+    if (!db.posts.some(p => p.id === 11)) db.posts.push({ id: 11, userId: 'd4', unionId: 3, category: 'প্রশ্ন', createdAt: h(1), body: 'উপজেলায় কোন রাস্তাটা আগে মেরামত হওয়া দরকার বলে মনে করেন?', image: '', likes: 4, rx: { like: 4 }, cm: [], poll: ['ভালুকা-গফরগাঁও রোড', 'উথুরা বাজার রোড', 'হবিরবাড়ি সংযোগ সড়ক'] });
+    if (!db.votes[11]) db.votes[11] = { d1: 0, d2: 0, d3: 1, d5: 0, d6: 2 };
+    const p10 = db.posts.find(p => p.id === 10);
+    if (p10 && !p10.eventAt) { const d = new Date(); d.setHours(17, 0, 0, 0); if (d < new Date()) d.setDate(d.getDate() + 1); p10.eventAt = d.toISOString(); p10.eventPlace = 'উথুরা স্কুল মাঠ'; db.going[10] = ['d1', 'd3', 'd5']; }
+    if (!db.posts.some(p => p.id === 12)) db.posts.push({ id: 12, userId: 'd6', unionId: 2, category: 'খবর', createdAt: h(3), body: 'শীত আসছে, পুরোনো গরম কাপড় দান করুন। পাশে দাঁড়ান অসহায় মানুষের 🤝', image: '', likes: 9, rx: { like: 6, love: 3 }, cm: [], bg: 'g5' });
+    purgeStories();
+    if (!db.stories.some(x => x.seed)) {
+      const now = Date.now();
+      [['d2', 'আজ বিকেলে ফুটবল ফাইনাল ⚽ সবাই আসবেন!', 'g2', 2], ['d3', 'রক্ত দিয়ে জীবন বাঁচান ❤️', 'g6', 5], ['d1', 'বিনামূল্যে স্বাস্থ্য ক্যাম্প: শনিবার সকাল ১০টা', 'g4', 8], ['d2', 'টিকিট লাগবে না, সবাই আমন্ত্রিত 🎉', 'g7', 1]]
+        .forEach(([u, b, bg, hh]) => db.stories.push({ id: nid(db.stories), seed: true, userId: u, kind: 'text', body: b, bg, privacy: 'public', createdAt: new Date(now - hh * 36e5).toISOString(), expiresAt: new Date(now - hh * 36e5 + 864e5).toISOString() }));
+    }
+  })();
   const friendRow = (a, b) => db.friendships.find(f => (f.requester === a && f.addressee === b) || (f.requester === b && f.addressee === a));
   const friendIds = of => db.friendships.filter(f => f.status === 'accepted' && (f.requester === of || f.addressee === of)).map(f => (f.requester === of ? f.addressee : f.requester));
   const rel = id => {
@@ -1107,10 +1163,12 @@ function demoApi() {
       meId = null; save();
     },
 
-    async posts({ scope = 'area', unionId, category, before, userId, postId, q, groupId, pageId, saved, ids }) {
+    async posts({ scope = 'area', unionId, category, before, userId, postId, q, groupId, pageId, saved, ids, urgent }) {
       const myFriends = meId ? new Set(friendIds(meId)) : new Set();
       const visible = db.posts.filter(p => (!p.groupId || canSeeGroup(p.groupId))
         && (!p.privacy || p.privacy === 'public' || p.userId === meId || (p.privacy === 'friends' && myFriends.has(p.userId))));
+      if (urgent) return this.__map(visible.filter(p => p.category === 'সাহায্য চাই' && !p.resolvedAt && !p.groupId && Date.now() - new Date(p.createdAt) < 864e5 && (!unionId || p.unionId === unionId) && !isBlocked(p.userId))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3));
       if (ids) return this.__map(visible.filter(p => ids.includes(p.id) && !isBlocked(p.userId)));
       if (postId || q || saved) {
         const t = (q || '').trim().toLowerCase();
@@ -1142,6 +1200,9 @@ function demoApi() {
           author: pg ? pg.name : u.name, avatar: pg ? pg.avatar : u.avatar, badge: pg ? badgeOf(pg) : (u.verified || ''), poster: u.name, union: uname(p.unionId), liked: db.likes.includes(meId + ':' + p.id),
           reactions: p.rx || { like: p.likes }, myReaction: db.reacts[meId + ':' + p.id] || (db.likes.includes(meId + ':' + p.id) ? 'like' : ''),
           saved: db.saved.includes(meId + ':' + p.id), pageId: p.pageId || null, groupId: p.groupId || null, groupName: g ? g.name : '',
+          bg: p.bg || '', poll: p.poll || null, eventAt: p.eventAt || null, eventPlace: p.eventPlace || '', link: p.link || null, resolvedAt: p.resolvedAt || null,
+          ...(p.poll ? { votes: p.poll.map((_, i) => Object.values(db.votes[p.id] || {}).filter(v => v === i).length), myVote: db.votes[p.id]?.[meId] ?? null } : { votes: [], myVote: null }),
+          going: (db.going[p.id] || []).length, meGoing: (db.going[p.id] || []).includes(meId),
           views: p.userId === meId ? demoViews(p).views : 0, kind: p.kind || 'normal', albumId: p.albumId || null, albumName: p.albumId ? (db.albums.find(a => a.id === p.albumId && albumVisible(a))?.name || '') : '' };
       }));
     },
@@ -1217,16 +1278,17 @@ function demoApi() {
     async groupMembers(id, status = 'active') { return wait(db.members.filter(m => m.groupId === Number(id) && m.status === status).map(m => ({ ...user(m.userId), role: m.role })).filter(u => u.id)); },
     async approveMember(gid, uid) { const m = member(gid, uid); if (!m) throw new Error('no pending request'); m.status = 'active'; db.notifs = db.notifs.filter(n => !(n.groupId === Number(gid) && n.from === uid && n.type === 'group_request')); save(); },
     async removeMember(gid, uid) { db.members = db.members.filter(m => !(m.groupId === Number(gid) && m.userId === uid)); save(); },
-    async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions, albumId, kind = 'normal', imageUrls }) {
+    async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions, albumId, kind = 'normal', imageUrls, bg, poll, eventAt, eventPlace, link }) {
       const files = images?.length ? images.slice(0, 10) : image ? [image] : [];
       const imgs = [...(imageUrls || [])]; for (const f of files) imgs.push(await toBlobUrl(f));
+      if (poll && (poll.length < 2 || poll.length > 4 || poll.some(o => !o.trim() || o.length > 80))) throw new Error('bad poll option');
       if (albumId && !db.albums.some(a => a.id === Number(albumId) && a.userId === meId)) throw new Error('row-level security');
       const img = imgs[0] || '';
       if (sharedPostId) { const o = db.posts.find(x => x.id === Number(sharedPostId)), g = o?.groupId && db.groups.find(x => x.id === o.groupId); if (!o || (g && g.privacy === 'private')) throw new Error('row-level security'); }
       const fr = new Set(friendIds(meId));
       const post = { id: nid(db.posts), userId: meId, pageId: pageId ? Number(pageId) : null, groupId: groupId ? Number(groupId) : null, sharedPostId: sharedPostId ? Number(sharedPostId) : null, unionId: person(meId).unionId, category, body: body || '', image: img, images: imgs,
         privacy: pageId || groupId ? 'public' : (privacy || 'public'), tags: (tags || []).filter(uid => fr.has(uid)), createdAt: new Date().toISOString(), likes: 0, cm: [],
-        albumId: albumId ? Number(albumId) : null, kind };
+        albumId: albumId ? Number(albumId) : null, kind, bg: bg || '', poll: poll?.length ? poll : null, eventAt: eventAt || null, eventPlace: eventPlace || '', link: link || null };
       post.tags.forEach(uid => notify(uid, meId, 'tag', post.id));
       post.mentions = mentionNotify(post, mentions, meId);
       if (post.sharedPostId) { const o = db.posts.find(x => x.id === post.sharedPostId); db.posts.push(post); save(); notify(o.userId, meId, 'share', o.id); earn('share', o.id, o.userId); return; }
@@ -1237,6 +1299,40 @@ function demoApi() {
       setTimeout(() => { if (!db.posts.includes(post)) return; reactAs('d2', post.id, 'love', ''); notify(uid, 'd2', 'like', post.id); }, 3000);
       setTimeout(() => { if (!db.posts.includes(post)) return; post.cm.push({ id: Date.now(), userId: 'd4', body: 'খুব ভালো লাগলো 👍', createdAt: new Date().toISOString() }); notify(uid, 'd4', 'comment', post.id); }, 5000);
     },
+    async resolvePost(id, on) { const p = db.posts.find(x => x.id === Number(id)); if (!p || p.userId !== meId) throw new Error('not allowed'); p.resolvedAt = on ? new Date().toISOString() : null; save(); return wait(); },
+    async votePoll(id, opt) { const p = db.posts.find(x => x.id === Number(id)); if (!p?.poll) throw new Error('no poll'); const v = db.votes[p.id] = db.votes[p.id] || {}; if (opt == null) delete v[meId]; else v[meId] = opt; save(); return wait(); },
+    async setGoing(id, on) {
+      const g = db.going[id] = (db.going[id] || []).filter(u => u !== meId); if (on) g.push(meId); save();
+      // ডেমো: অনুষ্ঠান ২৪ ঘণ্টার মধ্যে হলে কিছুক্ষণ পর রিমাইন্ডার (আসল অ্যাপে সার্ভার প্রতি ঘণ্টায় পাঠায়)
+      const p = db.posts.find(x => x.id === Number(id)), uid = meId;
+      if (on && p?.eventAt && new Date(p.eventAt) - Date.now() < 864e5 && !db.notifs.some(n => n.to === uid && n.type === 'event_reminder' && n.postId === p.id))
+        setTimeout(() => notify(uid, p.userId, 'event_reminder', p.id, null, { at: p.eventAt, place: p.eventPlace }), 4000);
+      return wait();
+    },
+    async linkPreview(url) {   // ডেমোতে ইন্টারনেটে যাওয়া হয় না, নমুনা প্রিভিউ
+      let h = ''; try { h = new URL(url).hostname.replace(/^www\./, ''); } catch { return null; }
+      return wait({ url, title: h === 'prothomalo.com' ? 'প্রথম আলো: সর্বশেষ খবর' : `${h} — লিংকের শিরোনাম`, desc: 'ডেমো প্রিভিউ: আসল অ্যাপে লিংকের পাতার শিরোনাম, বিবরণ ও ছবি দেখাবে।', site: h });
+    },
+    async stories() {
+      purgeStories();
+      const fr = meId ? new Set(friendIds(meId)) : new Set();
+      return wait(db.stories.filter(x => !isBlocked(x.userId) && (x.userId === meId || x.privacy === 'public' || fr.has(x.userId)) && !lockedOut(x.userId))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .map(x => { const u = user(x.userId) || { name: 'সদস্য', avatar: '' }; return { id: x.id, userId: x.userId, kind: x.kind, body: x.body || '', bg: x.bg || 'g1', privacy: x.privacy, createdAt: x.createdAt, expiresAt: x.expiresAt, name: u.name, avatar: u.avatar }; }));
+    },
+    async storyImage(id) { return wait(db.stories.find(x => x.id === id)?.image || ''); },
+    async createStory({ kind, body, bg, blob, privacy }) {
+      purgeStories();
+      if (db.stories.filter(x => x.userId === meId).length >= 15) throw new Error('story limit');
+      const image = blob ? await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); }) : null;
+      const now = Date.now();
+      db.stories.push({ id: nid(db.stories), userId: meId, kind, body: body || '', bg: kind === 'text' ? bg : null, image, privacy: privacy || 'public', createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 864e5).toISOString() });
+      save(); return wait();
+    },
+    async deleteStory(id) { db.stories = db.stories.filter(x => !(x.id === id && x.userId === meId)); save(); return wait(); },
+    async storySeen(ids) { for (const id of ids) { const st = db.stories.find(x => x.id === id); if (!st || st.userId === meId) continue; const v = db.storyViews[id] = db.storyViews[id] || []; if (!v.some(x => x.id === meId)) v.push({ id: meId, at: new Date().toISOString() }); } save(); },
+    async storyViewers(id) { return wait((db.storyViews[id] || []).map(v => { const u = user(v.id) || { name: 'সদস্য' }; return { id: v.id, name: u.name, avatar: u.avatar || '', seenAt: v.at }; }).reverse()); },
+    async myStoryViews() { return wait(new Map(db.stories.filter(x => x.userId === meId).map(x => [x.id, (db.storyViews[x.id] || []).length]))); },
     async deletePost(id) { db.posts = db.posts.filter(p => p.id !== id); save(); },
     async react(id, reaction, prev) { reactAs(meId, id, reaction, prev); },
     async comments(postId, sort = 'old') {

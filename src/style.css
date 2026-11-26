@@ -693,13 +693,13 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .pv-ok{display:none}
 .pv-pick label.pv-opt{margin:0}
 
-/* ===== v19: বন্ধু/ফলোয়ার/ফলো করছেন — ছোট পিল বাটন ===== */
+/* ===== v19: বন্ধু/ফলোয়ার/ফলো করছেন — আইকনসহ সাধারণ বাটন ===== */
 .stats.stat-tiles{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
-.stat-tiles .stat-b{display:inline-flex;flex-direction:row;align-items:baseline;gap:4px;flex:0 1 auto;padding:5px 10px 5px 12px;border:1px solid var(--line);border-radius:999px;
-  background:var(--card);color:var(--ink);font:inherit;font-size:14px;cursor:pointer;min-height:0;transition:border-color .15s,background .15s,transform .08s}
-.stat-tiles .stat-b:hover{border-color:color-mix(in srgb,var(--g) 50%,var(--line));background:var(--g2)}
+.stat-tiles .stat-b{display:inline-flex;flex-direction:row;align-items:center;gap:5px;flex:0 1 auto;padding:6px 12px;border:1px solid var(--line);border-radius:10px;
+  background:var(--g2);color:var(--ink);font:inherit;font-size:14px;cursor:pointer;min-height:0;transition:border-color .15s,background .15s,transform .08s}
+.stat-tiles .stat-b:hover{border-color:var(--g)}
 .stat-tiles .stat-b:active{transform:scale(.96)}
 .stat-tiles .stat-b:focus-visible{outline:3px solid color-mix(in srgb,var(--g) 40%,transparent);outline-offset:2px}
+.stat-tiles .st-ic{display:inline-flex;color:var(--gt)}
 .stat-tiles b{font-size:15px;line-height:1.3;display:inline}
 .stat-tiles .st-l{font-size:13px;color:var(--mut);display:inline}
-.stat-tiles .st-arr{font-size:15px;line-height:1;color:var(--gt);font-weight:700;margin-left:1px}

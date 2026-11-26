@@ -60,3 +60,43 @@ returns table (post_id bigint, views bigint) language sql stable security define
 $$;
 revoke all on function public.post_view_counts(bigint[]) from public, anon;
 grant execute on function public.post_view_counts(bigint[]) to authenticated;
+
+-- দেখার সময় দর্শক বন্ধু বা ফলোয়ার ছিলেন কিনা (পরে ফলো করলে "নতুন ফলোয়ার" হিসেবে গোনা যায়)
+alter table public.post_views add column if not exists was_close boolean;
+
+create or replace function public.post_seen(p_ids bigint[])
+returns void language plpgsql security definer set search_path = public as $$
+declare today date := (now() at time zone 'Asia/Dhaka')::date; me uuid := auth.uid();
+begin
+  if me is null or p_ids is null then return; end if;
+  insert into public.post_views (post_id, user_id, was_close)
+  select p.id, me, (private.are_friends(p.user_id, me) or exists (select 1 from public.follows f where f.follower_id = me and f.followee_id = p.user_id))
+    from public.posts p
+   where p.id = any (p_ids[1:30]) and p.user_id <> me and public.post_visible(p.user_id, p.group_id, p.privacy)
+  on conflict (post_id, user_id) do update set times = public.post_views.times + 1, last_day = excluded.last_day
+   where public.post_views.last_day < today;
+end $$;
+
+create or replace function public.post_stats(p_id bigint)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare p public.posts; r jsonb;
+begin
+  select * into p from public.posts where id = p_id;
+  if not found then raise exception 'পোস্ট পাওয়া যায়নি'; end if;
+  if p.user_id is distinct from auth.uid() and not public.is_admin() then raise exception 'শুধু পোস্টকারী দেখতে পারেন'; end if;
+  with v as (
+    select v.*, coalesce(v.was_close, private.are_friends(p.user_id, v.user_id)
+             or exists (select 1 from public.follows f where f.follower_id = v.user_id and f.followee_id = p.user_id)) as close
+      from public.post_views v where v.post_id = p_id)
+  select jsonb_build_object(
+    'people', count(*),
+    'views', coalesce(sum(times), 0),
+    'today', count(*) filter (where last_day = (now() at time zone 'Asia/Dhaka')::date),
+    'close', count(*) filter (where close),
+    'others', count(*) filter (where not close),
+    'new_followers', count(*) filter (where not close and exists (select 1 from public.follows f
+                       where f.follower_id = v.user_id and f.followee_id = p.user_id and f.created_at >= v.first_at)),
+    'boost_reach', (select coalesce(sum(reach), 0) from public.boosts where post_id = p_id))
+  into r from v;
+  return r;
+end $$;

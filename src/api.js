@@ -179,7 +179,7 @@ async function supabaseApi() {
     },
     // ---------- পোস্ট কতজন দেখেছেন
     async postSeen(ids) { if (me && ids.length) await sb.rpc('post_seen', { p_ids: ids }); },
-    async postStats(id) { const r = ok(await sb.rpc('post_stats', { p_id: id })) || {}; return { people: r.people || 0, views: r.views || 0, today: r.today || 0, boostReach: r.boost_reach || 0 }; },
+    async postStats(id) { const r = ok(await sb.rpc('post_stats', { p_id: id })) || {}; return { people: r.people || 0, views: r.views || 0, today: r.today || 0, close: r.close || 0, others: r.others || 0, newFollowers: r.new_followers || 0, boostReach: r.boost_reach || 0 }; },
     // ---------- পোস্ট বুস্ট
     async boostedPosts(n = 3) {
       const rows = ok(await sb.rpc('active_boosts', { p_limit: n })) || [];
@@ -690,7 +690,8 @@ function demoApi() {
   function demoViews(p) {
     const real = Object.values(get('pviews', {})[p.id] || {}), base = (p.likes || 0) * 4 + p.cm.length * 3 + (p.userId === meId ? 2 : 6);
     const boostReach = db.boosts.filter(b => b.post_id === p.id).reduce((t, b) => t + (b.reach || 0), 0);
-    return { people: base + real.length + boostReach, views: Math.round(base * 1.4) + real.reduce((t, r) => t + r.t, 0) + boostReach, today: Math.ceil(base / 3), boostReach };
+    const people = base + real.length + boostReach, close = Math.round(people * 0.6), others = people - close;
+    return { people, views: Math.round(base * 1.4) + real.reduce((t, r) => t + r.t, 0) + boostReach, today: Math.ceil(base / 3), close, others, newFollowers: Math.floor(others / 6), boostReach };
   }
   const addCoins = (amount, reason, ref) => { db.wallet.coins += amount; db.wallet.ledger.unshift({ amount, reason, ref: String(ref), createdAt: new Date().toISOString() }); };
   const albumVisible = a => a.privacy === 'public' || a.userId === meId || (a.privacy === 'friends' && meId && friendIds(meId).includes(a.userId));

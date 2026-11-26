@@ -399,6 +399,11 @@ async function postStatsSheet(p) {
         ${cell('👁', st.views, 'মোট দেখা')}${cell('📅', st.today, 'আজ দেখেছেন')}${cell('👍', rx, 'রিয়্যাক্ট')}
         ${cell('💬', p.comments || 0, 'মন্তব্য')}${cell('↗', p.shares || 0, 'শেয়ার')}${cell('🔖', p.saves || 0, 'সেভ')}
       </div>
+      <div class="ps-aud"><b>কারা দেখেছেন</b>
+        <div class="ps-bar" role="img" aria-label="বন্ধু বা ফলোয়ার ${bn(st.close)} জন, অন্যরা ${bn(st.others)} জন"><i style="width:${st.people ? (st.close / st.people) * 100 : 0}%"></i></div>
+        <div class="ps-leg"><span><i class="c1"></i>বন্ধু / ফলোয়ার <b>${bn(st.close)}</b></span><span><i class="c2"></i>অন্যরা (ফলো করেন না) <b>${bn(st.others)}</b></span></div>
+      </div>
+      <div class="ps-newf">${ic('user', 18)}<span>${st.newFollowers ? `পোস্টটি দেখার পর <b>${bn(st.newFollowers)} জন</b> নতুন করে আপনাকে ফলো করেছেন` : 'এই পোস্ট থেকে এখনো নতুন ফলোয়ার আসেনি'}</span></div>
       ${st.boostReach ? `<p class="ps-boost">🚀 এর মধ্যে বুস্ট থেকে পৌঁছেছে <b>${bn(st.boostReach)}</b> জনের কাছে</p>` : ''}
       <p class="mut" style="font-size:13px;margin:10px 0 0">এই হিসাব শুধু আপনি দেখতে পাচ্ছেন। একজন মানুষ যতবারই দেখুক, "দেখেছেন"-এ একবার গোনা হয়; মোট দেখা দিনে একবার করে বাড়ে। কে কে দেখেছেন তা দেখানো হয় না।</p>
       ${(p.privacy || 'public') === 'public' && !p.groupId && feat('featBoost') && !p.sponsored ? `<button class="btn wide" id="ps-boost" style="margin-top:12px">${ic('send', 16)} আরও মানুষের কাছে পৌঁছাতে বুস্ট করুন</button>` : ''}

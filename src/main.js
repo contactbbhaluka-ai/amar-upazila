@@ -6,6 +6,7 @@ import { DISTRICTS, DISTRICT_ORDER, HOME_UPAZILA, HOME_DISTRICT, BLOOD_GROUPS } 
 // সাধারণ এক রঙের রেখার আইকন (লেখার রং-ই আইকনের রং)
 const ICONS = {
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
+  play: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5l5.5 3.5-5.5 3.5z"/>',
   pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
   map: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
   home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
@@ -349,8 +350,8 @@ function postHtml(p) {
   const urgent = p.category === 'সাহায্য চাই' && !p.resolvedAt && !p.groupId && Date.now() - new Date(p.createdAt) < 864e5;
   const showBg = p.bg && p.body && !p.images.length && !p.shared && !p.poll && p.body.length <= BG_MAX;
   return `<article class="card post${p.sponsored ? ' sponsored' : ''}${p.pinnedPage ? ' pinned-pg' : ''}${urgent ? ' urgent' : ''}${p.urgentTop ? ' urg-top' : ''}" data-pid="${esc(p.id)}"${own ? ' data-own="1"' : ''}${p.shared && p.shared.userId !== u?.id ? ` data-spid="${esc(p.shared.id)}"` : ''}>
-    ${p.pinnedPage ? '<div class="pin-lbl">📌 পিন করা পোস্ট</div>' : ''}<div class="top">${link(av(p), 'avbtn')}
-      <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
+    ${p.pinnedPage ? '<div class="pin-lbl">📌 পিন করা পোস্ট</div>' : ''}<div class="top">${!p.pageId && storyUserSet().has(p.userId) ? `<button class="avbtn av-story" data-avstory="${esc(p.userId)}" aria-label="${esc(p.author)}: স্টোরি বা প্রোফাইল">${av(p)}</button>` : link(av(p), 'avbtn')}
+      <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${folBtn(p)}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
       ${own ? `<button class="pinfo" data-pinfo="${esc(p.id)}" aria-label="পোস্টটি কতজন দেখেছেন" title="পোস্টের হিসাব">${ic('info', 19)}</button>` : ''}<button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
     <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>${urgent ? '<span class="urg-lbl">🚨 জরুরি</span>' : ''}${p.resolvedAt && RESOLVE[p.category] ? `<span class="resolved">${RESOLVE[p.category][0]}</span>` : ''}
     ${showBg ? `<div class="pbg ${esc(p.bg)}">${esc(p.body)}</div>` : p.body ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
@@ -451,6 +452,39 @@ document.addEventListener('submit', e => {
     renderFeed(key); focusCmi(id);
   });
 });
+// ফলো করছেন না এমন কারো (বা পেইজের) পোস্টে নামের পাশে "ফলো করুন"
+S.fol = null;
+function folBtn(p) {
+  const u = me(); if (!u || !S.fol || S.actAs || p.userId === u.id) return '';
+  if (p.pageId ? S.fol.pages.has(p.pageId) : S.fol.users.has(p.userId)) return '';
+  return ` <span class="fol-dot">·</span> <button class="fol-btn" data-folpost="${p.pageId ? 'p:' + esc(p.pageId) : 'u:' + esc(p.userId)}">ফলো করুন</button>`;
+}
+const rerenderFeeds = () => { for (const key of ['home', 'group', 'post', 'search', 'saved']) if (S.feeds[key]?.posts.length && $('#feed-' + key)) renderFeed(key); };
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-folpost]'); if (!b) return;
+  e.stopPropagation(); if (!needUser() || !S.fol) return;
+  const [k, id0] = b.dataset.folpost.split(':'), id = k === 'p' ? Number(id0) || id0 : id0, set = k === 'p' ? S.fol.pages : S.fol.users;
+  set.add(id); rerenderFeeds();
+  try { await (k === 'p' ? S.api.followPage(id) : S.api.follow(id)); toast('ফলো করছেন। এখন থেকে এর পোস্ট আপনার ফিডে আসবে।'); }
+  catch (err) { set.delete(id); rerenderFeeds(); toast(errText(err)); }
+}, true);
+// স্টোরি আছে এমন কারো পোস্টে ছবির চারপাশে রঙিন বৃত্ত; চাপলে "স্টোরি দেখুন / প্রোফাইল দেখুন"
+const storyUserSet = () => new Set((S.stories || []).map(x => x.userId));
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-avstory]'); if (!b) return;
+  e.stopPropagation();
+  const uid = b.dataset.avstory, name = b.getAttribute('aria-label')?.split(':')[0] || '';
+  openSheet(`<div class="menu"><div class="menu-h">${esc(name)}</div>
+    <button data-act="story">${ic('play', 18)} স্টোরি দেখুন</button>
+    <button data-act="profile">${ic('user', 18)} প্রোফাইল দেখুন</button>
+    <button data-close>বন্ধ করুন</button></div>`);
+  $('#sheet').onclick = ev => {
+    const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    closeSheet();
+    if (a === 'profile') return openUser(uid);
+    const gi = storyGroups().findIndex(g => g.userId === uid); if (gi >= 0) openStories(gi); else toast('স্টোরিটি আর নেই');
+  };
+}, true);
 // পোল: ভোট দিলে (বা নিজের পোস্টে) ফলাফল দেখায়
 function pollHtml(p) {
   const votes = p.poll.map((_, i) => Number(p.votes?.[i]) || 0), total = votes.reduce((a, b) => a + b, 0);
@@ -489,8 +523,12 @@ S.stories = []; S.stImg = new Map();
 const stSeen = () => new Set(local.get('stseen', []));
 function markStSeen(id) { const s0 = stSeen(); if (s0.has(id)) return; s0.add(id); const live = new Set(S.stories.map(x => x.id)); local.set('stseen', [...s0].filter(x => live.has(x)).slice(-400)); }
 async function loadStories() {
+  const had = storyUserSet();
   try { S.stories = await S.api.stories(); } catch { S.stories = []; }
   renderStories();
+  // কারো স্টোরি এল/গেল: ফিডের ছবির বৃত্ত হালনাগাদ
+  const now = storyUserSet();
+  if (S.feeds.home.posts.length && ([...now].some(x => !had.has(x)) || [...had].some(x => !now.has(x)))) renderFeed('home');
 }
 function storyGroups() {
   const m = new Map(), myId = me()?.id, seen = stSeen();
@@ -857,7 +895,7 @@ async function loadFeed(key, append) {
     const pinP = pinId ? S.api.posts({ postId: pinId }).catch(() => []) : null;
     const rows = plainHome ? await cachedCall('feed', async () => (await call()).slice(0, PAGE)) : await call();
     if (adsP) f.ads = await adsP;
-    if (key === 'home' && !append) loadStories();
+    if (key === 'home' && !append) { loadStories(); if (me()) S.fol = await S.api.followState().catch(() => S.fol); }
     if (key === 'home' && !append) f.urgent = urgP ? (await urgP).map(p => ({ ...p, urgentTop: true })) : [];
     f.posts = append ? [...f.posts, ...rows] : rows; f.more = !['post', 'saved'].includes(key) && rows.length >= PAGE;
     if (pinP) { const pin = (await pinP)[0]; if (pin) f.posts = [{ ...pin, pinnedPage: true }, ...f.posts.filter(x => x.id !== pin.id)]; }

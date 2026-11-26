@@ -580,6 +580,12 @@ async function supabaseApi() {
     },
     async acceptFriend(id) { ok(await sb.rpc('accept_friend', { from_user: id })); },
     async removeFriend(id) { ok(await sb.from('friendships').delete().or(`and(requester.eq.${me.id},addressee.eq.${id}),and(requester.eq.${id},addressee.eq.${me.id})`)); },
+    // ফিডে "ফলো করুন" দেখানোর জন্য: কাদের বন্ধু/ফলো করছি, কোন পেইজ ফলো করছি
+    async followState() {
+      if (!me) return null;
+      const [fr, fo, pf] = await Promise.all([friendIds(me.id), sb.from('follows').select('followee_id').eq('follower_id', me.id), sb.from('page_follows').select('page_id').eq('user_id', me.id)]);
+      return { users: new Set([me.id, ...fr, ...ok(fo).map(x => x.followee_id)]), pages: new Set(ok(pf).map(x => x.page_id)) };
+    },
     async follow(id) { ok(await sb.from('follows').upsert({ follower_id: me.id, followee_id: id }, { ignoreDuplicates: true })); },
     async unfollow(id) { ok(await sb.from('follows').delete().eq('follower_id', me.id).eq('followee_id', id)); },
     async block(id) { ok(await sb.from('blocks').insert({ blocker_id: me.id, blocked_id: id })); blocked.add(id); },
@@ -1439,6 +1445,10 @@ function demoApi() {
       db.notifs = db.notifs.filter(n => !(n.to === meId && n.from === id && n.type === 'friend_request')); save();
     },
     async removeFriend(id) { const f = friendRow(meId, id); db.friendships = db.friendships.filter(x => x !== f); save(); },
+    async followState() {
+      if (!meId) return null;
+      return wait({ users: new Set([meId, ...friendIds(meId), ...db.follows.filter(f => f.startsWith(meId + ':')).map(f => f.split(':')[1])]), pages: new Set(db.pageFollows.filter(f => f.startsWith(meId + ':')).map(f => Number(f.split(':')[1]))) });
+    },
     async follow(id) { if (!db.follows.includes(meId + ':' + id)) db.follows.push(meId + ':' + id); save(); },
     async unfollow(id) { db.follows = db.follows.filter(f => f !== meId + ':' + id); save(); },
     async block(id) {

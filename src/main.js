@@ -2441,7 +2441,11 @@ function renderMsgs() {
     const showName = group && !m.mine && m.senderId !== prevSender;
     prevSender = m.senderId;
     const rx = Object.entries(m.reactions || {}).filter(([, n]) => n > 0);
-    html += `<div class="mrow${m.mine ? ' mine' : ''}">${group && !m.mine ? `<span class="m-av">${showName ? userLink(m.senderId, av(m.sender || {}, 'xs')) : ''}</span>` : ''}
+    // যে পাঠিয়েছেন তার ছবি (একটানা কয়েকটা মেসেজের শেষটার পাশে); চাপলে প্রোফাইল, পেইজ হলে পেইজ
+    const nx = msgs[i + 1], lastOfRun = !nx || nx.senderId !== m.senderId || dayLabel(nx.createdAt) !== day || nx.mine !== m.mine;
+    const pgSender = th.kind === 'page' && !th.asPage && th.pg;
+    const avBtn = pgSender ? `<button class="avbtn" data-page="${esc(th.pg.id)}" aria-label="${esc(th.pg.name)} পেইজ দেখুন">${entAv(th.pg)}</button>` : userLink(m.senderId, av(m.sender || (th.partner?.id === m.senderId ? th.partner : {}), 'xs'));
+    html += `<div class="mrow${m.mine ? ' mine' : ''}">${!m.mine ? `<span class="m-av">${lastOfRun ? avBtn : ''}</span>` : ''}
       <div class="mcol">${showName ? `<span class="m-name">${esc(m.sender?.name || '')}</span>` : ''}
       <div class="bub${m.mine ? ' mine' : ''}${m.deleted ? ' deleted' : ''}${m.image && !m.body ? ' imgonly' : ''}" data-mid="${esc(m.id)}" tabindex="0">${msgBody(m)}<small>${m.auto ? '⚡ অটো মেসেজ · ' : ''}${esc(clock(m.createdAt))}</small></div>
       ${rx.length ? `<button class="m-rx" data-mrx="${esc(m.id)}" aria-label="রিয়্যাক্ট">${rx.map(([e]) => e).join('')}${rx.reduce((a, [, n]) => a + n, 0) > 1 ? `<b>${bn(rx.reduce((a, [, n]) => a + n, 0))}</b>` : ''}</button>` : ''}</div></div>`;

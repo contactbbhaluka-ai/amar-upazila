@@ -362,9 +362,64 @@ function postHtml(p) {
       <button data-save="${esc(p.id)}" class="${p.saved ? 'saved' : ''}" aria-pressed="${!!p.saved}" aria-label="${p.saved ? 'সেভ থেকে সরান' : 'সেভ করুন'}" title="সেভ">${ic('bookmark', 22, p.saved ? 'currentColor' : 'none')}${p.saves ? `<span class="cnt">${bn(p.saves)}</span>` : ''}</button>
       ${own ? `<button data-pinfo="${esc(p.id)}" class="views-btn" aria-label="মোট ভিউ ${bn(p.views || 0)}, চাপলে বিস্তারিত" title="মোট ভিউ">${ic('eye', 22)}<span class="cnt">${bn(p.views || 0)}</span></button>` : ''}
     </div>
-
+    ${S.view !== 'post' && S.cmIn.has(String(p.id)) ? inlineCmHtml(p) : ''}
   </article>`;
 }
+// ================================================================ ফিডেই পোস্টের নিচে মন্তব্য (ফেসবুকের মতো)
+// মন্তব্য বাটনে চাপলে পোস্টের নিচেই কয়েকটি মন্তব্য আর লেখার বক্স খোলে; সব দেখতে আলাদা পাতায়
+S.cmIn = new Map();   // postId → { list, draft, added: Set, ments: Map }
+const CMI_SHOW = 3;
+function inlineCmHtml(p) {
+  const st = S.cmIn.get(String(p.id)), u = me();
+  let shown = [];
+  if (st.list) {
+    const tops = st.list.filter(c => !c.parentId);
+    const pinned = tops.find(c => c.id === p.pinnedCommentId);
+    const mine = tops.filter(c => st.added.has(c.id));
+    const best = tops.filter(c => c !== pinned && !st.added.has(c.id)).sort((a, b) => (b.likes || 0) - (a.likes || 0) || b.createdAt.localeCompare(a.createdAt));
+    shown = [...(pinned ? [pinned] : []), ...best].slice(0, Math.max(CMI_SHOW - mine.length, 1)).concat(mine);
+  }
+  const total = p.comments || 0;
+  return `<div class="cmi" data-cmi="${esc(p.id)}">
+    ${!st.list ? '<div class="cmi-load mut">মন্তব্য লোড হচ্ছে…</div>' : shown.map(c => `<button class="cmi-c" data-openpost="${esc(p.id)}">${av(c, 'sm')}<span class="cmi-b"><b>${esc(c.author)}${vb(c.badge)}</b><span class="cmi-t">${esc(c.body.length > 160 ? c.body.slice(0, 160) + '…' : c.body)}</span></span><span class="cmi-m mut">${esc(ago(c.createdAt))}${c.likes ? ` · ${ic('thumb', 12)} ${bn(c.likes)}` : ''}</span></button>`).join('')}
+    ${st.list && total > shown.length ? `<button class="cmi-all" data-openpost="${esc(p.id)}">সব মন্তব্য দেখুন (${bn(total)})</button>` : ''}
+    <form class="cmi-form" data-cmiform="${esc(p.id)}">${S.actAs ? entAv(S.actAs) : u ? av(u, 'sm') : ''}<input class="cmi-input" placeholder="${u ? 'মন্তব্য লিখুন…' : 'মন্তব্য করতে লগইন করুন'}" maxlength="300" autocomplete="off" aria-label="মন্তব্য লিখুন" value="${esc(st.draft || '')}"><button class="cmi-send" aria-label="মন্তব্য পাঠান">${ic('send', 20)}</button></form>
+  </div>`;
+}
+function focusCmi(id) {
+  const i = document.querySelector(`.cmi[data-cmi="${id}"] .cmi-input`); if (!i) return;
+  i.focus({ preventScroll: true }); i.setSelectionRange(i.value.length, i.value.length);
+  i.closest('.cmi').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+async function loadCmi(key, id) {
+  const st = S.cmIn.get(String(id)); if (!st) return;
+  try { st.list = await S.api.comments(Number(id) || id, 'top'); } catch { st.list = []; }
+  const had = document.activeElement?.closest?.(`.cmi[data-cmi="${id}"]`);
+  renderFeed(key); if (had) focusCmi(id);
+}
+async function toggleCmi(key, id) {
+  id = String(id);
+  if (S.cmIn.has(id)) { const i = document.querySelector(`.cmi[data-cmi="${id}"] .cmi-input`); if (i && document.activeElement !== i) return focusCmi(id); if (!S.cmIn.get(id).draft) { S.cmIn.delete(id); renderFeed(key); } return; }
+  S.cmIn.set(id, { list: null, draft: '', added: new Set(), ments: new Map() });
+  renderFeed(key); focusCmi(id);
+  loadCmi(key, id);
+}
+document.addEventListener('input', e => { const i = e.target.closest?.('.cmi-input'); if (i) { const st = S.cmIn.get(i.closest('.cmi').dataset.cmi); if (st) st.draft = i.value; } });
+document.addEventListener('focusin', e => { const i = e.target.closest?.('.cmi-input'); if (!i) return; if (!me()) { i.blur(); return needUser(); } if (!i._m) { i._m = true; attachMention(i, S.cmIn.get(i.closest('.cmi').dataset.cmi).ments); } });
+document.addEventListener('submit', e => {
+  const f = e.target.closest?.('[data-cmiform]'); if (!f) return;
+  e.preventDefault(); if (!needUser()) return;
+  const id = f.dataset.cmiform, key = feedOf(f), st = S.cmIn.get(id), post = key && findPost(key, id), i = f.querySelector('input'), body = i.value.trim();
+  if (!body || !post || !st) return;
+  busy(f.querySelector('button'), async () => {
+    const ments = mentionIds(body, st.ments);
+    await S.api.addComment(post.id, body, null, ments, S.actAs?.id || null);
+    st.draft = ''; st.ments.clear(); post.comments = (post.comments || 0) + 1;
+    const list = await S.api.comments(post.id, 'new').catch(() => null);
+    if (list) { const mine = list.find(c => !c.parentId && c.body === body && !st.added.has(c.id)); if (mine) st.added.add(mine.id); st.list = list; }
+    renderFeed(key); focusCmi(id);
+  });
+});
 // ================================================================ পোস্ট কতজন দেখেছেন
 // অর্ধেকের বেশি অংশ অন্তত ১ সেকেন্ড স্ক্রিনে থাকলে "দেখা" ধরা হয়; কয়েক সেকেন্ড পরপর একসাথে সার্ভারে পাঠানো হয়
 const seenPosts = new Set(), seenQueue = new Map(), seenTimers = new Map();
@@ -603,7 +658,7 @@ document.addEventListener('click', async e => {
     reactorsSheet('post', b.dataset.rxlist);
   } else if (b.dataset.cm) {
     if (key === 'post') { $('#cm-input').focus(); return; }
-    openPost(b.dataset.cm);
+    toggleCmi(key, b.dataset.cm);
   } else if (b.dataset.share) {
     shareSheet(findPost(key, b.dataset.share));
   } else if (b.dataset.menu) {

@@ -1045,3 +1045,19 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .cm-photo:hover,.cm-photo:active{background:var(--g2)}
 .cm-top .cm-open{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #comp-av{cursor:pointer;display:grid}
+
+/* v41 ফিডে পোস্টের নিচেই মন্তব্য */
+.cmi{border-top:1px solid var(--line);margin-top:6px;padding-top:8px;display:grid;gap:6px}
+.cmi-load{font-size:13px;padding:2px 4px}
+.cmi-c{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;text-align:left;border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer}
+.cmi-c .av{grid-row:span 2}
+.cmi-b{background:var(--g2);border-radius:14px;padding:6px 12px;justify-self:start;max-width:100%;overflow-wrap:anywhere}
+.cmi-b b{display:block;font-size:13px}
+.cmi-t{display:block;font-size:14px;line-height:1.45;white-space:pre-line}
+.cmi-m{font-size:12px;padding:2px 12px 0;display:flex;align-items:center;gap:3px}
+.cmi-all{justify-self:start;border:0;background:none;color:var(--mut);font:inherit;font-weight:600;font-size:14px;padding:2px 4px;cursor:pointer}
+.cmi-form{display:flex;align-items:center;gap:8px;margin-top:2px}
+.cmi-form .ent-av{width:32px;height:32px;min-width:32px;font-size:13px;border-radius:8px}
+.cmi-input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:8px 14px;font:inherit;font-size:15px;color:var(--ink);min-height:40px}
+.cmi-send{flex:none;display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:50%;background:none;color:var(--gt,#006a4e);cursor:pointer}
+.cmi-send:disabled{opacity:.5}

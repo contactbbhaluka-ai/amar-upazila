@@ -1395,3 +1395,10 @@ button.av-edit{border:0;background:none;padding:0;border-radius:50%}
 .av-story{box-sizing:border-box;display:grid;place-items:center;flex:none;width:48px;height:48px;aspect-ratio:1/1}
 .av-story .av{width:42px;height:42px;min-width:42px;aspect-ratio:1/1;box-sizing:border-box}
 img.av{aspect-ratio:1/1}
+/* মেসেজ: উপরে স্টোরি ও সক্রিয় মানুষ (মেসেঞ্জারের মতো) */
+.act-row{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:4px 2px 6px}
+.act-row::-webkit-scrollbar{display:none}
+.act-row .st-ring{position:relative}
+.act-row .st-ring.plain{background:none;padding:3px}
+.act-row .on-dot{right:2px;bottom:2px;width:15px;height:15px;border-width:3px}
+.act-cap{font-size:12px;margin:0 2px 6px}

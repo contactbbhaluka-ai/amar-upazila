@@ -2288,8 +2288,12 @@ async function loadConvs() {
     const list = await S.api.inbox();
     S.inboxList = list; S.mutedKeys = new Set(list.filter(c => c.muted).map(cvKey));
     renderConvs();
-    const ids = [...new Set(list.filter(c => c.kind === 'dm').map(c => c.userId))];
+    // সক্রিয় বন্ধু ও চ্যাটের মানুষ, আর স্টোরি (মেসেঞ্জারের মতো উপরে এক সারিতে)
+    const friends = await S.api.friends().catch(() => []);
+    S.inboxFriends = friends;
+    const ids = [...new Set([...list.filter(c => c.kind === 'dm').map(c => c.userId), ...friends.map(f => f.id)])].slice(0, 200);
     if (ids.length) S.api.presence(ids).then(m => { S.pres = m; if (S.view === 'msgs') renderConvs(); }).catch(() => {});
+    if (!S.stories?.length) loadStories().then(() => { if (S.view === 'msgs') renderConvs(); });
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 function renderConvs() {
@@ -2301,6 +2305,7 @@ function renderConvs() {
   if (q) rows = rows.filter(c => (c.name || '').toLowerCase().includes(q));
   const head = f ? `<div class="card conv-filter">${entAv(f)}<div class="info"><b>${esc(f.name)}</b><small>পেইজের মেসেজ · আপনি পেইজের নামে উত্তর দেবেন</small></div>${f.isOwner ? `<button class="sbtn ghost" id="auto-reply">⚡ অটো মেসেজ${f.autoReplyOn ? ' ✓' : ''}</button><button class="sbtn ghost" id="faq-btn">❓ প্রশ্ন-উত্তর${f.faqs?.length ? ' ✓' : ''}</button>` : ''}${S.actAs ? '' : '<button class="link" id="conv-all">← আমার মেসেজ</button>'}</div>`
     : `<div class="inbox-top"><input type="search" id="cv-q" placeholder="নাম দিয়ে চ্যাট খুঁজুন…" aria-label="চ্যাট খুঁজুন" value="${esc(S.cvQ || '')}"><button class="sbtn" id="cv-newgroup">${ic('users', 16)} নতুন গ্রুপ</button></div>
+      ${activeRowHtml()}
       <div class="seg cv-tabs"><button data-cvtab="chats" class="${S.cvTab === 'chats' ? 'on' : ''}">চ্যাট</button><button data-cvtab="req" class="${S.cvTab === 'req' ? 'on' : ''}">মেসেজ রিকোয়েস্ট${reqs.length ? ` <span class="badge">${bn(reqs.length)}</span>` : ''}</button></div>
       ${S.cvTab === 'req' ? '<p class="mut cv-reqnote">যারা আপনার বন্ধু নন তাদের মেসেজ এখানে আসে। উত্তর দিলে বা গ্রহণ করলে সাধারণ চ্যাটে চলে যাবে। আপনি না খোলা পর্যন্ত তারা জানবেন না আপনি দেখেছেন।</p>' : ''}`;
   const row = c => {
@@ -2319,10 +2324,29 @@ function renderConvs() {
   $('#faq-btn')?.addEventListener('click', () => faqSheet(f));
   const qi = $('#cv-q'); if (qi) qi.oninput = () => { S.cvQ = qi.value; const pos = qi.selectionStart; renderConvs(); const n = $('#cv-q'); n.focus(); n.setSelectionRange(pos, pos); };
 }
+// উপরের সারি: নিজের স্টোরি দিন, যাদের স্টোরি আছে, আর যারা এখন সক্রিয়
+function activeRowHtml() {
+  const u = me(); if (!u || S.actAs) return '';
+  const groups = storyGroups(), withStory = new Set(groups.map(g => g.userId));
+  const people = new Map();
+  for (const f of S.inboxFriends || []) people.set(f.id, f);
+  for (const c of S.inboxList || []) if (c.kind === 'dm' && !people.has(c.userId)) people.set(c.userId, { id: c.userId, name: c.name, avatar: c.avatar });
+  const active = [...people.values()].filter(p => isOnline(S.pres.get(p.id)) && !withStory.has(p.id));
+  const mine = groups.find(g => g.userId === u.id);
+  const items = [
+    `<button class="st-u" ${mine ? `data-stg="${groups.indexOf(mine)}"` : 'data-stnew'} aria-label="${mine ? 'আপনার স্টোরি' : 'স্টোরি দিন'}"><span class="st-ring${mine ? '' : ' add'}">${av(u)}${mine ? '' : '<i>+</i>'}</span><span class="st-n">${mine ? 'আপনার স্টোরি' : 'স্টোরি দিন'}</span></button>`,
+    ...groups.filter(g => g.userId !== u.id).map(g => `<button class="st-u${g.seen ? ' seen' : ''}" data-stg="${groups.indexOf(g)}"><span class="st-ring">${av(g)}${isOnline(S.pres.get(g.userId)) ? '<b class="on-dot"></b>' : ''}</span><span class="st-n">${esc(g.name.split(' ')[0])}</span></button>`),
+    ...active.map(p => `<button class="st-u act-u" data-actchat="${esc(p.id)}"><span class="st-ring plain">${av(p)}<b class="on-dot"></b></span><span class="st-n">${esc(p.name.split(' ')[0])}</span></button>`),
+  ];
+  return `<div class="act-row" aria-label="স্টোরি ও সক্রিয় মানুষ">${items.join('')}</div>${active.length ? `<p class="act-cap mut">🟢 এখন সক্রিয়: ${bn(active.length)} জন</p>` : ''}`;
+}
 const convOf = key => (S.inboxList || []).find(c => cvKey(c) === key);
 const tOf = c => (c.kind === 'group' ? { kind: 'group', id: c.chatId } : { kind: c.pageId ? 'page' : 'dm', id: c.userId, pageId: c.pageId, asPage: c.asPage });
 $('#convs').addEventListener('click', async e => {
   const tab = e.target.closest('[data-cvtab]'); if (tab) { S.cvTab = tab.dataset.cvtab; return renderConvs(); }
+  if (e.target.closest('[data-stnew]')) return storyCreator();
+  const sg = e.target.closest('[data-stg]'); if (sg) return openStories(Number(sg.dataset.stg));
+  const ac = e.target.closest('[data-actchat]'); if (ac) return openThread(ac.dataset.actchat);
   if (e.target.closest('#cv-newgroup')) return newGroupSheet();
   const mb = e.target.closest('[data-cvmenu]');
   if (mb) { const c = convOf(mb.dataset.cvmenu); if (c) convMenu(tOf(c), c); return; }

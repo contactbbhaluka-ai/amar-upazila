@@ -279,6 +279,8 @@ async function supabaseApi() {
       return url;
     },
     async removeCover() { ok(await sb.from('profiles').update({ cover_url: null }).eq('id', me.id)); me.cover = ''; },
+    // আগের ছবিকে আবার প্রোফাইল/কভার করা: নতুন পোস্ট হয় না, আগের পোস্টের রিয়্যাক্ট-মন্তব্য যেমন ছিল তেমনই থাকে
+    async useOldPhoto(kind, url) { ok(await sb.from('profiles').update(kind === 'cover' ? { cover_url: url } : { avatar_url: url }).eq('id', me.id)); if (kind === 'cover') me.cover = url; else me.avatar = url; },
     // ছবি: কারও সব ছবি, বা একটা অ্যালবামের (albumId), বা প্রোফাইল/কভার ছবির (kind)
     async photos(userId, { albumId, kind, pageId } = {}) {
       let q = sb.from('posts').select('id,image_url,image_urls,created_at');
@@ -1146,6 +1148,7 @@ function demoApi() {
     async setAvatar(blob, share = true) { const url = await toBlobUrl(blob); person(meId).avatar = url; save(); await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'avatar', privacy: share ? 'public' : 'only_me' }); return url; },
     async setCover(blob, share = true) { const url = await toBlobUrl(blob); person(meId).cover = url; save(); await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', privacy: share ? 'public' : 'only_me' }); return url; },
     async removeCover() { person(meId).cover = ''; save(); },
+    async useOldPhoto(kind, url) { if (kind === 'cover') person(meId).cover = url; else person(meId).avatar = url; save(); return wait(); },
     async photos(userId, { albumId, kind, pageId } = {}) {
       const mine = this.__visiblePosts().filter(p => (pageId ? p.pageId === Number(pageId) : p.userId === userId && !p.pageId) && !p.groupId && (!albumId || p.albumId === Number(albumId)) && (!kind || inVirtual(kind, p)));
       return wait(flattenPhotos(mine.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(p => ({ id: p.id, createdAt: p.createdAt, images: (p.images?.length ? p.images : (p.image ? [p.image] : [])).map(demoPic) }))));

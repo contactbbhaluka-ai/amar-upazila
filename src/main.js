@@ -1701,12 +1701,12 @@ S.pstate = { me: { tab: 'posts', seg: 'all', album: null }, user: { tab: 'posts'
 function coverHtml(p, own) {
   if (p.lockedOut) p = { ...p, _noview: true };   // লক: বন্ধু ছাড়া বড় করে দেখা যাবে না
   return `<div class="cover${p.cover ? '' : ' empty'}">
-    ${p.cover ? (p._noview ? `<div class="cover-img"><img loading="lazy" decoding="async" src="${esc(p.cover)}" alt=""></div>` : `<button class="cover-img" data-viewpic="${esc(p.cover)}" aria-label="কভার ছবি দেখুন"><img loading="lazy" decoding="async" src="${esc(p.cover)}" alt=""></button>`) : ''}
+    ${p.cover ? (p._noview ? `<div class="cover-img"><img loading="lazy" decoding="async" src="${esc(p.cover)}" alt=""></div>` : `<button class="cover-img" data-picpost="${esc(p.id)}|cover|${esc(p.cover)}" aria-label="কভার ছবি দেখুন"><img loading="lazy" decoding="async" src="${esc(p.cover)}" alt=""></button>`) : ''}
     ${own ? `<button class="cover-btn" id="cover-btn">${ic('camera', 16)} ${p.cover ? 'কভার বদলান' : 'কভার ছবি যোগ করুন'}</button>` : ''}
   </div>
   <div class="prof-av">${own
-    ? `<label class="av-edit" title="প্রোফাইল ছবি বদলান">${av(p, 'lg')}<span class="av-cam">${ic('camera', 16)}</span><input type="file" id="avfile" accept="image/*" hidden></label>`
-    : p.avatar && !p._noview ? `<button class="avbtn" data-viewpic="${esc(p.avatar)}" aria-label="প্রোফাইল ছবি দেখুন">${av(p, 'lg')}</button>` : av(p, 'lg')}</div>`;
+    ? `<button class="av-edit" data-avmenu title="প্রোফাইল ছবি" aria-label="প্রোফাইল ছবি: দেখুন বা বদলান">${av(p, 'lg')}<span class="av-cam">${ic('camera', 16)}</span></button><input type="file" id="avfile" accept="image/*" hidden>`
+    : p.avatar && !p._noview ? `<button class="avbtn" data-picpost="${esc(p.id)}|avatar|${esc(p.avatar)}" aria-label="প্রোফাইল ছবি দেখুন">${av(p, 'lg')}</button>` : av(p, 'lg')}</div>`;
 }
 function profTabs(key) {
   const st = S.pstate[key], tabs = key === 'page' ? [['posts', 'পোস্ট'], ['photos', 'ছবি']] : [['posts', 'পোস্ট'], ['about', 'এবাউট'], ['photos', 'ছবি']];
@@ -1819,15 +1819,67 @@ function picSheet(kind, blob, page) {
     toast(cover ? 'কভার ছবি বদলানো হয়েছে' : 'প্রোফাইল ছবি বদলানো হয়েছে');
   });
 }
+// প্রোফাইল/কভার ছবি দেখলে সেই ছবির পোস্ট খোলে (রিয়্যাক্ট ও মন্তব্যসহ); পোস্ট না পেলে শুধু ছবি
+async function openPicPost(uid, kind, url) {
+  const list = await S.api.photos(uid, { kind }).catch(() => []);
+  const hit = list.find(x => x.url === url);
+  if (hit) return openPost(hit.postId);
+  openViewer({ images: [url] });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-picpost]'); if (!b) return;
+  e.stopPropagation(); const [uid, kind, ...rest] = b.dataset.picpost.split('|'); openPicPost(uid, kind, rest.join('|'));
+}, true);
+// নিজের প্রোফাইল ছবিতে চাপলে: দেখুন / নতুন আপলোড / আগের ছবি থেকে / ফ্রেম
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-avmenu]')) return;
+  const u = me(); if (!u) return;
+  openSheet(`<div class="menu">${u.avatar ? `<button data-act="view">${ic('photo', 18)} প্রোফাইল ছবি দেখুন</button>` : ''}
+    <button data-act="up">${ic('camera', 18)} নতুন ছবি আপলোড করুন</button>
+    <button data-act="old">${ic('album', 18)} আগের ছবি থেকে বাছাই করুন</button>
+    <button data-act="frame">🖼️ ছবিতে ফ্রেম দিন</button>
+    <button data-close>বন্ধ করুন</button></div>`);
+  $('#sheet').onclick = ev => {
+    const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    closeSheet();
+    if (a === 'view') openPicPost(u.id, 'avatar', u.avatar);
+    if (a === 'up') $('#avfile')?.click();
+    if (a === 'old') oldPhotoSheet('avatar');
+    if (a === 'frame') frameSheet();
+  };
+});
+// আগের ছবি থেকে বাছাই: নতুন পোস্ট হয় না, আগের পোস্টের রিয়্যাক্ট-মন্তব্য অক্ষত থাকে
+async function oldPhotoSheet(kind) {
+  const u = me(), cover = kind === 'cover', title = cover ? 'আগের ছবি থেকে কভার' : 'আগের ছবি থেকে প্রোফাইল ছবি';
+  openSheet(`<h2>${title}</h2><div class="skel"></div>`);
+  const [prev, other] = await Promise.all([S.api.photos(u.id, { kind }).catch(() => []), S.api.photos(u.id, { kind: 'uploads' }).catch(() => [])]);
+  const cur = cover ? u.cover : u.avatar;
+  const grid = (list, label) => list.length ? `<h3 class="res-h">${label}</h3><div class="ph-grid op-grid">${list.map(ph => `<button class="ph-cell${ph.url === cur ? ' cur' : ''}" data-oldpic="${esc(ph.url)}"><img loading="lazy" decoding="async" src="${esc(ph.url)}" alt="">${ph.url === cur ? '<span class="op-now">এখন</span>' : ''}</button>`).join('')}</div>` : '';
+  const body = grid(prev, cover ? 'আগের কভার ছবি' : 'আগের প্রোফাইল ছবি') + grid(other.slice(0, 60), 'আপনার অন্য ছবি');
+  openSheet(`<h2>${title}</h2>${body || '<p class="mut">এখনো কোনো ছবি নেই।</p>'}<button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
+  $('#sheet').classList.add('tall');
+  $('#sheet').onclick = ev => {
+    const b = ev.target.closest('[data-oldpic]'); if (!b) return;
+    const url = b.dataset.oldpic; if (url === cur) return toast(cover ? 'এটিই এখন কভার ছবি' : 'এটিই এখন প্রোফাইল ছবি');
+    openSheet(`<h2>${cover ? 'কভার ছবি করবেন?' : 'প্রোফাইল ছবি করবেন?'}</h2><div class="pic-prev${cover ? ' cover' : ''}"><img src="${esc(url)}" alt=""></div>
+      <p class="mut" style="font-size:13px">নতুন পোস্ট হবে না। ছবিটির আগের পোস্টের রিয়্যাক্ট ও মন্তব্য যেমন আছে তেমনই থাকবে।</p>
+      <button class="btn wide" id="op-go">${cover ? 'কভার ছবি করুন' : 'প্রোফাইল ছবি করুন'}</button><button class="btn ghost wide" id="op-back" style="margin-top:8px">ফিরে যান</button>`);
+    $('#op-back').onclick = () => oldPhotoSheet(kind);
+    $('#op-go').onclick = e2 => busy(e2.currentTarget, async () => {
+      await S.api.useOldPhoto(kind, url); closeSheet(); renderMe(); renderComposer(); loadFeed('home');
+      toast(cover ? 'কভার ছবি বদলানো হয়েছে' : 'প্রোফাইল ছবি বদলানো হয়েছে');
+    });
+  };
+}
 function coverMenu() {
   const u = me();
-  if (!u.cover) return $('#coverfile').click();
-  openSheet(`<div class="menu"><button data-act="up">${ic('camera', 18)} নতুন ছবি আপলোড করুন</button><button data-act="view">${ic('photo', 18)} কভার ছবি দেখুন</button><button data-act="rm" class="danger">কভার ছবি সরান</button><button data-close>বন্ধ করুন</button></div>`);
+  openSheet(`<div class="menu">${u.cover ? `<button data-act="view">${ic('photo', 18)} কভার ছবি দেখুন</button>` : ''}<button data-act="up">${ic('camera', 18)} নতুন ছবি আপলোড করুন</button><button data-act="old">${ic('album', 18)} আগের ছবি থেকে বাছাই করুন</button>${u.cover ? '<button data-act="rm" class="danger">কভার ছবি সরান</button>' : ''}<button data-close>বন্ধ করুন</button></div>`);
   $('#sheet').onclick = async ev => {
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
     closeSheet();
     if (a === 'up') $('#coverfile').click();
-    if (a === 'view') openViewer({ images: [u.cover] });
+    if (a === 'view') openPicPost(u.id, 'cover', u.cover);
+    if (a === 'old') oldPhotoSheet('cover');
     if (a === 'rm' && await confirmSheet('কভার ছবি সরাবেন? ছবিটা আপনার "কভার ছবি" অ্যালবামে থেকে যাবে।', 'সরান', true)) await busy(null, async () => { await S.api.removeCover(); renderMe(); toast('কভার ছবি সরানো হয়েছে'); });
   };
 }

@@ -55,3 +55,47 @@ returns jsonb language sql stable security definer set search_path = public as $
   where p.id = uid;
 $$;
 grant execute on function public.profile_about(uuid) to anon, authenticated;
+
+-- ---------- সম্পর্কের অবস্থা, ধর্ম, সংগঠন/ক্লাব ----------
+-- সম্পর্ক ও ধর্ম শুরুতে "শুধু আমি"; সংগঠন শুরুতে পাবলিক
+create or replace function public.valid_orgs(j jsonb)
+returns boolean language sql immutable as $$
+  select jsonb_typeof(j) = 'array' and jsonb_array_length(j) <= 5
+     and not exists (select 1 from jsonb_array_elements(j) e where case
+       when jsonb_typeof(e) <> 'object' then true
+       when exists (select 1 from jsonb_object_keys(e) k where k not in ('name','role')) then true
+       when jsonb_typeof(e->'name') is distinct from 'string' then true
+       when char_length(e->>'name') not between 1 and 80 then true
+       when e ? 'role' and (jsonb_typeof(e->'role') <> 'string' or char_length(e->>'role') > 40) then true
+       else false end);
+$$;
+alter table public.profile_details add column if not exists relationship text
+  check (relationship in ('single','married','engaged','divorced','widowed'));
+alter table public.profile_details add column if not exists relationship_visibility text not null default 'only_me' check (relationship_visibility in ('public','friends','only_me'));
+alter table public.profile_details add column if not exists religion text
+  check (religion in ('islam','hindu','buddhist','christian','other'));
+alter table public.profile_details add column if not exists religion_visibility text not null default 'only_me' check (religion_visibility in ('public','friends','only_me'));
+alter table public.profile_details add column if not exists orgs jsonb not null default '[]'::jsonb;
+alter table public.profile_details add column if not exists orgs_visibility text not null default 'public' check (orgs_visibility in ('public','friends','only_me'));
+do $$ begin
+  alter table public.profile_details add constraint profile_details_orgs_valid check (public.valid_orgs(orgs));
+exception when duplicate_object then null; end $$;
+
+create or replace function public.profile_about(uid uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'works',        case when private.can_view(p.id, coalesce(d.works_visibility, 'public'))          then coalesce(d.works, '[]'::jsonb) end,
+    'educations',   case when private.can_view(p.id, coalesce(d.educations_visibility, 'public'))     then coalesce(d.educations, '[]'::jsonb) end,
+    'social',       case when private.can_view(p.id, coalesce(d.social_visibility, 'public'))         then coalesce(d.social, '{}'::jsonb) end,
+    'phone',        case when private.can_view(p.id, coalesce(d.contact_visibility, 'only_me'))       then pp.phone end,
+    'birth_year',   case when private.can_view(p.id, coalesce(d.birth_visibility, 'only_me'))         then d.birth_year end,
+    'birth_date',   case when private.can_view(p.id, coalesce(d.birth_visibility, 'only_me'))         then d.birth_date end,
+    'relationship', case when private.can_view(p.id, coalesce(d.relationship_visibility, 'only_me'))  then d.relationship end,
+    'religion',     case when private.can_view(p.id, coalesce(d.religion_visibility, 'only_me'))      then d.religion end,
+    'orgs',         case when private.can_view(p.id, coalesce(d.orgs_visibility, 'public'))           then coalesce(d.orgs, '[]'::jsonb) end)
+  from public.profiles p
+  left join public.profile_details d on d.user_id = p.id
+  left join public.profile_private pp on pp.user_id = p.id
+  where p.id = uid;
+$$;
+grant execute on function public.profile_about(uuid) to anon, authenticated;

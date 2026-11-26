@@ -41,6 +41,9 @@ const ICONS = {
   s_tiktok: '<path d="M14 4v10.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 4c.4 2.3 2 3.8 4.5 4"/>',
   s_youtube: '<rect x="3" y="6" width="18" height="12" rx="3.5"/><path d="M10.5 9.5v5l4-2.5z"/>',
   s_instagram: '<rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="16.8" cy="7.2" r=".6"/>',
+  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7"/>',
+  org: '<rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M12 3l8 6H4z"/><path d="M9 20v-5h6v5"/>',
   work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 12h18"/>',
   school: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
@@ -1036,7 +1039,16 @@ document.addEventListener('click', async e => {
 // ================================================================ এবাউট (ফেসবুকের মতো): প্রতিটা অংশ চাপলে নিচে এডিট খোলে
 const joinedText = d => { if (!d) return ''; const t = new Date(d); return `${bn(t.getFullYear())} সালের ${['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'][t.getMonth()]} থেকে সদস্য`; };
 // এবাউটের প্রতিটা অংশ কারা দেখবে
-const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me' };
+const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
+const RELATIONSHIPS = { single: 'অবিবাহিত', married: 'বিবাহিত', engaged: 'বাগদান হয়েছে', divorced: 'তালাকপ্রাপ্ত', widowed: 'বিধবা / বিপত্নীক' };
+const RELIGIONS = { islam: 'ইসলাম', hindu: 'হিন্দু', buddhist: 'বৌদ্ধ', christian: 'খ্রিস্টান', other: 'অন্যান্য' };
+const choiceSelect = (id, map, cur) => `<select class="f" id="${id}"><option value="" ${cur ? '' : 'selected'}>বলতে চাই না</option>${Object.entries(map).map(([k, l]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+const MAX_ORG = 5;
+const orgRow = (o, i) => `<div class="we-card"><div class="we-h"><b>সংগঠন ${bn(i + 1)}</b><button type="button" class="we-x" data-werm="org|${i}" aria-label="এই সংগঠন বাদ দিন">${ic('close', 14)}</button></div>
+  <label>সংগঠন / ক্লাবের নাম</label><input class="og-name" maxlength="80" value="${esc(o.name || '')}" placeholder="যেমন: ভালুকা যুব সংঘ, রক্তদাতা ক্লাব">
+  <label>পদ</label><input class="og-role" maxlength="40" value="${esc(o.role || '')}" placeholder="যেমন: সদস্য, সভাপতি, সাধারণ সম্পাদক"></div>`;
+const readOrgsDom = () => [...document.querySelectorAll('#we-orgs .we-card')].map(c => ({ name: c.querySelector('.og-name').value.trim(), role: c.querySelector('.og-role').value.trim() }));
+const orgText = o => (o.role ? `${o.name} (${o.role})` : o.name);
 const aVis = (u, k) => (u.aboutVis || ABOUT_VIS0)[k] || ABOUT_VIS0[k];
 const visSel = (id, cur, label = 'কারা দেখবে') => `<label class="vis-sel" for="${id}"><span>${ic(PRIVACY[cur][0], 14)} ${label}</span><select id="${id}" class="f">${Object.entries(PRIVACY).map(([k, [, l]]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
 const visChip = (v, label) => `<span class="ab-vis" title="কারা দেখবে">${ic(PRIVACY[v][0], 11)} ${label ? label + ': ' : ''}${PRIVACY[v][1]}</span>`;
@@ -1056,24 +1068,25 @@ const eduRow = (e, i) => `<div class="we-card"><div class="we-h"><b>শিক্
   <div class="we-2"><div><label>অবস্থা</label><select class="f ed-status"><option value="passed" ${e.status !== 'running' ? 'selected' : ''}>পাশ করেছি</option><option value="running" ${e.status === 'running' ? 'selected' : ''}>এখন পড়ছি</option></select></div>
     <div class="ed-yearw" ${e.status === 'running' ? 'hidden' : ''}><label>পাশের সন</label><select class="f ed-year">${yearOpts(e.year)}</select></div></div>
   <label>বিষয় / গ্রুপ</label><input class="ed-subject" maxlength="60" list="subj-hints" value="${esc(e.subject || '')}" placeholder="যেমন: বিজ্ঞান, মানবিক, হিসাববিজ্ঞান"></div>`;
-const weList = (kind, list) => { const l = list?.length ? list : [{}]; return l.map(kind === 'work' ? workRow : eduRow).join(''); };
+const weList = (kind, list) => { const l = list?.length ? list : [{}]; return l.map(kind === 'work' ? workRow : kind === 'org' ? orgRow : eduRow).join(''); };
 const readWorksDom = () => [...document.querySelectorAll('#we-works .we-card')].map(c => ({ place: c.querySelector('.we-place').value.trim(), title: c.querySelector('.we-title').value.trim() }));
 const readEdusDom = () => [...document.querySelectorAll('#we-edus .we-card')].map(c => ({ school: c.querySelector('.ed-school').value.trim(), status: c.querySelector('.ed-status').value, year: Number(c.querySelector('.ed-year').value) || 0, subject: c.querySelector('.ed-subject').value.trim() }));
 function weSyncAdd() {
-  const w = document.querySelectorAll('#we-works .we-card').length, e = document.querySelectorAll('#we-edus .we-card').length;
-  const aw = document.querySelector('[data-weadd=work]'), ae = document.querySelector('[data-weadd=edu]');
-  if (aw) aw.hidden = w >= MAX_WORK; if (ae) ae.hidden = e >= MAX_EDU;
+  const w = document.querySelectorAll('#we-works .we-card').length, e = document.querySelectorAll('#we-edus .we-card').length, o = document.querySelectorAll('#we-orgs .we-card').length;
+  const aw = document.querySelector('[data-weadd=work]'), ae = document.querySelector('[data-weadd=edu]'), ao = document.querySelector('[data-weadd=org]');
+  if (aw) aw.hidden = w >= MAX_WORK; if (ae) ae.hidden = e >= MAX_EDU; if (ao) ao.hidden = o >= MAX_ORG;
 }
 document.addEventListener('click', e => {
   const add = e.target.closest('[data-weadd]'), rm = e.target.closest('[data-werm]');
   if (!add && !rm) return;
   const kind = add ? add.dataset.weadd : rm.dataset.werm.split('|')[0];
-  const list = kind === 'work' ? readWorksDom() : readEdusDom();
-  if (add) list.push(kind === 'work' ? {} : { status: 'passed' });
+  const box = { work: '#we-works', edu: '#we-edus', org: '#we-orgs' }[kind];
+  const list = kind === 'work' ? readWorksDom() : kind === 'org' ? readOrgsDom() : readEdusDom();
+  if (add) list.push(kind === 'edu' ? { status: 'passed' } : {});
   else list.splice(Number(rm.dataset.werm.split('|')[1]), 1);
-  $(kind === 'work' ? '#we-works' : '#we-edus').innerHTML = weList(kind, list);
+  $(box).innerHTML = weList(kind, list);
   weSyncAdd();
-  if (add) $(kind === 'work' ? '#we-works' : '#we-edus').lastElementChild?.querySelector('input')?.focus();
+  if (add) $(box).lastElementChild?.querySelector('input')?.focus();
 });
 document.addEventListener('change', e => {
   if (!e.target.classList?.contains('ed-status')) return;
@@ -1144,6 +1157,29 @@ const ABOUT = [
       }
       return { works, educations, aboutVis: { works: $('#ab-vis-works').value, educations: $('#ab-vis-edu').value } };
     } },
+  { id: 'personal', ic: 'heart', t: 'সম্পর্ক ও ধর্ম',
+    chips: u => visChip(aVis(u, 'relationship'), 'সম্পর্ক') + visChip(aVis(u, 'religion'), 'ধর্ম'),
+    sum: u => [RELATIONSHIPS[u.relationship], RELIGIONS[u.religion] && `ধর্ম: ${RELIGIONS[u.religion]}`].filter(Boolean).join(' · '), empty: 'সম্পর্কের অবস্থা ও ধর্ম (ঐচ্ছিক)',
+    form: u => `<details class="ab-sub"><summary>${ic('heart', 16)} সম্পর্কের অবস্থা <small class="mut">· ${RELATIONSHIPS[u.relationship] || 'দেওয়া নেই'}</small></summary>
+        ${choiceSelect('ab-rel', RELATIONSHIPS, u.relationship)}${visSel('ab-vis-rel', aVis(u, 'relationship'), 'কারা দেখবে')}</details>
+      <details class="ab-sub"><summary>${ic('book', 16)} ধর্ম <small class="mut">· ${RELIGIONS[u.religion] || 'দেওয়া নেই'}</small></summary>
+        ${choiceSelect('ab-rlg', RELIGIONS, u.religion)}${visSel('ab-vis-rlg', aVis(u, 'religion'), 'কারা দেখবে')}</details>
+      <p class="mut ab-note">${ic('lock', 13)} দুটোই ঐচ্ছিক, শুরুতে শুধু আপনি দেখতে পান।</p>`,
+    read: () => ({ relationship: $('#ab-rel').value, religion: $('#ab-rlg').value, aboutVis: { relationship: $('#ab-vis-rel').value, religion: $('#ab-vis-rlg').value } }) },
+  { id: 'orgs', ic: 'org', t: 'সংগঠন ও ক্লাব', chips: u => visChip(aVis(u, 'orgs')),
+    sum: u => (u.orgs || []).map(orgText).join(' · '), empty: 'যেসব সংগঠন বা ক্লাবের সদস্য, যোগ করুন',
+    form: u => `${visSel('ab-vis-orgs', aVis(u, 'orgs'), 'সংগঠনের তথ্য কারা দেখবে')}<div id="we-orgs">${weList('org', u.orgs)}</div>
+      <button type="button" class="we-add" data-weadd="org">${ic('plus', 15)} আরেকটি সংগঠন যোগ করুন</button>`,
+    after: () => weSyncAdd(),
+    read: () => {
+      const orgs = [];
+      for (const o of readOrgsDom()) {
+        if (!o.name && !o.role) continue;
+        if (!o.name) return { err: 'পদের সাথে সংগঠনের নামও দিন' };
+        orgs.push(o.role ? o : { name: o.name });
+      }
+      return { orgs, aboutVis: { orgs: $('#ab-vis-orgs').value } };
+    } },
   { id: 'addr', ic: 'pin', t: 'ঠিকানা',
     sum: u => u.union || '', empty: 'ঠিকানা দিন',
     form: u => addrHtml('ab', u), after: u => addrRefresh('ab', u),
@@ -1188,6 +1224,9 @@ function renderAbout(key) {
         : `<b>${esc(e.school)}</b> থেকে ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পাশ করেছেন${e.year ? ` (${bn(e.year)})` : ''}`]),
       u.union && [ic('pin', 18), `থাকেন <b>${esc(u.union)}</b>`],
       GENDERS[u.gender] && [ic('users', 18), GENDERS[u.gender]],
+      RELATIONSHIPS[u.relationship] && [ic('heart', 18), RELATIONSHIPS[u.relationship]],
+      RELIGIONS[u.religion] && [ic('book', 18), `ধর্ম: <b>${RELIGIONS[u.religion]}</b>`],
+      ...(u.orgs || []).map(o => [ic('org', 18), o.role ? `<b>${esc(o.name)}</b>-এর <b>${esc(o.role)}</b>` : `<b>${esc(o.name)}</b>-এর সদস্য`]),
       birthText(u) && [ic('calendar', 18), u.birthDate ? `জন্মতারিখ <b>${birthText(u)}</b>` : `জন্ম <b>${bn(u.birthYear)}</b> সালে`],
       u.phone && [ic('mobile', 18), `<a href="tel:${esc(u.phone)}" class="link">${bn(u.phone)}</a>`],
       blood && [ic('drop', 18), esc(blood)],
@@ -1213,7 +1252,7 @@ function renderAbout(key) {
   ${u.joinedAt ? `<div class="ab-joined">${ic('calendar', 15)} ${joinedText(u.joinedAt)}</div>` : ''}</div>`;
   const a = ABOUT.find(x => x.id === open);
   if (a?.after) a.after(u);
-  if (a && a.id !== 'work' && a.id !== 'intro') setTimeout(() => pane.querySelector('.ab-form input, .ab-form select, .ab-form textarea')?.focus({ preventScroll: true }), 30);
+  if (a && !['work', 'intro', 'personal'].includes(a.id)) setTimeout(() => pane.querySelector('.ab-form input, .ab-form select, .ab-form textarea')?.focus({ preventScroll: true }), 30);
 }
 function openAbout(section) {
   Object.assign(S.pstate.me, { tab: 'about', open: section || null, album: null });

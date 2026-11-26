@@ -1421,7 +1421,7 @@ img.av{aspect-ratio:1/1}
 .m-fwd{display:block;font-size:11.5px;opacity:.75;font-style:italic;margin-bottom:2px}
 .m-loc{display:flex!important;align-items:center;gap:8px;text-decoration:none!important;background:rgba(0,0,0,.07);border-radius:12px;padding:8px 12px;margin:2px 0;min-width:180px}
 .m-loc .ml-pin{font-size:26px}.m-loc b{display:block}.m-loc small{display:block;font-size:12px;opacity:.85;font-weight:400}
-.mention{font-weight:700;color:var(--gt,#006a4e)}.bub.mine .mention{color:#fff;text-decoration:underline}.mention.me{background:light-dark(#fef3c7,#78350f);border-radius:4px;padding:0 2px}
+.cmention{font-weight:700;color:var(--gt,#006a4e)}.bub.mine .cmention{color:#fff;text-decoration:underline}.cmention.me{background:light-dark(#fef3c7,#78350f);border-radius:4px;padding:0 2px}
 .bub.pollb{min-width:240px;white-space:normal}
 .m-poll{display:flex;flex-direction:column;gap:6px}
 .mp-q{font-size:15px}
@@ -1483,3 +1483,19 @@ img.av{aspect-ratio:1/1}
 .act-li{width:100%}
 .act-li .act-on{color:#16a34a;font-weight:600}
 .act-msg{color:var(--gt,#006a4e);margin-left:auto;display:grid;place-items:center}
+/* একসাথে পাঠানো কয়েকটা ছবি: অ্যালবাম গ্রিড */
+.m-album{display:grid;grid-template-columns:1fr 1fr;gap:3px;width:min(260px,68vw);border-radius:14px;overflow:hidden}
+.m-album.n3>.alb:first-child{grid-column:1/-1}
+.m-album.many{grid-template-columns:1fr 1fr 1fr}
+.m-album .alb{padding:0!important;border:0!important;background:var(--g2)!important;border-radius:0;position:relative;aspect-ratio:1/1;max-width:none}
+.m-album.n3>.alb:first-child{aspect-ratio:2/1}
+.m-album .m-img{margin:0;border-radius:0;width:100%;height:100%}
+.m-album .m-img img{width:100%;height:100%;max-width:none;max-height:none;min-width:0;min-height:0;object-fit:cover}
+.alb-rx{position:absolute;right:4px;bottom:4px;margin:0}
+.alb-t{font-size:11px;color:var(--mut);margin:2px 4px 0}
+.t-ro{max-width:560px;margin:0 auto;padding:14px 16px;text-align:center;font-size:14px;color:var(--mut)}
+.t-ro[hidden]{display:none}
+.jn-card{text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;margin-bottom:12px}
+.jn-card h2{margin:6px 0 0}.jn-card p{margin:0}
+/* লম্বা মেনুসহ শিটে সদস্য তালিকা যেন চুপসে না যায় */
+.sheet.tall>.gm-list{flex-shrink:0;max-height:none;overflow:visible}

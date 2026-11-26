@@ -632,7 +632,7 @@ async function supabaseApi() {
       else if (t.pageId) q = q.eq('page_id', t.pageId).or(`sender_id.eq.${cust},recipient_id.eq.${cust}`);
       else q = q.is('page_id', null).is('chat_id', null).or(`and(sender_id.eq.${me.id},recipient_id.eq.${t.id}),and(sender_id.eq.${t.id},recipient_id.eq.${me.id})`);
       const key = convKey(t);
-      const [rowsR, setR] = await Promise.all([q.order('created_at', { ascending: false }).limit(200), sb.from('conv_settings').select('muted,accepted,cleared_at').eq('user_id', me.id).eq('key', key).maybeSingle()]);
+      const [rowsR, setR] = await Promise.all([q.order('created_at', { ascending: false }).limit(200), sb.from('conv_settings').select('muted,accepted,cleared_at,marked_unread').eq('user_id', me.id).eq('key', key).maybeSingle()]);
       const set = setR.data || {};
       let rows = ok(rowsR).reverse();
       if (set.cleared_at) rows = rows.filter(m => m.created_at > set.cleared_at);
@@ -659,7 +659,7 @@ async function supabaseApi() {
       let members = [];
       if (t.kind === 'group') members = ok(await sb.from('chat_members').select('user_id,role,last_read_at,p:profiles(name,avatar_url)').eq('chat_id', t.id)).map(x => ({ id: x.user_id, role: x.role, lastReadAt: x.last_read_at, name: x.p?.name || 'সদস্য', avatar: x.p?.avatar_url || '' }));
       const shared = sh?.data || {};
-      return { msgs, muted: !!set.muted, accepted: !!set.accepted, members, shared: { theme: shared.theme || '', nicknames: shared.nicknames || {}, disappear: !!shared.disappear } };
+      return { msgs, muted: !!set.muted, accepted: !!set.accepted, marked: !!set.marked_unread, members, shared: { theme: shared.theme || '', nicknames: shared.nicknames || {}, disappear: !!shared.disappear } };
     },
     async messages(id, pageId, asPage) { return (await this.thread({ kind: pageId ? 'page' : 'dm', id, pageId, asPage })).msgs; },
     async sendMessage(id, body, pageId, opts = {}) { return this.send({ kind: pageId ? 'page' : 'dm', id, pageId, asPage: opts.asPage }, body, opts); },
@@ -727,10 +727,18 @@ async function supabaseApi() {
     async setShowActive(on) { ok(await sb.rpc('set_show_active', { p_on: !!on })); },
     // গ্রুপ চ্যাট
     async createChat(name, ids) { return ok(await sb.rpc('create_chat', { p_name: name, p_members: ids })); },
-    async chatInfo(id) { const c = ok(await sb.from('chats').select('id,name,created_by,created_at,about,photo_path').eq('id', id).maybeSingle()); return c && { id: c.id, name: c.name, createdBy: c.created_by, about: c.about || '', photo: c.photo_path ? (await this.fileUrls([c.photo_path])).get(c.photo_path) || '' : '' }; },
+    async chatInfo(id) { const c = ok(await sb.from('chats').select('id,name,created_by,created_at,about,photo_path,admins_only,join_approval').eq('id', id).maybeSingle()); return c && { id: c.id, name: c.name, createdBy: c.created_by, about: c.about || '', adminsOnly: !!c.admins_only, approval: c.join_approval !== false, photo: c.photo_path ? (await this.fileUrls([c.photo_path])).get(c.photo_path) || '' : '' }; },
     async addChatMembers(id, ids) { ok(await sb.rpc('add_chat_members', { p_chat: id, p_members: ids })); },
     async removeChatMember(id, uid) { ok(await sb.rpc('remove_chat_member', { p_chat: id, p_user: uid })); },
     async renameChat(id, name) { ok(await sb.rpc('rename_chat', { p_chat: id, p_name: name })); },
+    async markUnread(t, on) { await this.convSet(t, { marked_unread: !!on }); },
+    async chatInvite(id, reset) { return ok(await sb.rpc('chat_invite', { p_chat: id, p_reset: !!reset })); },
+    async chatByCode(code) { const r = ok(await sb.rpc('chat_by_code', { p_code: code }))[0]; return r && { id: r.id, name: r.name, about: r.about || '', members: r.members, isMember: r.is_member, pending: r.pending, approval: r.approval }; },
+    async joinChat(code) { return ok(await sb.rpc('join_chat', { p_code: code })); },
+    async chatJoinList(id) { return ok(await sb.rpc('chat_join_list', { p_chat: id })).map(r => ({ id: r.user_id, name: r.name, avatar: r.avatar_url || '', createdAt: r.created_at })); },
+    async decideChatJoin(id, uid, okk) { ok(await sb.rpc('decide_chat_join', { p_chat: id, p_user: uid, p_ok: !!okk })); },
+    async setChatOptions(id, { adminsOnly, approval }) { ok(await sb.rpc('set_chat_options', { p_chat: id, p_admins_only: adminsOnly ?? null, p_approval: approval ?? null })); },
+    async setChatAdmin(id, uid, on) { ok(await sb.rpc('set_chat_admin', { p_chat: id, p_user: uid, p_on: !!on })); },
     // "লিখছেন…": শুধু মুহূর্তের সংকেত, কোথাও জমা হয় না
     typing(t, onTyping) {
       const ch = sb.channel('typing-' + chatFolder(t), { config: { broadcast: { self: false } } })
@@ -1644,13 +1652,13 @@ function demoApi() {
       const out = [...map.values()].map(c => {
         const pg = c.pageId && pageOf(c.pageId), asPage = !!pg && mine.has(pg.id), set = db.convSet[demoKey({ kind: c.kind, id: c.userId, pageId: c.pageId })] || {};
         const request = !c.pageId && !set.accepted && !fr.has(c.userId) && !db.messages.some(m => m.from === meId && m.to === c.userId && !m.pageId && !m.chatId);
-        return { ...c, asPage, pageName: pg?.name || '', name: pg && !asPage ? pg.name : user(c.userId)?.name || 'সদস্য', avatar: pg && !asPage ? pg.avatar || '' : user(c.userId)?.avatar || '', muted: !!set.muted, request, _cleared: set.clearedAt };
+        return { ...c, asPage, pageName: pg?.name || '', name: pg && !asPage ? pg.name : user(c.userId)?.name || 'সদস্য', avatar: pg && !asPage ? pg.avatar || '' : user(c.userId)?.avatar || '', muted: !!set.muted, request, _cleared: set.clearedAt, unread: c.unread || (set.marked_unread ? 1 : 0) };
       }).filter(c => !c._cleared || c.lastAt > c._cleared);
       for (const g of db.chats.filter(g => g.members.some(x => x.id === meId))) {
         const me2 = g.members.find(x => x.id === meId), ms = db.messages.filter(m => m.chatId === g.id && !(m.hid || []).includes(meId)), lm = ms.at(-1), set = db.convSet['g:' + g.id] || {};
         const lastAt = lm?.createdAt || g.createdAt; if (set.clearedAt && lastAt <= set.clearedAt) continue;
         out.push({ kind: 'group', userId: null, pageId: null, chatId: g.id, asPage: false, pageName: '', name: g.name, avatar: g.photo || '', last: lm ? label(lm) : 'গ্রুপ তৈরি হয়েছে', lastAt, lastMine: lm?.from === meId,
-          unread: ms.filter(m => m.from !== meId && m.createdAt > me2.lastReadAt).length, muted: !!set.muted, request: false, members: g.members.length });
+          unread: Math.max(ms.filter(m => m.from !== meId && m.createdAt > me2.lastReadAt).length, set.marked_unread ? 1 : 0), muted: !!set.muted, request: false, members: g.members.length });
       }
       return wait(out.sort((a, b) => b.lastAt.localeCompare(a.lastAt)));
     },
@@ -1674,7 +1682,7 @@ function demoApi() {
       const g = t.kind === 'group' && db.chats.find(x => x.id === Number(t.id));
       const members = g ? g.members.map(x => { const u = user(x.id) || { name: 'সদস্য', avatar: '' }; return { id: x.id, role: x.role, lastReadAt: x.lastReadAt, name: u.name, avatar: u.avatar }; }) : [];
       const sh = t.kind === 'page' || t.pageId ? {} : demoSh(t);
-      return wait({ msgs, muted: !!set.muted, accepted: !!set.accepted, members, shared: { theme: sh.theme || '', nicknames: sh.nicknames || {}, disappear: !!sh.disappear } });
+      return wait({ msgs, muted: !!set.muted, accepted: !!set.accepted, marked: !!set.marked_unread, members, shared: { theme: sh.theme || '', nicknames: sh.nicknames || {}, disappear: !!sh.disappear } });
     },
     async messages(id, pageId) { return (await this.thread({ kind: pageId ? 'page' : 'dm', id, pageId })).msgs; },
     async sendMessage(id, body, pageId, opts = {}) { return this.send({ kind: pageId ? 'page' : 'dm', id, pageId }, body, opts); },
@@ -1688,6 +1696,7 @@ function demoApi() {
       if (t.kind === 'group') { const g0 = db.chats.find(x => x.id === Number(t.id)); base.mentions = (mentions || []).filter(u => g0?.members.some(x => x.id === u && u !== meId)); }
       if (t.kind === 'group') {
         const g = db.chats.find(x => x.id === Number(t.id)); if (!g || !g.members.some(x => x.id === meId)) throw new Error('row-level security');
+        if (g.adminsOnly && g.members.find(x => x.id === meId)?.role !== 'admin') throw new Error('admins only');
         db.messages.push({ ...base, chatId: g.id, to: null }); save();
         const other = g.members.find(x => x.id !== meId && String(x.id).startsWith('d'));
         if (other) setTimeout(() => { db.messages.push({ id: nid(db.messages), from: other.id, to: null, chatId: g.id, body: 'ঠিক আছে 👍 (ডেমো উত্তর)', createdAt: new Date().toISOString(), rx: {} }); g.members.forEach(x => { if (x.id === other.id) x.lastReadAt = new Date().toISOString(); }); save(); listeners.forEach(cb => cb({ type: 'new', from: other.id, chatId: g.id })); }, 1800);
@@ -1769,7 +1778,7 @@ function demoApi() {
       const g = { id: nid(db.chats), name: name.trim(), createdBy: meId, createdAt: now, members: [{ id: meId, role: 'admin', lastReadAt: now, joinedAt: now }, ...ids.filter(i => fr.has(i)).map(i => ({ id: i, role: 'member', lastReadAt: now, joinedAt: now }))] };
       db.chats.push(g); save(); return wait(g.id);
     },
-    async chatInfo(id) { const g = db.chats.find(x => x.id === Number(id)); return wait(g && g.members.some(x => x.id === meId) ? { id: g.id, name: g.name, createdBy: g.createdBy, about: g.about || '', photo: g.photo || '' } : null); },
+    async chatInfo(id) { const g = db.chats.find(x => x.id === Number(id)); return wait(g && g.members.some(x => x.id === meId) ? { id: g.id, name: g.name, createdBy: g.createdBy, about: g.about || '', photo: g.photo || '', adminsOnly: !!g.adminsOnly, approval: g.joinApproval !== false } : null); },
     async addChatMembers(id, ids) { const g = db.chats.find(x => x.id === Number(id)), fr = new Set(friendIds(meId)), now = new Date().toISOString(); ids.filter(i => fr.has(i) && !g.members.some(x => x.id === i)).forEach(i => g.members.push({ id: i, role: 'member', lastReadAt: now, joinedAt: now })); save(); return wait(); },
     async removeChatMember(id, uid) {
       const g = db.chats.find(x => x.id === Number(id)); if (!g) return;
@@ -1779,6 +1788,36 @@ function demoApi() {
       save(); return wait();
     },
     async renameChat(id, name) { const g = db.chats.find(x => x.id === Number(id)); if (g) g.name = name.trim(); save(); return wait(); },
+    async markUnread(t, on) { await this.convSet(t, { marked_unread: !!on }); },
+    async chatInvite(id, reset) {
+      const g = db.chats.find(x => x.id === Number(id)), mine = g?.members.find(x => x.id === meId); if (!mine) throw new Error('not allowed');
+      if (reset && mine.role !== 'admin') throw new Error('not allowed');
+      if (!g.joinCode || reset) { g.joinCode = Math.random().toString(16).slice(2, 14); save(); }
+      return wait(g.joinCode);
+    },
+    async chatByCode(code) { const g = db.chats.find(x => x.joinCode === code); return wait(g && { id: g.id, name: g.name, about: g.about || '', members: g.members.length, isMember: g.members.some(x => x.id === meId), pending: (g.joinReqs || []).some(r => r.id === meId), approval: g.joinApproval !== false }); },
+    async joinChat(code) {
+      const g = db.chats.find(x => x.joinCode === code); if (!g) throw new Error('invalid link');
+      if (g.members.some(x => x.id === meId)) return 'member';
+      if (g.members.length >= 50) throw new Error('members max 50');
+      const now = new Date().toISOString();
+      if (g.joinApproval !== false) { g.joinReqs = [...(g.joinReqs || []).filter(r => r.id !== meId), { id: meId, at: now }]; save(); return 'pending'; }
+      g.members.push({ id: meId, role: 'member', lastReadAt: now, joinedAt: now }); save(); return 'joined';
+    },
+    async chatJoinList(id) { const g = db.chats.find(x => x.id === Number(id)); if (g?.members.find(x => x.id === meId)?.role !== 'admin') throw new Error('not allowed'); return wait((g.joinReqs || []).map(r => { const u = user(r.id) || { name: 'সদস্য', avatar: '' }; return { id: r.id, name: u.name, avatar: u.avatar, createdAt: r.at }; })); },
+    async decideChatJoin(id, uid, okk) {
+      const g = db.chats.find(x => x.id === Number(id)); if (g?.members.find(x => x.id === meId)?.role !== 'admin') throw new Error('not allowed');
+      g.joinReqs = (g.joinReqs || []).filter(r => r.id !== uid);
+      if (okk && !g.members.some(x => x.id === uid)) { const now = new Date().toISOString(); g.members.push({ id: uid, role: 'member', lastReadAt: now, joinedAt: now }); }
+      save(); return wait();
+    },
+    async setChatOptions(id, { adminsOnly, approval }) { const g = db.chats.find(x => x.id === Number(id)); if (g?.members.find(x => x.id === meId)?.role !== 'admin') throw new Error('not allowed'); if (adminsOnly != null) g.adminsOnly = !!adminsOnly; if (approval != null) g.joinApproval = !!approval; save(); return wait(); },
+    async setChatAdmin(id, uid, on) {
+      const g = db.chats.find(x => x.id === Number(id)); if (g?.members.find(x => x.id === meId)?.role !== 'admin') throw new Error('not allowed');
+      const m = g.members.find(x => x.id === uid); if (!m) throw new Error('not found');
+      if (!on && g.members.filter(x => x.role === 'admin').length <= 1) throw new Error('last admin');
+      m.role = on ? 'admin' : 'member'; save(); return wait();
+    },
     typing(t, onTyping) { const fn = from => { if (t.kind !== 'group' && from === t.id) onTyping({ u: from, n: user(from)?.name || '' }); }; typingListeners.add(fn); return { send: () => {}, stop: () => typingListeners.delete(fn) }; },
     async unreadCount() { return (await this.inbox()).filter(c => !c.asPage && !c.muted && !c.request).reduce((a, c) => a + c.unread, 0); },
     async pageUnread() { const out = new Map(); for (const m of db.messages) if (m.to === meId && !m.read && m.pageId && pageOf(m.pageId)?.ownerId === meId) out.set(m.pageId, (out.get(m.pageId) || 0) + 1); return wait(out); },

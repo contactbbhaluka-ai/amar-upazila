@@ -89,7 +89,7 @@ const postLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#
 const profileLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#u-${id}`;
 const pageLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#page-${id}`;
 // মেসেজে লিংক থাকলে চাপা যায়; অ্যাপের পোস্টের লিংক অ্যাপের ভেতরেই খোলে
-const linkify = t => esc(t).replace(/https?:\/\/[^\s<]+/g, u => { const m = u.match(/#post-(\d+)$/), pm = u.match(/#page-(\d+)$/), um = u.match(/#u-([\w-]{2,40})$/); return um ? `<a href="${u}" data-user="${um[1]}">প্রোফাইল দেখুন ↗</a>` : pm ? `<a href="${u}" data-page="${pm[1]}">পেইজটি দেখুন ↗</a>` : m ? `<a href="${u}" data-openpost="${m[1]}">পোস্টটি দেখুন ↗</a>` : `<a href="${u}" target="_blank" rel="noopener">${u}</a>`; });
+const linkify = t => esc(t).replace(/https?:\/\/[^\s<]+/g, u => { const jm = u.match(/#join-([a-f0-9]{6,20})$/); if (jm) return `<a href="${u}" data-join="${jm[1]}">👥 গ্রুপে যোগ দিন ↗</a>`; const m = u.match(/#post-(\d+)$/), pm = u.match(/#page-(\d+)$/), um = u.match(/#u-([\w-]{2,40})$/); return um ? `<a href="${u}" data-user="${um[1]}">প্রোফাইল দেখুন ↗</a>` : pm ? `<a href="${u}" data-page="${pm[1]}">পেইজটি দেখুন ↗</a>` : m ? `<a href="${u}" data-openpost="${m[1]}">পোস্টটি দেখুন ↗</a>` : `<a href="${u}" target="_blank" rel="noopener">${u}</a>`; });
 
 // ================================================================ সহায়ক
 const $ = s => document.querySelector(s);
@@ -144,6 +144,11 @@ function errText(e) {
   const m = String(e?.message || e || '');
   if (/profiles_username_key/.test(m)) return 'এই ইউজারনেম আগে থেকেই কেউ নিয়েছে, অন্য একটা দিন';
   if (/Invalid login/i.test(m)) return 'ইমেইল বা পাসওয়ার্ড ভুল';
+  if (/admins only/.test(m)) return 'এই গ্রুপে শুধু অ্যাডমিনরা মেসেজ পাঠাতে পারেন';
+  if (/last admin/.test(m)) return 'গ্রুপে অন্তত একজন অ্যাডমিন থাকতে হবে';
+  if (/invalid link/.test(m)) return 'লিংকটি কাজ করছে না';
+  if (/members max 50/.test(m)) return 'গ্রুপে সর্বোচ্চ ৫০ জন থাকতে পারেন';
+  if (/disappearing: no media/.test(m)) return 'অদৃশ্য মেসেজ চালু থাকলে ছবি ও ভয়েস পাঠানো যায় না';
   if (/already registered|already been registered/i.test(m)) return 'এই ইমেইল দিয়ে আগেই অ্যাকাউন্ট আছে। লগইন করুন।';
   if (/Password should be/i.test(m)) return 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের দিন';
   if (/Email not confirmed/i.test(m)) return 'আগে ইমেইলে পাঠানো লিংকে ক্লিক করে অ্যাকাউন্ট নিশ্চিত করুন';
@@ -2385,6 +2390,7 @@ function convMenu(t, c) {
   openSheet(`<div class="menu">
     <button data-act="mute">${muted ? '🔔 আনমিউট করুন' : '🔕 মিউট করুন'}</button>
     ${c?.request ? '<button data-act="accept">✅ রিকোয়েস্ট গ্রহণ করুন</button>' : ''}
+    ${c ? (c.unread ? '<button data-act="read">✓ পড়া হিসেবে চিহ্ন দিন</button>' : '<button data-act="unread">📩 না পড়া হিসেবে চিহ্ন দিন</button>') : ''}
     <button data-act="clear" class="danger">🗑 চ্যাট মুছে ফেলুন</button>
     ${t.kind === 'group' ? '<button data-act="leave" class="danger">🚪 গ্রুপ ছেড়ে দিন</button>' : ''}
     ${!c ? chatExtrasHtml(t) : ''}
@@ -2395,6 +2401,8 @@ function convMenu(t, c) {
     closeSheet();
     if (a === 'mute') return busy(null, async () => { await S.api.convSet(t, { muted: !muted }); if (S.th && sameT(S.th, t)) S.th.muted = !muted; toast(muted ? 'আনমিউট করা হয়েছে' : 'মিউট করা হয়েছে, এই চ্যাটের নতুন মেসেজে আর জানানো হবে না'); afterConvChange(); });
     if (a === 'accept') return busy(null, async () => { await S.api.convSet(t, { accepted: true }); toast('গ্রহণ করা হয়েছে'); afterConvChange(); });
+    if (a === 'unread') return busy(null, async () => { await S.api.markUnread(t, true); toast('না পড়া হিসেবে চিহ্ন দেওয়া হয়েছে'); afterConvChange(); });
+    if (a === 'read') return busy(null, async () => { await S.api.markUnread(t, false); await S.api.markThreadRead(t).catch(() => {}); afterConvChange(); });
     if (a === 'clear') {
       if (!(await confirmSheet('এই চ্যাটের সব মেসেজ আপনার দিক থেকে মুছে যাবে। অন্যজনের কাছে থেকে যাবে। মুছবেন?', 'মুছে ফেলুন', true))) return;
       return busy(null, async () => { await S.api.clearConversation(t); toast('চ্যাট মুছে ফেলা হয়েছে'); if (S.view === 'thread') history.back(); afterConvChange(); });
@@ -2423,6 +2431,7 @@ function openThread(id, silent, pageId = null) { return openConv({ kind: pageId 
 function openChatGroup(chatId, silent) { return openConv({ kind: 'group', id: Number(chatId) || chatId }, silent); }
 async function openConv(t, silent) {
   if (!silent) {
+    $('#tform').hidden = false; $('#t-ro').hidden = true;
     S.th = { ...t }; S.threadId = t.kind === 'group' ? null : t.id; S.threadPage = t.pageId || null; S.reply = null; S.edit = null; S.tq = ''; $('#t-search').hidden = true; $('#t-mention').hidden = true; $('#t-top').innerHTML = ''; $('#v-thread').dataset.theme = '';
     open('thread'); $('#thread').innerHTML = '<div class="mut">লোড হচ্ছে…</div>'; $('#t-req').innerHTML = ''; setReplyBar(); $('#t-typing').hidden = true; $('#t-emoji').hidden = true;
     S.typingCh?.stop(); S.typingCh = null;
@@ -2438,6 +2447,11 @@ async function openConv(t, silent) {
     const data = await S.api.thread(th);
     if (S.th !== th) return;
     th.muted = data.muted; th.members = data.members; th.msgs = data.msgs; th.shared = data.shared || { nicknames: {} };
+    if (data.marked) S.api.markUnread(th, false).then(refreshBadges).catch(() => {});
+    // শুধু অ্যাডমিনরা লিখতে পারেন এমন গ্রুপে সাধারণ সদস্যের লেখার জায়গা বন্ধ
+    th.isAdmin = th.kind === 'group' && data.members.find(x => x.id === me().id)?.role === 'admin';
+    const ro = th.kind === 'group' && th.info?.adminsOnly && !th.isAdmin;
+    if (!rec) { $('#tform').hidden = ro; $('#t-ro').hidden = !ro; }
     $('#v-thread').dataset.theme = th.shared.theme || '';
     renderThreadHead(); renderThreadTop();
     if (th.partner?.rel?.blocked) { $('#thread').innerHTML = '<div class="empty">আপনি এই ব্যক্তিকে ব্লক করেছেন।</div>'; return; }
@@ -2490,22 +2504,34 @@ function renderMsgs() {
   if (!msgs.length) { $('#thread').innerHTML = `<div class="empty">${th.kind === 'page' && !th.asPage ? 'পেইজকে মেসেজ পাঠান 👋<br><small>পেইজের মালিক উত্তর দেবেন।</small>' : group ? 'গ্রুপে প্রথম মেসেজটি পাঠান 👋' : 'কথোপকথন শুরু করুন 👋'}</div>`; return; }
   const lastMine = [...msgs].reverse().find(m => m.mine);
   let html = '', prevDay = '', prevSender = '';
+  // একসাথে পাঠানো কয়েকটা ছবি এক অ্যালবামে (একই জন, ৩ মিনিটের মধ্যে, শুধু ছবি)
+  const albOk = m => m.image && !m.body && !m.reply && !m.deleted && !m.forwarded;
+  const albums = new Map(), skip = new Set();
+  for (let i = 0; i < msgs.length; i++) {
+    if (!albOk(msgs[i])) continue;
+    const g = [msgs[i]]; let j = i + 1;
+    while (j < msgs.length && g.length < 10 && albOk(msgs[j]) && msgs[j].senderId === msgs[i].senderId && dayLabel(msgs[j].createdAt) === dayLabel(msgs[i].createdAt) && new Date(msgs[j].createdAt) - new Date(msgs[i].createdAt) < 18e4) { g.push(msgs[j]); j++; }
+    if (g.length > 1) { albums.set(i, g); for (let k = i + 1; k < j; k++) skip.add(k); i = j - 1; }
+  }
+  const rxChip = (m, cls = 'm-rx') => { const rx = Object.entries(m.reactions || {}).filter(([, n]) => n > 0), tot = rx.reduce((a, [, n]) => a + n, 0); return rx.length ? `<button class="${cls}" data-mrx="${esc(m.id)}" aria-label="রিয়্যাক্ট">${rx.map(([e]) => e).join('')}${tot > 1 ? `<b>${bn(tot)}</b>` : ''}</button>` : ''; };
   msgs.forEach((m, i) => {
+    if (skip.has(i)) return;
+    const grp = albums.get(i);
     const day = dayLabel(m.createdAt);
     if (day !== prevDay) { html += `<div class="day-sep"><span>${day}</span></div>`; prevDay = day; prevSender = ''; }
     const showName = group && !m.mine && m.senderId !== prevSender;
     if (m.sender) m.sender.name = nickOf(m.senderId, m.sender.name);
     prevSender = m.senderId;
-    const rx = Object.entries(m.reactions || {}).filter(([, n]) => n > 0);
     // যে পাঠিয়েছেন তার ছবি (একটানা কয়েকটা মেসেজের শেষটার পাশে); চাপলে প্রোফাইল, পেইজ হলে পেইজ
-    const nx = msgs[i + 1], lastOfRun = !nx || nx.senderId !== m.senderId || dayLabel(nx.createdAt) !== day || nx.mine !== m.mine;
+    const nx = msgs[i + (grp ? grp.length : 1)], lastOfRun = !nx || nx.senderId !== m.senderId || dayLabel(nx.createdAt) !== day || nx.mine !== m.mine;
     const pgSender = th.kind === 'page' && !th.asPage && th.pg;
     const avBtn = pgSender ? `<button class="avbtn" data-page="${esc(th.pg.id)}" aria-label="${esc(th.pg.name)} পেইজ দেখুন">${entAv(th.pg)}</button>` : userLink(m.senderId, av(m.sender || (th.partner?.id === m.senderId ? th.partner : {}), 'xs'));
     html += `<div class="mrow${m.mine ? ' mine' : ''}">${!m.mine ? `<span class="m-av">${lastOfRun ? avBtn : ''}</span>` : ''}
       <div class="mcol">${showName ? `<span class="m-name">${esc(m.sender?.name || '')}</span>` : ''}
-      <div class="bub${m.mine ? ' mine' : ''}${m.deleted ? ' deleted' : ''}${m.image && !m.body ? ' imgonly' : ''}${m.sticker && !m.deleted ? ' stkonly' : ''}${m.poll && !m.deleted ? ' pollb' : ''}${m.pinnedAt ? ' pinned' : ''}" data-mid="${esc(m.id)}" tabindex="0">${msgBody(m)}<small>${m.pinnedAt ? '📌 ' : ''}${m.saved ? '🔖 ' : ''}${m.expiresAt ? '⏱ ' : ''}${m.auto ? '⚡ অটো মেসেজ · ' : ''}${m.editedAt && !m.deleted ? 'সম্পাদিত · ' : ''}${esc(clock(m.createdAt))}</small></div>
-      ${rx.length ? `<button class="m-rx" data-mrx="${esc(m.id)}" aria-label="রিয়্যাক্ট">${rx.map(([e]) => e).join('')}${rx.reduce((a, [, n]) => a + n, 0) > 1 ? `<b>${bn(rx.reduce((a, [, n]) => a + n, 0))}</b>` : ''}</button>` : ''}</div></div>`;
-    if (m === lastMine) {
+      ${grp ? `<div class="m-album n${Math.min(grp.length, 4)}${grp.length > 4 ? ' many' : ''}">${grp.map(g => `<div class="bub imgonly alb${g.mine ? ' mine' : ''}" data-mid="${esc(g.id)}" tabindex="0"><button class="m-img" data-mimg="${esc(g.image)}" aria-label="ছবি বড় করে দেখুন"><img alt="" data-path="${esc(g.image)}"></button>${rxChip(g, 'm-rx alb-rx')}</div>`).join('')}</div><small class="alb-t">${bn(grp.length)}টি ছবি · ${esc(clock(grp.at(-1).createdAt))}</small>` : `<div class="bub${m.mine ? ' mine' : ''}${m.deleted ? ' deleted' : ''}${m.image && !m.body ? ' imgonly' : ''}${m.sticker && !m.deleted ? ' stkonly' : ''}${m.poll && !m.deleted ? ' pollb' : ''}${m.pinnedAt ? ' pinned' : ''}" data-mid="${esc(m.id)}" tabindex="0">${msgBody(m)}<small>${m.pinnedAt ? '📌 ' : ''}${m.saved ? '🔖 ' : ''}${m.expiresAt ? '⏱ ' : ''}${m.auto ? '⚡ অটো মেসেজ · ' : ''}${m.editedAt && !m.deleted ? 'সম্পাদিত · ' : ''}${esc(clock(m.createdAt))}</small></div>
+      ${rxChip(m)}`}</div></div>`;
+    if (m === lastMine || grp?.includes(lastMine)) {
+      if (grp) m = grp.at(-1);
       if (group) {
         const seenBy = (th.members || []).filter(x => x.id !== meId0 && x.lastReadAt >= m.createdAt);
         if (seenBy.length) html += `<div class="seen">${seenBy.slice(0, 5).map(x => av(x, 'xs')).join('')}<span>${seenBy.length === (th.members.length - 1) ? 'সবাই দেখেছেন' : `${bn(seenBy.length)} জন দেখেছেন`}</span></div>`;
@@ -2522,7 +2548,13 @@ function renderMsgs() {
 }
 // মেসেজে চাপলে: রিয়্যাক্ট, উত্তর, কপি, মুছা
 $('#thread').addEventListener('click', e => {
-  const im = e.target.closest('[data-mimg]'); if (im) { if (im.dataset.url) openViewer({ images: [im.dataset.url] }); return; }
+  const im = e.target.closest('[data-mimg]');
+  if (im) {
+    const alb = im.closest('.m-album');
+    if (alb) { const all = [...alb.querySelectorAll('[data-mimg]')], urls = all.map(x => x.dataset.url).filter(Boolean); if (urls.length) openViewer({ images: urls }, Math.max(0, urls.indexOf(im.dataset.url))); }
+    else if (im.dataset.url) openViewer({ images: [im.dataset.url] });
+    return;
+  }
   if (e.target.closest('a, audio, .who-btn, .avbtn')) return;
   const pv = e.target.closest('[data-pvote]');
   if (pv) { const m = (S.th?.msgs || []).find(x => String(x.id) === pv.dataset.pvote); if (m) busy(null, async () => { const o = Number(pv.dataset.opt); await S.api.voteChatPoll(m.id, m.poll.my === o ? null : o); openConv(S.th, true); }); return; }
@@ -2535,6 +2567,12 @@ $('#thread').addEventListener('click', e => {
   clearTimeout(tapT); tapId = id; tapT = setTimeout(() => { tapT = null; tapId = null; msgActions(m); }, 260);
 });
 let tapT = null, tapId = null;
+// চেপে ধরে রাখলে (বা ডান-ক্লিকে) অপশন: ছবির মেসেজেও রিয়্যাক্ট/মুছা যায়
+$('#thread').addEventListener('contextmenu', e => {
+  const b = e.target.closest('[data-mid]'); if (!b) return;
+  const m = (S.th?.msgs || []).find(x => String(x.id) === b.dataset.mid); if (!m) return;
+  e.preventDefault(); clearTimeout(tapT); tapT = null; msgActions(m);
+});
 function quickHeart(m, el) {
   if (m.deleted) return;
   const on = m.myReaction !== '❤️';
@@ -2633,8 +2671,24 @@ async function sendNow(opts = {}, btn) {
 $('#tform').addEventListener('submit', e => { e.preventDefault(); sendNow({}, $('#t-send')); });
 $('#t-img').addEventListener('click', () => { if (S.th?.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ছবি পাঠানো যায় না'); $('#t-file').click(); });
 $('#t-file').addEventListener('change', async e => {
-  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try { const blob = await compress(f, 1280, 0.75); await sendNow({ image: blob }, $('#t-img')); } catch { toast('ছবিটি পাঠানো যায়নি'); }
+  let files = [...e.target.files].filter(f => f.type.startsWith('image/')); e.target.value = ''; if (!files.length) return;
+  if (files.length > 10) { toast('একসাথে সর্বোচ্চ ১০টি ছবি পাঠানো যায়, প্রথম ১০টি যাচ্ছে'); files = files.slice(0, 10); }
+  if (files.length === 1) { try { const blob = await compress(files[0], 1280, 0.75); await sendNow({ image: blob }, $('#t-img')); } catch (er) { toast(errText(er) || 'ছবিটি পাঠানো যায়নি'); } return; }
+  const th = S.th; if (!th) return;
+  if (th.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ছবি পাঠানো যায় না');
+  const btn = $('#t-img'); btn.disabled = true; let sent = 0;
+  try {
+    for (const f of files) {
+      toast(`ছবি পাঠানো হচ্ছে ${bn(sent + 1)}/${bn(files.length)}…`);
+      const blob = await compress(f, 1280, 0.75);
+      await S.api.send(th, '', { image: blob, replyTo: sent === 0 ? S.reply?.id || null : null });
+      sent++;
+    }
+    toast(`${bn(sent)}টি ছবি পাঠানো হয়েছে`);
+  } catch (er) { toast(`${bn(sent)}টি গেছে, বাকিগুলো পাঠানো যায়নি: ${errText(er)}`); }
+  btn.disabled = false; S.reply = null; setReplyBar();
+  if (th.request) { await S.api.convSet(th, { accepted: true }).catch(() => {}); th.request = false; }
+  if (S.th === th) openConv(th, true);
 });
 // ভয়েস মেসেজ (সর্বোচ্চ ২ মিনিট)
 let rec = null;
@@ -2703,7 +2757,7 @@ const nickOf = (id, name) => S.th?.shared?.nicknames?.[id] || name;
 function mentionify(html) {
   const th = S.th; if (th?.kind !== 'group' || !html.includes('@')) return html;
   for (const x of [...(th.members || [])].sort((a, b) => b.name.length - a.name.length)) {
-    const tag = esc('@' + x.name); if (html.includes(tag)) html = html.split(tag).join(`<b class="mention${x.id === me()?.id ? ' me' : ''}">${tag}</b>`);
+    const tag = esc('@' + x.name); if (html.includes(tag)) html = html.split(tag).join(`<b class="cmention${x.id === me()?.id ? ' me' : ''}">${tag}</b>`);
   }
   return html;
 }
@@ -2927,6 +2981,64 @@ function groupEditSheet() {
     busy(e.currentTarget, async () => { await S.api.updateChat(th.id, { name, about: $('#ge-about').value.trim(), photo, removePhoto: remove }); th.info = await S.api.chatInfo(th.id); closeSheet(); renderThreadHead(); toast('গ্রুপের তথ্য সংরক্ষণ হয়েছে'); });
   };
 }
+// ---------- গ্রুপে যোগ দেওয়ার লিংক / QR
+const joinLink = code => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#join-${code}`;
+async function inviteSheet(th) {
+  openSheet('<div class="qr-sheet"><h2>🔗 যোগ দেওয়ার লিংক</h2><div class="mut">লোড হচ্ছে…</div></div>');
+  let code; try { code = await S.api.chatInvite(th.id); } catch (e) { return openSheet(`<p>${esc(errText(e))}</p><button class="btn ghost wide" data-close>বন্ধ করুন</button>`); }
+  const link = joinLink(code), approval = th.info?.approval !== false;
+  openSheet(`<div class="qr-sheet"><h2>🔗 যোগ দেওয়ার লিংক</h2>
+    <div class="qr-card">${groupAv(th.info?.name, 'md', th.info?.photo)}<b>${esc(th.info?.name || 'গ্রুপ')}</b>
+      <div id="qr-box" class="qr-box" aria-label="গ্রুপের QR কোড"><span class="mut">QR কোড তৈরি হচ্ছে…</span></div>
+      <span class="mut qr-hint">${approval ? 'লিংক বা QR দিয়ে যে কেউ যোগ দেওয়ার অনুরোধ পাঠাতে পারবেন; অ্যাডমিন অনুমোদন দিলে যুক্ত হবেন।' : 'লিংক বা QR দিয়ে যে কেউ সরাসরি যোগ দিতে পারবেন।'}</span></div>
+    <div class="qr-link"><input class="f" readonly value="${esc(link)}" aria-label="গ্রুপের লিংক"><button class="sbtn" id="qr-copy">কপি</button></div>
+    ${navigator.share ? '<button class="btn wide" id="qr-share">লিংক শেয়ার করুন</button>' : ''}
+    ${th.isAdmin ? `<div class="menu" style="margin-top:8px"><button data-act="appr">✋ যোগ দিতে অনুমোদন লাগবে: ${approval ? '<b class="on-t">চালু</b>' : 'বন্ধ'}</button><button data-act="reset" class="danger">♻️ নতুন লিংক বানান (আগেরটা আর কাজ করবে না)</button></div>` : ''}
+    <button class="btn ghost wide" data-close style="margin-top:8px">বন্ধ করুন</button></div>`);
+  $('#qr-copy').onclick = async () => { try { await navigator.clipboard.writeText(link); toast('লিংক কপি হয়েছে'); } catch { toast('কপি করা যায়নি'); } };
+  $('#qr-share')?.addEventListener('click', () => navigator.share({ title: th.info?.name || 'গ্রুপ', text: `"${th.info?.name || ''}" গ্রুপে যোগ দিন — আমার উপজেলা`, url: link }).catch(() => {}));
+  $('#sheet').onclick = async ev => {
+    const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    if (a === 'appr') return busy(null, async () => { await S.api.setChatOptions(th.id, { approval: !approval }); th.info = await S.api.chatInfo(th.id); toast(!approval ? 'এখন যোগ দিতে অনুমোদন লাগবে' : 'এখন লিংক দিয়ে সরাসরি যোগ দেওয়া যাবে'); inviteSheet(th); });
+    if (a === 'reset') { if (await confirmSheet('নতুন লিংক বানালে আগের লিংক ও QR আর কাজ করবে না। বানাবেন?', 'নতুন লিংক')) busy(null, async () => { await S.api.chatInvite(th.id, true); toast('নতুন লিংক তৈরি হয়েছে'); inviteSheet(th); }); else inviteSheet(th); }
+  };
+  try {
+    const QR = await loadQr(), box = $('#qr-box'); if (!box) return;
+    box.innerHTML = ''; new QR(box, { text: link, width: 200, height: 200, colorDark: '#0b3d2e', colorLight: '#ffffff', correctLevel: QR.CorrectLevel.M });
+  } catch { if ($('#qr-box')) $('#qr-box').innerHTML = '<span class="mut">QR কোড তৈরি করতে ইন্টারনেট লাগবে। নিচের লিংক কপি করে শেয়ার করুন।</span>'; }
+}
+// লিংক খুললে: গ্রুপের পরিচয় আর "যোগ দিন"
+async function joinSheet(code) {
+  if (!me()) { toast('গ্রুপে যোগ দিতে আগে লগইন করুন'); return go('me'); }
+  openSheet('<h2>গ্রুপে যোগ দিন</h2><div class="mut">লোড হচ্ছে…</div>');
+  try {
+    const g = await S.api.chatByCode(code);
+    if (!g) return openSheet('<h2>লিংকটি কাজ করছে না</h2><p class="mut">লিংকটি ভুল, অথবা অ্যাডমিন নতুন লিংক বানিয়েছেন। গ্রুপের কারও কাছ থেকে নতুন লিংক চেয়ে নিন।</p><button class="btn ghost wide" data-close>বন্ধ করুন</button>');
+    const btn = g.isMember ? '<button class="btn wide" id="jn-go">💬 চ্যাট খুলুন</button>' : g.pending ? '<button class="btn wide" disabled>⏳ অনুরোধ পাঠানো হয়েছে</button><p class="mut" style="text-align:center">অ্যাডমিন অনুমোদন দিলে নোটিফিকেশন পাবেন।</p>' : `<button class="btn wide" id="jn-go">${g.approval ? '🙋 যোগ দেওয়ার অনুরোধ পাঠান' : '👥 যোগ দিন'}</button>`;
+    openSheet(`<div class="jn-card">${groupAv(g.name, 'md')}<h2>${esc(g.name)}</h2><p class="mut">👥 ${bn(g.members)} জন সদস্য${g.approval && !g.isMember ? ' · অ্যাডমিনের অনুমোদন লাগবে' : ''}</p>${g.about ? `<p class="gm-about">${esc(g.about)}</p>` : ''}</div>${btn}<button class="btn ghost wide" data-close style="margin-top:8px">বন্ধ করুন</button>`);
+    $('#jn-go')?.addEventListener('click', e => busy(e.currentTarget, async () => {
+      const r = g.isMember ? 'member' : await S.api.joinChat(code);
+      if (r === 'pending') { toast('অনুরোধ পাঠানো হয়েছে'); return joinSheet(code); }
+      closeSheet(); if (r === 'joined') toast('গ্রুপে যুক্ত হয়েছেন'); openChatGroup(g.id);
+    }));
+  } catch (e) { openSheet(`<p>${esc(errText(e))}</p><button class="btn ghost wide" data-close>বন্ধ করুন</button>`); }
+  if (/^#join-/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-join]'); if (!b) return; e.preventDefault(); e.stopPropagation(); joinSheet(b.dataset.join); }, true);
+// অ্যাডমিন: যোগ দেওয়ার অনুরোধ
+async function joinReqSheet(th) {
+  openSheet('<h2>🙋 যোগ দেওয়ার অনুরোধ</h2><div id="jr-list"><div class="mut">লোড হচ্ছে…</div></div><button class="btn ghost wide" data-close style="margin-top:10px">বন্ধ করুন</button>');
+  $('#sheet').classList.add('tall');
+  try {
+    const list = await S.api.chatJoinList(th.id);
+    $('#jr-list').innerHTML = list.length ? list.map(u => `<div class="person">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name), 'who-btn')}<div class="sub">${esc(ago(u.createdAt))}</div></div><button class="sbtn" data-jr="${esc(u.id)}" data-ok="1">গ্রহণ</button><button class="sbtn ghost" data-jr="${esc(u.id)}" data-ok="0">বাতিল</button></div>`).join('')
+      : '<p class="mut">কোনো অনুরোধ নেই। "যোগ দেওয়ার লিংক ও QR" থেকে লিংক শেয়ার করুন।</p>';
+    $('#sheet').onclick = ev => {
+      const b = ev.target.closest('[data-jr]'); if (!b) return;
+      busy(b, async () => { const okk = b.dataset.ok === '1'; await S.api.decideChatJoin(th.id, b.dataset.jr, okk); toast(okk ? 'গ্রুপে যুক্ত করা হয়েছে' : 'অনুরোধ বাতিল করা হয়েছে'); if (S.th === th) await openConv(th, true); joinReqSheet(th); });
+    };
+  } catch (e) { $('#jr-list').innerHTML = `<p class="mut">${esc(errText(e))}</p>`; }
+}
 // ================================================================ গ্রুপ চ্যাট
 async function friendPicker(title, exclude, btnLabel, onPick, withName) {
   openSheet(`<h2>${title}</h2>${withName ? '<input class="f" id="gp-name" maxlength="60" placeholder="গ্রুপের নাম (যেমন: পরিবার, বন্ধুরা)">' : ''}<input type="search" id="gp-q" placeholder="বন্ধু খুঁজুন…" aria-label="বন্ধু খুঁজুন"><div id="gp-list" style="margin-top:8px"><div class="mut">লোড হচ্ছে…</div></div>
@@ -2954,17 +3066,28 @@ function newGroupSheet() {
 function groupMenu() {
   const th = S.th, meIsAdmin = th.members?.find(x => x.id === me().id)?.role === 'admin';
   openSheet(`<div class="gm-head">${groupAv(th.info?.name, '', th.info?.photo)}<div><h2>${esc(th.info?.name || 'গ্রুপ')}</h2>${th.info?.about ? `<p class="gm-about">${esc(th.info.about)}</p>` : ''}</div></div><h3 class="res-h">সদস্য (${bn(th.members.length)})</h3>
-    <div class="gm-list">${th.members.map(x => `<div class="person">${userLink(x.id, av(x))}<div class="info">${userLink(x.id, esc(x.name), 'who-btn')}${x.role === 'admin' ? '<div class="sub">অ্যাডমিন</div>' : ''}</div>${meIsAdmin && x.id !== me().id ? `<button class="sbtn ghost" data-gmrm="${esc(x.id)}">বাদ দিন</button>` : ''}</div>`).join('')}</div>
-    <div class="menu"><button data-act="add">➕ সদস্য যোগ করুন</button><button data-act="rename">✏️ নাম, ছবি ও বিবরণ</button>
+    <div class="gm-list">${th.members.map(x => `<div class="person">${userLink(x.id, av(x))}<div class="info">${userLink(x.id, esc(x.name), 'who-btn')}${x.role === 'admin' ? '<div class="sub">⭐ অ্যাডমিন</div>' : ''}</div>${meIsAdmin && x.id !== me().id ? `<button class="sbtn ghost" data-gmadm="${esc(x.id)}" data-on="${x.role === 'admin' ? 0 : 1}">${x.role === 'admin' ? 'অ্যাডমিন সরান' : 'অ্যাডমিন বানান'}</button><button class="sbtn ghost" data-gmrm="${esc(x.id)}">বাদ দিন</button>` : ''}</div>`).join('')}</div>
+    <div class="menu"><button data-act="add">➕ সদস্য যোগ করুন</button><button data-act="invite">🔗 যোগ দেওয়ার লিংক ও QR</button>
+      ${meIsAdmin ? `<button data-act="joinreq" id="gm-jr">🙋 যোগ দেওয়ার অনুরোধ</button>
+      <button data-act="ro">📢 শুধু অ্যাডমিনরা মেসেজ পাঠাবেন: ${th.info?.adminsOnly ? '<b class="on-t">চালু</b>' : 'বন্ধ'}</button>` : ''}<button data-act="rename">✏️ নাম, ছবি ও বিবরণ</button>
       ${chatExtrasHtml(th)}
       <button data-act="mute">${th.muted ? '🔔 আনমিউট করুন' : '🔕 মিউট করুন'}</button><button data-act="clear" class="danger">🗑 চ্যাট মুছে ফেলুন</button>
       <button data-act="leave" class="danger">🚪 গ্রুপ ছেড়ে দিন</button><button data-close>বন্ধ করুন</button></div>`);
   $('#sheet').classList.add('tall');
+  if (meIsAdmin) S.api.chatJoinList(th.id).then(l => { const b = $('#gm-jr'); if (b && l.length) b.innerHTML = `🙋 যোগ দেওয়ার অনুরোধ <span class="badge">${bn(l.length)}</span>`; }).catch(() => {});
   $('#sheet').onclick = async ev => {
     const rm = ev.target.closest('[data-gmrm]');
     if (rm) { if (await confirmSheet('এই সদস্যকে গ্রুপ থেকে বাদ দেবেন?', 'বাদ দিন', true)) busy(null, async () => { await S.api.removeChatMember(th.id, rm.dataset.gmrm); toast('বাদ দেওয়া হয়েছে'); await openConv(th, true); groupMenu(); }); return; }
+    const ad = ev.target.closest('[data-gmadm]');
+    if (ad) return busy(ad, async () => { const on = ad.dataset.on === '1'; await S.api.setChatAdmin(th.id, ad.dataset.gmadm, on); toast(on ? 'অ্যাডমিন বানানো হয়েছে' : 'অ্যাডমিন থেকে সরানো হয়েছে'); await openConv(th, true); groupMenu(); });
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
     if (EXTRA_ACTS.has(a)) return chatExtra(a);
+    if (a === 'invite') return inviteSheet(th);
+    if (a === 'joinreq') return joinReqSheet(th);
+    if (a === 'ro') {
+      const on = !th.info?.adminsOnly;
+      return busy(null, async () => { await S.api.setChatOptions(th.id, { adminsOnly: on }); th.info = await S.api.chatInfo(th.id); toast(on ? 'এখন শুধু অ্যাডমিনরা মেসেজ পাঠাতে পারবেন' : 'এখন সবাই মেসেজ পাঠাতে পারবেন'); await openConv(th, true); groupMenu(); });
+    }
     if (a === 'add') return friendPicker('সদস্য যোগ করুন', new Set(th.members.map(x => x.id)), 'যোগ করুন', async ids => { await S.api.addChatMembers(th.id, ids); closeSheet(); toast('যোগ করা হয়েছে'); openConv(th, true); });
     if (a === 'rename') return groupEditSheet();
     convMenuAction(a, th);
@@ -3460,6 +3583,8 @@ const NT = {
   blood_request: ['🩸', ''],
   event_reminder: ['📅', '-এর অনুষ্ঠান আগামী ২৪ ঘণ্টার মধ্যে, আপনি যাচ্ছেন'],
   chat_mention: ['@', 'গ্রুপ চ্যাটে আপনাকে উল্লেখ করেছেন'],
+  chat_join_request: ['🙋', 'আপনার গ্রুপ চ্যাটে যোগ দিতে চান'],
+  chat_join_ok: ['✅', 'আপনাকে গ্রুপ চ্যাটে যুক্ত করেছেন'],
 };
 // নিজের অর্জনের নোটিফিকেশন (মাইলফলক, সাপ্তাহিক রিপোর্ট): কারো নাম নয়, শুধু খবরটা
 const SELF_TYPES = ['milestone', 'follower_milestone', 'weekly'];
@@ -3489,7 +3614,7 @@ async function loadNotifs(keep) {
       const txt1 = n.type === 'page_admin' && n.meta?.page ? `আপনাকে "${n.meta.page}" পেইজের অ্যাডমিন বানিয়েছেন` : n.meta?.page && (n.type === 'verify_ok' || n.type === 'verify_no') ? `আপনার পেইজ "${n.meta.page}"-এর ভেরিফাইড ব্যাজের আবেদন ${n.type === 'verify_ok' ? 'অনুমোদন করেছেন' : 'গ্রহণ করেননি'}` : txt0;
       const txt2 = n.type === 'blood_request' ? `-এর ${n.meta?.bg || ''} রক্ত দরকার। আপনি কাছাকাছি একজন ${n.meta?.bg || ''} ডোনার, সাহায্য করতে পারবেন?` : txt1;
       const txt = S.actAs ? txt2.replace('আপনার পোস্ট', 'পেইজের পোস্ট').replace('আপনার পেইজ', 'পেইজ') : txt2;
-      const snip = n.type === 'chat_mention' ? ` <span class="q">${esc(n.meta?.chat || '')}${n.meta?.text ? ` · "${esc(n.meta.text.slice(0, 40))}"` : ''}</span>` : n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
+      const snip = n.type === 'chat_join_request' || n.type === 'chat_join_ok' ? ` <span class="q">${esc(n.meta?.chat || '')}</span>` : n.type === 'chat_mention' ? ` <span class="q">${esc(n.meta?.chat || '')}${n.meta?.text ? ` · "${esc(n.meta.text.slice(0, 40))}"` : ''}</span>` : n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
       const reqBtns = n.type === 'friend_request' && pending.has(n.actor.id)
         ? `<div class="acts2"><button class="sbtn" data-fr="accept" data-id="${esc(n.actor.id)}">গ্রহণ করুন</button><button class="sbtn ghost" data-fr="remove" data-id="${esc(n.actor.id)}">মুছুন</button></div>` : '';
       return `<div class="notif${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="${esc(n.groupId ?? '')}" data-n-user="${esc(n.actor.id)}" data-n-page="${esc(n.meta?.page_id ?? '')}" data-n-chat="${esc(n.meta?.chat_id ?? '')}" role="button" tabindex="0">
@@ -3503,7 +3628,8 @@ function openNotif(el) {
   if (!el || el.closest('button')) return;
   const t = el.dataset.nType;
   if ((t === 'blood_request' || t === 'event_reminder' || t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag' || t === 'boost_ok' || t === 'boost_no') && el.dataset.nPost) openPost(el.dataset.nPost);
-  else if (t === 'chat_mention' && el.dataset.nChat) openChatGroup(el.dataset.nChat);
+  else if ((t === 'chat_mention' || t === 'chat_join_ok') && el.dataset.nChat) openChatGroup(el.dataset.nChat);
+  else if (t === 'chat_join_request' && el.dataset.nChat) openChatGroup(el.dataset.nChat).then(() => { if (S.th?.isAdmin) joinReqSheet(S.th); });
   else if (t === 'friend_request') go('friends');
   else if (t === 'verify_ok' || t === 'verify_no') { open('wallet'); loadWallet(); }
   else if (t === 'milestone' && el.dataset.nPost) openPost(el.dataset.nPost);
@@ -4843,7 +4969,7 @@ async function cachedCall(key, fn) {
     refreshSettings(); setTimeout(checkLiveUpdate, 8000);
     await loadFeed('home');
     setInterval(() => { if (document.visibilityState === 'visible') refreshBadges(); }, 60000);
-    const deep = () => { const m = location.hash.match(/^#post-(\d+)$/), pm = location.hash.match(/^#page-(\d+)$/), um = location.hash.match(/^#u-([\w-]{2,40})$/); if (um && !(S.view === 'user' && S.userId === um[1])) openUser(um[1]); if (m && !(S.view === 'post' && String(S.postId) === m[1])) openPost(m[1]); if (pm && !(S.view === 'page' && String(S.pageId) === pm[1])) openPage(pm[1]); };
+    const deep = () => { const jn = location.hash.match(/^#join-([a-f0-9]{6,20})$/); if (jn) joinSheet(jn[1]); const m = location.hash.match(/^#post-(\d+)$/), pm = location.hash.match(/^#page-(\d+)$/), um = location.hash.match(/^#u-([\w-]{2,40})$/); if (um && !(S.view === 'user' && S.userId === um[1])) openUser(um[1]); if (m && !(S.view === 'post' && String(S.postId) === m[1])) openPost(m[1]); if (pm && !(S.view === 'page' && String(S.pageId) === pm[1])) openPage(pm[1]); };
     deep(); window.addEventListener('hashchange', deep);
   } catch (e) {
     $('#feed-home').innerHTML = `<div class="empty">${esc(errText(e))}<br><button class="btn" id="retry">আবার চেষ্টা করুন</button></div>`;

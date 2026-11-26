@@ -1204,3 +1204,52 @@ body{overscroll-behavior-y:contain}
 .av-story{padding:3px;border-radius:50%;background:conic-gradient(#006a4e,#22c1c3,#e5303f,#f59e0b,#006a4e)}
 .av-story .av{border:2.5px solid var(--card)}
 .menu-h{font-weight:700;text-align:center;padding:4px 0 10px;color:var(--mut)}
+
+/* v48 নিউজফিড: হ্যাশট্যাগ, রক্ত, নামাজ-আবহাওয়া, জন্মদিন, আলোচিত, পরিচিত হতে পারেন */
+.htag{border:0;background:none;padding:0;font:inherit;color:#1d6fd8;font-weight:600;cursor:pointer;min-height:0}
+.blood-lbl{display:inline-block;margin:8px 0 0 6px;padding:2px 8px;border-radius:999px;background:light-dark(#ffe4e6,#4c1018);color:light-dark(#be123c,#fecdd3);font-size:12px;font-weight:700;border:1px solid light-dark(#fda4af,#881337)}
+.pc-blood{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;border:1px solid light-dark(#fda4af,#881337);background:light-dark(#fff1f2,#2a0a10);border-radius:12px;padding:8px 10px;margin:8px 0}
+.pc-blood label{font-weight:700;font-size:14px}
+.pc-blood .f{margin:0}
+.pc-blood p{grid-column:1/-1;margin:0;font-size:12.5px}
+.daily{padding:0;overflow:hidden}
+.dl-top{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:10px 14px;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.dl-pr{flex:1;display:flex;align-items:center;gap:10px;font-size:22px;min-width:0}
+.dl-pr>span,.dl-wx>span:last-child{display:grid;line-height:1.3}
+.dl-pr small,.dl-wx small{font-size:12px;color:var(--mut)}
+.dl-pr b{font-size:15px}
+.dl-wx{display:flex;align-items:center;gap:6px;padding-left:10px;border-left:1px solid var(--line)}
+.dl-wi{font-size:24px}
+.dl-wx b{font-size:16px}
+.dl-chev{color:var(--mut);font-size:14px}
+.dl-more{padding:0 14px 10px}
+.dl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.dl-grid span{display:grid;text-align:center;background:var(--bg);border-radius:10px;padding:6px 4px;line-height:1.3}
+.dl-grid span.on{background:var(--g);color:#fff}
+.dl-grid span.on small{color:#e6f4ee}
+.dl-grid small{font-size:12px;color:var(--mut)}
+.dl-grid b{font-size:13.5px}
+.dl-wxl{margin:8px 0 2px;font-size:13.5px}
+.dl-note{margin:4px 0;font-size:12px}
+.dl-off{font-size:13px}
+.bday{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 12px;background:light-dark(#fff7ed,#2b1a0c);border:1px solid light-dark(#fed7aa,#7c2d12)}
+.bd-ic{font-size:26px}
+.bd-t{flex:1;min-width:150px;font-size:14.5px}
+.bd-b{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.bd-x{border:0;background:none;color:var(--mut);width:30px;height:30px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
+.trend{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:-2px 0 10px}
+.trend::-webkit-scrollbar{display:none}
+.trend[hidden]{display:none}
+.tr-l{flex:none;font-size:13px;font-weight:700;color:var(--mut)}
+.tr-chip{flex:none;color:#1d6fd8}
+.pymk{padding:12px 0 12px 12px}
+.pymk .sec-h{padding-right:12px}
+.pymk-row{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:4px 12px 2px 0}
+.pymk-row::-webkit-scrollbar{display:none}
+.pymk-c{position:relative;flex:none;width:150px;display:grid;justify-items:center;gap:4px;text-align:center;border:1px solid var(--line);border-radius:14px;padding:14px 10px 10px;background:var(--bg)}
+.pymk-c .av{width:64px;height:64px;font-size:24px}
+.pymk-c .who-btn{font-size:14px;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pymk-c .mut{font-size:12px;min-height:18px;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pymk-c .sbtn{width:100%}
+.pymk-x{position:absolute;top:4px;right:4px;border:0;background:none;color:var(--mut);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
+.sh-ic.ms{background:linear-gradient(135deg,#0866ff,#a033ff);color:#fff}

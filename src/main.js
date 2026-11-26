@@ -222,9 +222,14 @@ function clampText(text, maxChars, maxLines) {
 }
 function moreText(text, key, opts = {}) {
   const short = S.expanded.has(key) || opts.full ? null : clampText(text, opts.chars || 280, opts.lines || 5);
-  const out = t => mentionize(esc(t), opts.mentions);
+  const out = t => hashtagize(mentionize(esc(t), opts.mentions));
   return short === null ? out(text) : `${out(short)}… <button class="see-more" data-more="${esc(key)}">আরও দেখুন</button>`;
 }
+// #হ্যাশট্যাগ চাপলে সেই ট্যাগের সব পোস্ট
+const TAG_RE = /(^|[\s(])#([^\s#.,!?।:;()\[\]{}"'<>/\\&]{2,40})/g;
+const hashtagize = html => html.replace(TAG_RE, (_, pre, t) => `${pre}<button class="htag" data-htag="${t}">#${t}</button>`);
+function openTag(tag) { open('search'); $('#sq').value = '#' + tag; runSearch(); }
+document.addEventListener('click', e => { const b = e.target.closest('[data-htag]'); if (!b) return; e.stopPropagation(); openTag(b.dataset.htag); }, true);
 // লেখার ভেতরের "@নাম" কে প্রোফাইলের লিংক বানানো (শুধু যাঁদের আসলেই মেনশন করা হয়েছে)
 function mentionize(html, mentions) {
   if (!mentions?.length) return html;
@@ -353,7 +358,7 @@ function postHtml(p) {
     ${p.pinnedPage ? '<div class="pin-lbl">📌 পিন করা পোস্ট</div>' : ''}<div class="top">${!p.pageId && storyUserSet().has(p.userId) ? `<button class="avbtn av-story" data-avstory="${esc(p.userId)}" aria-label="${esc(p.author)}: স্টোরি বা প্রোফাইল">${av(p)}</button>` : link(av(p), 'avbtn')}
       <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${folBtn(p)}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
       ${own ? `<button class="pinfo" data-pinfo="${esc(p.id)}" aria-label="পোস্টটি কতজন দেখেছেন" title="পোস্টের হিসাব">${ic('info', 19)}</button>` : ''}<button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
-    <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>${urgent ? '<span class="urg-lbl">🚨 জরুরি</span>' : ''}${p.resolvedAt && RESOLVE[p.category] ? `<span class="resolved">${RESOLVE[p.category][0]}</span>` : ''}
+    <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>${urgent ? '<span class="urg-lbl">🚨 জরুরি</span>' : ''}${p.bloodGroup ? `<span class="blood-lbl">🩸 ${esc(p.bloodGroup)} রক্ত দরকার</span>` : ''}${p.resolvedAt && RESOLVE[p.category] ? `<span class="resolved">${RESOLVE[p.category][0]}</span>` : ''}
     ${showBg ? `<div class="pbg ${esc(p.bg)}">${esc(p.body)}</div>` : p.body ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
     ${photosHtml(p)}
     ${p.poll ? pollHtml(p) : ''}${p.eventAt ? eventHtml(p) : ''}${p.link && !p.images.length && !p.shared ? linkCardHtml(p.link) : ''}
@@ -484,6 +489,111 @@ document.addEventListener('click', e => {
     if (a === 'profile') return openUser(uid);
     const gi = storyGroups().findIndex(g => g.userId === uid); if (gi >= 0) openStories(gi); else toast('স্টোরিটি আর নেই');
   };
+}, true);
+// ================================================================ হোমের উপরের অংশ: নামাজ-আবহাওয়া, জন্মদিন, আলোচিত, পরিচিত হতে পারেন
+const HOME_LOC = { lat: 24.3814, lng: 90.3816, name: 'ভালুকা' };   // ভালুকা উপজেলা সদর
+// নামাজের সময় অ্যাপের ভেতরেই হিসাব (ইন্টারনেট লাগে না): ফজর/এশা ১৮°, আসর হানাফি — বাংলাদেশে প্রচলিত পদ্ধতি
+function prayerTimes(date, lat, lng, tz = 6) {
+  const r = Math.PI / 180, sin = d => Math.sin(d * r), cos = d => Math.cos(d * r), tan = d => Math.tan(d * r);
+  const asin = x => Math.asin(x) / r, acos = x => Math.acos(Math.max(-1, Math.min(1, x))) / r, atan2 = (y, x) => Math.atan2(y, x) / r, acot = x => Math.atan(1 / x) / r;
+  const fix = (a, b) => { a -= b * Math.floor(a / b); return a < 0 ? a + b : a; };
+  let y = date.getUTCFullYear(), m = date.getUTCMonth() + 1; const d = date.getUTCDate();
+  if (m <= 2) { y -= 1; m += 12; }
+  const A = Math.floor(y / 100), jd0 = Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + (2 - A + Math.floor(A / 4)) - 1524.5;
+  const jd = jd0 - lng / (15 * 24);
+  const sun = t => { const D = jd + t - 2451545, g = fix(357.529 + 0.98560028 * D, 360), q = fix(280.459 + 0.98564736 * D, 360), L = fix(q + 1.915 * sin(g) + 0.020 * sin(2 * g), 360), e = 23.439 - 0.00000036 * D;
+    return { decl: asin(sin(e) * sin(L)), eqt: q / 15 - fix(atan2(cos(e) * sin(L), cos(L)) / 15, 24) }; };
+  const mid = t => fix(12 - sun(t).eqt, 24);
+  const at = (ang, t, ccw) => { const { decl } = sun(t), T = acos((-sin(ang) - sin(decl) * sin(lat)) / (cos(decl) * cos(lat))) / 15; return mid(t) + (ccw ? -T : T); };
+  const asr = t => { const { decl } = sun(t); return at(-acot(2 + tan(Math.abs(lat - decl))), t); };
+  let t = { fajr: 5, sunrise: 6, dhuhr: 12, asr: 13, maghrib: 18, isha: 18 };
+  for (let i = 0; i < 2; i++) { const p = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v / 24]));
+    t = { fajr: at(18, p.fajr, true), sunrise: at(0.833, p.sunrise, true), dhuhr: mid(p.dhuhr), asr: asr(p.asr), maghrib: at(0.833, p.maghrib), isha: at(18, p.isha) }; }
+  const extra = { dhuhr: 2, maghrib: 2 };   // সতর্কতামূলক কয়েক মিনিট
+  return Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v + tz - lng / 15 + (extra[k] || 0) / 60]));
+}
+const PRAYERS = [['fajr', 'ফজর'], ['sunrise', 'সূর্যোদয়'], ['dhuhr', 'যোহর'], ['asr', 'আসর'], ['maghrib', 'মাগরিব'], ['isha', 'এশা']];
+const hm = h => { let mm = Math.round(h * 60); const H = Math.floor(mm / 60) % 24; mm %= 60; const per = H < 4 ? 'রাত' : H < 6 ? 'ভোর' : H < 12 ? 'সকাল' : H < 15 ? 'দুপুর' : H < 18 ? 'বিকাল' : H < 20 ? 'সন্ধ্যা' : 'রাত'; return `${per} ${bn(H % 12 || 12)}:${bn(String(mm).padStart(2, '0'))}`; };
+const WX = { 0: ['☀️', 'রোদ'], 1: ['🌤️', 'হালকা মেঘ'], 2: ['⛅', 'আংশিক মেঘলা'], 3: ['☁️', 'মেঘলা'], 45: ['🌫️', 'কুয়াশা'], 48: ['🌫️', 'ঘন কুয়াশা'], 51: ['🌦️', 'গুঁড়ি গুঁড়ি বৃষ্টি'], 53: ['🌦️', 'গুঁড়ি গুঁড়ি বৃষ্টি'], 55: ['🌧️', 'বৃষ্টি'], 61: ['🌧️', 'হালকা বৃষ্টি'], 63: ['🌧️', 'বৃষ্টি'], 65: ['🌧️', 'ভারী বৃষ্টি'], 80: ['🌦️', 'বৃষ্টির ঝাপটা'], 81: ['🌧️', 'বৃষ্টি'], 82: ['⛈️', 'ভারী বৃষ্টি'], 95: ['⛈️', 'বজ্রবৃষ্টি'], 96: ['⛈️', 'বজ্রবৃষ্টি'], 99: ['⛈️', 'বজ্রবৃষ্টি'] };
+// আবহাওয়া (Open-Meteo, চাবি লাগে না); ৩০ মিনিট পর্যন্ত আগের তথ্যই দেখাই, তাই ডেটা কম খরচ
+async function loadWeather() {
+  const c = local.get('wx'); if (c && Date.now() - c.t < 30 * 6e4) return c.v;
+  try {
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${HOME_LOC.lat}&longitude=${HOME_LOC.lng}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FDhaka&forecast_days=1`;
+    const j = await (await fetch(u, { signal: AbortSignal.timeout?.(6000) })).json();
+    const v = { temp: Math.round(j.current.temperature_2m), code: j.current.weather_code, max: Math.round(j.daily.temperature_2m_max[0]), min: Math.round(j.daily.temperature_2m_min[0]), rain: j.daily.precipitation_probability_max?.[0] ?? null };
+    local.set('wx', { t: Date.now(), v }); return v;
+  } catch { return c?.v || null; }
+}
+function renderDaily() {
+  const box = $('#daily'); if (!box) return;
+  if (local.get('daily-off')) { box.innerHTML = ''; return; }
+  const now = new Date(), pt = prayerTimes(new Date(now.getTime() + 6 * 36e5), HOME_LOC.lat, HOME_LOC.lng);
+  const t = dhakaParts(now), nowH = t.h + t.m / 60;
+  const list = PRAYERS.filter(([k]) => k !== 'sunrise');
+  let next = list.find(([k]) => pt[k] > nowH), tomorrow = false;
+  if (!next) { next = list[0]; tomorrow = true; }
+  const left = ((tomorrow ? pt[next[0]] + 24 : pt[next[0]]) - nowH), lh = Math.floor(left), lm = Math.round((left - lh) * 60);
+  const wx = S.wx, w = wx ? (WX[wx.code] || WX[Math.floor(wx.code / 10) * 10] || ['🌡️', '']) : null;
+  const open = !!S.dailyOpen;
+  box.innerHTML = `<div class="card daily${open ? ' open' : ''}"><button class="dl-top" id="dl-toggle" aria-expanded="${open}">
+      <span class="dl-pr">🕌 <span><small>পরের নামাজ${tomorrow ? ' (কাল)' : ''}</small><b>${next[1]} ${hm(pt[next[0]])}</b><small>${lh ? `${bn(lh)} ঘণ্টা ` : ''}${bn(lm)} মিনিট পর</small></span></span>
+      ${w ? `<span class="dl-wx"><span class="dl-wi">${w[0]}</span><span><b>${bn(wx.temp)}°</b><small>${w[1]}</small></span></span>` : ''}
+      <span class="dl-chev">${open ? '▴' : '▾'}</span></button>
+    ${open ? `<div class="dl-more"><div class="dl-grid">${PRAYERS.map(([k, n]) => `<span class="${next[0] === k && !tomorrow ? 'on' : ''}"><small>${n}</small><b>${hm(pt[k])}</b></span>`).join('')}</div>
+      ${wx ? `<p class="dl-wxl">${esc(HOME_LOC.name)}: আজ সর্বোচ্চ ${bn(wx.max)}°, সর্বনিম্ন ${bn(wx.min)}°${wx.rain != null ? ` · বৃষ্টির সম্ভাবনা ${bn(wx.rain)}%` : ''}</p>` : ''}
+      <p class="dl-note mut">নামাজের সময় আনুমানিক (${esc(HOME_LOC.name)}), স্থানীয় মসজিদের সময়সূচি দেখে নিন।${wx ? ' আবহাওয়া: Open-Meteo' : ''}</p>
+      <button class="link dl-off" id="dl-off">এই কার্ডটি লুকান</button></div>` : ''}</div>`;
+}
+$('#daily').addEventListener('click', e => {
+  if (e.target.closest('#dl-toggle')) { S.dailyOpen = !S.dailyOpen; renderDaily(); }
+  if (e.target.closest('#dl-off')) { local.set('daily-off', 1); renderDaily(); toast('লুকানো হয়েছে। ☰ মেনু → সেটিংস থেকে আবার চালু করা যাবে'); }
+});
+setInterval(() => { if (S.view === 'home' && !document.hidden) renderDaily(); }, 60000);
+function renderBdays() {
+  const box = $('#bdays'); if (!box) return;
+  const hide = new Set(local.get('bday-hide', [])), day = new Date(Date.now() + 6 * 36e5).toISOString().slice(0, 10);
+  const list = (S.bdays || []).filter(x => !hide.has(day + ':' + x.id));
+  box.innerHTML = list.length ? `<div class="card bday"><span class="bd-ic">🎂</span><div class="bd-t">আজ ${list.length === 1 ? `<b>${esc(list[0].name)}</b>-এর` : list.length === 2 ? `<b>${esc(list[0].name)}</b> ও <b>${esc(list[1].name)}</b>-এর` : `<b>${esc(list[0].name)}</b> ও আরও ${bn(list.length - 1)} জনের`} জন্মদিন</div>
+    <div class="bd-b">${list.slice(0, 3).map(x => `<button class="sbtn" data-bdwish="${esc(x.id)}">${list.length > 1 ? esc(x.name.split(' ')[0]) + '-কে ' : ''}শুভেচ্ছা জানান</button>`).join('')}<button class="bd-x" data-bdx aria-label="লুকান">${ic('close', 16)}</button></div></div>` : '';
+}
+$('#bdays').addEventListener('click', async e => {
+  const w = e.target.closest('[data-bdwish]');
+  if (w) { await openThread(w.dataset.bdwish); const i = $('#tmsg'); if (i && !i.value) { i.value = 'শুভ জন্মদিন! 🎂 অনেক অনেক শুভকামনা।'; i.focus(); } return; }
+  if (e.target.closest('[data-bdx]')) { const day = new Date(Date.now() + 6 * 36e5).toISOString().slice(0, 10); local.set('bday-hide', [...local.get('bday-hide', []).filter(x => x.startsWith(day)), ...(S.bdays || []).map(x => day + ':' + x.id)]); renderBdays(); }
+});
+function renderTrend() {
+  const box = $('#trend'); if (!box) return;
+  const t = S.trend || []; box.hidden = !t.length;
+  box.innerHTML = t.length ? `<span class="tr-l">🔥 এখন আলোচিত</span>${t.map(x => `<button class="chip tr-chip" data-htag="${esc(x.tag)}">#${esc(x.tag)}</button>`).join('')}` : '';
+}
+async function loadHomeExtras() {
+  renderDaily();
+  if (!local.get('daily-off')) loadWeather().then(v => { if (v) { S.wx = v; renderDaily(); } });
+  S.api.trendingTags().then(t => { S.trend = t; renderTrend(); }).catch(() => {});
+  if (me() && !S.actAs) {
+    S.api.birthdays().then(b => { S.bdays = b; renderBdays(); }).catch(() => {});
+    if (!S.pymkAt || Date.now() - S.pymkAt > 10 * 6e4) {
+      S.pymkAt = Date.now();
+      S.api.people({}).then(list => { S.pymk = list.filter(u => (!u.rel || u.rel.friend === 'none' || !u.rel.friend) && !u.rel?.following); if (S.feeds.home.posts.length > 3) renderFeed('home'); }).catch(() => {});
+    }
+  } else { S.bdays = []; S.pymk = []; renderBdays(); }
+}
+// ফিডের মাঝে "পরিচিত হতে পারেন"
+function pymkHtml() {
+  const hide = new Set(local.get('pymk-hide', [])), list = (S.pymk || []).filter(u => !hide.has(u.id)).slice(0, 10);
+  if (!me() || S.actAs || !list.length) return '';
+  return `<div class="card pymk"><div class="sec-h"><h3>পরিচিত হতে পারেন</h3><button class="link" data-go="friends">সব দেখুন</button></div>
+    <div class="pymk-row">${list.map(u => `<div class="pymk-c"><button class="pymk-x" data-pymkx="${esc(u.id)}" aria-label="সরিয়ে দিন">${ic('close', 14)}</button>${userLink(u.id, av(u))}${userLink(u.id, esc(u.name) + vb(u.verified), 'who-btn')}<span class="mut">${esc(u.union || '')}</span>
+      ${u.sent ? '<button class="sbtn ghost" disabled>রিকোয়েস্ট গেছে ✓</button>' : `<button class="sbtn" data-pymkadd="${esc(u.id)}">বন্ধু হোন</button>`}</div>`).join('')}</div></div>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-pymkadd],[data-pymkx]'); if (!b) return;
+  e.stopPropagation();
+  if (b.dataset.pymkx) { local.set('pymk-hide', [...local.get('pymk-hide', []), b.dataset.pymkx].slice(-200)); return renderFeed('home'); }
+  if (!needUser()) return;
+  const u = (S.pymk || []).find(x => String(x.id) === b.dataset.pymkadd); if (!u) return;
+  await busy(b, async () => { await S.api.sendFriendRequest(u.id); u.sent = true; toast('ফ্রেন্ড রিকোয়েস্ট পাঠানো হয়েছে'); renderFeed('home'); });
 }, true);
 // পোল: ভোট দিলে (বা নিজের পোস্টে) ফলাফল দেখায়
 function pollHtml(p) {
@@ -862,7 +972,7 @@ function renderFeed(key) {
   const f = S.feeds[key], box = $('#feed-' + key);
   let list = key === 'home' ? withAds(f) : f.posts;
   if (key === 'home' && f.urgent?.length) { const top = f.urgent.filter(p => !p.resolvedAt), ids = new Set(top.map(p => String(p.id))); list = [...top, ...list.filter(p => !ids.has(String(p.id)))]; }
-  box.innerHTML = f.posts.length ? list.map(postHtml).join('')
+  box.innerHTML = f.posts.length ? list.map((p, i) => postHtml(p) + (key === 'home' && i === 3 ? pymkHtml() : '')).join('')
     : key === 'search' ? '' : key === 'post' ? '<div class="empty">পোস্টটি আর নেই।</div>'
     : key === 'saved' ? '<div class="empty">কোনো সেভ করা পোস্ট নেই।<br>পোস্টের ⋯ মেনু থেকে "পোস্ট সেভ করুন" চাপুন।</div>'
     : key === 'page' || key === 'group' ? '<div class="empty">এখনো কোনো পোস্ট নেই।</div>'
@@ -895,7 +1005,7 @@ async function loadFeed(key, append) {
     const pinP = pinId ? S.api.posts({ postId: pinId }).catch(() => []) : null;
     const rows = plainHome ? await cachedCall('feed', async () => (await call()).slice(0, PAGE)) : await call();
     if (adsP) f.ads = await adsP;
-    if (key === 'home' && !append) { loadStories(); if (me()) S.fol = await S.api.followState().catch(() => S.fol); }
+    if (key === 'home' && !append) { loadStories(); loadHomeExtras(); if (me()) S.fol = await S.api.followState().catch(() => S.fol); }
     if (key === 'home' && !append) f.urgent = urgP ? (await urgP).map(p => ({ ...p, urgentTop: true })) : [];
     f.posts = append ? [...f.posts, ...rows] : rows; f.more = !['post', 'saved'].includes(key) && rows.length >= PAGE;
     if (pinP) { const pin = (await pinP)[0]; if (pin) f.posts = [{ ...pin, pinnedPage: true }, ...f.posts.filter(x => x.id !== pin.id)]; }
@@ -1174,6 +1284,7 @@ const BGS = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8'];
 const BG_MAX = 150;
 const canBg = d => !d.photos.length && !d.poll && !d.shared && (d.body || '').trim().length <= BG_MAX;
 const URL_RE = /https?:\/\/[^\s<>"']+/i;
+const BLOOD_OK = d => d.category === 'সাহায্য চাই' && !d.pageId && !d.groupId;
 const RESOLVE = { 'সাহায্য চাই': ['✅ সমাধান হয়েছে', 'সমাধান হয়েছে চিহ্ন দিন'], 'হারানো-প্রাপ্তি': ['✅ পাওয়া গেছে', 'পাওয়া গেছে চিহ্ন দিন'], 'কেনা-বেচা': ['✅ বিক্রি হয়ে গেছে', 'বিক্রি হয়ে গেছে চিহ্ন দিন'] };
 const localDT = d => { const z = new Date(d.getTime() - d.getTimezoneOffset() * 6e4); return z.toISOString().slice(0, 16); };
 function linkCardHtml(l, rm) {
@@ -1213,6 +1324,7 @@ function renderComposerSheet() {
     ${extras && d.bgOpen && !d.photos.length && !d.poll ? `<div class="pc-bgs" role="radiogroup" aria-label="ব্যাকগ্রাউন্ড রং"><button type="button" class="pc-sw none${d.bg ? '' : ' on'}" data-bg="" aria-label="কোনো রং নয়">✕</button>${BGS.map(g => `<button type="button" class="pc-sw ${g}${d.bg === g ? ' on' : ''}" data-bg="${g}" aria-label="রং ${g.slice(1)}"></button>`).join('')}${(d.body || '').trim().length > BG_MAX ? `<span class="mut pc-bgnote">রঙিন পোস্ট ${bn(BG_MAX)} অক্ষরের মধ্যে হয়</span>` : ''}</div>` : ''}
     ${d.poll ? `<div class="pc-poll"><div class="pc-blk-h">${ic('poll', 16)} পোল<button type="button" class="link" data-rmpoll>বাদ দিন</button></div>${d.poll.map((o, i) => `<div class="pc-po"><input class="f pc-poll-opt" data-pi="${i}" maxlength="80" placeholder="অপশন ${bn(i + 1)}" value="${esc(o)}">${d.poll.length > 2 ? `<button type="button" data-rmopt="${i}" aria-label="অপশন বাদ দিন">${ic('close', 14)}</button>` : ''}</div>`).join('')}${d.poll.length < 4 ? '<button type="button" class="link pc-addopt" data-addopt>+ আরেকটি অপশন</button>' : ''}</div>` : ''}
     ${d.event ? `<div class="pc-ev"><div class="pc-blk-h">${ic('calendar', 16)} অনুষ্ঠানের সময় ও জায়গা<button type="button" class="link" data-rmev>বাদ দিন</button></div><label class="pc-evl">কবে, কখন<input type="datetime-local" class="f" id="pc-ev-at" min="${localDT(new Date())}" value="${esc(d.event.at || '')}"></label><label class="pc-evl">কোথায়<input class="f" id="pc-ev-place" maxlength="120" placeholder="যেমন: উথুরা স্কুল মাঠ" value="${esc(d.event.place || '')}"></label><p class="mut pc-evn">যারা "যাব" চাপবেন তারা অনুষ্ঠানের আগের দিন রিমাইন্ডার পাবেন।</p></div>` : ''}
+    ${extras && BLOOD_OK(d) ? `<div class="pc-blood"><label for="pc-bg">🩸 রক্ত লাগবে?</label><select class="f" id="pc-bg"><option value="">না</option>${BLOOD_GROUPS.map(g => `<option ${d.blood === g ? 'selected' : ''}>${g}</option>`).join('')}</select>${d.blood ? `<p class="mut">উপজেলার যেসব ${esc(d.blood)} ডোনার গত ৯০ দিনে রক্ত দেননি, তারা নোটিফিকেশন পাবেন। পোস্টটি পাবলিক থাকলে তবেই পাঠানো হবে।</p>` : ''}</div>` : ''}
     <div id="pc-link">${!d.photos.length && d.link ? linkCardHtml(d.link, true) : ''}</div>
     ${d.photos.length ? `<div class="pc-photos">${d.photos.map((ph, i) => `<div class="pc-ph"><img loading="lazy" decoding="async" src="${esc(ph.url)}" alt="ছবি ${bn(i + 1)}"><button type="button" data-rmph="${i}" aria-label="ছবি বাদ দিন">${ic('close', 14)}</button></div>`).join('')}
       ${d.photos.length < MAX_PHOTOS && photosOk ? `<label class="pc-ph add" aria-label="আরও ছবি">${ic('plus', 24)}<span>${bn(d.photos.length)}/${bn(MAX_PHOTOS)}</span><input type="file" accept="image/*" multiple class="pc-more" hidden></label>` : ''}</div>` : ''}
@@ -1251,7 +1363,8 @@ function renderComposerSheet() {
     const t = $('#pc-text'), on = !!d.bg && canBg(d);
     t.classList.toggle('pc-bg', on); BGS.forEach(g => t.classList.toggle(g, on && d.bg === g));
   };
-  $('#pc-cat').onchange = () => { keep(); if (d.category === 'অনুষ্ঠান' && !d.event && extras) { d.event = { at: '', place: '' }; renderComposerSheet(); } };
+  $('#pc-cat').onchange = () => { keep(); if ((d.category === 'অনুষ্ঠান' && !d.event && extras) || (d.category === 'সাহায্য চাই') !== !!$('#pc-bg')) { if (d.category === 'অনুষ্ঠান' && !d.event && extras) d.event = { at: '', place: '' }; renderComposerSheet(); } };
+  if ($('#pc-bg')) $('#pc-bg').onchange = () => { keep(); d.blood = $('#pc-bg').value; renderComposerSheet(); };
   $('#sheet').oninput = e => { if (e.target.closest('.pc-poll-opt, #pc-ev-at, #pc-ev-place')) keep(); };
   if (!d.link && !d.photos.length) linkCheck();
   attachMention($('#pc-text'), d.mentions);
@@ -1302,7 +1415,8 @@ function renderComposerSheet() {
       if (d.albumId && !d.photos.length) return toast('অ্যালবামে যোগ করতে অন্তত একটা ছবি দিন');
       await S.api.createPost({ body: d.body.trim(), category: d.category, images: d.photos.map(p => p.blob), pageId: d.pageId, groupId: d.groupId, privacy: d.privacy, tags: d.tags.map(t => t.id), mentions: mentionIds(d.body, d.mentions), albumId: d.albumId || null,
         bg: d.bg && canBg(d) ? d.bg : null, poll, eventAt: evAt ? evAt.toISOString() : null, eventPlace: d.event?.place?.trim() || null,
-        link: !d.photos.length && d.link ? d.link : null });
+        link: !d.photos.length && d.link ? d.link : null, bloodGroup: BLOOD_OK(d) && d.blood ? d.blood : null });
+      if (BLOOD_OK(d) && d.blood && d.privacy === 'public') setTimeout(() => toast(`🩸 উপজেলার ${d.blood} ডোনারদের জানানো হয়েছে`), 1200);
       d.photos.forEach(p => URL.revokeObjectURL(p.url));
       const where = d.pageId ? 'page' : d.groupId ? 'group' : 'home';
       S.draft = null; $('#sheet').classList.remove('tall'); closeSheet(); toast('পোস্ট হয়েছে');
@@ -1544,6 +1658,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-plist]'); if (b) { const [uid, kind] = b.dataset.plist.split('|'); return peopleSheet(uid, kind); }
   if (e.target.closest('#listpriv')) listPrivacySheet();
   if (e.target.closest('#plock, .lock-chip')) lockSheet();
+  if (e.target.closest('#daily-tog')) { const off = !local.get('daily-off'); local.set('daily-off', off ? 1 : 0); toast(off ? 'কার্ডটি লুকানো হয়েছে' : 'হোমে নামাজের সময় ও আবহাওয়া দেখাবে'); renderMenu(); renderDaily(); }
 });
 // ফেসবুকের মতো প্রোফাইল লক: বন্ধু ছাড়া কেউ পোস্ট, ছবি, বিস্তারিত ও তালিকা দেখবে না
 function lockSheet() {
@@ -2581,6 +2696,7 @@ const NT = {
   boost_ok: ['🚀', 'আপনার পোস্টের বুস্ট অনুমোদন করেছেন, এখন চলছে'],
   boost_no: ['✖', 'আপনার পোস্টের বুস্ট গ্রহণ করেননি, কয়েন ফেরত গেছে'],
   page_admin: ['📄', 'আপনাকে একটি পেইজের অ্যাডমিন বানিয়েছেন'],
+  blood_request: ['🩸', ''],
   event_reminder: ['📅', '-এর অনুষ্ঠান আগামী ২৪ ঘণ্টার মধ্যে, আপনি যাচ্ছেন'],
 };
 // নিজের অর্জনের নোটিফিকেশন (মাইলফলক, সাপ্তাহিক রিপোর্ট): কারো নাম নয়, শুধু খবরটা
@@ -2609,13 +2725,14 @@ async function loadNotifs(keep) {
       if (SELF_TYPES.includes(n.type)) return selfNotif(n);
       const [ic, txt0] = NT[n.type] || ['•', ''];
       const txt1 = n.type === 'page_admin' && n.meta?.page ? `আপনাকে "${n.meta.page}" পেইজের অ্যাডমিন বানিয়েছেন` : n.meta?.page && (n.type === 'verify_ok' || n.type === 'verify_no') ? `আপনার পেইজ "${n.meta.page}"-এর ভেরিফাইড ব্যাজের আবেদন ${n.type === 'verify_ok' ? 'অনুমোদন করেছেন' : 'গ্রহণ করেননি'}` : txt0;
-      const txt = S.actAs ? txt1.replace('আপনার পোস্ট', 'পেইজের পোস্ট').replace('আপনার পেইজ', 'পেইজ') : txt1;
+      const txt2 = n.type === 'blood_request' ? `-এর ${n.meta?.bg || ''} রক্ত দরকার। আপনি কাছাকাছি একজন ${n.meta?.bg || ''} ডোনার, সাহায্য করতে পারবেন?` : txt1;
+      const txt = S.actAs ? txt2.replace('আপনার পোস্ট', 'পেইজের পোস্ট').replace('আপনার পেইজ', 'পেইজ') : txt1;
       const snip = n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
       const reqBtns = n.type === 'friend_request' && pending.has(n.actor.id)
         ? `<div class="acts2"><button class="sbtn" data-fr="accept" data-id="${esc(n.actor.id)}">গ্রহণ করুন</button><button class="sbtn ghost" data-fr="remove" data-id="${esc(n.actor.id)}">মুছুন</button></div>` : '';
       return `<div class="notif${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="${esc(n.groupId ?? '')}" data-n-user="${esc(n.actor.id)}" data-n-page="${esc(n.meta?.page_id ?? '')}" role="button" tabindex="0">
         <span class="ico">${av(n.actor)}<i>${ic}</i></span>
-        <span class="txt"><b>${esc(n.actor.name)}</b>${n.type === 'event_reminder' ? '' : ' '}${esc(txt)}${n.type === 'event_reminder' && n.meta?.at ? ` <span class="q">${esc(bnWhen(n.meta.at, true))}${n.meta.place ? ' · ' + esc(n.meta.place) : ''}</span>` : snip}<span class="time">${esc(ago(n.createdAt))}</span>${reqBtns}</span></div>`;
+        <span class="txt"><b>${esc(n.actor.name)}</b>${n.type === 'event_reminder' || n.type === 'blood_request' ? '' : ' '}${esc(txt)}${n.type === 'event_reminder' && n.meta?.at ? ` <span class="q">${esc(bnWhen(n.meta.at, true))}${n.meta.place ? ' · ' + esc(n.meta.place) : ''}</span>` : snip}<span class="time">${esc(ago(n.createdAt))}</span>${reqBtns}</span></div>`;
     }).join('') : (S.actAs ? `<div class="empty">${esc(S.actAs.name)} পেইজের এখনো কোনো নোটিফিকেশন নেই।<br>কেউ পেইজের পোস্টে রিয়্যাক্ট বা মন্তব্য করলে এখানে দেখাবে।</div>` : '<div class="empty">এখনো কোনো নোটিফিকেশন নেই।<br>কেউ আপনার পোস্টে লাইক বা মন্তব্য করলে, বা ফ্রেন্ড রিকোয়েস্ট পাঠালে এখানে দেখাবে।</div>');
     if (list.some(n => !n.read)) { await S.api.markNotificationsRead(list.filter(n => !n.read).map(n => n.id)); $('#b-notif').hidden = true; }
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
@@ -2623,7 +2740,7 @@ async function loadNotifs(keep) {
 function openNotif(el) {
   if (!el || el.closest('button')) return;
   const t = el.dataset.nType;
-  if ((t === 'event_reminder' || t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag' || t === 'boost_ok' || t === 'boost_no') && el.dataset.nPost) openPost(el.dataset.nPost);
+  if ((t === 'blood_request' || t === 'event_reminder' || t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag' || t === 'boost_ok' || t === 'boost_no') && el.dataset.nPost) openPost(el.dataset.nPost);
   else if (t === 'friend_request') go('friends');
   else if (t === 'verify_ok' || t === 'verify_no') { open('wallet'); loadWallet(); }
   else if (t === 'milestone' && el.dataset.nPost) openPost(el.dataset.nPost);
@@ -2820,11 +2937,14 @@ function shareSheet(p) {
     <button data-sh="msg"><span class="sh-ic">${ic('message', 22)}</span>মেসেজে পাঠান</button>
     <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}" target="_blank" rel="noopener" data-sh="fb"><span class="sh-ic fb">${FB_ICON}</span>Facebook</a>
     <a href="https://wa.me/?text=${encodeURIComponent(text + '\n' + link)}" target="_blank" rel="noopener" data-sh="wa"><span class="sh-ic wa">${WA_ICON}</span>WhatsApp</a>
+    <a href="fb-messenger://share/?link=${encodeURIComponent(link)}" data-sh="ms"><span class="sh-ic ms">${ic('message', 22)}</span>Messenger</a>
     <button data-sh="copy"><span class="sh-ic">${ic('link', 22)}</span>লিংক কপি</button>
+    ${navigator.share ? `<button data-sh="more"><span class="sh-ic">${ic('dots', 22)}</span>অন্য অ্যাপে</button>` : ''}
   </div><button class="btn ghost wide" data-close style="margin-top:14px">বাতিল</button>`);
   $('#sheet').onclick = async e => {
     const a = e.target.closest('[data-sh]')?.dataset.sh; if (!a) return;
-    if (a === 'fb' || a === 'wa') { setTimeout(closeSheet, 300); return; }
+    if (a === 'fb' || a === 'wa' || a === 'ms') { setTimeout(closeSheet, 300); return; }
+    if (a === 'more') { try { await navigator.share({ title: 'আমার উপজেলা', text, url: link }); } catch { /* বাতিল */ } return closeSheet(); }
     if (a === 'copy') { try { await navigator.clipboard.writeText(link); toast('লিংক কপি হয়েছে'); } catch { toast('কপি করা যায়নি: ' + link); } return closeSheet(); }
     if (!needUser()) return closeSheet();
     if (a === 'profile') return shareToProfile(orig);
@@ -2980,6 +3100,7 @@ function renderMenu() {
       <button id="edit">প্রোফাইল এডিট</button>
       <button id="chpw">পাসওয়ার্ড পরিবর্তন</button>
       <button id="plock">🔒 প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
+      <button id="daily-tog">🕌 নামাজের সময় ও আবহাওয়া কার্ড<span class="val">${local.get('daily-off') ? 'বন্ধ' : 'চালু'}</span></button>
       <button id="listpriv">বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
       <button id="blocked">ব্লক করা মানুষ</button>
       <button id="theme">থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>

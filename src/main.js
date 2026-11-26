@@ -1620,7 +1620,7 @@ $('#tform').addEventListener('submit', e => {
 async function refreshBadges() {
   if (!me()) { $('#b-msgs').hidden = $('#b-friends').hidden = $('#b-notif').hidden = true; return; }
   try {
-    const [n, reqs, nt] = await Promise.all([S.actAs ? S.api.pageUnread().then(m => m.get(S.actAs.id) || 0) : S.api.unreadCount(), S.api.friendRequests(), S.api.unreadNotifications()]);
+    const [n, reqs, nt] = await Promise.all([S.actAs ? S.api.pageUnread().then(m => m.get(S.actAs.id) || 0) : S.api.unreadCount(), S.actAs ? [] : S.api.friendRequests(), S.api.unreadNotifications(S.actAs?.id)]);
     const setB = (id, v) => { $(id).hidden = !v; $(id).textContent = v > 99 ? '৯৯+' : bn(v); };
     setB('#b-msgs', n); setB('#b-friends', reqs.length); setB('#b-notif', S.view === 'notif' ? 0 : nt);
   } catch { /* badge না দেখালেও চলে */ }
@@ -1926,8 +1926,18 @@ function renderComposer() {
   const u = me(), pg = u && S.actAs;
   $('#comp-av').innerHTML = pg ? entAv(pg) : u ? av(u) : `<div class="av" aria-hidden="true">?</div>`; $('#tab-av').innerHTML = pg ? entAv(pg) : u ? av(u) : TAB_ME_ICON;
   $('#cm-open').textContent = pg ? `${pg.name}-এর পক্ষে কিছু লিখুন…` : u ? `আপনার মনে কী আছে, ${u.name.split(' ')[0]}?` : 'আপনার মনে কী আছে? পোস্ট করতে লগইন করুন';
-  document.querySelectorAll('#composer [data-compose="tag"], #composer [data-compose="privacy"]').forEach(b => { b.hidden = !!pg; });   // পেইজের পোস্ট সবসময় পাবলিক
+  document.querySelectorAll('#composer [data-compose="tag"], #composer [data-compose="privacy"]').forEach(b => { b.hidden = !!pg; });
+  swapFriendsTab(!!pg);   // পেইজের পোস্ট সবসময় পাবলিক
   renderActAsBar();
+}
+// পেইজ হিসেবে থাকলে "বন্ধু" ট্যাবের জায়গায় পেইজের ড্যাশবোর্ড
+const FRIENDS_TAB = { html: null, label: '' };
+const DASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="badge" id="b-friends" hidden></span>';
+function swapFriendsTab(page) {
+  const b = document.querySelector('header [data-v="friends"], header [data-v="pinsights"]'); if (!b) return;
+  if (FRIENDS_TAB.html === null) { FRIENDS_TAB.html = b.innerHTML; FRIENDS_TAB.label = b.getAttribute('aria-label'); }
+  if (page && b.dataset.v !== 'pinsights') { b.dataset.v = 'pinsights'; b.innerHTML = DASH_ICON; b.setAttribute('aria-label', 'পেইজের ড্যাশবোর্ড'); }
+  if (!page && b.dataset.v !== 'friends') { b.dataset.v = 'friends'; b.innerHTML = FRIENDS_TAB.html; b.setAttribute('aria-label', FRIENDS_TAB.label); }
 }
 // ---------- পেইজ হিসেবে চলা (ফেসবুকের মতো প্রোফাইল বদল)
 const actAsOpts = () => (S.actAs ? { pageId: S.actAs.id, authorName: S.actAs.name, authorAvatar: S.actAs.avatar, title: `${S.actAs.name}-এর পক্ষে পোস্ট` } : {});
@@ -1943,7 +1953,8 @@ function setActAs(pg, quiet) {
   S.actAs = pg ? { id: pg.id, name: pg.name, avatar: pg.avatar || '', verified: pg.verified || '', autoReplyOn: pg.autoReplyOn, autoReply: pg.autoReply, faqs: pg.faqs, isOwner: pg.isOwner !== false && !pg.isAdmin, canManage: true } : null;
   local.set('actAs', S.actAs ? S.actAs.id : null);
   S.convPage = null; S.draft = null;
-  renderComposer(); refreshBadges(); if (S.view === 'menu') renderMenu(); if (S.view === 'msgs') loadConvs();
+  renderComposer(); refreshBadges(); if (S.view === 'menu') renderMenu(); if (S.view === 'msgs') loadConvs(); if (S.view === 'notif') loadNotifs();
+  if (!pg && S.tab === 'pinsights') go('home'); if (pg && S.view === 'friends') go('pinsights');
   if (!quiet) toast(pg ? `এখন "${pg.name}" হিসেবে আছেন: পোস্ট, মন্তব্য ও মেসেজ পেইজের নামে যাবে` : 'নিজের প্রোফাইলে ফিরেছেন');
 }
 async function restoreActAs() {
@@ -2100,20 +2111,21 @@ async function loadNotifs(keep) {
   if (!me()) { box.innerHTML = `<div class="empty">নোটিফিকেশন দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
   if (!keep) box.innerHTML = '<div class="skel"></div>';
   try {
-    const [list, reqs] = await Promise.all([S.api.notifications(), S.api.friendRequests()]);
+    const [list, reqs] = await Promise.all([S.api.notifications(S.actAs?.id), S.actAs ? [] : S.api.friendRequests()]);
     const pending = new Set(reqs.map(r => r.id));
     box.innerHTML = list.length ? list.map(n => {
       if (SELF_TYPES.includes(n.type)) return selfNotif(n);
       const [ic, txt0] = NT[n.type] || ['•', ''];
-      const txt = n.type === 'page_admin' && n.meta?.page ? `আপনাকে "${n.meta.page}" পেইজের অ্যাডমিন বানিয়েছেন` : n.meta?.page && (n.type === 'verify_ok' || n.type === 'verify_no') ? `আপনার পেইজ "${n.meta.page}"-এর ভেরিফাইড ব্যাজের আবেদন ${n.type === 'verify_ok' ? 'অনুমোদন করেছেন' : 'গ্রহণ করেননি'}` : txt0;
+      const txt1 = n.type === 'page_admin' && n.meta?.page ? `আপনাকে "${n.meta.page}" পেইজের অ্যাডমিন বানিয়েছেন` : n.meta?.page && (n.type === 'verify_ok' || n.type === 'verify_no') ? `আপনার পেইজ "${n.meta.page}"-এর ভেরিফাইড ব্যাজের আবেদন ${n.type === 'verify_ok' ? 'অনুমোদন করেছেন' : 'গ্রহণ করেননি'}` : txt0;
+      const txt = S.actAs ? txt1.replace('আপনার পোস্ট', 'পেইজের পোস্ট').replace('আপনার পেইজ', 'পেইজ') : txt1;
       const snip = n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
       const reqBtns = n.type === 'friend_request' && pending.has(n.actor.id)
         ? `<div class="acts2"><button class="sbtn" data-fr="accept" data-id="${esc(n.actor.id)}">গ্রহণ করুন</button><button class="sbtn ghost" data-fr="remove" data-id="${esc(n.actor.id)}">মুছুন</button></div>` : '';
       return `<div class="notif${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="${esc(n.groupId ?? '')}" data-n-user="${esc(n.actor.id)}" data-n-page="${esc(n.meta?.page_id ?? '')}" role="button" tabindex="0">
         <span class="ico">${av(n.actor)}<i>${ic}</i></span>
         <span class="txt"><b>${esc(n.actor.name)}</b> ${esc(txt)}${snip}<span class="time">${esc(ago(n.createdAt))}</span>${reqBtns}</span></div>`;
-    }).join('') : '<div class="empty">এখনো কোনো নোটিফিকেশন নেই।<br>কেউ আপনার পোস্টে লাইক বা মন্তব্য করলে, বা ফ্রেন্ড রিকোয়েস্ট পাঠালে এখানে দেখাবে।</div>';
-    if (list.some(n => !n.read)) { await S.api.markNotificationsRead(); $('#b-notif').hidden = true; }
+    }).join('') : (S.actAs ? `<div class="empty">${esc(S.actAs.name)} পেইজের এখনো কোনো নোটিফিকেশন নেই।<br>কেউ পেইজের পোস্টে রিয়্যাক্ট বা মন্তব্য করলে এখানে দেখাবে।</div>` : '<div class="empty">এখনো কোনো নোটিফিকেশন নেই।<br>কেউ আপনার পোস্টে লাইক বা মন্তব্য করলে, বা ফ্রেন্ড রিকোয়েস্ট পাঠালে এখানে দেখাবে।</div>');
+    if (list.some(n => !n.read)) { await S.api.markNotificationsRead(list.filter(n => !n.read).map(n => n.id)); $('#b-notif').hidden = true; }
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 function openNotif(el) {
@@ -3182,6 +3194,13 @@ function show(v) {
 // প্রধান ট্যাবে যাওয়া
 function go(v) {
   if (v === 'me' && S.actAs && me()) { closeSheet(); S.stack = []; return openPage(S.actAs.id); }
+  if (v === 'pinsights') {
+    if (!S.actAs) return go('friends');
+    closeSheet(); S.stack = []; S.insTarget = { kind: 'page', id: S.actAs.id, name: S.actAs.name };
+    show('insights'); S.tab = 'pinsights'; document.querySelectorAll('header [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === 'pinsights'));
+    return loadInsights();
+  }
+  if (v === 'friends' && S.actAs) return go('pinsights');
   closeSheet(); S.stack = [];
   show(v);
   if (v === 'me') renderMe(); if (v === 'friends') loadFriends(); if (v === 'msgs') loadConvs();

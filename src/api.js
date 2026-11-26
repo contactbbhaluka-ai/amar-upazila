@@ -26,6 +26,9 @@ const toStats = r => ({ people: r.people || 0, views: r.views || 0, today: r.tod
 const toInsights = r => ({ days: r.days || 7, people: r.people || 0, views: r.views || 0, close: r.close || 0, others: r.others || 0, newFollowers: r.new_followers || 0, posts: r.posts || 0,
   sources: r.sources || {}, daily: r.daily || [], hours: r.hours || Array(24).fill(0), top: (r.top || []).map(t => ({ id: t.id, body: t.body || '', image: t.image || '', createdAt: t.created_at, people: t.people || 0, views: t.views || 0 })) });
 const SELF_NT = ['milestone', 'follower_milestone', 'weekly'];
+// নোটিফিকেশন কোন পেইজের: পেইজের পোস্টে লাইক/মন্তব্য ইত্যাদি, বা পেইজের ব্যাজ (অ্যাডমিন বানানোর খবরটা ব্যক্তিগত)
+const notifPage = n => n.p?.page_id || ((n.type === 'verify_ok' || n.type === 'verify_no') && n.meta?.page_id) || null;
+const inScope = (n, pageId) => (pageId ? Number(notifPage(n)) === Number(pageId) : !notifPage(n));
 const toGrowth = r => ({ visits: r.visits || 0, visitors: r.visitors || 0, visitsDaily: r.visits_daily || [], followers: r.followers || 0, gained: r.gained || 0, lost: r.lost || 0, followDaily: r.follow_daily || [] });
 const toEnt = r => ({ ...toInsights(r), growth: toGrowth(r), pending: r.pending || 0, activeMembers: r.active_members || 0 });
 const lastDays = n => Array.from({ length: n }, (_, i) => { const d = new Date(Date.now() + 6 * 3600e3 - (n - 1 - i) * 864e5); return d.toISOString().slice(0, 10); });
@@ -585,19 +588,21 @@ async function supabaseApi() {
     },
 
     // ---------- নোটিফিকেশন
-    async notifications() {
-      const rows = ok(await sb.from('notifications').select('id,type,post_id,group_id,read,created_at,actor_id,meta, a:profiles!notifications_actor_id_fkey(id,name,avatar_url), p:posts!notifications_post_id_fkey(body), g:groups!notifications_group_id_fkey(name)')
-        .eq('user_id', me.id).order('created_at', { ascending: false }).limit(60));
-      return rows.filter(n => n.a && !blocked.has(n.actor_id)).map(n => ({
+    // pageId দিলে শুধু ওই পেইজের নোটিফিকেশন; না দিলে পেইজেরগুলো বাদে বাকি সব
+    async notifications(pageId) {
+      const rows = ok(await sb.from('notifications').select('id,type,post_id,group_id,read,created_at,actor_id,meta, a:profiles!notifications_actor_id_fkey(id,name,avatar_url), p:posts!notifications_post_id_fkey(body,page_id), g:groups!notifications_group_id_fkey(name)')
+        .eq('user_id', me.id).order('created_at', { ascending: false }).limit(100));
+      return rows.filter(n => n.a && !blocked.has(n.actor_id) && inScope(n, pageId)).slice(0, 60).map(n => ({
         id: n.id, type: n.type, postId: n.post_id, groupId: n.group_id, groupName: n.g?.name || '', read: n.read, createdAt: n.created_at,
         actor: { id: n.a.id, name: n.a.name, avatar: n.a.avatar_url || '' }, snippet: n.p?.body || '', meta: n.meta || {},
       }));
     },
-    async unreadNotifications() {
+    async unreadNotifications(pageId) {
       if (!me) return 0;
-      return ok(await sb.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', me.id).eq('read', false)) || 0;
+      const rows = ok(await sb.from('notifications').select('id,type,meta,p:posts!notifications_post_id_fkey(page_id)').eq('user_id', me.id).eq('read', false).limit(300));
+      return rows.filter(n => inScope(n, pageId)).length;
     },
-    async markNotificationsRead() { ok(await sb.rpc('mark_notifications_read')); },
+    async markNotificationsRead(ids) { if (ids) { if (ids.length) ok(await sb.rpc('mark_notifications_read_ids', { p_ids: ids })); } else ok(await sb.rpc('mark_notifications_read')); },
     onNotify(cb) {
       if (!me) return () => {};
       const ch = sb.channel('nt-' + me.id)
@@ -723,6 +728,7 @@ function demoApi() {
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
   const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true, aboutVis: { ...ABOUT_VIS0, ...(person(meId).aboutVis || {}) } } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
+  const demoN = n => ({ ...n, p: { page_id: db.posts.find(x => x.id === n.postId)?.pageId || null }, meta: n.meta || {} });
   // ডেমো: কাজ করলে কয়েন (আসল সার্ভারে এটা ডাটাবেসের ট্রিগার করে)
   const sett = k => Number(db.settings[k] ?? SETTING_KEYS[k][1]);
   function earn(why, ref, ownerId) {
@@ -1378,12 +1384,12 @@ function demoApi() {
     async pageUnread() { const out = new Map(); for (const m of db.messages) if (m.to === meId && !m.read && m.pageId && pageOf(m.pageId)?.ownerId === meId) out.set(m.pageId, (out.get(m.pageId) || 0) + 1); return wait(out); },
     onMessage(cb) { listeners.add(cb); return () => listeners.delete(cb); },
 
-    async notifications() {
-      return wait(db.notifs.filter(n => n.to === meId && !isBlocked(n.from)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 60)
+    async notifications(pageId) {
+      return wait(db.notifs.filter(n => n.to === meId && !isBlocked(n.from) && inScope(demoN(n), pageId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 60)
         .map(n => ({ id: n.id, type: n.type, postId: n.postId, groupId: n.groupId || null, groupName: db.groups.find(g => g.id === n.groupId)?.name || '', read: n.read, createdAt: n.createdAt, actor: user(n.from) || { id: n.from, name: 'সদস্য', avatar: '' }, snippet: db.posts.find(p => p.id === n.postId)?.body || '', meta: n.meta || {} })));
     },
-    async unreadNotifications() { return db.notifs.filter(n => n.to === meId && !n.read && !isBlocked(n.from)).length; },
-    async markNotificationsRead() { for (const n of db.notifs) if (n.to === meId) n.read = true; save(); },
+    async unreadNotifications(pageId) { return db.notifs.filter(n => n.to === meId && !n.read && !isBlocked(n.from) && inScope(demoN(n), pageId)).length; },
+    async markNotificationsRead(ids) { for (const n of db.notifs) if (n.to === meId && (!ids || ids.includes(n.id))) n.read = true; save(); },
     onNotify(cb) { notifyListeners.add(cb); return () => notifyListeners.delete(cb); },
     async search(q) {
       const [people, posts, services] = await Promise.all([this.people({ q }), this.posts({ q }), this.services({ q })]);

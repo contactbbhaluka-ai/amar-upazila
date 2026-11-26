@@ -615,6 +615,13 @@ async function supabaseApi() {
       const ps = new Map(ok(await sb.from('profiles').select(PROFILE).in('id', sg.map(r => r.id))).map(p => [p.id, toUser(p)]));
       return sg.filter(r => ps.has(r.id)).map(r => ({ ...ps.get(r.id), rel: { friend: 'none' }, mutual: r.mutual, sameArea: r.same_area, school: r.school || '', isNew: r.is_new }));
     },
+    async areaPeople(area) {
+      const [k, v] = [area.slice(0, 1), area.slice(2)];
+      const sg = ok(await sb.rpc('area_people', { p_union: k === 'u' ? Number(v) : null, p_upazila: k === 'x' ? v : null, p_limit: 60 })).filter(r => !blocked.has(r.id));
+      if (!sg.length) return [];
+      const ps = new Map(ok(await sb.from('profiles').select(PROFILE).in('id', sg.map(r => r.id))).map(p => [p.id, toUser(p)]));
+      return sg.filter(r => ps.has(r.id)).map(r => ({ ...ps.get(r.id), rel: { friend: 'none' }, mutual: r.mutual, sameArea: false, school: r.school || '', isNew: r.is_new }));
+    },
     async hideSuggestion(id) { ok(await sb.from('friend_suggest_hidden').upsert({ user_id: me.id, other_id: id }, { ignoreDuplicates: true })); },
     async newNearMe() { return me ? Number(ok(await sb.rpc('new_near_me'))) || 0 : 0; },
     async birthdaysUpcoming(days = 31) { return ok(await sb.rpc('friends_birthdays_upcoming', { p_days: days })).filter(r => !blocked.has(r.id)).map(r => ({ id: r.id, name: r.name, avatar: r.avatar_url || '', nextDate: r.next_date, days: r.days })); },
@@ -1686,6 +1693,13 @@ function demoApi() {
         return { ...u, rel: { friend: 'none' }, mutual: friendIds(u.id).filter(x => mine.has(x)).length, sameArea: !!(me0?.unionId && u.unionId === me0.unionId), school, isNew: !!u.joinedAt && Date.now() - new Date(u.joinedAt) < 7 * 864e5 };
       });
       return wait(out.sort((a, b) => b.mutual - a.mutual || (!!b.school - !!a.school) || (b.sameArea - a.sameArea)).slice(0, 60));
+    },
+    async areaPeople(area) {
+      const k = area.slice(0, 1), v = area.slice(2), me0 = meUser(), mine = new Set(friendIds(meId)), hidden = new Set(db.sugHidden || []);
+      const mySchools = new Set((me0?.educations || []).map(e => (e.school || '').trim().toLowerCase()).filter(Boolean));
+      return wait([...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u && u.id !== meId && !isBlocked(u.id) && !friendRow(meId, u.id) && !hidden.has(u.id) && (k === 'u' ? String(u.unionId) === v : !u.unionId && u.upazila === v))
+        .map(u => ({ ...u, rel: { friend: 'none' }, mutual: friendIds(u.id).filter(x => mine.has(x)).length, sameArea: false, school: (u.educations || []).find(e => mySchools.has((e.school || '').trim().toLowerCase()))?.school || '', isNew: !!u.joinedAt && Date.now() - new Date(u.joinedAt) < 7 * 864e5 }))
+        .sort((a, b) => b.mutual - a.mutual));
     },
     async hideSuggestion(id) { db.sugHidden = [...new Set([...(db.sugHidden || []), id])]; save(); return wait(); },
     async newNearMe() { const me0 = meUser(); return wait([...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u && u.id !== meId && me0?.unionId && u.unionId === me0.unionId && u.joinedAt && Date.now() - new Date(u.joinedAt) < 7 * 864e5).length); },

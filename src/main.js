@@ -1609,13 +1609,26 @@ function reqTabHtml(F) {
 const SUGG_F = [['all', 'সব'], ['mutual', '👥 মিউচুয়াল'], ['school', '🎓 সহপাঠী'], ['new', '🆕 নতুন'], ['area', '📍 আমার এলাকা']];
 const suggWhy = u => u.mutual ? `👥 ${bn(u.mutual)} জন মিউচুয়াল বন্ধু` : u.school ? `🎓 একই প্রতিষ্ঠান: ${u.school}` : u.isNew && u.sameArea ? '🆕 আপনার এলাকায় নতুন যোগ দিয়েছেন' : u.sameArea ? `📍 একই এলাকা${u.union ? ': ' + u.union : ''}` : u.isNew ? '🆕 নতুন যোগ দিয়েছেন' : u.union;
 function suggTabHtml(F) {
-  const f = S.suggF || 'all';
-  const list = F.sugg.filter(u => f === 'all' || (f === 'mutual' && u.mutual) || (f === 'school' && u.school) || (f === 'new' && u.isNew) || (f === 'area' && u.sameArea));
+  const f = S.suggF || 'all', area = S.sgArea || '';
+  F.areaSugg = F.areaSugg || {};
+  if (area && !F.areaSugg[area]) {   // বাছাই করা এলাকার মানুষ সার্ভার থেকে আনা
+    S.api.areaPeople(area).then(l => { F.areaSugg[area] = l; if (S.view === 'friends' && S.frTab === 'sugg') renderFriends(); }).catch(e => { F.areaSugg[area] = []; toast(errText(e)); });
+  }
+  const base = area ? F.areaSugg[area] : F.sugg;
+  const others = [...new Set([...F.sugg, ...F.friends].filter(u => !u.unionId && u.upazila).map(u => u.upazila).concat(area.startsWith('x:') ? [area.slice(2)] : []))].sort();
+  const areaSel = `<div class="fr-filter"><select class="f" id="sg-area" aria-label="এলাকা অনুযায়ী সাজেশন" style="flex:1;max-width:none"><option value="">📍 সব এলাকা (আপনার জন্য বাছাই করা)</option>
+    <optgroup label="ভালুকা">${(S.unions || []).map(x => `<option value="u:${esc(x.id)}" ${area === 'u:' + x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</optgroup>
+    ${others.length ? `<optgroup label="অন্য উপজেলা">${others.map(x => `<option value="x:${esc(x)}" ${area === 'x:' + x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</optgroup>` : ''}</select></div>`;
+  const areaName = area ? (area.startsWith('u:') ? (S.unions || []).find(x => 'u:' + x.id === area)?.name || '' : area.slice(2)) : '';
+  if (area && !base) return `${areaSel}<div class="card"><div class="skel"></div></div>`;
+  const list = base.filter(u => f === 'all' || (f === 'mutual' && u.mutual) || (f === 'school' && u.school) || (f === 'new' && u.isNew) || (f === 'area' && u.sameArea));
   const myArea = me()?.union?.split(',')[0] || 'আপনার এলাকা';
   return `${F.near ? `<div class="card fr-near">🏡 এই সপ্তাহে <b>${esc(myArea)}</b> থেকে <b>${bn(F.near)} জন</b> আমার উপজেলায় যোগ দিয়েছেন${F.sugg.some(u => u.isNew && u.sameArea) ? ' <button class="link" data-suggf="new">দেখুন</button>' : ''}</div>` : ''}
-    <div class="chips fr-sf">${SUGG_F.map(([k, l]) => `<button class="chip${f === k ? ' on' : ''}" data-suggf="${k}">${l}</button>`).join('')}</div>
+    ${areaSel}
+    <div class="chips fr-sf">${SUGG_F.filter(([k]) => !area || k !== 'area').map(([k, l]) => `<button class="chip${f === k ? ' on' : ''}" data-suggf="${k}">${l}</button>`).join('')}</div>
+    ${area ? `<p class="mut fr-areanote">📍 ${esc(areaName)}-এর মানুষ: ${bn(list.length)} জন <button class="link" data-sgarea="">সব এলাকা</button></p>` : ''}
     <div class="card">${list.length ? list.map(u => `<div class="fr-item">${personRow(u, `${u.sent ? '<button class="sbtn ghost" disabled>রিকোয়েস্ট গেছে ✓</button>' : `<button class="sbtn" data-fr="add" data-id="${esc(u.id)}">বন্ধু হোন</button>`}<button class="sbtn ghost fr-x" data-sgx="${esc(u.id)}" aria-label="সাজেশন থেকে সরান" title="সরিয়ে দিন">✕</button>`, suggWhy(u))}</div>`).join('')
-      : `<div class="mut">${f === 'school' ? 'আপনার স্কুল/কলেজের কাউকে পাওয়া যায়নি। প্রোফাইলে "শিক্ষা" যোগ করলে সহপাঠীদের খুঁজে দেব।' : 'এখন কোনো সাজেশন নেই।'}</div>`}</div>`;
+      : `<div class="mut">${area && f === 'all' ? `${esc(areaName)} থেকে এখনো নতুন কেউ নেই (যারা আছেন তারা হয়তো আগেই আপনার বন্ধু বা রিকোয়েস্টে আছেন)।` : f === 'school' ? 'আপনার স্কুল/কলেজের কাউকে পাওয়া যায়নি। প্রোফাইলে "শিক্ষা" যোগ করলে সহপাঠীদের খুঁজে দেব।' : 'এখন কোনো সাজেশন নেই।'}</div>`}</div>`;
 }
 function mineTabHtml(F) {
   const q = (S.frQ || '').trim().toLowerCase(), un = S.frUnion || '', lf = S.frList || '';
@@ -1645,15 +1658,19 @@ $('#friends').addEventListener('click', async e => {
   const sf = e.target.closest('[data-suggf]'); if (sf) { S.suggF = sf.dataset.suggf; S.frTab = 'sugg'; return renderFriends(); }
   const fl = e.target.closest('[data-frl]'); if (fl) { S.frList = fl.dataset.frl; return renderFriends(); }
   const fa = e.target.closest('[data-frarea]'); if (fa) { S.frUnion = ''; return renderFriends(); }
+  const sa = e.target.closest('[data-sgarea]'); if (sa) { S.sgArea = ''; return renderFriends(); }
   const sg = e.target.closest('[data-sgx]');
-  if (sg) return busy(sg, async () => { await S.api.hideSuggestion(sg.dataset.sgx); S.fr.sugg = S.fr.sugg.filter(u => u.id !== sg.dataset.sgx); toast('আর এই সাজেশনে দেখাবে না'); renderFriends(); });
+  if (sg) return busy(sg, async () => { await S.api.hideSuggestion(sg.dataset.sgx); S.fr.sugg = S.fr.sugg.filter(u => u.id !== sg.dataset.sgx); for (const k in S.fr.areaSugg || {}) S.fr.areaSugg[k] = S.fr.areaSugg[k].filter(u => u.id !== sg.dataset.sgx); toast('আর এই সাজেশনে দেখাবে না'); renderFriends(); });
   const x = e.target.closest('[data-frx]')?.dataset.frx; if (!x) return;
   if (x === 'acceptall') { if (await confirmSheet(`${bn(S.fr.reqs.length)}টি রিকোয়েস্ট একসাথে গ্রহণ করবেন?`, 'সব গ্রহণ করুন')) busy(null, async () => { const n = await S.api.acceptAllFriends(); toast(`${bn(n)} জন এখন আপনার বন্ধু`); S.frTab = 'mine'; loadFriends(true); refreshBadges(); }); return; }
   if (x === 'bday') return birthdaySheet();
   if (x === 'lists') return listsSheet();
   if (x === 'rule') return reqRuleSheet();
 });
-$('#friends').addEventListener('change', e => { if (e.target.id === 'fr-union') { S.frUnion = e.target.value; renderFriends(); } });
+$('#friends').addEventListener('change', e => {
+  if (e.target.id === 'fr-union') { S.frUnion = e.target.value; renderFriends(); }
+  if (e.target.id === 'sg-area') { S.sgArea = e.target.value; if (S.suggF === 'area') S.suggF = 'all'; renderFriends(); }
+});
 // জন্মদিনের তালিকা: আজ / এই সপ্তাহে / এই মাসে
 async function birthdaySheet() {
   openSheet('<h2>🎂 বন্ধুদের জন্মদিন</h2><div id="bd-list"><div class="mut">লোড হচ্ছে…</div></div><button class="btn ghost wide" data-close style="margin-top:10px">বন্ধ করুন</button>');
@@ -1743,7 +1760,7 @@ document.addEventListener('click', async e => {
     return;
   }
   busy(b, async () => {
-    if (act === 'add') { await S.api.sendFriendRequest(id); toast('ফ্রেন্ড রিকোয়েস্ট পাঠানো হয়েছে'); const sgu = S.fr?.sugg.find(x => x.id === id); if (sgu) sgu.sent = true; }
+    if (act === 'add') { await S.api.sendFriendRequest(id); toast('ফ্রেন্ড রিকোয়েস্ট পাঠানো হয়েছে'); [S.fr?.sugg || [], ...Object.values(S.fr?.areaSugg || {})].forEach(l => { const sgu = l.find(x => x.id === id); if (sgu) sgu.sent = true; }); }
     if (act === 'accept') { await S.api.acceptFriend(id); toast('আপনারা এখন বন্ধু'); }
     if (act === 'remove' || act === 'cancel') await S.api.removeFriend(id);
     refresh();

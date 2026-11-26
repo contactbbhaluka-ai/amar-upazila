@@ -233,3 +233,39 @@ returns boolean language sql stable security definer set search_path = public as
           or (p_privacy = 'close' and public.are_friends(auth.uid(), p_user)
               and exists (select 1 from public.friend_marks fm where fm.user_id = p_user and fm.other_id = auth.uid() and fm.close)));
 $$;
+
+-- সাজেশনে এলাকা বাছাই: নির্দিষ্ট ইউনিয়ন (বা অন্য উপজেলা) থেকে মানুষ, মিউচুয়াল বন্ধু আগে
+create or replace function public.area_people(p_union bigint default null, p_upazila text default null, p_limit int default 60)
+returns table(id uuid, mutual int, same_area boolean, school text, is_new boolean)
+language sql stable security definer set search_path = public as $$
+  with mine as (
+    select case when requester = auth.uid() then addressee else requester end f
+      from public.friendships where status = 'accepted' and auth.uid() in (requester, addressee)
+  ),
+  excl as (
+    select case when requester = auth.uid() then addressee else requester end u from public.friendships where auth.uid() in (requester, addressee)
+    union select other_id from public.friend_suggest_hidden where user_id = auth.uid()
+    union select blocked_id from public.blocks where blocker_id = auth.uid()
+    union select blocker_id from public.blocks where blocked_id = auth.uid()
+    union select auth.uid()
+  ),
+  my_schools as (
+    select distinct lower(btrim(e->>'school')) s from public.profile_details pd, jsonb_array_elements(pd.educations) e where pd.user_id = auth.uid()
+  ),
+  cand as (
+    select p.id, p.created_at from public.profiles p
+     where auth.uid() is not null and (p_union is not null or p_upazila is not null)
+       and (p_union is null or p.union_id = p_union) and (p_upazila is null or (p.union_id is null and p.upazila = p_upazila))
+       and p.id not in (select u from excl where u is not null)
+     order by p.created_at desc limit 400
+  )
+  select c.id,
+         (select count(*) from mine m where private.are_friends(m.f, c.id))::int m,
+         true,
+         (select e->>'school' from public.profile_details pd, jsonb_array_elements(pd.educations) e
+           where pd.user_id = c.id and lower(btrim(e->>'school')) in (select s from my_schools) and private.can_view(c.id, pd.educations_visibility) limit 1),
+         c.created_at > now() - interval '7 days'
+    from cand c
+   order by m desc, c.created_at desc
+   limit least(greatest(p_limit, 1), 100);
+$$;

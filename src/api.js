@@ -271,14 +271,14 @@ async function supabaseApi() {
       const url = await upload(blob, 'avatar');
       ok(await sb.from('profiles').update({ avatar_url: url }).eq('id', me.id));
       me.avatar = url;
-      await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'avatar', privacy: share ? 'public' : 'only_me' });
+      await this.createPost({ body: '', category: null, imageUrls: [url], kind: 'avatar', privacy: share ? 'public' : 'only_me' });
       return url;
     },
     async setCover(blob, share = true) {
       const url = await upload(blob, 'cover');
       ok(await sb.from('profiles').update({ cover_url: url }).eq('id', me.id));
       me.cover = url;
-      await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', privacy: share ? 'public' : 'only_me' });
+      await this.createPost({ body: '', category: null, imageUrls: [url], kind: 'cover', privacy: share ? 'public' : 'only_me' });
       return url;
     },
     async removeCover() { ok(await sb.from('profiles').update({ cover_url: null }).eq('id', me.id)); me.cover = ''; },
@@ -307,11 +307,11 @@ async function supabaseApi() {
     // পেইজের প্রোফাইল ও কভার ছবি (পেইজের নামে পোস্টও হয়, পেইজের অ্যালবামে জমা থাকে)
     async setPageAvatar(pageId, blob, share = true) {
       const url = await upload(blob, 'page'); ok(await sb.from('pages').update({ avatar_url: url }).eq('id', pageId));
-      if (share) await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'avatar', pageId }); return url;
+      if (share) await this.createPost({ body: '', category: null, imageUrls: [url], kind: 'avatar', pageId }); return url;
     },
     async setPageCover(pageId, blob, share = true) {
       const url = await upload(blob, 'page'); ok(await sb.from('pages').update({ cover_url: url }).eq('id', pageId));
-      if (share) await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', pageId }); return url;
+      if (share) await this.createPost({ body: '', category: null, imageUrls: [url], kind: 'cover', pageId }); return url;
     },
     async removePageCover(pageId) { ok(await sb.from('pages').update({ cover_url: null }).eq('id', pageId)); },
     async updateAlbum(id, { name, privacy }) { ok(await sb.from('albums').update({ name, privacy }).eq('id', id)); },
@@ -1339,8 +1339,8 @@ function demoApi() {
     async updateManualDonor(id, v) { const m = db.manual.find(x => x.id === Number(id) && x.createdBy === meId); if (!m) throw new Error('row-level security'); Object.assign(m, v, { unionId: v.unionId || null }); save(); },
     async deleteManualDonor(id) { db.manual = db.manual.filter(x => !(x.id === Number(id) && x.createdBy === meId)); save(); },
     async setLastDonated(date) { person(meId).lastDonated = date || ''; save(); },
-    async setAvatar(blob, share = true) { const url = await toBlobUrl(blob); person(meId).avatar = url; save(); await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'avatar', privacy: share ? 'public' : 'only_me' }); return url; },
-    async setCover(blob, share = true) { const url = await toBlobUrl(blob); person(meId).cover = url; save(); await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', privacy: share ? 'public' : 'only_me' }); return url; },
+    async setAvatar(blob, share = true) { const url = await toBlobUrl(blob); person(meId).avatar = url; save(); await this.createPost({ body: '', category: null, imageUrls: [url], kind: 'avatar', privacy: share ? 'public' : 'only_me' }); return url; },
+    async setCover(blob, share = true) { const url = await toBlobUrl(blob); person(meId).cover = url; save(); await this.createPost({ body: '', category: null, imageUrls: [url], kind: 'cover', privacy: share ? 'public' : 'only_me' }); return url; },
     async removeCover() { person(meId).cover = ''; save(); },
     async useOldPhoto(kind, url) { if (kind === 'cover') person(meId).cover = url; else person(meId).avatar = url; save(); return wait(); },
     async photos(userId, { albumId, kind, pageId } = {}) {
@@ -1356,8 +1356,8 @@ function demoApi() {
       return wait([...out, ...own.map(a => pack(a.id, a.name, a.privacy, posts.filter(p => p.albumId === a.id), true))]);
     },
     async createAlbum({ name, privacy, pageId }) { const a = { id: nid(db.albums), userId: meId, pageId: pageId ? Number(pageId) : null, name, privacy: pageId ? 'public' : (privacy || 'public'), createdAt: new Date().toISOString() }; db.albums.push(a); save(); return a.id; },
-    async setPageAvatar(pageId, blob, share = true) { const url = await toBlobUrl(blob), pg = pageOf(pageId); pg.avatar = url; save(); if (share) await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'avatar', pageId }); return url; },
-    async setPageCover(pageId, blob, share = true) { const url = await toBlobUrl(blob), pg = pageOf(pageId); pg.cover = url; save(); if (share) await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', pageId }); return url; },
+    async setPageAvatar(pageId, blob, share = true) { const url = await toBlobUrl(blob), pg = pageOf(pageId); pg.avatar = url; save(); if (share) await this.createPost({ body: '', category: null, imageUrls: [url], kind: 'avatar', pageId }); return url; },
+    async setPageCover(pageId, blob, share = true) { const url = await toBlobUrl(blob), pg = pageOf(pageId); pg.cover = url; save(); if (share) await this.createPost({ body: '', category: null, imageUrls: [url], kind: 'cover', pageId }); return url; },
     async removePageCover(pageId) { const pg = pageOf(pageId); if (pg) pg.cover = ''; save(); },
     async updateAlbum(id, { name, privacy }) {
       const a = db.albums.find(x => x.id === Number(id) && x.userId === meId); if (!a) throw new Error('row-level security');

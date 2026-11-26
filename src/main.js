@@ -1,6 +1,6 @@
 // আমার উপজেলা — অ্যাপের UI
 import { createApi, PAGE, boostState } from './api.js';
-import { POST_CATS, SERVICE_CATS, EMERGENCY, PUBLIC_URL, SETTING_KEYS, PLAY_URL } from './config.js';
+import { POST_CATS, CAT_ICON, SERVICE_CATS, EMERGENCY, PUBLIC_URL, SETTING_KEYS, PLAY_URL } from './config.js';
 import { DISTRICTS, DISTRICT_ORDER, HOME_UPAZILA, HOME_DISTRICT, BLOOD_GROUPS } from './bd-geo.js';
 
 // সাধারণ এক রঙের রেখার আইকন (লেখার রং-ই আইকনের রং)
@@ -372,7 +372,7 @@ function postHtml(p) {
     ${p.pinnedPage ? '<div class="pin-lbl">📌 পিন করা পোস্ট</div>' : ''}<div class="top">${!p.pageId && storyUserSet().has(p.userId) ? `<button class="avbtn av-story" data-avstory="${esc(p.userId)}" aria-label="${esc(p.author)}: স্টোরি বা প্রোফাইল">${av(p)}</button>` : link(av(p), 'avbtn')}
       <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${folBtn(p)}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${(POST_PRIVACY[p.privacy] || PRIVACY.public)[1]}" aria-label="${(POST_PRIVACY[p.privacy] || PRIVACY.public)[1]}">${ic((POST_PRIVACY[p.privacy] || PRIVACY.public)[0], 13)}</span></div></div>
       ${own ? `<button class="pinfo" data-pinfo="${esc(p.id)}" aria-label="পোস্টটি কতজন দেখেছেন" title="পোস্টের হিসাব">${ic('info', 19)}</button>` : ''}<button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
-    <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>${urgent ? '<span class="urg-lbl">🚨 জরুরি</span>' : ''}${p.bloodGroup ? `<span class="blood-lbl">🩸 ${esc(p.bloodGroup)} রক্ত দরকার</span>` : ''}${p.resolvedAt && RESOLVE[p.category] ? `<span class="resolved">${RESOLVE[p.category][0]}</span>` : ''}
+    ${p.category ? `<span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${CAT_ICON[p.category] || ''} ${esc(p.category)}</span>` : ''}${urgent ? '<span class="urg-lbl">🚨 জরুরি</span>' : ''}${p.bloodGroup ? `<span class="blood-lbl">🩸 ${esc(p.bloodGroup)} রক্ত দরকার</span>` : ''}${p.resolvedAt && RESOLVE[p.category] ? `<span class="resolved">${RESOLVE[p.category][0]}</span>` : ''}
     ${lifeHtml(p)}
     ${showBg ? `<div class="pbg ${esc(p.bg)}">${esc(p.body)}</div>` : p.body && !(p.lifeEvent && p.body === LIFE[p.lifeEvent]?.[1]) ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
     ${photosHtml(p)}
@@ -1306,7 +1306,7 @@ const PRIVACY = { public: ['globe', 'পাবলিক', 'যে কেউ দ�
 const POST_PRIVACY = { public: PRIVACY.public, friends: PRIVACY.friends, close: ['star', 'ক্লোজ ফ্রেন্ড', 'শুধু যাদের ⭐ ক্লোজ ফ্রেন্ড বানিয়েছেন'], only_me: PRIVACY.only_me };
 const MAX_PHOTOS = 10;
 S.draft = null;
-function newDraft(opts = {}) { return { body: '', category: POST_CATS[0], photos: [], tags: [], mentions: new Map(), privacy: local.get('privacy', 'public'), bg: '', poll: null, event: null, link: null, linkOff: '', ...opts }; }
+function newDraft(opts = {}) { return { body: '', category: null, photos: [], tags: [], mentions: new Map(), privacy: local.get('privacy', 'public'), bg: '', poll: null, event: null, link: null, linkOff: '', ...opts }; }
 const BGS = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8'];
 const BG_MAX = 150;
 const canBg = d => !d.photos.length && !d.poll && !d.shared && (d.body || '').trim().length <= BG_MAX;
@@ -1331,7 +1331,7 @@ function openPostComposer(opts = {}, then) {
 function openEditPost(p) {
   if (!needUser()) return;
   const raw = p.rawImages || p.images || [];
-  S.draft = { editId: p.id, body: p.body || '', category: p.category || POST_CATS[0], privacy: p.privacy || 'public',
+  S.draft = { editId: p.id, body: p.body || '', category: p.category || null, privacy: p.privacy || 'public',
     photos: (p.images || []).map((url, i) => ({ url, keep: raw[i] ?? url })), tags: (p.tags || []).map(t => ({ ...t })), mentions: new Map((p.mentions || []).map(m => [m.id, m.name])),
     pageId: p.pageId, groupId: p.groupId, shared: !!p.sharedPostId, title: 'পোস্ট এডিট করুন', authorName: p.pageId ? p.author : '', orig: raw.slice() };
   S.draft.start = draftSig(S.draft);
@@ -1367,11 +1367,11 @@ function renderComposerSheet() {
       ${extras && !d.photos.length && !d.poll ? `<button class="pc-tool" id="pc-pollt" title="পোল" aria-label="পোল যোগ করুন">${ic('poll', 22)}</button>` : ''}
       ${extras && !d.life && !d.pageId && !d.groupId ? `<button class="pc-tool pc-life" id="pc-lifet" title="জীবনের ঘটনা" aria-label="জীবনের ঘটনা যোগ করুন">🎉</button>` : ''}
       ${extras && !d.event ? `<button class="pc-tool" id="pc-evt" title="অনুষ্ঠান" aria-label="অনুষ্ঠানের তারিখ যোগ করুন">${ic('calendar', 22)}</button>` : ''}
-      <select class="f pc-cat" id="pc-cat" aria-label="পোস্টের ধরন">${POST_CATS.map(c => `<option ${c === d.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+      <select class="f pc-cat${d.category ? ' set' : ''}" id="pc-cat" aria-label="পোস্টের ধরন (ঐচ্ছিক)"><option value="" ${d.category ? '' : 'selected'}>🏷️ ধরন</option>${POST_CATS.map(c => `<option value="${esc(c)}" ${c === d.category ? 'selected' : ''}>${CAT_ICON[c] || ''} ${esc(c)}</option>`).join('')}${d.category ? '<option value="">✕ ধরন বাদ দিন</option>' : ''}</select></div>
     <button class="btn wide" id="pc-post">${d.editId ? 'সংরক্ষণ করুন' : 'পোস্ট করুন'}</button></div></div>`);
   $('#sheet').classList.add('tall');
   const keep = () => {
-    d.body = $('#pc-text')?.value ?? d.body; d.category = $('#pc-cat')?.value || d.category;
+    d.body = $('#pc-text')?.value ?? d.body; if ($('#pc-cat')) d.category = $('#pc-cat').value || null;
     if (d.poll) document.querySelectorAll('#sheet .pc-poll-opt').forEach(x => { d.poll[Number(x.dataset.pi)] = x.value; });
     if (d.event) { d.event.at = $('#pc-ev-at')?.value ?? d.event.at; d.event.place = $('#pc-ev-place')?.value ?? d.event.place; }
     if (d.life) { d.life.type = $('#pc-life-t')?.value || d.life.type; d.life.date = $('#pc-life-d')?.value ?? d.life.date; }
@@ -1397,7 +1397,7 @@ function renderComposerSheet() {
     const t = $('#pc-text'), on = !!d.bg && canBg(d);
     t.classList.toggle('pc-bg', on); BGS.forEach(g => t.classList.toggle(g, on && d.bg === g));
   };
-  $('#pc-cat').onchange = () => { keep(); if ((d.category === 'অনুষ্ঠান' && !d.event && extras) || (d.category === 'সাহায্য চাই') !== !!$('#pc-bg')) { if (d.category === 'অনুষ্ঠান' && !d.event && extras) d.event = { at: '', place: '' }; renderComposerSheet(); } };
+  $('#pc-cat').onchange = () => { keep(); if (d.category === 'অনুষ্ঠান' && !d.event && extras) d.event = { at: '', place: '' }; renderComposerSheet(); };
   if ($('#pc-bg')) $('#pc-bg').onchange = () => { keep(); d.blood = $('#pc-bg').value; renderComposerSheet(); };
   $('#sheet').oninput = e => { if (e.target.closest('.pc-poll-opt, #pc-ev-at, #pc-ev-place, #pc-life-t, #pc-life-d')) keep(); };
   if (!d.link && !d.photos.length) linkCheck();
@@ -1418,7 +1418,7 @@ function renderComposerSheet() {
       keep();
       if (x.id === 'pc-bgt' || x.id === 'pc-bgt2') d.bgOpen = !d.bgOpen;
       else if (x.dataset.bg !== undefined) { d.bg = x.dataset.bg; if (d.bg && (d.body || '').trim().length > BG_MAX) toast(`রঙিন পোস্ট ${bn(BG_MAX)} অক্ষরের মধ্যে হয়`); }
-      else if (x.id === 'pc-pollt') { d.poll = ['', '']; d.bg = ''; d.bgOpen = false; if (d.category === POST_CATS[0]) d.category = 'প্রশ্ন'; }
+      else if (x.id === 'pc-pollt') { d.poll = ['', '']; d.bg = ''; d.bgOpen = false; if (!d.category) d.category = 'প্রশ্ন'; }
       else if (x.dataset.rmpoll !== undefined) d.poll = null;
       else if (x.dataset.addopt !== undefined) { if (d.poll.length < 4) d.poll.push(''); }
       else if (x.dataset.rmopt !== undefined) d.poll.splice(Number(x.dataset.rmopt), 1);
@@ -1510,7 +1510,7 @@ $('#comp-av').addEventListener('click', () => { if (me()) go('me'); else $('#cm-
 $('#composer').addEventListener('click', e => { const b = e.target.closest('[data-compose]'); if (b) openPostComposer(actAsOpts(), S.actAs && b.dataset.compose !== 'photo' ? undefined : b.dataset.compose); });
 
 function renderFilters() {
-  $('#fchips').innerHTML = ['', ...POST_CATS].map(c => `<button class="chip${c === S.fcat ? ' on' : ''}" data-f="${esc(c)}">${esc(c || 'সব')}</button>`).join('');
+  $('#fchips').innerHTML = ['', ...POST_CATS].map(c => `<button class="chip${c === S.fcat ? ' on' : ''}" data-f="${esc(c)}">${c ? (CAT_ICON[c] || '') + ' ' + esc(c) : 'সব'}</button>`).join('');
   document.querySelectorAll('#scope button').forEach(b => b.classList.toggle('on', b.dataset.s === S.scope));
   $('#locrow').hidden = S.scope === 'friends';
 }

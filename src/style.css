@@ -1546,3 +1546,6 @@ img.av{aspect-ratio:1/1}
 .pc-foot .pc-bgs-below{margin:0}.pc-foot .pc-bgnote{margin:-4px 0 0}
 @media (max-width:380px){.pc-add-l{display:none}.pc-add .pc-tool{width:36px;height:36px}}
 #pc-cat{min-width:84px}
+/* পোস্টের ধরন: ঐচ্ছিক */
+#pc-cat{color:var(--mut)}
+#pc-cat.set{color:var(--ink);font-weight:600;border-color:var(--g)}

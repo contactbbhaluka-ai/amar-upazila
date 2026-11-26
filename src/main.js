@@ -195,7 +195,7 @@ const catName = k => (SERVICE_CATS.find(c => c[0] === k) || ['', ''])[1];
 
 const S = {
   api: null, unions: [], union: local.get('union', ''), scope: 'area', fcat: '', dcat: '',
-  feeds: { home: { posts: [], more: false }, me: { posts: [], more: false }, user: { posts: [], more: false }, post: { posts: [], more: false }, search: { posts: [], more: false }, saved: { posts: [], more: false }, page: { posts: [], more: false }, group: { posts: [], more: false } },
+  feeds: { home: { posts: [], more: false }, me: { posts: [], more: false }, user: { posts: [], more: false }, post: { posts: [], more: false }, search: { posts: [], more: false }, mem: { posts: [], more: false }, saved: { posts: [], more: false }, page: { posts: [], more: false }, group: { posts: [], more: false } },
   seenBoosts: new Set(), curPage: null, open: new Map(), view: 'home', tab: 'home', stack: [], bgroup: '', bscope: 'home', bready: false, settings: { ...Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d])), ...local.get('settings', {}) }, userId: null, threadId: null, postId: null, pageId: null, groupId: null, photo: null, stopMsg: null, stopNotif: null,
 };
 const me = () => S.api?.me();
@@ -488,7 +488,7 @@ function folBtn(p) {
   if (p.pageId ? S.fol.pages.has(p.pageId) : S.fol.users.has(p.userId)) return '';
   return ` <span class="fol-dot">·</span> <button class="fol-btn" data-folpost="${p.pageId ? 'p:' + esc(p.pageId) : 'u:' + esc(p.userId)}">ফলো করুন</button>`;
 }
-const rerenderFeeds = () => { for (const key of ['home', 'group', 'post', 'search', 'saved']) if (S.feeds[key]?.posts.length && $('#feed-' + key)) renderFeed(key); };
+const rerenderFeeds = () => { for (const key of ['home', 'group', 'post', 'search', 'saved', 'mem']) if (S.feeds[key]?.posts.length && $('#feed-' + key)) renderFeed(key); };
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-folpost]'); if (!b) return;
   e.stopPropagation(); if (!needUser() || !S.fol) return;
@@ -645,7 +645,7 @@ let BN_WD = EN ? ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 let BN_MON = EN ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] : ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
 function dhakaParts(d) {
   const x = new Date(new Date(d).getTime() + 6 * 36e5);   // ঢাকা UTC+6, দিবালোক সময় নেই
-  return { wd: x.getUTCDay(), day: x.getUTCDate(), mon: x.getUTCMonth(), h: x.getUTCHours(), m: x.getUTCMinutes() };
+  return { wd: x.getUTCDay(), day: x.getUTCDate(), mon: x.getUTCMonth(), year: x.getUTCFullYear(), h: x.getUTCHours(), m: x.getUTCMinutes() };
 }
 function bnWhen(d, short) {
   const t = dhakaParts(d), per = t.h < 4 ? 'রাত' : t.h < 6 ? 'ভোর' : t.h < 12 ? 'সকাল' : t.h < 15 ? 'দুপুর' : t.h < 18 ? 'বিকাল' : t.h < 20 ? 'সন্ধ্যা' : 'রাত';
@@ -1006,6 +1006,7 @@ function renderFeed(key) {
   if (key === 'home' && f.urgent?.length) { const top = f.urgent.filter(p => !p.resolvedAt), ids = new Set(top.map(p => String(p.id))); list = [...top, ...list.filter(p => !ids.has(String(p.id)))]; }
   box.innerHTML = f.posts.length ? list.map((p, i) => postHtml(p) + (key === 'home' && i === 3 ? pymkHtml() : '')).join('')
     : key === 'search' ? '' : key === 'post' ? '<div class="empty">পোস্টটি আর নেই।</div>'
+    : key === 'mem' ? '<div class="empty">🕰️<br>আগের বছরগুলোতে আজকের তারিখে আপনার কোনো পোস্ট নেই।<br>পরের বছর এই দিনে আজকের পোস্টগুলো এখানে দেখাবে।</div>'
     : key === 'saved' ? '<div class="empty">কোনো সেভ করা পোস্ট নেই।<br>পোস্টের ⋯ মেনু থেকে "পোস্ট সেভ করুন" চাপুন।</div>'
     : key === 'page' || key === 'group' ? '<div class="empty">এখনো কোনো পোস্ট নেই।</div>'
     : `<div class="empty">${key === 'home' && S.scope === 'friends' ? 'বন্ধু বা যাদের ফলো করছেন তাদের কোনো পোস্ট এখনো নেই।<br>"বন্ধু" ট্যাব থেকে মানুষ খুঁজে যুক্ত হোন।' : key === 'home' ? 'এখানে এখনো কোনো পোস্ট নেই।<br>প্রথম পোস্টটি আপনিই করুন!' : 'এখনো কোনো পোস্ট নেই।'}</div>`;
@@ -1024,11 +1025,12 @@ async function loadFeed(key, append) {
     ? { scope: S.scope, unionId: S.union ? Number(S.union) : null, category: S.fcat || null }
     : key === 'post' ? { postId: S.postId }
     : key === 'saved' ? { saved: true }
+    : key === 'mem' ? { memories: true }
     : key === 'page' ? { pageId: S.pageId }
     : key === 'group' ? { groupId: S.groupId }
     : { userId: key === 'me' ? me()?.id : S.userId };
   try {
-    if (key !== 'home' && !q.userId && !q.postId && !q.saved && !q.pageId && !q.groupId) { f.posts = []; box.innerHTML = ''; return; }
+    if (key !== 'home' && !q.userId && !q.postId && !q.saved && !q.memories && !q.pageId && !q.groupId) { f.posts = []; box.innerHTML = ''; return; }
     const plainHome = key === 'home' && !append && S.scope === 'area' && !q.unionId && !q.category && !S.api.demoLogin;
     const call = () => S.api.posts({ ...q, before: append ? f.posts.at(-1)?.createdAt : undefined });
     const adsP = key === 'home' && !append && !q.category && feat('featBoost') ? S.api.boostedPosts(3).catch(() => []) : null;
@@ -1041,7 +1043,7 @@ async function loadFeed(key, append) {
     if (key === 'home' && !append) f.urgent = urgP ? (await urgP).map(p => ({ ...p, urgentTop: true })) : [];
     let rows2 = key === 'user' && S.preview ? rows.filter(p => p.privacy === 'public' || (S.preview === 'friends' && p.privacy === 'friends')) : rows;
     if (key === 'home' && !append) { const cut = new Date(Date.now() - 2 * 864e5).toISOString(), top = rows2.filter(p => p.closeFriend && p.createdAt > cut); if (top.length) { const ids = new Set(top.map(p => p.id)); rows2.splice(0, rows2.length, ...top, ...rows2.filter(p => !ids.has(p.id))); } }
-    f.posts = append ? [...f.posts, ...rows2] : rows2; f.more = !['post', 'saved'].includes(key) && rows.length >= PAGE;
+    f.posts = append ? [...f.posts, ...rows2] : rows2; f.more = !['post', 'saved', 'mem'].includes(key) && rows.length >= PAGE;
     if (pinP) { const pin = (await pinP)[0]; if (pin) f.posts = [{ ...pin, pinnedPage: true }, ...f.posts.filter(x => x.id !== pin.id)]; }
   } catch (e) { toast(errText(e)); if (!append) f.posts = []; }
   renderFeed(key);
@@ -3753,7 +3755,7 @@ $('#me').addEventListener('change', async e => {
 });
 document.addEventListener('click', async e => {
   const id = e.target.closest('button')?.id; if (!id) return;
-  if (id === 'logout') { await S.api.signOut(); afterAuth(); }
+  if (id === 'logout') return logoutSheet();
   if (id === 'donated-today') {
     if (!(await confirmSheet('আজকের তারিখকে সর্বশেষ রক্তদানের তারিখ হিসেবে সেভ করবেন? ব্লাড ব্যাংকে ৯০ দিন "অপেক্ষায়" দেখাবে।', 'হ্যাঁ, সেভ করুন'))) return;
     await busy(null, async () => { await S.api.setLastDonated(today()); if (S.view === 'dir') loadBlood(); else renderMe(); toast('ধন্যবাদ! আপনার রক্তদান একটা জীবন বাঁচাতে পারে 🩸'); });
@@ -4579,10 +4581,10 @@ const FONT_SIZES = [['sm', 'ছোট', 0.92], ['md', 'মাঝারি', 1], 
 function applyFont() { const z = FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[2] || 1; document.body.style.zoom = z === 1 ? '' : String(z); document.documentElement.style.setProperty('--zoom', z); }
 applyFont();
 // মেনুতে খোঁজা: শর্টকাট আর সেটিং দুটোই
-const MN_KEYS = { 'dark-tg': 'dark night mode theme ডার্ক রাত থিম মোড', 'lang-tg': 'language bhasha english bangla ভাষা ইংরেজি বাংলা', 'acc-un': 'username id ইউজারনেম আইডি', chpw: 'password পাসওয়ার্ড গোপন', edit: 'profile প্রোফাইল নাম ছবি এডিট', delacc: 'delete account মুছে অ্যাকাউন্ট', plock: 'lock লক', listpriv: 'privacy তালিকা বন্ধু ফলোয়ার', showact: 'active online সক্রিয় অনলাইন',
+const MN_KEYS = { faq: 'faq help প্রশ্ন উত্তর সাহায্য কীভাবে', 'dark-tg': 'dark night mode theme ডার্ক রাত থিম মোড', 'lang-tg': 'language bhasha english bangla ভাষা ইংরেজি বাংলা', 'acc-un': 'username id ইউজারনেম আইডি', chpw: 'password পাসওয়ার্ড গোপন', edit: 'profile প্রোফাইল নাম ছবি এডিট', delacc: 'delete account মুছে অ্যাকাউন্ট', plock: 'lock লক', listpriv: 'privacy তালিকা বন্ধু ফলোয়ার', showact: 'active online সক্রিয় অনলাইন',
   blocked: 'block ব্লক', ntset2: 'notification নোটিফিকেশন', msgsnd: 'sound শব্দ আওয়াজ', theme: 'dark light ডার্ক লাইট থিম রং', fontsz: 'font size লেখা অক্ষর বড় ছোট', help: 'help সমস্যা সাহায্য অভিযোগ', about: 'version ভার্সন সম্পর্কে',
   logout: 'logout লগআউট বের', 'demo-guide': 'demo ডেমো' };
-const MN_SC_KEYS = { dir: 'হাসপাতাল ফার্মেসি ডাক্তার থানা service', blood: 'রক্ত ডোনার blood', sos: '৯৯৯ পুলিশ ফায়ার অ্যাম্বুলেন্স emergency', prayer: 'নামাজ আজান ওয়াক্ত আবহাওয়া বৃষ্টি weather', groups: 'group', pages: 'page দোকান ব্যবসা', saved: 'save সেভ', bday: 'birthday জন্মদিন', wallet: 'coin কয়েন ব্যাজ verify', insights: 'dashboard ড্যাশবোর্ড ভিউ' };
+const MN_SC_KEYS = { mem: 'memory memories স্মৃতি এই দিনে আগের বছর', activity: 'activity log কার্যকলাপ লাইক মন্তব্য শেয়ার ইতিহাস', dir: 'হাসপাতাল ফার্মেসি ডাক্তার থানা service', blood: 'রক্ত ডোনার blood', sos: '৯৯৯ পুলিশ ফায়ার অ্যাম্বুলেন্স emergency', prayer: 'নামাজ আজান ওয়াক্ত আবহাওয়া বৃষ্টি weather', groups: 'group', pages: 'page দোকান ব্যবসা', saved: 'save সেভ', bday: 'birthday জন্মদিন', wallet: 'coin কয়েন ব্যাজ verify', insights: 'dashboard ড্যাশবোর্ড ভিউ' };
 function bindMenuSearch() {
   const q = $('#mn-q'); if (!q) return;
   q.oninput = () => {
@@ -4635,35 +4637,23 @@ function renderMenu() {
     const off = flag && S.settings[flag] === false;
     return `<button class="sc${off ? ' off' : ''}" data-mgo="${go2}"><span class="si">${icon}</span><span class="sc-t"><b>${esc(label)}</b>${off ? '<small>বন্ধ আছে (শুধু অ্যাডমিন দেখছেন)</small>' : sub ? `<small>${esc(sub)}</small>` : ''}</span></button>`;
   };
+  const pins = u ? menuPins() : [], pinSet = new Set(pins);
+  const scs = (grp) => SC_ALL.filter(x => x[5] === grp && !pinSet.has(x[0])).map(x => sc(x[0], x[1], x[2], x[3], x[4])).join('');
+  const sec = (h, grp) => { const inner = scs(grp); return inner ? `<h3 class="mn-h">${h}</h3><div class="sc-grid">${inner}</div>` : ''; };
   $('#menu').innerHTML = `
+    ${todayHtml()}
     ${u ? `<div class="me-wrap"><button class="me-row" data-v="me">${S.actAs ? entAv(S.actAs) : av(u)}<div class="info"><b>${esc(S.actAs ? S.actAs.name : u.name)}</b><div class="sub">${S.actAs ? 'পেইজ দেখুন' : 'আপনার প্রোফাইল দেখুন'}</div></div></button><button class="sw-toggle" id="sw-toggle" aria-label="প্রোফাইল বা পেইজ বদলান" aria-expanded="false" hidden>${ic('users', 16)}<span class="chev">▾</span></button><div id="switcher" class="sw-drop" hidden></div></div>`
       : `${demoCard()}<div class="card"><b>আপনি লগইন করেননি</b><p class="mut" style="margin:4px 0 10px">পোস্ট, বন্ধু, গ্রুপ ও পেইজ ব্যবহার করতে লগইন করুন।</p><button class="btn wide" data-v="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`}
-    ${u ? `<div class="sc-grid mn-quick">
-      ${sc('wallet', '🪙', 'কয়েন ও ব্যাজ', 'ভেরিফাইড ব্যাজ নিন')}
-      ${sc('insights', '📊', 'ড্যাশবোর্ড', 'পোস্ট কতজন দেখছেন')}
-    </div>` : ''}
+    ${u ? `<div class="mn-pinhead"><span>📌 আমার শর্টকাট</span><button id="mn-pinedit">✏️ সাজান</button></div>
+    ${pins.length ? `<div class="sc-grid mn-quick">${pins.map(k => { const x = SC_ALL.find(y => y[0] === k); return sc(x[0], x[1], x[2], x[3], x[4]); }).join('')}</div>` : '<p class="mut mn-pinempty">"সাজান" চেপে পছন্দের শর্টকাট এখানে রাখুন</p>'}` : ''}
     ${!u?.admin && S.announcer ? `<button class="me-row admin-row" data-mgo="announce"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:20px">📢</span><div class="info"><b>জরুরি ঘোষণা পাঠান</b><div class="sub">${esc(S.announcer.title)} হিসেবে</div></div></button>` : ''}
     ${u?.admin ? `<button class="me-row admin-row" data-mgo="admin"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('shield', 22)}</span><div class="info"><b>অ্যাডমিন ড্যাশবোর্ড</b><div class="sub">অ্যাপের সংখ্যা ও সেটিংস</div></div></button>` : ''}
     <div class="mn-top"><input type="search" id="mn-q" placeholder="মেনুতে খুঁজুন… (যেমন: পাসওয়ার্ড, ব্লক, রক্ত)" aria-label="মেনুতে খুঁজুন" autocomplete="off"><button class="mn-dark" id="mn-dark" aria-label="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}" title="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}">${isDark() ? '☀️' : '🌙'}</button><button class="mn-dark mn-lang" id="mn-lang" translate="no" aria-label="${EN ? 'বাংলা' : 'English'}" title="${EN ? 'বাংলা' : 'English'}">${EN ? 'বাং' : 'EN'}</button></div>
     <div id="mn-res" class="card" hidden></div>
     <div id="mn-main">
-    <h3 class="mn-h">🏡 উপজেলার সেবা</h3>
-    <div class="sc-grid">
-      ${sc('dir', '🏥', 'সেবা ডিরেক্টরি', 'উপজেলার সব সেবা')}
-      ${sc('blood', '🩸', 'ব্লাড ব্যাংক', 'রক্তদাতা খুঁজুন', 'featBlood')}
-      ${sc('sos', '🚨', 'জরুরি নম্বর', '৯৯৯ ও হেল্পলাইন')}
-      ${sc('prayer', '🕌', 'নামাজ ও আবহাওয়া', 'ওয়াক্ত ও ৭ দিনের পূর্বাভাস')}
-    </div>
-    <h3 class="mn-h">👥 কমিউনিটি</h3>
-    <div class="sc-grid">
-      ${sc('groups', '👥', 'গ্রুপ', 'যোগ দিন বা তৈরি করুন', 'featGroups')}
-      ${sc('pages', '🏳️', 'পেইজ', 'ব্যবসা ও প্রতিষ্ঠান', 'featPages')}
-    </div>
-    ${u ? `<h3 class="mn-h">⭐ আমার</h3>
-    <div class="sc-grid">
-      ${sc('saved', '🔖', 'সেভ করা পোস্ট', '')}
-      ${sc('bday', '🎂', 'জন্মদিন', 'বন্ধুদের জন্মদিন')}
-    </div>` : ''}
+    ${sec('🏡 উপজেলার সেবা', 'svc')}
+    ${sec('👥 কমিউনিটি', 'com')}
+    ${u ? sec('⭐ আমার', 'my') : ''}
     <h3 class="mn-h">⚙️ সেটিংস</h3>
     <details class="card"${u ? '' : ' hidden'}><summary>👤 অ্যাকাউন্ট</summary><div class="setlist">
       <button id="acc-name"><span class="set-ic">✏️</span>নাম পরিবর্তন<span class="val">${esc(u?.name || '')}</span></button>
@@ -4687,6 +4677,7 @@ function renderMenu() {
       <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button></div></details>
     <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
       ${S.api.demoLogin ? '<button id="demo-guide"><span class="set-ic">🧪</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">🔄</span>ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
+      <button id="faq"><span class="set-ic">💡</span>সাধারণ প্রশ্নোত্তর (FAQ)</button>
       <button id="help"><span class="set-ic">🐞</span>কোনো সমস্যা জানান</button>
       <a href="./privacy.html"><span class="set-ic">📜</span>গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>
       <button id="about"><span class="set-ic">ℹ️</span>অ্যাপ সম্পর্কে<span class="val">${esc(versionLabel())}</span></button></div></details>
@@ -4713,12 +4704,161 @@ $('#menu').addEventListener('click', e => {
   else if (t === 'announce') announceSheet();
   else if (t === 'bday') birthdaySheet();
   else if (t === 'saved') { open('saved'); loadFeed('saved'); }
+  else if (t === 'mem') { open('mem'); loadFeed('mem'); }
+  else if (t === 'activity') { S.actF = 'all'; open('act'); loadActivity(); }
   else if (t === 'wallet') { open('wallet'); loadWallet(); }
   else if (t === 'insights') { S.insTarget = null; open('insights'); loadInsights(); }
   else if (t === 'pages') { if (featGuard('featPages')) { open('pages'); loadPages(); } }
   else if (t === 'groups') { if (featGuard('featGroups')) { open('groups'); loadGroups(); } }
   else if (t === 'admin') { open('admin'); loadAdmin(); }
 });
+
+
+// ================================================================ মেনু: শর্টকাট, আজকের দিন, কার্যকলাপ, FAQ, লগআউট
+// [id, আইকন, নাম, নিচের লেখা, ফিচার-ফ্ল্যাগ, অংশ]
+const SC_ALL = [
+  ['dir', '🏥', 'সেবা ডিরেক্টরি', 'উপজেলার সব সেবা', null, 'svc'],
+  ['blood', '🩸', 'ব্লাড ব্যাংক', 'রক্তদাতা খুঁজুন', 'featBlood', 'svc'],
+  ['sos', '🚨', 'জরুরি নম্বর', '৯৯৯ ও হেল্পলাইন', null, 'svc'],
+  ['prayer', '🕌', 'নামাজ ও আবহাওয়া', 'ওয়াক্ত ও ৭ দিনের পূর্বাভাস', null, 'svc'],
+  ['groups', '👥', 'গ্রুপ', 'যোগ দিন বা তৈরি করুন', 'featGroups', 'com'],
+  ['pages', '🏳️', 'পেইজ', 'ব্যবসা ও প্রতিষ্ঠান', 'featPages', 'com'],
+  ['saved', '🔖', 'সেভ করা পোস্ট', '', null, 'my'],
+  ['bday', '🎂', 'জন্মদিন', 'বন্ধুদের জন্মদিন', null, 'my'],
+  ['wallet', '🪙', 'কয়েন ও ব্যাজ', 'ভেরিফাইড ব্যাজ নিন', null, 'my'],
+  ['insights', '📊', 'ড্যাশবোর্ড', 'পোস্ট কতজন দেখছেন', null, 'my'],
+  ['mem', '🕰️', 'এই দিনে', 'আগের বছরের আজকের পোস্ট', null, 'my'],
+  ['activity', '📜', 'আমার কার্যকলাপ', 'লাইক, মন্তব্য ও শেয়ার', null, 'my'],
+];
+const PIN_MAX = 6;
+const menuPins = () => (local.get('mn_pins', ['wallet', 'insights']) || []).filter(k => SC_ALL.some(x => x[0] === k)).slice(0, PIN_MAX);
+function pinSheet() {
+  const draw = () => {
+    const pins = menuPins(), rest = SC_ALL.filter(x => !pins.includes(x[0]));
+    const row = (x, i, on) => `<div class="pin-row"><span class="pin-ic">${x[1]}</span><span class="pin-t">${esc(x[2])}</span>${on
+      ? `<button data-pup="${i}" ${i ? '' : 'disabled'} aria-label="উপরে">↑</button><button data-pdn="${i}" ${i < pins.length - 1 ? '' : 'disabled'} aria-label="নিচে">↓</button><button class="pin-x" data-poff="${x[0]}" aria-label="সরান">✕</button>`
+      : `<button class="pin-add" data-pon="${x[0]}" ${pins.length >= PIN_MAX ? 'disabled' : ''}>＋ যোগ</button>`}</div>`;
+    openSheet(`<h2>📌 শর্টকাট সাজান</h2><p class="mut" style="margin-top:-4px">মেনুর একদম উপরে কোন শর্টকাটগুলো থাকবে বেছে নিন। ↑ ↓ দিয়ে আগে-পরে করুন। সর্বোচ্চ ${bn(PIN_MAX)}টি।</p>
+      <h3 class="pin-h">উপরে আছে (${bn(pins.length)})</h3>${pins.length ? pins.map((k, i) => row(SC_ALL.find(x => x[0] === k), i, true)).join('') : '<p class="mut">কিছু নেই</p>'}
+      <h3 class="pin-h">বাকি শর্টকাট</h3>${rest.map(x => row(x, 0, false)).join('')}
+      <button class="btn wide" data-close style="margin-top:12px">হয়ে গেছে</button>`);
+    $('#sheet').onclick = ev => {
+      const b = ev.target.closest('button'); if (!b || b.disabled) return;
+      const ps = menuPins(); let ch = true;
+      if (b.dataset.pup) { const i = +b.dataset.pup; [ps[i - 1], ps[i]] = [ps[i], ps[i - 1]]; }
+      else if (b.dataset.pdn) { const i = +b.dataset.pdn; [ps[i + 1], ps[i]] = [ps[i], ps[i + 1]]; }
+      else if (b.dataset.poff) ps.splice(ps.indexOf(b.dataset.poff), 1);
+      else if (b.dataset.pon) ps.push(b.dataset.pon);
+      else ch = false;
+      if (!ch) return;
+      local.set('mn_pins', ps); renderMenu(); draw();
+    };
+  };
+  draw();
+}
+// বাংলা সন (বাংলাদেশের সংশোধিত পঞ্জিকা: বৈশাখ–আশ্বিন ৩১, কার্তিক–মাঘ ৩০, ফাল্গুন ২৯/৩০ লিপ ইয়ারে, চৈত্র ৩০)
+const BN_SON_MON = ['বৈশাখ', 'জ্যৈষ্ঠ', 'আষাঢ়', 'শ্রাবণ', 'ভাদ্র', 'আশ্বিন', 'কার্তিক', 'অগ্রহায়ণ', 'পৌষ', 'মাঘ', 'ফাল্গুন', 'চৈত্র'];
+const EN_SON_MON = ['Boishakh', 'Joishtho', 'Asharh', 'Srabon', 'Bhadro', 'Ashwin', 'Kartik', 'Ogrohayon', 'Poush', 'Magh', 'Falgun', 'Choitro'];
+function banglaDate(t) {
+  const y = t.mon >= 3 && !(t.mon === 3 && t.day < 14) ? t.year : t.year - 1;     // বছর শুরু ১৪ এপ্রিল
+  let off = Math.round((Date.UTC(t.year, t.mon, t.day) - Date.UTC(y, 3, 14)) / 864e5);
+  const leap = n => (n % 4 === 0 && n % 100 !== 0) || n % 400 === 0;
+  const lens = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, leap(y + 1) ? 30 : 29, 30];
+  let m = 0; while (m < 11 && off >= lens[m]) off -= lens[m++];
+  return { day: off + 1, mon: m, year: y - 593 };
+}
+function nextPrayer() {
+  const L = HOME_LOC, now = new Date(), pt = prayerTimes(new Date(now.getTime() + 6 * 36e5), L.lat, L.lng, 6);
+  const t = dhakaParts(now), nowH = t.h + t.m / 60, list = PRAYERS.filter(([k]) => k !== 'sunrise');
+  let next = list.find(([k]) => pt[k] > nowH), tomorrow = false;
+  if (!next) { next = list[0]; tomorrow = true; }
+  return { name: next[1], time: hm(pt[next[0]]), tomorrow };
+}
+function todayHtml() {
+  try {
+    const now = new Date(), t = dhakaParts(now), bd = banglaDate(t), np = nextPrayer();
+    let hij = '';
+    try { hij = new Intl.DateTimeFormat((EN ? 'en' : 'bn') + '-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(now.getTime() + 6 * 36e5 - 864e5)).replace(/\s*(AH|যুগ)$/, ''); } catch { /* পুরনো ব্রাউজার */ }
+    const eng = `${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}`;
+    const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)}`;
+    return `<button class="card mn-today" id="mn-today" translate="no"><span class="td-l"><b>${esc(BN_WD[t.wd])}, ${esc(son)}</b><small>${esc(eng)}${hij ? ' · ' + esc(hij) : ''}</small></span>
+      <span class="td-r"><small>${EN ? 'Next prayer' : 'পরের নামাজ'}${np.tomorrow ? (EN ? ' (tomorrow)' : ' (কাল)') : ''}</small><b>🕌 ${esc(EN ? ({ 'ফজর': 'Fajr', 'যোহর': 'Dhuhr', 'আসর': 'Asr', 'মাগরিব': 'Maghrib', 'এশা': 'Isha' })[np.name] : np.name)} ${esc(np.time)}</b></span></button>`;
+  } catch { return ''; }
+}
+// আমার কার্যকলাপ
+const ACT_F = [['all', 'সব'], ['react', 'রিয়্যাক্ট'], ['comment', 'মন্তব্য'], ['share', 'শেয়ার']];
+const RX_EMO = { like: '👍', love: '❤️', haha: '😆', wow: '😮', sad: '😢', angry: '😡' };
+async function loadActivity() {
+  const box = $('#act'); if (!box) return;
+  box.innerHTML = '<div class="skel"></div><div class="skel"></div>';
+  try { S.act = await S.api.myActivity(); } catch (e) { S.act = []; toast(errText(e)); }
+  renderActivity();
+}
+function renderActivity() {
+  const box = $('#act'); if (!box) return;
+  const f = S.actF || 'all', all = S.act || [];
+  const list = all.filter(x => f === 'all' || x.kind === f || (f === 'comment' && x.kind === 'reply'));
+  const dayKey = iso => { const t = dhakaParts(new Date(iso)); return `${t.year}-${t.mon}-${t.day}`; };
+  const today = dayKey(new Date().toISOString()), yest = dayKey(new Date(Date.now() - 864e5).toISOString());
+  let last = '', html = '';
+  for (const x of list) {
+    const k = dayKey(x.at);
+    if (k !== last) { last = k; html += `<h3 class="act-day">${k === today ? 'আজ' : k === yest ? 'গতকাল' : esc(dateBn(x.at))}</h3>`; }
+    const whose = x.owner ? `<b>${esc(x.owner)}</b>-এর পোস্টে` : 'নিজের পোস্টে';
+    const what = x.kind === 'react' ? `${whose} ${RX_EMO[x.reaction] || '👍'} রিয়্যাক্ট দিয়েছেন`
+      : x.kind === 'comment' ? `${whose} মন্তব্য করেছেন` : x.kind === 'reply' ? `${whose} একটি মন্তব্যের উত্তর দিয়েছেন`
+      : x.owner ? `<b>${esc(x.owner)}</b>-এর পোস্ট শেয়ার করেছেন` : 'নিজের পোস্ট শেয়ার করেছেন';
+    const ico = x.kind === 'react' ? (RX_EMO[x.reaction] || '👍') : x.kind === 'share' ? '↗️' : '💬';
+    html += `<button class="act-row" data-actpost="${esc(x.postId)}" ${x.gone ? 'disabled' : ''}><span class="act-ic">${ico}</span><span class="act-b"><span class="act-w">${what}</span>
+      ${x.text ? `<span class="act-q" translate="no">"${esc(x.text.slice(0, 120))}"</span>` : ''}
+      ${x.gone ? '<small class="mut">পোস্টটি আর নেই</small>' : x.postText ? `<small class="act-p" translate="no">${esc(x.postText.slice(0, 80))}</small>` : ''}
+      <small class="mut">${esc(ago(x.at))}</small></span></button>`;
+  }
+  box.innerHTML = `<div class="act-tabs">${ACT_F.map(([k, l]) => `<button data-actf="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="card act-list">${html || '<div class="empty">এখানে এখনো কিছু নেই। লাইক, মন্তব্য বা শেয়ার করলে এখানে দেখাবে।</div>'}</div>
+    <p class="mut act-note">শুধু আপনি এই তালিকা দেখতে পান।</p>`;
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-actf]'); if (t) { S.actF = t.dataset.actf; return renderActivity(); }
+  const p = e.target.closest('[data-actpost]'); if (p && !p.disabled) openPost(Number(p.dataset.actpost) || p.dataset.actpost);
+});
+// লগআউট: নিশ্চিত করা, চাইলে সব ডিভাইস থেকে
+function logoutSheet() {
+  openSheet(`<div class="lock-sheet"><div class="lock-ic">👋</div><h2>লগআউট করবেন?</h2><p class="mut">আবার ঢুকতে ইমেইল ও পাসওয়ার্ড লাগবে।</p>
+    <button class="btn wide" id="lo-one">লগআউট</button>
+    ${S.api.demoLogin ? '' : '<button class="btn ghost wide" id="lo-all" style="margin-top:8px">সব ডিভাইস থেকে লগআউট</button><p class="mut" style="font-size:12.5px;margin-top:6px">অন্য কোনো ফোনে বা কম্পিউটারে লগইন করা থাকলে সেখান থেকেও বের হয়ে যাবেন। ফোন হারালে বা পাসওয়ার্ড অন্য কেউ জানলে এটা ব্যবহার করুন।</p>'}
+    <button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button></div>`);
+  const go2 = all => async ev => busy(ev.currentTarget, async () => { await S.api.signOut(all); closeSheet(); afterAuth(); if (all) toast('সব ডিভাইস থেকে লগআউট হয়েছে'); });
+  $('#lo-one').onclick = go2(false);
+  if ($('#lo-all')) $('#lo-all').onclick = go2(true);
+}
+// সাধারণ প্রশ্নোত্তর (বাংলা ও ইংরেজি দুটোই এখানে, তাই অনুবাদকের দরকার নেই)
+const APP_FAQ = [
+  ['কীভাবে রক্তদাতা হব?', 'মেনু → ব্লাড ব্যাংক → "নিজের ডোনার প্রোফাইল যোগ করুন"। প্রোফাইলে ব্লাড গ্রুপ দিলেই আপনি তালিকায় চলে আসবেন। রক্ত দেওয়ার পর "আজ রক্ত দিয়েছি" চাপলে ৯০ দিন "অপেক্ষায়" দেখাবে।',
+    'How do I become a blood donor?', 'Menu → Blood bank → "Add your donor profile". Once your profile has a blood group you are on the list. After donating, tap "Donated blood today" and you will show as "waiting" for 90 days.'],
+  ['ভেরিফাইড ব্যাজ কীভাবে পাব?', 'মেনু → কয়েন ও ব্যাজ। পাবলিক ফিগার বা পরিচিত প্রতিষ্ঠান হলে ফ্রিতে আবেদন করুন, অ্যাডমিন যাচাই করে স্থায়ী নীল ব্যাজ দেবেন। অথবা কয়েন দিয়ে নির্দিষ্ট দিনের জন্য ব্যাজ নিতে পারেন।',
+    'How do I get a verified badge?', 'Menu → Coins & badges. Public figures and known organizations can apply for free and an admin will give a permanent blue badge after checking. Anyone can also get a time-limited badge with coins.'],
+  ['কয়েন কীভাবে পাব?', 'পোস্ট, মন্তব্য, লাইক আর শেয়ার করলে কয়েন পাবেন (দিনে সর্বোচ্চ সীমা আছে)। কয়েন দিয়ে ব্যাজ নেওয়া বা পোস্ট বুস্ট করা যায়, টাকা হিসেবে তোলা যায় না।',
+    'How do I earn coins?', 'You earn coins by posting, commenting, liking and sharing (with a daily limit). Coins can be used for badges and post boosts, not withdrawn as money.'],
+  ['কেউ বিরক্ত করলে কী করব?', 'তার প্রোফাইল বা পোস্টের ⋯ মেনু থেকে "ব্লক করুন" চাপুন। তাহলে সে আপনাকে মেসেজ, ফ্রেন্ড রিকোয়েস্ট বা ফলো করতে পারবে না। আপত্তিকর কিছু হলে "রিপোর্ট করুন", অ্যাডমিন দেখবেন।',
+    'What if someone bothers me?', 'Tap "Block" from their profile or post ⋯ menu. They will not be able to message, send friend requests or follow you. For anything offensive tap "Report" and an admin will look into it.'],
+  ['আমার প্রোফাইল কে কে দেখতে পায়?', 'সেটিংস → প্রাইভেসি থেকে প্রোফাইল লক করতে পারেন, তাহলে বন্ধু ছাড়া কেউ পোস্ট ও ছবি দেখবে না। প্রতিটা পোস্ট লেখার সময়ও "কারা দেখবে" বেছে নিতে পারেন।',
+    'Who can see my profile?', 'From Settings → Privacy you can lock your profile so only friends see your posts and photos. You can also choose "Who can see" for each post when writing it.'],
+  ['পাসওয়ার্ড ভুলে গেলে?', 'লগইন পাতায় "পাসওয়ার্ড ভুলে গেছেন?" চাপুন। আপনার ইমেইলে নতুন পাসওয়ার্ড দেওয়ার লিংক যাবে। ইমেইল না পেলে স্প্যাম ফোল্ডার দেখুন।',
+    'What if I forget my password?', 'Tap "Forgot password?" on the login page. A link to set a new password will be sent to your email. If it does not arrive, check the spam folder.'],
+  ['ফোন হারিয়ে গেলে কী করব?', 'অন্য ফোন বা কম্পিউটার থেকে লগইন করে মেনু → লগআউট → "সব ডিভাইস থেকে লগআউট" চাপুন, তারপর পাসওয়ার্ড বদলে নিন।',
+    'What if I lose my phone?', 'Log in from another phone or computer, go to Menu → Log out → "Log out of all devices", then change your password.'],
+  ['অ্যাকাউন্ট মুছে ফেললে কী হয়?', 'অনুরোধের পর ৩০ দিন প্রোফাইল লুকানো থাকে। এর মধ্যে আবার লগইন করলে মুছে ফেলা বাতিল হয়ে যায়। ৩০ দিন পর সব তথ্য চিরতরে মুছে যায়।',
+    'What happens if I delete my account?', 'After the request your profile stays hidden for 30 days. Logging in during that time cancels the deletion. After 30 days everything is deleted forever.'],
+  ['অ্যাপ ইংরেজিতে দেখতে চাই', 'সেটিংসে "ভাষা" সুইচ চালু করুন, অথবা মেনুর উপরে সার্চ বক্সের পাশের EN বাটন চাপুন।',
+    'I want the app in Bangla / English', 'Turn the "Language" switch in Settings on or off, or tap the language button next to the menu search box.'],
+  ['উপজেলার সেবার তথ্য ভুল দেখলে?', 'মেনু → সেবা ডিরেক্টরি থেকে নতুন সেবা যোগ করতে পারেন, অথবা "কোনো সমস্যা জানান" থেকে আমাদের লিখুন। অ্যাডমিন যাচাই করে ঠিক করবেন।',
+    'What if upazila service info is wrong?', 'You can add a new service from Menu → Service directory, or write to us from "Report a problem". An admin will check and fix it.'],
+];
+function appFaqSheet() {
+  openSheet(`<h2>💡 ${EN ? 'Frequently asked questions' : 'সাধারণ প্রশ্নোত্তর'}</h2><div class="faq" translate="no">${APP_FAQ.map(f => `<details class="faq-i"><summary>${esc(EN ? f[2] : f[0])}</summary><p>${esc(EN ? f[3] : f[1])}</p></details>`).join('')}</div>
+    <p class="mut" style="font-size:13px;margin-top:10px">${EN ? 'Still need help? Use "Report a problem" in the menu.' : 'আরও প্রশ্ন থাকলে মেনুর "কোনো সমস্যা জানান" থেকে লিখুন।'}</p><button class="btn ghost wide" data-close>${EN ? 'Close' : 'বন্ধ করুন'}</button>`);
+}
 
 // ================================================================ কয়েন ও ভেরিফাইড ব্যাজ
 const COIN_RULES = [['earnPost', 'পোস্ট করলে'], ['earnComment', 'মন্তব্য করলে'], ['earnLike', 'লাইক/রিয়্যাক্ট দিলে'], ['earnShare', 'শেয়ার করলে'], ['earnCap', 'দিনে সর্বোচ্চ আয়'], ['badgePrice', 'ব্যাজের দাম (কয়েন)'], ['badgeDays', 'ব্যাজের মেয়াদ (দিন)'], ['boostPrice', 'বুস্টের দাম (প্রতিদিন)']];
@@ -5147,6 +5287,9 @@ document.addEventListener('click', e => {
   if (id === 'acc-name') return nameSheet();
   if (id === 'acc-un') return usernameSheet();
   if (id === 'lang-tg' || id === 'mn-lang') return setLang(!EN);
+  if (id === 'mn-pinedit') return pinSheet();
+  if (id === 'faq') return appFaqSheet();
+  if (e.target.closest('#mn-today')) return prayerWeatherSheet();
   if (id === 'dark-tg') { local.set('theme', isDark() ? 'light' : 'dark'); applyTheme(); renderMenu(); return; }
   if (id === 'acc-email') return emailSheet();
   if (id === 'acc-phone') return phoneSheet();
@@ -5597,6 +5740,7 @@ document.addEventListener('click', e => {
 // ================================================================ নেভিগেশন (ফোনের Back বাটনও কাজ করে)
 const TABS = ['home', 'friends', 'notif', 'me', 'menu', 'msgs'];
 const RELOAD = {
+  mem: () => loadFeed('mem'), act: () => loadActivity(),
   msgs: () => loadConvs(), friends: () => loadFriends(), notif: () => loadNotifs(true), me: () => renderMe(), menu: () => renderMenu(),
   pages: () => loadPages(), groups: () => loadGroups(), saved: () => loadFeed('saved'), dir: () => loadDir(),
   page: () => openPage(S.pageId, true), group: () => openGroup(S.groupId, true), user: () => openUser(S.userId, true), admin: () => loadAdmin(), post: () => { renderFeed('post'); loadComments(); },

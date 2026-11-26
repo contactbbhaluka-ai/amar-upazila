@@ -36,6 +36,7 @@ const toReq = r => r && ({ id: r.id, userId: r.user_id, pageId: r.page_id || nul
 const settingDefaults = () => Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d]));
 
 export const PAGE = 20;
+const DHAKA_MD = iso => new Date(new Date(iso).getTime() + 6 * 36e5).toISOString().slice(5, 10);
 
 // ================================================================ Supabase
 async function supabaseApi() {
@@ -166,7 +167,21 @@ async function supabaseApi() {
       await loadMe(data.session); return { user: me };
     },
     async signIn({ email, password }) { return loadMe(ok(await sb.auth.signInWithPassword({ email, password })).session); },
-    async signOut() { await sb.auth.signOut(); me = null; },
+    async signOut(all) { await sb.auth.signOut(all ? { scope: 'global' } : undefined); me = null; },
+    // আমার কার্যকলাপ: রিয়্যাক্ট, মন্তব্য, শেয়ার (সবচেয়ে নতুন আগে)
+    async myActivity() {
+      const P = 'body,image_url,user_id,profiles!posts_user_id_fkey(name)';
+      const [l, c, sh] = await Promise.all([
+        sb.from('likes').select(`post_id,reaction,created_at,p:post_id(${P})`).eq('user_id', me.id).order('created_at', { ascending: false }).limit(60),
+        sb.from('comments').select(`id,post_id,body,parent_id,created_at,p:post_id(${P})`).eq('user_id', me.id).order('created_at', { ascending: false }).limit(60),
+        sb.from('posts').select(`id,shared_post_id,created_at,p:shared_post_id(${P})`).eq('user_id', me.id).not('shared_post_id', 'is', null).order('created_at', { ascending: false }).limit(60)]);
+      const own = r => ({ postText: r.p?.body || (r.p?.image_url ? '📷' : ''), owner: r.p?.user_id === me.id ? '' : r.p?.profiles?.name || '', gone: !r.p });
+      return [
+        ...ok(l).map(r => ({ kind: 'react', postId: r.post_id, at: r.created_at, reaction: r.reaction, ...own(r) })),
+        ...ok(c).map(r => ({ kind: r.parent_id ? 'reply' : 'comment', postId: r.post_id, at: r.created_at, text: r.body, ...own(r) })),
+        ...ok(sh).map(r => ({ kind: 'share', postId: r.shared_post_id, myPostId: r.id, at: r.created_at, ...own(r) })),
+      ].sort((a, b) => b.at.localeCompare(a.at));
+    },
     async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations, aboutVis, gender, username, birthDate, relationship, religion, orgs, featured }) {
       const row = { name, district, upazila, union_id: unionId || null, bio: bio || null, blood_group: bloodGroup || null, donor_visible: donorVisible !== false, last_donated: (bloodGroup && lastDonated) || null };
       if (gender !== undefined) row.gender = gender || null;
@@ -339,13 +354,20 @@ async function supabaseApi() {
     },
 
     // ---------- পোস্ট
-    async posts({ scope = 'area', unionId, category, before, userId, postId, q: text, groupId, pageId, saved, ids, urgent }) {
+    async posts({ scope = 'area', unionId, category, before, userId, postId, q: text, groupId, pageId, saved, ids, urgent, memories }) {
       let q = sb.from('posts').select(POST_COLS).order('created_at', { ascending: false }).limit(PAGE);
       if (urgent) {   // জরুরি সাহায্য: ২৪ ঘণ্টার মধ্যে, এখনো সমাধান হয়নি
         q = q.eq('category', 'সাহায্য চাই').is('resolved_at', null).is('group_id', null).gt('created_at', new Date(Date.now() - 864e5).toISOString()).limit(3);
         if (unionId) q = q.eq('union_id', unionId);
       } else if (postId) q = q.eq('id', postId);
       else if (ids) q = q.in('id', ids.length ? ids : [0]).limit(10);
+      else if (memories) {   // এই দিনে: আগের বছরগুলোর আজকের তারিখের নিজের পোস্ট
+        const y0 = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1) - 6 * 36e5).toISOString();
+        const all = ok(await sb.from('posts').select('id,created_at').eq('user_id', me.id).is('page_id', null).is('group_id', null).lt('created_at', y0).order('created_at', { ascending: false }).limit(3000));
+        const md = DHAKA_MD(new Date().toISOString()), mids = all.filter(r => DHAKA_MD(r.created_at) === md).map(r => r.id);
+        if (!mids.length) return [];
+        q = q.in('id', mids).limit(50);
+      }
       else if (saved) {
         const ids = ok(await sb.from('saved_posts').select('post_id').eq('user_id', me.id).order('created_at', { ascending: false }).limit(100)).map(r => r.post_id);
         if (!ids.length) return [];
@@ -368,7 +390,7 @@ async function supabaseApi() {
       if (before) q = q.lt('created_at', before);
       let rows = ok(await q);
       // ৩০ দিনের বিরতি দেওয়া বন্ধুর পোস্ট ফিডে নয়; ক্লোজ ফ্রেন্ডের পোস্ট চিহ্নিত (ফিডে আগে দেখাতে)
-      const feedScope = !urgent && !postId && !ids && !saved && !text && !groupId && !pageId && !userId;
+      const feedScope = !urgent && !postId && !ids && !memories && !saved && !text && !groupId && !pageId && !userId;
       const marks = me && feedScope ? await this.friendMarks().catch(() => new Map()) : new Map();
       if (marks.size) rows = rows.filter(r => r.page_id || !(marks.get(r.user_id)?.snoozeUntil > new Date().toISOString()));
       let mine = new Map(), sv = new Set(), views = new Map(), ex = {};
@@ -1077,7 +1099,7 @@ function demoApi() {
     const k = uid + ':' + postId, p = db.posts.find(x => x.id === postId); if (!p) return;
     p.rx = p.rx || { like: p.likes };
     if (prev) { p.rx[prev] = Math.max((p.rx[prev] || 0) - 1, 0); }
-    if (reaction) { p.rx[reaction] = (p.rx[reaction] || 0) + 1; db.reacts[k] = reaction; if (!db.likes.includes(k)) db.likes.push(k); if (uid === meId && !prev) earn('like', postId, p.userId); }
+    if (reaction) { p.rx[reaction] = (p.rx[reaction] || 0) + 1; db.reacts[k] = reaction; if (!prev) (p.rxAt = p.rxAt || {})[uid] = new Date().toISOString(); if (!db.likes.includes(k)) db.likes.push(k); if (uid === meId && !prev) earn('like', postId, p.userId); }
     else { delete db.reacts[k]; db.likes = db.likes.filter(x => x !== k); }
     p.likes += (reaction ? 1 : 0) - (prev ? 1 : 0);
     save();
@@ -1151,6 +1173,7 @@ function demoApi() {
     db.posts.push(p1);
     const p2 = { id: nid(db.posts), userId: id, unionId: 2, category: 'প্রশ্ন', createdAt: t(30), body: 'উপজেলায় ভালো কম্পিউটার প্রশিক্ষণ কেন্দ্র কোথায় আছে? কেউ জানলে জানাবেন।', image: '', likes: 1, cm: [{ id: Date.now() + 3, userId: 'd6', body: 'যুব উন্নয়ন অফিসে কোর্স চলছে, পেইজে দেখুন।', createdAt: t(29) }] };
     db.posts.push(p2);
+    { const yd = new Date(); yd.setFullYear(yd.getFullYear() - 1); db.posts.push({ id: nid(db.posts), userId: id, unionId: 2, category: '', createdAt: yd.toISOString(), body: 'আজ প্রথম আমার উপজেলা অ্যাপে যোগ দিলাম! সবাইকে শুভেচ্ছা 🌾', image: '', likes: 4, rx: { like: 3, love: 1 }, cm: [] }); }
     db.likes.push(`d1:${p1.id}`, `d2:${p1.id}`, `d1:${p2.id}`, `${id}:2`, `${id}:5`);
     db.saved.push(`${id}:2`, `${id}:4`);
     // নিজের পেইজ
@@ -1214,6 +1237,16 @@ function demoApi() {
     onDeletionCancelled(cb) { this._delCb = cb; if (this._delCancelled) setTimeout(cb, 0); },
     async requestAccountDeletion(password) { const p = person(meId); if (p.password !== password) throw new Error('wrong password'); p.deleteAt = new Date(Date.now() + 30 * 864e5).toISOString(); meId = null; save(); return wait(p.deleteAt); },
     async signOut() { meId = null; save(); },
+    async myActivity() {
+      const own = p => ({ postText: p?.body || (p?.image ? '📷' : ''), owner: p && p.userId !== meId ? user(p.userId)?.name || '' : '', gone: !p });
+      const out = [];
+      for (const k of new Set([...db.likes, ...Object.keys(db.reacts || {})])) { const [uid, pid] = k.split(':'); if (uid !== meId) continue; const r = db.reacts?.[k] || 'like'; const p = db.posts.find(x => x.id === Number(pid)); out.push({ kind: 'react', postId: Number(pid), at: p?.rxAt?.[meId] || p?.createdAt || new Date().toISOString(), reaction: r, ...own(p) }); }
+      for (const p of db.posts) {
+        for (const c of p.cm || []) if (c.userId === meId) out.push({ kind: c.parentId ? 'reply' : 'comment', postId: p.id, at: c.createdAt, text: c.body, ...own(p) });
+        if (p.userId === meId && p.sharedPostId) { const sp = db.posts.find(x => x.id === p.sharedPostId); out.push({ kind: 'share', postId: p.sharedPostId, myPostId: p.id, at: p.createdAt, ...own(sp) }); }
+      }
+      return wait(out.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 150));
+    },
     demoInfo: { email: DEMO_EMAIL, password: DEMO_PASS },
     async demoLogin({ reset } = {}) { if (reset || !db.users.some(u => u.id === DEMO_ID)) seedDemo(); else { meId = DEMO_ID; const p = person(DEMO_ID); if (p?.deleteAt) { delete p.deleteAt; this._delCancelled = true; setTimeout(() => this._delCb?.(), 0); } save(); } return meUser(); },
     async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations, aboutVis, gender, username, birthDate, relationship, religion, orgs, featured }) {
@@ -1425,13 +1458,14 @@ function demoApi() {
       meId = null; save();
     },
 
-    async posts({ scope = 'area', unionId, category, before, userId, postId, q, groupId, pageId, saved, ids, urgent }) {
+    async posts({ scope = 'area', unionId, category, before, userId, postId, q, groupId, pageId, saved, ids, urgent, memories }) {
       const myFriends = meId ? new Set(friendIds(meId)) : new Set();
       const visible = db.posts.filter(p => (!p.groupId || canSeeGroup(p.groupId))
         && (!p.privacy || p.privacy === 'public' || p.userId === meId || (p.privacy === 'friends' && myFriends.has(p.userId))));
       if (urgent) return this.__map(visible.filter(p => p.category === 'সাহায্য চাই' && !p.resolvedAt && !p.groupId && Date.now() - new Date(p.createdAt) < 864e5 && (!unionId || p.unionId === unionId) && !isBlocked(p.userId))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3));
       if (ids) return this.__map(visible.filter(p => ids.includes(p.id) && !isBlocked(p.userId)));
+      if (memories) { const md = DHAKA_MD(new Date().toISOString()), yr = new Date().getFullYear(); return this.__map(visible.filter(p => p.userId === meId && !p.pageId && !p.groupId && DHAKA_MD(p.createdAt) === md && new Date(p.createdAt).getFullYear() < yr).sort((a, b) => b.createdAt.localeCompare(a.createdAt))); }
       if (postId || q || saved) {
         const t = (q || '').trim().toLowerCase();
         const savedIds = db.saved.filter(x => x.startsWith(meId + ':')).map(x => Number(x.split(':')[1]));

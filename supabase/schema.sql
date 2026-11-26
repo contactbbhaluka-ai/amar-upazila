@@ -5024,6 +5024,13 @@ language sql stable security definer set search_path = public as $$
    limit least(greatest(p_limit, 1), 100);
 $$;
 
+-- আমার কার্যকলাপ: কখন রিয়্যাক্ট দিয়েছেন তা দেখাতে likes-এ সময় যোগ
+-- (আগের রিয়্যাক্টগুলোর সময় হবে এই মাইগ্রেশন চালানোর সময়)
+alter table public.likes add column if not exists created_at timestamptz not null default now();
+create index if not exists likes_user_time_idx on public.likes (user_id, created_at desc);
+create index if not exists comments_user_time_idx on public.comments (user_id, created_at desc);
+create index if not exists posts_user_shared_idx on public.posts (user_id, created_at desc) where shared_post_id is not null;
+
 -- =====================================================================
 --  নিজেকে অ্যাডমিন বানাতে: অ্যাপে প্রথমে সাইনআপ করুন, তারপর নিচের লাইনে
 --  নিজের ইমেইল বসিয়ে আলাদাভাবে চালান:

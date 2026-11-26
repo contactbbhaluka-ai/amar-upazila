@@ -144,6 +144,20 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'আমার শর্টকাট': 'My shortcuts', 'সাজান': 'Arrange', '"সাজান" চেপে পছন্দের শর্টকাট এখানে রাখুন': 'Tap "Arrange" to keep favorite shortcuts here',
+  'শর্টকাট সাজান': 'Arrange shortcuts', 'মেনুর একদম উপরে কোন শর্টকাটগুলো থাকবে বেছে নিন। ↑ ↓ দিয়ে আগে-পরে করুন। সর্বোচ্চ {x}টি': 'Choose which shortcuts stay at the top of the menu. Reorder with ↑ ↓. Up to {x}',
+  'উপরে আছে ({x}': 'At the top ({x}', 'বাকি শর্টকাট': 'Other shortcuts', '＋ যোগ': '＋ Add', 'যোগ': 'Add', 'কিছু নেই': 'Nothing', 'হয়ে গেছে': 'Done', 'উপরে': 'Up', 'নিচে': 'Down',
+  'এই দিনে': 'On this day', 'আগের বছরের আজকের পোস্ট': "Your posts from this day", 'আমার কার্যকলাপ': 'My activity', 'লাইক, মন্তব্য ও শেয়ার': 'Likes, comments & shares',
+  'আগের বছরগুলোতে ঠিক আজকের তারিখে আপনি যা পোস্ট করেছিলেন': 'What you posted on this date in past years',
+  'আগের বছরগুলোতে আজকের তারিখে আপনার কোনো পোস্ট নেই': 'You have no posts from this date in past years', 'পরের বছর এই দিনে আজকের পোস্টগুলো এখানে দেখাবে': "Next year on this day, today's posts will show here",
+  'রিয়্যাক্ট': 'Reactions', 'নিজের পোস্টে': 'On your own post', 'এর পোস্টে': "'s post:", 'রিয়্যাক্ট দিয়েছেন': 'you reacted', 'মন্তব্য করেছেন': 'you commented', 'একটি মন্তব্যের উত্তর দিয়েছেন': 'you replied to a comment',
+  'নিজের পোস্টে {x} রিয়্যাক্ট দিয়েছেন': 'You reacted {x} to your own post', 'নিজের পোস্টে মন্তব্য করেছেন': 'You commented on your own post', 'নিজের পোস্টে একটি মন্তব্যের উত্তর দিয়েছেন': 'You replied to a comment on your own post',
+  'এর পোস্টে {x} রিয়্যাক্ট দিয়েছেন': "'s post: you reacted {x}", 'এর পোস্টে মন্তব্য করেছেন': "'s post: you commented", 'এর পোস্টে একটি মন্তব্যের উত্তর দিয়েছেন': "'s post: you replied to a comment",
+  'এর পোস্ট শেয়ার করেছেন': "'s post: you shared it", 'নিজের পোস্ট শেয়ার করেছেন': 'You shared your own post',
+  'এখানে এখনো কিছু নেই। লাইক, মন্তব্য বা শেয়ার করলে এখানে দেখাবে': 'Nothing here yet. Your likes, comments and shares will show here', 'শুধু আপনি এই তালিকা দেখতে পান': 'Only you can see this list',
+  'লগআউট করবেন': 'Log out', 'আবার ঢুকতে ইমেইল ও পাসওয়ার্ড লাগবে': "You'll need your email and password to log back in", 'সব ডিভাইস থেকে লগআউট': 'Log out of all devices',
+  'অন্য কোনো ফোনে বা কম্পিউটারে লগইন করা থাকলে সেখান থেকেও বের হয়ে যাবেন। ফোন হারালে বা পাসওয়ার্ড অন্য কেউ জানলে এটা ব্যবহার করুন': 'You will also be logged out on any other phone or computer. Use this if you lose your phone or someone else knows your password',
+  'সব ডিভাইস থেকে লগআউট হয়েছে': 'Logged out of all devices', 'সাধারণ প্রশ্নোত্তর (FAQ': 'FAQ (frequently asked questions',
   'ফন্ট সাইজ': 'Font size',
   'ডার্ক মোড': 'Dark mode', 'চালু · চোখের আরাম, রাতে ভালো': 'On · easy on the eyes at night', 'বন্ধ · এখন দিনের (লাইট) মোড': 'Off · day (light) mode now', 'লাইট': 'Light',
   'বেশি': 'more', 'কম': 'less', '(কাল': '(tomorrow', 'কাল': 'tomorrow', 'ঘণ্টা {x} মিনিট পর': 'h {x} min left', 'মিনিট পর': 'min left', 'পরের ওয়াক্ত': 'next',

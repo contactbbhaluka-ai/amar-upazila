@@ -2302,11 +2302,12 @@ function renderConvs() {
   const f = S.convPage, q = (S.cvQ || '').trim().toLowerCase();
   const reqs = list.filter(c => !c.asPage && c.request);
   let rows = f ? list.filter(c => c.asPage && c.pageId === f.id) : list.filter(c => !c.asPage && (S.cvTab === 'req' ? c.request : !c.request));
+  const onlineN = (S.inboxFriends || []).filter(p => isOnline(S.pres.get(p.id))).length;
   if (q) rows = rows.filter(c => (c.name || '').toLowerCase().includes(q));
   const head = f ? `<div class="card conv-filter">${entAv(f)}<div class="info"><b>${esc(f.name)}</b><small>পেইজের মেসেজ · আপনি পেইজের নামে উত্তর দেবেন</small></div>${f.isOwner ? `<button class="sbtn ghost" id="auto-reply">⚡ অটো মেসেজ${f.autoReplyOn ? ' ✓' : ''}</button><button class="sbtn ghost" id="faq-btn">❓ প্রশ্ন-উত্তর${f.faqs?.length ? ' ✓' : ''}</button>` : ''}${S.actAs ? '' : '<button class="link" id="conv-all">← আমার মেসেজ</button>'}</div>`
     : `<div class="inbox-top"><input type="search" id="cv-q" placeholder="নাম দিয়ে চ্যাট খুঁজুন…" aria-label="চ্যাট খুঁজুন" value="${esc(S.cvQ || '')}"><button class="sbtn ghost" id="cv-saved" aria-label="সেভ করা মেসেজ" title="সেভ করা মেসেজ">🔖</button><button class="sbtn" id="cv-newgroup">${ic('users', 16)} নতুন গ্রুপ</button></div>
       ${activeRowHtml()}
-      <div class="seg cv-tabs"><button data-cvtab="chats" class="${S.cvTab === 'chats' ? 'on' : ''}">চ্যাট</button><button data-cvtab="req" class="${S.cvTab === 'req' ? 'on' : ''}">মেসেজ রিকোয়েস্ট${reqs.length ? ` <span class="badge">${bn(reqs.length)}</span>` : ''}</button></div>
+      <div class="seg cv-tabs"><button data-cvtab="chats" class="${S.cvTab === 'chats' ? 'on' : ''}">চ্যাট</button><button data-cvtab="act" class="${S.cvTab === 'act' ? 'on' : ''}"><i class="tab-dot"></i>সক্রিয়${onlineN ? ` (${bn(onlineN)})` : ''}</button><button data-cvtab="req" class="${S.cvTab === 'req' ? 'on' : ''}">রিকোয়েস্ট${reqs.length ? ` <span class="badge">${bn(reqs.length)}</span>` : ''}</button></div>
       ${S.cvTab === 'req' ? '<p class="mut cv-reqnote">যারা আপনার বন্ধু নন তাদের মেসেজ এখানে আসে। উত্তর দিলে বা গ্রহণ করলে সাধারণ চ্যাটে চলে যাবে। আপনি না খোলা পর্যন্ত তারা জানবেন না আপনি দেখেছেন।</p>' : ''}`;
   const row = c => {
     const online = c.kind === 'dm' && isOnline(S.pres.get(c.userId));
@@ -2317,12 +2318,25 @@ function renderConvs() {
       <div style="text-align:right"><div class="time">${esc(ago(c.lastAt))}</div>${c.unread ? `<span class="badge">${bn(c.unread)}</span>` : ''}</div></button>
       <button class="cv-more" data-cvmenu="${esc(cvKey(c))}" aria-label="অপশন">${ic('dots', 18)}</button></div>`;
   };
+  if (!f && S.cvTab === 'act') { box.innerHTML = head + activeListHtml(q); bindCvSearch(); return; }
   box.innerHTML = head + (rows.length ? rows.map(row).join('')
     : `<div class="empty">${f ? 'এই পেইজে এখনো কেউ মেসেজ পাঠাননি।' : q ? `"${esc(q)}" নামে কোনো চ্যাট নেই` : S.cvTab === 'req' ? 'কোনো মেসেজ রিকোয়েস্ট নেই।' : 'এখনো কোনো মেসেজ নেই।<br>কারও প্রোফাইলে গিয়ে "মেসেজ" চাপুন, বা নতুন গ্রুপ খুলুন।'}</div>`);
   $('#conv-all')?.addEventListener('click', () => { S.convPage = null; renderConvs(); });
   $('#auto-reply')?.addEventListener('click', () => autoReplySheet(f));
   $('#faq-btn')?.addEventListener('click', () => faqSheet(f));
-  const qi = $('#cv-q'); if (qi) qi.oninput = () => { S.cvQ = qi.value; const pos = qi.selectionStart; renderConvs(); const n = $('#cv-q'); n.focus(); n.setSelectionRange(pos, pos); };
+  bindCvSearch();
+}
+function bindCvSearch() { const qi = $('#cv-q'); if (qi) qi.oninput = () => { S.cvQ = qi.value; const pos = qi.selectionStart; renderConvs(); const n = $('#cv-q'); n.focus(); n.setSelectionRange(pos, pos); }; }
+// "সক্রিয়" ট্যাব: এখন সক্রিয় সব বন্ধু, তারপর কিছুক্ষণ আগে সক্রিয় ছিলেন যারা
+function activeListHtml(q) {
+  if (S.showActiveOff) return '<div class="empty">আপনার "সক্রিয় স্ট্যাটাস" বন্ধ আছে, তাই অন্যদেরটাও দেখা যাচ্ছে না।<br><button class="btn" style="margin-top:10px" data-actset>চালু করুন</button></div>';
+  const fr = (S.inboxFriends || []).filter(p => !q || p.name.toLowerCase().includes(q));
+  const seen = p => S.pres.get(p.id), on = fr.filter(p => isOnline(seen(p))), recent = fr.filter(p => !isOnline(seen(p)) && activeText(seen(p))).sort((a, b) => String(seen(b)).localeCompare(String(seen(a))));
+  const row = p => `<button class="conv act-li" data-actchat="${esc(p.id)}"><span class="cv-av">${av(p)}${isOnline(seen(p)) ? '<i class="on-dot"></i>' : ''}</span><div class="info"><b>${esc(p.name)}</b><div class="last${isOnline(seen(p)) ? ' act-on' : ''}">${activeText(seen(p))}</div></div><span class="act-msg" aria-hidden="true">${ic('send', 18)}</span></button>`;
+  if (!S.inboxFriends) return '<div class="skel"></div>';
+  if (!on.length && !recent.length) return `<div class="empty">${q ? `"${esc(q)}" নামে সক্রিয় কেউ নেই` : 'এই মুহূর্তে কোনো বন্ধু সক্রিয় নেই।'}</div>`;
+  return (on.length ? `<h3 class="res-h">🟢 এখন সক্রিয় (${bn(on.length)})</h3>${on.map(row).join('')}` : '<p class="mut cv-reqnote">এই মুহূর্তে কোনো বন্ধু সক্রিয় নেই।</p>')
+    + (recent.length ? `<h3 class="res-h">কিছুক্ষণ আগে সক্রিয় ছিলেন</h3>${recent.map(row).join('')}` : '');
 }
 // উপরের সারি: নিজের স্টোরি দিন, যাদের স্টোরি আছে, আর যারা এখন সক্রিয়
 function activeRowHtml() {
@@ -2343,7 +2357,17 @@ function activeRowHtml() {
 const convOf = key => (S.inboxList || []).find(c => cvKey(c) === key);
 const tOf = c => (c.kind === 'group' ? { kind: 'group', id: c.chatId } : { kind: c.pageId ? 'page' : 'dm', id: c.userId, pageId: c.pageId, asPage: c.asPage });
 $('#convs').addEventListener('click', async e => {
-  const tab = e.target.closest('[data-cvtab]'); if (tab) { S.cvTab = tab.dataset.cvtab; return renderConvs(); }
+  const tab = e.target.closest('[data-cvtab]');
+  if (tab) {
+    S.cvTab = tab.dataset.cvtab; renderConvs();
+    if (S.cvTab === 'act') {   // সক্রিয় তালিকা টাটকা করে আনা
+      S.api.showActive?.().then(v => { S.showActiveOff = v === false; if (S.cvTab === 'act') renderConvs(); }).catch(() => {});
+      const ids = (S.inboxFriends || []).map(f => f.id).slice(0, 200);
+      if (ids.length) S.api.presence(ids).then(m => { S.pres = m; if (S.view === 'msgs') renderConvs(); }).catch(() => {});
+    }
+    return;
+  }
+  if (e.target.closest('[data-actset]')) return busy(null, async () => { await S.api.setShowActive(true); S.showActiveOff = false; toast('সক্রিয় স্ট্যাটাস চালু হয়েছে'); loadConvs(); });
   if (e.target.closest('[data-stnew]')) return storyCreator();
   const sg = e.target.closest('[data-stg]'); if (sg) return openStories(Number(sg.dataset.stg));
   const ac = e.target.closest('[data-actchat]'); if (ac) return openThread(ac.dataset.actchat);

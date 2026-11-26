@@ -1476,3 +1476,10 @@ img.av{aspect-ratio:1/1}
 .t-headwrap #t-top{max-width:none}
 .t-headwrap .t-pin{width:100%;margin:6px 0 0}.t-headwrap .t-dis{margin:6px 0 0}.t-headwrap .t-search{margin:6px 0 0;padding:0;max-width:none}
 .t-set{display:grid;place-items:center}
+/* মেসেজ: চ্যাট · সক্রিয় · রিকোয়েস্ট */
+.seg.cv-tabs{grid-template-columns:1fr 1fr 1fr}
+.cv-tabs button{display:flex;align-items:center;justify-content:center;gap:5px;font-size:14px}
+.tab-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block}
+.act-li{width:100%}
+.act-li .act-on{color:#16a34a;font-weight:600}
+.act-msg{color:var(--gt,#006a4e);margin-left:auto;display:grid;place-items:center}

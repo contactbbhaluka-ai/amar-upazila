@@ -447,6 +447,7 @@ async function supabaseApi() {
     },
     async sendPasswordReset(email) { ok(await sb.auth.resetPasswordForEmail(email, { redirectTo: (PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '') })); },
     async changeName(name) { ok(await sb.from('profiles').update({ name: name.trim() }).eq('id', me.id)); me.name = name.trim(); },
+    async changeUsername(u) { ok(await sb.from('profiles').update({ username: u || null }).eq('id', me.id)); me.username = u || ''; },
     async changePhone(phone) { ok(await sb.from('profile_private').upsert({ user_id: me.id, phone: phone || null })); me.phone = phone || ''; },
     async changeEmail(email, password) {
       const r = await sb.auth.signInWithPassword({ email: me.email, password }); if (r.error) throw new Error('wrong password');
@@ -1486,6 +1487,7 @@ function demoApi() {
     async sendPasswordReset() { return wait(); },
     onPasswordRecovery() {},
     async changeName(name) { person(meId).name = name.trim(); save(); return wait(); },
+    async changeUsername(u) { if (u && [...PEOPLE, ...db.users].some(x => x.id !== meId && (x.username || '').toLowerCase() === u)) throw new Error('duplicate key value violates unique constraint "profiles_username_key"'); person(meId).username = u || ''; save(); return wait(); },
     async changePhone(phone) { person(meId).phone = phone || ''; save(); return wait(); },
     async changeEmail(email, password) { const p = person(meId); if (p.password !== password) throw new Error('wrong password'); p.email = email.trim(); save(); return wait(); },
 

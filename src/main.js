@@ -2,6 +2,10 @@
 import { createApi, PAGE, boostState } from './api.js';
 import { POST_CATS, CAT_ICON, SERVICE_CATS, EMERGENCY, PUBLIC_URL, SETTING_KEYS, PLAY_URL } from './config.js';
 import { DISTRICTS, DISTRICT_ORDER, HOME_UPAZILA, HOME_DISTRICT, BLOOD_GROUPS } from './bd-geo.js';
+// ভাষা: ডিফল্ট বাংলা; ইংরেজি বাছাই করলে অনুবাদক লোড হয় (মেনু → দেখতে কেমন → ভাষা)
+const EN = (() => { try { return localStorage.getItem('au_lang') === '"en"'; } catch { return false; } })();
+const LOC = EN ? 'en-GB' : 'bn-BD';
+if (EN) import('./i18n.js').then(m => m.startI18n()).catch(() => document.documentElement.classList.remove('i18n-wait'));
 
 // সাধারণ এক রঙের রেখার আইকন (লেখার রং-ই আইকনের রং)
 const ICONS = {
@@ -95,7 +99,7 @@ const linkify = t => esc(t).replace(/https?:\/\/[^\s<]+/g, u => { const jm = u.m
 // ================================================================ সহায়ক
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const bn = n => String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]);
+const bn = n => (EN ? String(n) : String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]));
 const local = {
   get(k, d) { try { const v = localStorage.getItem('au_' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem('au_' + k, JSON.stringify(v)); } catch { /* ignore */ } },
@@ -107,9 +111,9 @@ function ago(iso) {
   if (s < 86400) return bn(Math.floor(s / 3600)) + ' ঘণ্টা আগে';
   if (s < 172800) return 'গতকাল';
   if (s < 604800) return bn(Math.floor(s / 86400)) + ' দিন আগে';
-  return new Date(iso).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+  return new Date(iso).toLocaleDateString(LOC, { day: 'numeric', month: 'long', year: 'numeric' });
 }
-const clock = iso => new Date(iso).toLocaleTimeString('bn-BD', { hour: 'numeric', minute: '2-digit' });
+const clock = iso => new Date(iso).toLocaleTimeString(LOC, { hour: 'numeric', minute: '2-digit' });
 // জন্মসাল: বয়স অন্তত ১৩ (অ্যাপের নিয়ম)
 const MIN_AGE = 13;
 const MONTHS_BN = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
@@ -379,7 +383,7 @@ function postHtml(p) {
       ${own ? `<button class="pinfo" data-pinfo="${esc(p.id)}" aria-label="পোস্টটি কতজন দেখেছেন" title="পোস্টের হিসাব">${ic('info', 19)}</button>` : ''}<button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
     ${p.category ? `<span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${CAT_ICON[p.category] || ''} ${esc(p.category)}</span>` : ''}${urgent ? '<span class="urg-lbl">🚨 জরুরি</span>' : ''}${p.bloodGroup ? `<span class="blood-lbl">🩸 ${esc(p.bloodGroup)} রক্ত দরকার</span>` : ''}${p.resolvedAt && RESOLVE[p.category] ? `<span class="resolved">${RESOLVE[p.category][0]}</span>` : ''}
     ${lifeHtml(p)}
-    ${showBg ? `<div class="pbg ${esc(p.bg)}">${esc(p.body)}</div>` : p.body && !(p.lifeEvent && p.body === LIFE[p.lifeEvent]?.[1]) ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
+    ${showBg ? `<div class="pbg ${esc(p.bg)}">${esc(p.body)}</div>` : p.body && !(p.lifeEvent && p.body === LIFE[p.lifeEvent]?.[1]) ? `<p class="ptext">${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
     ${photosHtml(p)}
     ${p.poll ? pollHtml(p) : ''}${p.eventAt ? eventHtml(p) : ''}${p.link && !p.images.length && !p.shared ? linkCardHtml(p.link) : ''}
     ${p.shared ? `<button class="shared-embed" data-openpost="${esc(p.shared.id)}"><span class="se-top">${av(p.shared, 'sm')}<span><b>${esc(p.shared.author)}${vb(p.shared.badge)}</b><span class="mut"> · ${esc(ago(p.shared.createdAt))}</span></span></span>${p.shared.body ? `<span class="se-body">${esc(p.shared.body)}</span>` : ''}${p.shared.image ? `<img src="${esc(p.shared.image)}" alt="" loading="lazy" decoding="async">` : ''}</button>`
@@ -533,7 +537,7 @@ function prayerTimes(date, lat, lng, tz = 6) {
   return Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v + tz - lng / 15 + (extra[k] || 0) / 60]));
 }
 const PRAYERS = [['fajr', 'ফজর'], ['sunrise', 'সূর্যোদয়'], ['dhuhr', 'যোহর'], ['asr', 'আসর'], ['maghrib', 'মাগরিব'], ['isha', 'এশা']];
-const hm = h => { let mm = Math.round(h * 60); const H = Math.floor(mm / 60) % 24; mm %= 60; const per = H < 4 ? 'রাত' : H < 6 ? 'ভোর' : H < 12 ? 'সকাল' : H < 15 ? 'দুপুর' : H < 18 ? 'বিকাল' : H < 20 ? 'সন্ধ্যা' : 'রাত'; return `${per} ${bn(H % 12 || 12)}:${bn(String(mm).padStart(2, '0'))}`; };
+const hm = h => { let mm = Math.round(h * 60); const H = Math.floor(mm / 60) % 24; mm %= 60; const per = H < 4 ? 'রাত' : H < 6 ? 'ভোর' : H < 12 ? 'সকাল' : H < 15 ? 'দুপুর' : H < 18 ? 'বিকাল' : H < 20 ? 'সন্ধ্যা' : 'রাত'; return EN ? `${H % 12 || 12}:${String(mm).padStart(2, '0')} ${H < 12 ? 'AM' : 'PM'}` : `${per} ${bn(H % 12 || 12)}:${bn(String(mm).padStart(2, '0'))}`; };
 const WX = { 0: ['☀️', 'রোদ'], 1: ['🌤️', 'হালকা মেঘ'], 2: ['⛅', 'আংশিক মেঘলা'], 3: ['☁️', 'মেঘলা'], 45: ['🌫️', 'কুয়াশা'], 48: ['🌫️', 'ঘন কুয়াশা'], 51: ['🌦️', 'গুঁড়ি গুঁড়ি বৃষ্টি'], 53: ['🌦️', 'গুঁড়ি গুঁড়ি বৃষ্টি'], 55: ['🌧️', 'বৃষ্টি'], 61: ['🌧️', 'হালকা বৃষ্টি'], 63: ['🌧️', 'বৃষ্টি'], 65: ['🌧️', 'ভারী বৃষ্টি'], 80: ['🌦️', 'বৃষ্টির ঝাপটা'], 81: ['🌧️', 'বৃষ্টি'], 82: ['⛈️', 'ভারী বৃষ্টি'], 95: ['⛈️', 'বজ্রবৃষ্টি'], 96: ['⛈️', 'বজ্রবৃষ্টি'], 99: ['⛈️', 'বজ্রবৃষ্টি'] };
 // আবহাওয়া (Open-Meteo, চাবি লাগে না); ৩০ মিনিট পর্যন্ত আগের তথ্যই দেখাই, তাই ডেটা কম খরচ
 async function loadWeather() {
@@ -637,15 +641,15 @@ function pollHtml(p) {
 }
 const DHAKA = { timeZone: 'Asia/Dhaka' };
 // বাংলায় তারিখ-সময় (ঢাকার সময়): "শুক্রবার, ২৭ নভেম্বর · বিকাল ৫:০০"
-const BN_WD = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
-const BN_MON = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+const BN_WD = EN ? ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] : ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+const BN_MON = EN ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] : ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
 function dhakaParts(d) {
   const x = new Date(new Date(d).getTime() + 6 * 36e5);   // ঢাকা UTC+6, দিবালোক সময় নেই
   return { wd: x.getUTCDay(), day: x.getUTCDate(), mon: x.getUTCMonth(), h: x.getUTCHours(), m: x.getUTCMinutes() };
 }
 function bnWhen(d, short) {
   const t = dhakaParts(d), per = t.h < 4 ? 'রাত' : t.h < 6 ? 'ভোর' : t.h < 12 ? 'সকাল' : t.h < 15 ? 'দুপুর' : t.h < 18 ? 'বিকাল' : t.h < 20 ? 'সন্ধ্যা' : 'রাত';
-  const time = `${per} ${bn(t.h % 12 || 12)}:${bn(String(t.m).padStart(2, '0'))}`;
+  const time = EN ? `${t.h % 12 || 12}:${String(t.m).padStart(2, '0')} ${t.h < 12 ? 'AM' : 'PM'}` : `${per} ${bn(t.h % 12 || 12)}:${bn(String(t.m).padStart(2, '0'))}`;
   return short ? `${BN_WD[t.wd]} ${time}` : `${BN_WD[t.wd]}, ${bn(t.day)} ${BN_MON[t.mon]} · ${time}`;
 }
 function eventHtml(p) {
@@ -3497,7 +3501,7 @@ const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).
 const DONATE_GAP = 90; // রক্তদানের পর কমপক্ষে ৯০ দিন বিরতি
 const daysSince = d => Math.floor((Date.now() - new Date(d + 'T00:00:00').getTime()) / 864e5);
 const canDonate = d => !d || daysSince(d) >= DONATE_GAP;
-const bnDate = d => new Date(d + 'T00:00:00').toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+const bnDate = d => new Date(d + 'T00:00:00').toLocaleDateString(LOC, { day: 'numeric', month: 'long', year: 'numeric' });
 function donateStatus(d) {
   if (!d) return '<span class="ok-chip">রক্ত দিতে পারবেন</span>';
   const left = DONATE_GAP - daysSince(d);
@@ -4548,7 +4552,7 @@ const FONT_SIZES = [['sm', 'ছোট', 0.92], ['md', 'মাঝারি', 1], 
 function applyFont() { const z = FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[2] || 1; document.body.style.zoom = z === 1 ? '' : String(z); document.documentElement.style.setProperty('--zoom', z); }
 applyFont();
 // মেনুতে খোঁজা: শর্টকাট আর সেটিং দুটোই
-const MN_KEYS = { chpw: 'password পাসওয়ার্ড গোপন', edit: 'profile প্রোফাইল নাম ছবি এডিট', delacc: 'delete account মুছে অ্যাকাউন্ট', plock: 'lock লক', listpriv: 'privacy তালিকা বন্ধু ফলোয়ার', showact: 'active online সক্রিয় অনলাইন',
+const MN_KEYS = { 'lang-tg': 'language bhasha english bangla ভাষা ইংরেজি বাংলা', 'acc-un': 'username id ইউজারনেম আইডি', chpw: 'password পাসওয়ার্ড গোপন', edit: 'profile প্রোফাইল নাম ছবি এডিট', delacc: 'delete account মুছে অ্যাকাউন্ট', plock: 'lock লক', listpriv: 'privacy তালিকা বন্ধু ফলোয়ার', showact: 'active online সক্রিয় অনলাইন',
   blocked: 'block ব্লক', ntset2: 'notification নোটিফিকেশন', msgsnd: 'sound শব্দ আওয়াজ', theme: 'dark light ডার্ক লাইট থিম রং', fontsz: 'font size লেখা অক্ষর বড় ছোট', help: 'help সমস্যা সাহায্য অভিযোগ', about: 'version ভার্সন সম্পর্কে',
   logout: 'logout লগআউট বের', 'demo-guide': 'demo ডেমো' };
 const MN_SC_KEYS = { dir: 'হাসপাতাল ফার্মেসি ডাক্তার থানা service', blood: 'রক্ত ডোনার blood', sos: '৯৯৯ পুলিশ ফায়ার অ্যাম্বুলেন্স emergency', prayer: 'নামাজ আজান ওয়াক্ত আবহাওয়া বৃষ্টি weather', groups: 'group', pages: 'page দোকান ব্যবসা', saved: 'save সেভ', bday: 'birthday জন্মদিন', wallet: 'coin কয়েন ব্যাজ verify', insights: 'dashboard ড্যাশবোর্ড ভিউ' };
@@ -4634,6 +4638,7 @@ function renderMenu() {
     <h3 class="mn-h">⚙️ সেটিংস</h3>
     <details class="card"${u ? '' : ' hidden'}><summary>👤 অ্যাকাউন্ট</summary><div class="setlist">
       <button id="acc-name"><span class="set-ic">✏️</span>নাম পরিবর্তন<span class="val">${esc(u?.name || '')}</span></button>
+      <button id="acc-un"><span class="set-ic">🆔</span>ইউজারনেম পরিবর্তন<span class="val" translate="no">${u?.username ? '@' + esc(u.username) : ''}</span></button>
       <button id="acc-email"><span class="set-ic">📧</span>ইমেইল পরিবর্তন<span class="val">${esc(u?.email || '')}</span></button>
       <button id="acc-phone"><span class="set-ic">📱</span>মোবাইল নম্বর পরিবর্তন<span class="val">${u?.phone ? esc(fmtPhone(u.phone)) : 'দেওয়া নেই'}</span></button>
       <button id="chpw"><span class="set-ic">🔑</span>পাসওয়ার্ড পরিবর্তন</button>
@@ -4649,7 +4654,8 @@ function renderMenu() {
       <button id="msgsnd"><span class="set-ic">🔊</span>শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
     <details class="card"><summary>🎨 দেখতে কেমন</summary><div class="setlist">
       <button id="theme"><span class="set-ic">🌓</span>থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
-      <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button></div></details>
+      <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button>
+      <button id="lang-tg" class="lang-row"><span class="set-ic">🌐</span>${EN ? 'Language: English' : 'ইংরেজি ভাষা (English)'}<input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${EN ? 'checked' : ''}></button></div></details>
     <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
       ${S.api.demoLogin ? '<button id="demo-guide"><span class="set-ic">🧪</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">🔄</span>ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
       <button id="help"><span class="set-ic">🐞</span>কোনো সমস্যা জানান</button>
@@ -4691,7 +4697,7 @@ const COIN_WHY = { post: 'পোস্ট করেছেন', comment: 'মন�
 const VCATS = ['জনপ্রতিনিধি', 'রাজনীতিবিদ', 'সরকারি কর্মকর্তা', 'সাংবাদিক', 'শিল্পী / লেখক', 'খেলোয়াড়', 'ব্যবসায়ী / প্রতিষ্ঠান', 'শিক্ষক / চিকিৎসক', 'সমাজকর্মী', 'অন্যান্য'];
 const coin = n => `🪙 ${bn(n)}`;
 const setN = k => Number(S.settings[k] ?? SETTING_KEYS[k][1]) || 0;
-const dateBn = d => new Date(d).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+const dateBn = d => new Date(d).toLocaleDateString(LOC, { day: 'numeric', month: 'long', year: 'numeric' });
 
 async function loadWallet() {
   const box = $('#wallet'), u = me();
@@ -5110,6 +5116,8 @@ document.addEventListener('click', e => {
   const id = e.target.closest('button')?.id;
   if (id === 'chpw') return passwordSheet();
   if (id === 'acc-name') return nameSheet();
+  if (id === 'acc-un') return usernameSheet();
+  if (id === 'lang-tg') { local.set('lang', EN ? 'bn' : 'en'); try { saveNav(); } catch { /* ignore */ } location.reload(); return; }
   if (id === 'acc-email') return emailSheet();
   if (id === 'acc-phone') return phoneSheet();
   if (id === 'theme') {
@@ -5163,6 +5171,21 @@ function nameSheet() {
     const v = $('#nm-v').value.trim().replace(/\s+/g, ' ');
     if (v.length < 2) return toast('নাম কমপক্ষে ২ অক্ষরের হতে হবে'); if (v === u.name) return closeSheet();
     busy(e.currentTarget, async () => { await S.api.changeName(v); u.name = v; closeSheet(); toast('নাম পরিবর্তন হয়েছে'); renderMenu(); renderComposer(); });
+  };
+}
+function usernameSheet() {
+  const u = me(); if (!u) return;
+  openSheet(`<h2>🆔 ইউজারনেম পরিবর্তন</h2><label for="ab-un">ইউজারনেম</label><div class="un-wrap"><span class="un-at">@</span><input id="ab-un" maxlength="21" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="ইউজারনেম" value="${esc(u.username || '')}" placeholder="যেমন: arif.bhaluka"></div>
+    <p id="ab-un-msg" class="un-msg mut" translate="no"></p>
+    <p class="mut" style="font-size:13px">অন্যরা @ইউজারনেম দিয়ে আপনাকে খুঁজে পাবেন ও মেনশন করতে পারবেন। খালি রাখলে কোনো ইউজারনেম থাকবে না</p><button class="btn wide" id="un-go">সংরক্ষণ</button>`);
+  $('#un-go').onclick = e => {
+    const v = normUsername($('#ab-un').value);
+    if (v === (u.username || '')) return closeSheet();
+    if (v && !validUsername(v)) return toast('শুধু ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . দিয়ে ৩–২০ অক্ষর; শুরুতে বা শেষে . চলবে না');
+    busy(e.currentTarget, async () => {
+      if (v && (await S.api.usernameFree(v).catch(() => true)) === false) return toast('এই ইউজারনেম আগে থেকেই কেউ নিয়েছে, অন্য একটা দিন');
+      await S.api.changeUsername(v); u.username = v; closeSheet(); toast(v ? 'ইউজারনেম পরিবর্তন হয়েছে' : 'ইউজারনেম সরানো হয়েছে'); renderMenu();
+    });
   };
 }
 function emailSheet() {

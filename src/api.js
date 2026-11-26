@@ -311,13 +311,16 @@ async function supabaseApi() {
       if (category) q = q.eq('category', category);
       if (before) q = q.lt('created_at', before);
       const rows = ok(await q);
-      let mine = new Map(), sv = new Set();
+      let mine = new Map(), sv = new Set(), views = new Map();
       if (me && rows.length) {
         const ids = rows.map(r => r.id);
-        const [l, s2] = await Promise.all([sb.from('likes').select('post_id,reaction').eq('user_id', me.id).in('post_id', ids), sb.from('saved_posts').select('post_id').eq('user_id', me.id).in('post_id', ids)]);
+        const ownIds = rows.filter(r => r.user_id === me.id).map(r => r.id);
+        const [l, s2, vc] = await Promise.all([sb.from('likes').select('post_id,reaction').eq('user_id', me.id).in('post_id', ids), sb.from('saved_posts').select('post_id').eq('user_id', me.id).in('post_id', ids),
+          ownIds.length ? sb.rpc('post_view_counts', { p_ids: ownIds }) : { data: [] }]);
         mine = new Map(ok(l).map(x => [x.post_id, x.reaction])); sv = new Set(ok(s2).map(x => x.post_id));
+        views = new Map((vc.data || []).map(x => [x.post_id, Number(x.views)]));   // নিজের পোস্টের মোট ভিউ (না এলে ০)
       }
-      return rows.map(r => toPost(r, mine, sv));
+      return rows.map(r => ({ ...toPost(r, mine, sv), views: views.get(r.id) || 0 }));
     },
     async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions, albumId, kind = 'normal', imageUrls }) {
       const files = images?.length ? images.slice(0, 10) : image ? [image] : [];
@@ -683,6 +686,12 @@ function demoApi() {
     if (amt <= 0) return;
     w.coins += amt; w.ledger.unshift({ amount: amt, reason: why, ref: key, createdAt: new Date().toISOString() }); save();
   }
+  // ডেমো: নমুনা মানুষের দেখা (রিয়্যাক্ট ও মন্তব্যের অনুপাতে) + এই ডিভাইসে গোনা দেখা
+  function demoViews(p) {
+    const real = Object.values(get('pviews', {})[p.id] || {}), base = (p.likes || 0) * 4 + p.cm.length * 3 + (p.userId === meId ? 2 : 6);
+    const boostReach = db.boosts.filter(b => b.post_id === p.id).reduce((t, b) => t + (b.reach || 0), 0);
+    return { people: base + real.length + boostReach, views: Math.round(base * 1.4) + real.reduce((t, r) => t + r.t, 0) + boostReach, today: Math.ceil(base / 3), boostReach };
+  }
   const addCoins = (amount, reason, ref) => { db.wallet.coins += amount; db.wallet.ledger.unshift({ amount, reason, ref: String(ref), createdAt: new Date().toISOString() }); };
   const albumVisible = a => a.privacy === 'public' || a.userId === meId || (a.privacy === 'friends' && meId && friendIds(meId).includes(a.userId));
   const friendRow = (a, b) => db.friendships.find(f => (f.requester === a && f.addressee === b) || (f.requester === b && f.addressee === a));
@@ -862,10 +871,7 @@ function demoApi() {
     },
     async postStats(id) {
       const p = db.posts.find(x => x.id === Number(id)); if (!p) throw new Error('পোস্ট পাওয়া যায়নি');
-      // ডেমো: নমুনা মানুষের দেখা (রিয়্যাক্ট ও মন্তব্যের অনুপাতে) + এই ডিভাইসে গোনা দেখা
-      const real = Object.values(get('pviews', {})[p.id] || {}), base = (p.likes || 0) * 4 + p.cm.length * 3 + (p.userId === meId ? 2 : 6);
-      const boostReach = db.boosts.filter(b => b.post_id === p.id).reduce((t, b) => t + (b.reach || 0), 0);
-      return wait({ people: base + real.length + boostReach, views: Math.round(base * 1.4) + real.reduce((t, r) => t + r.t, 0) + boostReach, today: Math.ceil(base / 3), boostReach });
+      return wait(demoViews(p));
     },
     async boostSeen(ids) { const seen = get('bseen', {}), day = new Date().toISOString().slice(0, 10); for (const id of ids) { const k = id + ':' + day; if (seen[k]) continue; seen[k] = 1; const b = db.boosts.find(x => x.id === id); if (b) b.reach++; } set('bseen', seen); save(); },
     async requestBoost(postId, days, unionId) {
@@ -1021,7 +1027,7 @@ function demoApi() {
           author: pg ? pg.name : u.name, avatar: pg ? pg.avatar : u.avatar, badge: pg ? '' : (u.verified || ''), poster: u.name, union: uname(p.unionId), liked: db.likes.includes(meId + ':' + p.id),
           reactions: p.rx || { like: p.likes }, myReaction: db.reacts[meId + ':' + p.id] || (db.likes.includes(meId + ':' + p.id) ? 'like' : ''),
           saved: db.saved.includes(meId + ':' + p.id), pageId: p.pageId || null, groupId: p.groupId || null, groupName: g ? g.name : '',
-          kind: p.kind || 'normal', albumId: p.albumId || null, albumName: p.albumId ? (db.albums.find(a => a.id === p.albumId && albumVisible(a))?.name || '') : '' };
+          views: p.userId === meId ? demoViews(p).views : 0, kind: p.kind || 'normal', albumId: p.albumId || null, albumName: p.albumId ? (db.albums.find(a => a.id === p.albumId && albumVisible(a))?.name || '') : '' };
       }));
     },
     async savePost(id) { if (!db.saved.includes(meId + ':' + id)) db.saved.push(meId + ':' + id); save(); },

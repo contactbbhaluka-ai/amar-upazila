@@ -47,6 +47,7 @@ const ICONS = {
   work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 12h18"/>',
   school: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   chevD: '<path d="M6 9l6 6 6-6"/>',
   album: '<rect x="3" y="6" width="15" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/><path d="M3 16l4-4 4 4 3-3 4 4"/>',
   tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.6"/>',
@@ -355,6 +356,7 @@ function postHtml(p) {
       <button data-cm="${esc(p.id)}" aria-label="মন্তব্য ${bn(p.comments || 0)}টি" title="মন্তব্য">${ic('comment', 22)}${p.comments ? `<span class="cnt">${bn(p.comments)}</span>` : ''}</button>
       <button data-share="${esc(p.id)}" aria-label="শেয়ার, ${bn(p.shares || 0)} বার" title="শেয়ার">${ic('share', 22)}${p.shares ? `<span class="cnt">${bn(p.shares)}</span>` : ''}</button>
       <button data-save="${esc(p.id)}" class="${p.saved ? 'saved' : ''}" aria-pressed="${!!p.saved}" aria-label="${p.saved ? 'সেভ থেকে সরান' : 'সেভ করুন'}" title="সেভ">${ic('bookmark', 22, p.saved ? 'currentColor' : 'none')}${p.saves ? `<span class="cnt">${bn(p.saves)}</span>` : ''}</button>
+      ${own ? `<button data-pinfo="${esc(p.id)}" class="views-btn" aria-label="মোট ভিউ ${bn(p.views || 0)}, চাপলে বিস্তারিত" title="মোট ভিউ">${ic('eye', 22)}<span class="cnt">${bn(p.views || 0)}</span></button>` : ''}
     </div>
 
   </article>`;
@@ -387,7 +389,9 @@ async function postStatsSheet(p) {
   if (!p) return;
   openSheet('<div class="skel"></div>');
   try {
-    const st = await S.api.postStats(p.id), rx = Object.values(p.reactions || {}).reduce((t, n) => t + n, 0) || p.likes || 0;
+    const st = await S.api.postStats(p.id);
+    p.views = st.views; document.querySelectorAll(`.views-btn[data-pinfo="${p.id}"] .cnt`).forEach(c => { c.textContent = bn(st.views); });
+    const rx = Object.values(p.reactions || {}).reduce((t, n) => t + n, 0) || p.likes || 0;
     const cell = (icon, n, l) => `<div class="ps-cell"><span>${icon}</span><b>${bn(n)}</b><small>${l}</small></div>`;
     openSheet(`<h2>পোস্টের হিসাব</h2>
       <div class="ps-big">${ic('users', 22)}<b>${bn(st.people)}</b><span>জন পোস্টটি দেখেছেন</span></div>

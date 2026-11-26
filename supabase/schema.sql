@@ -2012,6 +2012,17 @@ revoke all on function public.post_stats(bigint) from public, anon;
 grant execute on function public.post_seen(bigint[]) to authenticated;
 grant execute on function public.post_stats(bigint) to authenticated;
 
+-- ফিডে নিজের পোস্টের চোখ-বাটনে মোট ভিউ দেখানোর জন্য (একসাথে অনেকগুলো পোস্টের)
+create or replace function public.post_view_counts(p_ids bigint[])
+returns table (post_id bigint, views bigint) language sql stable security definer set search_path = public as $$
+  select v.post_id, sum(v.times)::bigint
+    from public.post_views v join public.posts p on p.id = v.post_id
+   where v.post_id = any (p_ids[1:100]) and p.user_id = auth.uid()
+   group by v.post_id;
+$$;
+revoke all on function public.post_view_counts(bigint[]) from public, anon;
+grant execute on function public.post_view_counts(bigint[]) to authenticated;
+
 -- =====================================================================
 --  নিজেকে অ্যাডমিন বানাতে: অ্যাপে প্রথমে সাইনআপ করুন, তারপর নিচের লাইনে
 --  নিজের ইমেইল বসিয়ে আলাদাভাবে চালান:

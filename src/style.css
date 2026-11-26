@@ -864,3 +864,12 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .bo-sum{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,#f59e0b 12%,var(--card))}
 .bo-sum b{font-size:18px}
 #bo-bal.err{color:var(--r)}
+
+/* ===== v28: অ্যাডমিনের কয়েন ও ব্যাজ শিট ===== */
+.adm-sec{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+.adm-sec>b{display:flex;align-items:center;gap:6px}
+.adm-opts{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.adm-opts label{display:flex;align-items:center;gap:8px;margin:0;font-weight:400;cursor:pointer}
+.adm-opts input{width:18px;height:18px;accent-color:var(--g)}
+.adm-opts span{display:inline-flex;align-items:center;gap:4px}
+.adm-days{display:block;margin-top:8px;font-size:14px}

@@ -1374,8 +1374,8 @@ async function openUser(id, silent, keepState) {
     $('#unblock')?.addEventListener('click', e => busy(e.currentTarget, async () => { await S.api.unblock(p.id); openUser(p.id, true); loadFeed('user'); }));
     $('#umore')?.addEventListener('click', () => {
       if (!needUser()) return;
-      openSheet(`<div class="menu"><button data-act="report">প্রোফাইল রিপোর্ট করুন</button><button data-act="block" class="danger">ব্লক করুন</button><button data-close>বন্ধ করুন</button></div>`);
-      $('#sheet').onclick = ev => { const a = ev.target.closest('[data-act]')?.dataset.act; if (a === 'report') reportSheet('user', p.id); if (a === 'block') { closeSheet(); blockUser(p.id, p.name); } };
+      openSheet(`<div class="menu">${me()?.admin ? `<button data-act="admin">${ic('shield', 16)} অ্যাডমিন: কয়েন ও ব্যাজ</button>` : ''}<button data-act="report">প্রোফাইল রিপোর্ট করুন</button><button data-act="block" class="danger">ব্লক করুন</button><button data-close>বন্ধ করুন</button></div>`);
+      $('#sheet').onclick = ev => { const a = ev.target.closest('[data-act]')?.dataset.act; if (a === 'admin') adminUserSheet(p, () => openUser(p.id, true)); if (a === 'report') reportSheet('user', p.id); if (a === 'block') { closeSheet(); blockUser(p.id, p.name); } };
     });
     if (r.blocked) $('#feed-user').hidden = true; else showProfPane('user');
   } catch (e) { $('#user').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
@@ -2244,6 +2244,7 @@ async function loadWallet() {
       <div class="card wal-top"><span class="mut">আপনার কয়েন</span><b class="wal-n">${coin(w.coins)}</b>
         <div class="wal-bar" aria-label="আজকের আয়"><i style="width:${Math.min(100, cap ? (w.today / cap) * 100 : 0)}%"></i></div>
         <small class="mut">আজ পেয়েছেন ${bn(w.today)} / সর্বোচ্চ ${bn(cap)}</small></div>
+      ${u.admin ? `<button class="btn ghost wide" id="adm-self" style="margin-bottom:4px">${ic('shield', 16)} অ্যাডমিন: নিজের কয়েন ও ব্যাজ</button>` : ''}
       <h3 class="res-h">ভেরিফাইড ব্যাজ</h3>
       <div class="card">${status}${reqBox}
         ${canApply ? `<div class="vb-opts">
@@ -2265,6 +2266,7 @@ async function loadWallet() {
 }
 $('#wallet').addEventListener('click', async e => {
   const bo = e.target.closest('[data-bopen]'); if (bo) return openPost(bo.dataset.bopen);
+  if (e.target.closest('#adm-self')) return adminUserSheet(me(), async () => { await S.api.reloadMe?.(); loadWallet(); });
   const a = e.target.closest('[data-vapply]');
   if (a) return verifySheet(a.dataset.vapply);
   if (e.target.id === 'vreq-cancel') {
@@ -2357,6 +2359,44 @@ function decideBoostUI(id, ok, btn) {
   openSheet(`<h2>বুস্ট প্রত্যাখ্যান</h2><form id="brjform"><label for="brj-note">কারণ (পোস্টদাতা দেখবেন)</label><textarea id="brj-note" rows="3" maxlength="300" placeholder="যেমন: পোস্টে ভুল বা বিভ্রান্তিকর তথ্য আছে"></textarea>
     <div class="row" style="margin-top:14px"><button class="btn danger" style="flex:1">প্রত্যাখ্যান করুন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div></form>`);
   $('#brjform').onsubmit = ev => { ev.preventDefault(); busy(ev.submitter, async () => { await S.api.decideBoost(id, false, $('#brj-note').value.trim()); closeSheet(); toast('প্রত্যাখ্যান করা হয়েছে, কয়েন ফেরত গেছে'); loadAdmin(); }); };
+}
+// অ্যাডমিন: কাউকে কয়েন দেওয়া/কাটা এবং ব্যাজ দেওয়া/সরানো
+async function adminUserSheet(u, after) {
+  if (!me()?.admin) return;
+  openSheet('<div class="skel"></div>');
+  try {
+    const w = await S.api.adminUserWallet(u.id), cur = u.verified || '';
+    openSheet(`<h2>${esc(u.name)}${vb(u.verified)}</h2><p class="mut" style="margin-top:0">শুধু অ্যাডমিন দেখছেন</p>
+      <div class="adm-sec"><b>${ic('check', 16)} ভেরিফাইড ব্যাজ</b>
+        <div class="adm-opts">
+          <label><input type="radio" name="abd" value="" ${cur ? '' : 'checked'}><span>ব্যাজ নেই</span></label>
+          <label><input type="radio" name="abd" value="authentic" ${cur === 'authentic' ? 'checked' : ''}><span>${vb('authentic')} পাবলিক ফিগার (স্থায়ী)</span></label>
+          <label><input type="radio" name="abd" value="paid" ${cur === 'paid' ? 'checked' : ''}><span>${vb('paid')} মেয়াদি ব্যাজ</span></label>
+        </div>
+        <label class="adm-days" id="abd-days-w" ${cur === 'paid' ? '' : 'hidden'}>কত দিন (আজ থেকে)<input class="f" type="number" id="abd-days" min="1" max="3650" value="${u.verifiedUntil && cur === 'paid' ? daysLeft(u.verifiedUntil) || 30 : setN('badgeDays')}"></label>
+        ${cur === 'paid' && u.verifiedUntil ? `<small class="mut">এখনকার মেয়াদ: ${dateBn(u.verifiedUntil)} পর্যন্ত</small>` : ''}
+        <button class="btn sm" id="abd-save" style="margin-top:8px">ব্যাজ সংরক্ষণ</button></div>
+      <div class="adm-sec"><b>🪙 কয়েন</b><div class="mut" style="margin:2px 0 6px">এখন আছে: <b id="ac-bal">${bn(w.coins)}</b></div>
+        <div class="row"><input class="f" type="number" id="ac-amt" min="1" max="100000" placeholder="পরিমাণ" style="flex:1"><input class="f" id="ac-note" maxlength="60" placeholder="কারণ (ঐচ্ছিক)" style="flex:1.4"></div>
+        <div class="row" style="margin-top:8px"><button class="btn sm" style="flex:1" data-acoin="1">যোগ করুন</button><button class="btn ghost sm" style="flex:1" data-acoin="-1">কেটে নিন</button></div></div>
+      <button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
+    $('#sheet').onchange = ev => { if (ev.target.name === 'abd') $('#abd-days-w').hidden = ev.target.value !== 'paid'; };
+    $('#abd-save').onclick = ev => {
+      const v = document.querySelector('[name="abd"]:checked').value, days = Math.max(1, parseInt($('#abd-days').value, 10) || 30);
+      busy(ev.currentTarget, async () => { await S.api.adminSetBadge(u.id, v || null, v === 'paid' ? days : null); toast(v ? 'ব্যাজ দেওয়া হয়েছে' : 'ব্যাজ সরানো হয়েছে'); closeSheet(); after?.(); });
+    };
+    $('#sheet').querySelectorAll('[data-acoin]').forEach(b => b.onclick = ev => {
+      const n = parseInt($('#ac-amt').value, 10);
+      if (!n || n < 1) return toast('কয়েনের পরিমাণ লিখুন');
+      const amt = n * Number(b.dataset.acoin);
+      busy(ev.currentTarget, async () => {
+        await S.api.adminAdjustCoins(u.id, amt, $('#ac-note').value.trim());
+        $('#ac-bal').textContent = bn((await S.api.adminUserWallet(u.id)).coins); $('#ac-amt').value = '';
+        toast(amt > 0 ? `${bn(n)} কয়েন যোগ হয়েছে` : `${bn(n)} কয়েন কাটা হয়েছে`);
+        if (u.id === me()?.id && S.view === 'wallet') loadWallet();
+      });
+    });
+  } catch (e) { closeSheet(); toast(errText(e)); }
 }
 const adminReqCard = r => `<div class="card vreq-card">
   <div class="person" style="padding:0">${userLink(r.userId, av(r.user || { name: r.name }))}<div class="info">${userLink(r.userId, esc(r.user?.name || r.name) + vb(r.user?.verified), 'who-btn')}<div class="sub">${esc(ago(r.createdAt))}</div></div>

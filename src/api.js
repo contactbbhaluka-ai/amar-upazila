@@ -124,6 +124,7 @@ async function supabaseApi() {
       return me;
     },
     me: () => me,
+    async reloadMe() { return loadMe((await sb.auth.getSession()).data.session); },
     async upazila() { return ok(await sb.from('upazilas').select('id,name,district').eq('id', UPAZILA_ID).single()); },
     async unions() {
       const rows = ok(await sb.from('unions').select('id,name').eq('upazila_id', UPAZILA_ID).order('sort'));
@@ -215,6 +216,7 @@ async function supabaseApi() {
     async decideVerification(id, approve, note) { ok(await sb.rpc('decide_verification', { p_id: id, p_approve: approve, p_note: note || null })); },
     async adminSetBadge(uid, verified, days) { ok(await sb.rpc('admin_set_badge', { p_user: uid, p_verified: verified || null, p_days: days || null })); },
     async adminAdjustCoins(uid, amount, note) { ok(await sb.rpc('admin_adjust_coins', { p_user: uid, p_amount: amount, p_note: note || null })); },
+    async adminUserWallet(uid) { return { coins: ok(await sb.from('wallets').select('coins').eq('user_id', uid).maybeSingle())?.coins || 0 }; },
     async adminStats() {
       const r = ok(await sb.rpc('admin_stats'));
       return { users: r.users, donors: r.donors, manualDonors: r.manual_donors, posts: r.posts, pendingServices: r.pending_services, openReports: r.open_reports };
@@ -911,7 +913,13 @@ function demoApi() {
       save();
     },
     async adminSetBadge(uid, verified, days) { const p = person(uid); if (p) Object.assign(p, { verified: verified || null, verifiedUntil: verified === 'paid' ? new Date(Date.now() + (days || 30) * 864e5).toISOString() : null }); save(); },
-    async adminAdjustCoins(uid, amount, note) { if (uid === meId) { if (db.wallet.coins + amount < 0) throw new Error('ব্যালান্স শূন্যের নিচে যাবে'); addCoins(amount, 'admin', note || ''); save(); } },
+    async adminAdjustCoins(uid, amount, note) {
+      const cur = uid === meId ? db.wallet.coins : (person(uid)?.coins || 0);
+      if (cur + amount < 0) throw new Error('ব্যালান্স শূন্যের নিচে যাবে');
+      if (uid === meId) addCoins(amount, 'admin', note || ''); else if (person(uid)) person(uid).coins = cur + amount;
+      save();
+    },
+    async adminUserWallet(uid) { return wait({ coins: uid === meId ? db.wallet.coins : (person(uid)?.coins || 0) }); },
     async adminStats() {
       const all = [...PEOPLE, ...db.users];
       return wait({ users: all.length, donors: all.filter(p => p.bloodGroup && p.donorVisible !== false).length, manualDonors: db.manual.length,

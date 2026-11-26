@@ -1520,3 +1520,24 @@ img.av{aspect-ratio:1/1}
 .fm-lists .chip{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
 .bday.anniv{background:light-dark(#eff6ff,#0c1a33)}
 .fr-areanote{margin:-2px 4px 8px;font-size:13.5px}
+/* লেখার পেছনে রং (ফেসবুকের মতো): লেখার বক্সের উপরে রঙিন Aa */
+#pc-text.pc-bg.g1{background:linear-gradient(135deg,#006a4e,#0b8f6a)}
+#pc-text.pc-bg.g2{background:linear-gradient(135deg,#e5303f,#f0743e)}
+#pc-text.pc-bg.g3{background:linear-gradient(135deg,#1d4ed8,#6d28d9)}
+#pc-text.pc-bg.g4{background:linear-gradient(135deg,#0f766e,#22c1c3)}
+#pc-text.pc-bg.g5{background:linear-gradient(135deg,#9a3412,#f59e0b)}
+#pc-text.pc-bg.g6{background:linear-gradient(135deg,#be185d,#f472b6)}
+#pc-text.pc-bg.g7{background:linear-gradient(135deg,#111827,#4b5563)}
+#pc-text.pc-bg.g8{background:linear-gradient(135deg,#4d7c0f,#a3e635)}
+#pc-text.pc-bg{border-radius:12px;display:block;width:100%;text-shadow:0 1px 2px rgba(0,0,0,.25);flex:none}
+.pc-bgbar{display:flex;align-items:center;gap:8px;margin:2px 0 6px;min-height:40px}
+.pc-aa2{flex:none;width:38px;height:38px;border-radius:10px;border:0;cursor:pointer;padding:0;color:#fff;font-weight:800;font-size:16px;text-shadow:0 1px 2px rgba(0,0,0,.35);
+  background:linear-gradient(135deg,#e5303f 0%,#f59e0b 25%,#22c55e 50%,#1d4ed8 75%,#be185d 100%);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.pc-aa2.on{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--ink)}
+.pc-bghint{border:0;background:none;color:var(--mut);font:inherit;font-size:14px;cursor:pointer;padding:6px 4px}
+.pc-bgbar .pc-bgs{flex:1;min-width:0;padding:2px}
+.pc-sw.none{position:relative;background:var(--card);border:2px solid var(--line)}
+.pc-sw.none::after{content:'';position:absolute;left:4px;right:4px;top:50%;height:2px;background:var(--mut);transform:rotate(-45deg)}
+.pc-sw.on{border-color:var(--ink)!important;box-shadow:0 0 0 2px var(--card) inset}
+.pc-bgnote{margin:-2px 0 6px;font-size:12.5px}
+#pc-text.pc-bg{padding:72px 18px 40px;min-height:220px}

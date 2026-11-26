@@ -1347,8 +1347,11 @@ function renderComposerSheet() {
     <div class="pc-author">${d.pageId && d.authorName ? entAv({ name: d.authorName, avatar: d.authorAvatar }) : av(u)}<div><div class="pc-name"><b>${esc(d.authorName || u.name)}</b>${tagLine}</div>
       ${d.albumId ? `<span class="pc-priv static" title="অ্যালবামের প্রাইভেসি">${ic(pv[0], 14)} ${pv[1]}</span>` : own ? `<button class="pc-priv" id="pc-priv" aria-label="কারা দেখবে: ${pv[1]}">${ic(pv[0], 14)} ${pv[1]} ▾</button>` : `<span class="pc-priv static">${ic('globe', 14)} পাবলিক</span>`}</div></div>
     ${d.albumId ? `<div class="pc-album">${ic('album', 16)} অ্যালবাম: <b>${esc(d.albumName)}</b></div>` : ''}
+    ${extras && !d.photos.length && !d.poll ? `<div class="pc-bgbar"><button type="button" class="pc-aa2${d.bgOpen || d.bg ? ' on' : ''}" id="pc-bgt" title="লেখার পেছনে রং" aria-label="লেখার পেছনে রং দিন" aria-expanded="${!!d.bgOpen}">Aa</button>
+      ${d.bgOpen ? `<div class="pc-bgs" role="radiogroup" aria-label="ব্যাকগ্রাউন্ড রং"><button type="button" class="pc-sw none${d.bg ? '' : ' on'}" data-bg="" aria-label="কোনো রং নয়" role="radio" aria-checked="${!d.bg}"></button>${BGS.map(g => `<button type="button" class="pc-sw ${g}${d.bg === g ? ' on' : ''}" data-bg="${g}" aria-label="রং ${bn(g.slice(1))}" role="radio" aria-checked="${d.bg === g}"></button>`).join('')}</div>`
+        : `<button type="button" class="pc-bghint" id="pc-bgt2">${d.bg ? 'রং বদলান' : 'লেখার পেছনে রং দিন'}</button>`}</div>
+      ${d.bgOpen && (d.body || '').trim().length > BG_MAX ? `<p class="mut pc-bgnote">রঙিন পোস্ট ${bn(BG_MAX)} অক্ষরের মধ্যে হয়, এর বেশি লিখলে সাধারণ পোস্ট হবে</p>` : ''}` : ''}
     <textarea id="pc-text" class="${d.bg && canBg(d) ? 'pc-bg ' + d.bg : ''}" maxlength="1000" placeholder="${d.poll ? 'প্রশ্নটি লিখুন… (যেমন: কোন রাস্তা আগে মেরামত হওয়া দরকার?)' : `আপনার মনে কী আছে, ${esc(u.name.split(' ')[0])}? (কাউকে উল্লেখ করতে @ লিখুন)`}">${esc(d.body)}</textarea>
-    ${extras && d.bgOpen && !d.photos.length && !d.poll ? `<div class="pc-bgs" role="radiogroup" aria-label="ব্যাকগ্রাউন্ড রং"><button type="button" class="pc-sw none${d.bg ? '' : ' on'}" data-bg="" aria-label="কোনো রং নয়">✕</button>${BGS.map(g => `<button type="button" class="pc-sw ${g}${d.bg === g ? ' on' : ''}" data-bg="${g}" aria-label="রং ${g.slice(1)}"></button>`).join('')}${(d.body || '').trim().length > BG_MAX ? `<span class="mut pc-bgnote">রঙিন পোস্ট ${bn(BG_MAX)} অক্ষরের মধ্যে হয়</span>` : ''}</div>` : ''}
     ${d.poll ? `<div class="pc-poll"><div class="pc-blk-h">${ic('poll', 16)} পোল<button type="button" class="link" data-rmpoll>বাদ দিন</button></div>${d.poll.map((o, i) => `<div class="pc-po"><input class="f pc-poll-opt" data-pi="${i}" maxlength="80" placeholder="অপশন ${bn(i + 1)}" value="${esc(o)}">${d.poll.length > 2 ? `<button type="button" data-rmopt="${i}" aria-label="অপশন বাদ দিন">${ic('close', 14)}</button>` : ''}</div>`).join('')}${d.poll.length < 4 ? '<button type="button" class="link pc-addopt" data-addopt>+ আরেকটি অপশন</button>' : ''}</div>` : ''}
     ${d.event ? `<div class="pc-ev"><div class="pc-blk-h">${ic('calendar', 16)} অনুষ্ঠানের সময় ও জায়গা<button type="button" class="link" data-rmev>বাদ দিন</button></div><label class="pc-evl">কবে, কখন<input type="datetime-local" class="f" id="pc-ev-at" min="${localDT(new Date())}" value="${esc(d.event.at || '')}"></label><label class="pc-evl">কোথায়<input class="f" id="pc-ev-place" maxlength="120" placeholder="যেমন: উথুরা স্কুল মাঠ" value="${esc(d.event.place || '')}"></label><p class="mut pc-evn">যারা "যাব" চাপবেন তারা অনুষ্ঠানের আগের দিন রিমাইন্ডার পাবেন।</p></div>` : ''}
     ${extras && BLOOD_OK(d) ? `<div class="pc-blood"><label for="pc-bg">🩸 রক্ত লাগবে?</label><select class="f" id="pc-bg"><option value="">না</option>${BLOOD_GROUPS.map(g => `<option ${d.blood === g ? 'selected' : ''}>${g}</option>`).join('')}</select>${d.blood ? `<p class="mut">উপজেলার যেসব ${esc(d.blood)} ডোনার গত ৯০ দিনে রক্ত দেননি, তারা নোটিফিকেশন পাবেন। পোস্টটি পাবলিক থাকলে তবেই পাঠানো হবে।</p>` : ''}</div>` : ''}
@@ -1362,7 +1365,6 @@ function renderComposerSheet() {
     <div class="pc-foot"><div class="pc-add"><span class="pc-add-l">যোগ করুন</span>
       ${photosOk ? `<label class="pc-tool" title="ছবি" aria-label="ছবি যোগ করুন">${ic('photo', 22)}<input type="file" id="pc-file" accept="image/*" multiple hidden></label>` : ''}
       ${own ? `<button class="pc-tool" id="pc-tag" title="বন্ধুদের ট্যাগ করুন" aria-label="বন্ধুদের ট্যাগ করুন">${ic('tag', 22)}</button>` : ''}
-      ${extras && !d.photos.length && !d.poll ? `<button class="pc-tool pc-aa${d.bgOpen ? ' on' : ''}" id="pc-bgt" title="রঙিন ব্যাকগ্রাউন্ড" aria-label="রঙিন ব্যাকগ্রাউন্ড">Aa</button>` : ''}
       ${extras && !d.photos.length && !d.poll ? `<button class="pc-tool" id="pc-pollt" title="পোল" aria-label="পোল যোগ করুন">${ic('poll', 22)}</button>` : ''}
       ${extras && !d.life && !d.pageId && !d.groupId ? `<button class="pc-tool pc-life" id="pc-lifet" title="জীবনের ঘটনা" aria-label="জীবনের ঘটনা যোগ করুন">🎉</button>` : ''}
       ${extras && !d.event ? `<button class="pc-tool" id="pc-evt" title="অনুষ্ঠান" aria-label="অনুষ্ঠানের তারিখ যোগ করুন">${ic('calendar', 22)}</button>` : ''}
@@ -1412,11 +1414,11 @@ function renderComposerSheet() {
   if ($('#pc-file')) $('#pc-file').onchange = e => addFiles(e.target.files);
   $('#sheet .pc-more')?.addEventListener('change', e => addFiles(e.target.files));
   $('#sheet').onclick = e => {
-    const x = e.target.closest('[data-bg],[data-rmpoll],[data-addopt],[data-rmopt],[data-rmev],[data-rmlink],[data-rmlife],#pc-bgt,#pc-pollt,#pc-evt,#pc-lifet');
+    const x = e.target.closest('[data-bg],[data-rmpoll],[data-addopt],[data-rmopt],[data-rmev],[data-rmlink],[data-rmlife],#pc-bgt,#pc-bgt2,#pc-pollt,#pc-evt,#pc-lifet');
     if (x) {
       keep();
-      if (x.id === 'pc-bgt') d.bgOpen = !d.bgOpen;
-      else if (x.dataset.bg !== undefined) d.bg = x.dataset.bg;
+      if (x.id === 'pc-bgt' || x.id === 'pc-bgt2') d.bgOpen = !d.bgOpen;
+      else if (x.dataset.bg !== undefined) { d.bg = x.dataset.bg; if (d.bg && (d.body || '').trim().length > BG_MAX) toast(`রঙিন পোস্ট ${bn(BG_MAX)} অক্ষরের মধ্যে হয়`); }
       else if (x.id === 'pc-pollt') { d.poll = ['', '']; d.bg = ''; d.bgOpen = false; if (d.category === POST_CATS[0]) d.category = 'প্রশ্ন'; }
       else if (x.dataset.rmpoll !== undefined) d.poll = null;
       else if (x.dataset.addopt !== undefined) { if (d.poll.length < 4) d.poll.push(''); }
@@ -1429,6 +1431,7 @@ function renderComposerSheet() {
       renderComposerSheet();
       if (x.dataset.addopt !== undefined) document.querySelectorAll('#sheet .pc-poll-opt')[d.poll.length - 1]?.focus();
       if (x.id === 'pc-pollt') $('#sheet .pc-poll-opt')?.focus();
+      if (x.dataset.bg !== undefined) $('#pc-text')?.focus();
       return;
     }
     const rm = e.target.closest('[data-rmph]'); if (rm) { keep(); const [x] = d.photos.splice(Number(rm.dataset.rmph), 1); if (x.blob) URL.revokeObjectURL(x.url); return renderComposerSheet(); }

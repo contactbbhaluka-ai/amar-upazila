@@ -1533,7 +1533,7 @@ addEventListener('scroll', () => {
 // নিচে টেনে ছেড়ে দিলে রিফ্রেশ (হোম ও নোটিফিকেশন)
 (function pullToRefresh() {
   let y0 = null, ind = null;
-  const can = () => (S.view === 'home' || S.view === 'notif') && scrollY <= 0 && !$('#modal').classList.contains('on') && !document.querySelector('.st-ov');
+  const can = () => S.view !== 'search' && scrollY <= 0 && !$('#modal').classList.contains('on') && !document.querySelector('.st-ov') && !S.viewerOpen;
   const hide = () => { ind?.remove(); ind = null; };
   addEventListener('touchstart', e => { y0 = e.touches.length === 1 && can() ? e.touches[0].clientY : null; }, { passive: true });
   addEventListener('touchmove', e => {
@@ -1548,7 +1548,17 @@ addEventListener('scroll', () => {
     if (y0 == null) return; y0 = null;
     if (!ind?.classList.contains('ready')) return hide();
     ind.classList.add('spin'); ind.style.transform = 'translate(-50%, 60px)';
-    try { if (S.view === 'home') await loadFeed('home'); else await loadNotifs(); refreshBadges(); } finally { hide(); }
+    try {
+      const v = S.view;
+      if (v === 'home') await loadFeed('home');
+      else if (v === 'notif') await loadNotifs();
+      else if (v === 'thread' && S.th) await openConv(S.th, true);
+      else if (v === 'insights') await loadInsights();
+      else if (v === 'wallet') await loadWallet();
+      else if (v === 'friends') await loadFriends(true);
+      else if (RELOAD[v]) await RELOAD[v]();
+      refreshBadges();
+    } finally { hide(); }
   });
 })();
 
@@ -5206,6 +5216,39 @@ async function cachedCall(key, fn) {
   catch (e) { const c = local.get('c_' + key); if (c != null) return c; throw e; }
 }
 
+// ================================================================ রিফ্রেশ করলেও একই পাতায় থাকা
+// পাতা বন্ধ/রিফ্রেশের ঠিক আগে কোথায় ছিলেন তা ট্যাবের সেশনে রাখা (ফোনে জায়গা লাগে না, ট্যাব বন্ধ করলে মুছে যায়)
+function saveNav() {
+  try {
+    const th = S.view === 'thread' && S.th ? { kind: S.th.kind, id: S.th.id, pageId: S.th.pageId || null } : null;
+    sessionStorage.setItem('au_nav', JSON.stringify({ v: S.view, tab: S.tab, userId: S.userId, pageId: S.pageId, groupId: S.groupId, postId: S.postId, th, frTab: S.frTab, cvTab: S.cvTab, y: scrollY, at: Date.now() }));
+  } catch { /* প্রাইভেট মোডে সেশন না থাকলেও চলে */ }
+}
+addEventListener('pagehide', saveNav);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNav(); });
+function restoreNav() {
+  let n; try { n = JSON.parse(sessionStorage.getItem('au_nav') || 'null'); sessionStorage.removeItem('au_nav'); } catch { return; }
+  if (!n || !n.v || n.v === 'home' || Date.now() - (n.at || 0) > 6 * 36e5) return;
+  const needMe = !['home', 'search', 'post', 'user', 'page', 'group', 'dir', 'pages', 'groups'].includes(n.v);
+  if (needMe && !me()) return;
+  if (n.frTab) S.frTab = n.frTab; if (n.cvTab) S.cvTab = n.cvTab;
+  const scroll = () => { if (n.y > 0) setTimeout(() => window.scrollTo(0, n.y), 700); };
+  const base = TABS.includes(n.tab) ? n.tab : 'home';
+  try {
+    if (TABS.includes(n.v)) { go(n.v); return scroll(); }
+    if (base !== 'home') go(base);
+    if (n.v === 'thread' && n.th) return openConv(n.th);
+    if (n.v === 'user' && n.userId) return openUser(n.userId);
+    if (n.v === 'page' && n.pageId) return openPage(n.pageId);
+    if (n.v === 'group' && n.groupId) return openGroup(n.groupId);
+    if (n.v === 'post' && n.postId) return openPost(n.postId);
+    if (n.v === 'insights') { S.insTarget = null; open('insights'); return loadInsights(); }
+    if (n.v === 'wallet') { open('wallet'); return loadWallet(); }
+    if (n.v === 'search') return openSearch();
+    if (RELOAD[n.v]) { open(n.v); RELOAD[n.v](); scroll(); }
+  } catch { /* না পারলে হোমেই থাকবে */ }
+}
+
 // ================================================================ শুরু
 (async () => {
   try {
@@ -5221,7 +5264,9 @@ async function cachedCall(key, fn) {
     $('#loc').value = S.union;
     renderComposer(); renderFilters(); listenMessages(); refreshBadges();
     refreshSettings(); setTimeout(checkLiveUpdate, 8000);
-    await loadFeed('home');
+    const homeP = loadFeed('home');
+    if (!/^#(post|page|u|join)-/.test(location.hash)) restoreNav();   // রিফ্রেশের আগে যে পাতায় ছিলেন সেখানেই
+    await homeP;
     setInterval(() => { if (document.visibilityState === 'visible') refreshBadges(); }, 60000);
     const deep = () => { const jn = location.hash.match(/^#join-([a-f0-9]{6,20})$/); if (jn) joinSheet(jn[1]); const m = location.hash.match(/^#post-(\d+)$/), pm = location.hash.match(/^#page-(\d+)$/), um = location.hash.match(/^#u-([\w-]{2,40})$/); if (um && !(S.view === 'user' && S.userId === um[1])) openUser(um[1]); if (m && !(S.view === 'post' && String(S.postId) === m[1])) openPost(m[1]); if (pm && !(S.view === 'page' && String(S.pageId) === pm[1])) openPage(pm[1]); };
     deep(); window.addEventListener('hashchange', deep);

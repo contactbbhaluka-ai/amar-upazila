@@ -654,3 +654,13 @@ button.cm-rx:hover{box-shadow:0 1px 4px rgba(0,0,0,.28)}
 .prof-av{pointer-events:none}
 .prof-av>*{pointer-events:auto}
 .cover-btn{z-index:2}
+
+/* ===== v17: বন্ধু/ফলো তালিকা ===== */
+.stats .stat-b{border:0;background:none;color:inherit;font:inherit;display:flex;flex-direction:column;align-items:center;flex:1;padding:6px 4px;border-radius:12px;cursor:pointer;min-height:0}
+.stats .stat-b:hover{background:var(--g2)}
+.vis-line{display:flex;align-items:center;gap:6px;border:0;background:var(--g2);color:var(--ink);font:inherit;font-size:13px;border-radius:10px;padding:7px 10px;margin:0 0 10px;cursor:pointer;min-height:0;width:100%}
+.vis-line .link{margin-left:auto;color:var(--gt);font-weight:700}
+.pl-list{max-height:55vh;overflow:auto}
+.pl-hidden{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--mut);padding:18px 8px}
+.pl-hidden p{margin:4px 0}
+.pv-h{display:block;font-weight:700;margin:12px 0 6px}

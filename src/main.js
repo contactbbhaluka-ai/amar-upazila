@@ -748,6 +748,47 @@ document.addEventListener('click', async e => {
 });
 
 // ================================================================ অন্যের প্রোফাইল
+// ================================================================ বন্ধু / ফলোয়ার / ফলো করছেন তালিকা ও তার প্রাইভেসি
+const PLIST = { friends: 'বন্ধু', followers: 'ফলোয়ার', following: 'ফলো করছেন' };
+const statsHtml = p => `<div class="stats">${Object.entries(PLIST).map(([k, l]) => `<button class="stat-b" data-plist="${esc(p.id)}|${k}" aria-label="${l} তালিকা দেখুন"><b>${typeof p[k] === 'number' ? bn(p[k]) : esc(p[k])}</b><span>${l}</span></button>`).join('')}</div>`;
+async function peopleSheet(uid, kind) {
+  const own = me()?.id === uid;
+  openSheet(`<h2>${PLIST[kind]}</h2><div class="skel"></div>`);
+  try {
+    const [r, prof] = await Promise.all([S.api.listPeople(uid, kind), own ? me() : S.api.profile(uid).catch(() => null)]);
+    const visKey = kind === 'friends' ? 'friendsVisibility' : 'followsVisibility', vis = r.visibility || prof?.[visKey] || 'public';
+    const head = `<h2>${PLIST[kind]}${r.hidden ? '' : ` <span class="mut" style="font-weight:400;font-size:15px">(${bn(r.list.length)})</span>`}</h2>
+      ${own ? `<button class="vis-line" id="pl-priv">${ic(PRIVACY[vis][0], 15)} কারা দেখবে: <b>${PRIVACY[vis][1]}</b> <span class="link">বদলান</span></button>` : ''}`;
+    if (r.hidden) {
+      openSheet(`${head}<div class="empty pl-hidden">${ic('lock', 34)}<p><b>${esc(prof?.name || 'এই ব্যক্তি')}</b> ${PLIST[kind]} তালিকা ${vis === 'friends' ? 'শুধু বন্ধুদের জন্য রেখেছেন' : 'গোপন রেখেছেন'}।</p><p class="mut">মোট সংখ্যা প্রোফাইলেই দেখা যাচ্ছে।</p></div><button class="btn ghost wide" data-close>বন্ধ করুন</button>`);
+      return;
+    }
+    const row = u => `<div class="person" data-pname="${esc(u.name.toLowerCase())}">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name), 'who-btn')}<div class="sub">${esc(u.union)}</div></div></div>`;
+    openSheet(`${head}${r.list.length > 8 ? `<input class="f" id="pl-q" placeholder="নাম দিয়ে খুঁজুন" style="margin-bottom:8px">` : ''}
+      <div class="pl-list">${r.list.length ? r.list.map(row).join('') : `<p class="mut">${own ? 'এখনো কেউ নেই।' : 'এখনো কেউ নেই।'}</p>`}</div>
+      <button class="btn ghost wide" data-close style="margin-top:10px">বন্ধ করুন</button>`);
+    $('#pl-q')?.addEventListener('input', e => { const t = e.target.value.trim().toLowerCase(); document.querySelectorAll('.pl-list .person').forEach(x => { x.hidden = t && !x.dataset.pname.includes(t); }); });
+    $('#sheet').onclick = ev => { if (ev.target.closest('#pl-priv')) return listPrivacySheet(() => peopleSheet(uid, kind)); if (ev.target.closest('[data-user]')) closeSheet(); };
+  } catch (e) { openSheet(`<h2>${PLIST[kind]}</h2><div class="empty">${esc(errText(e))}</div><button class="btn ghost wide" data-close>বন্ধ করুন</button>`); }
+}
+function listPrivacySheet(then) {
+  const u = me(); if (!u) return;
+  const group = (name, label, cur) => `<label class="pv-h">${label}</label><div class="pv-pick">${Object.entries(PRIVACY).map(([k, [icn, l, sub]]) => `<label class="pv-opt"><input type="radio" name="${name}" value="${k}" ${k === cur ? 'checked' : ''}><span>${ic(icn, 18)}</span><span><b>${l}</b><small>${sub}</small></span></label>`).join('')}</div>`;
+  openSheet(`<h2>বন্ধু ও ফলো তালিকার প্রাইভেসি</h2>
+    <p class="mut" style="margin-top:0">তালিকা লুকালেও অন্যরা প্রোফাইলে মোট সংখ্যা দেখতে পাবে, শুধু কারা আছে তা দেখবে না।</p>
+    ${group('lp-fr', 'বন্ধু তালিকা কারা দেখবে', u.friendsVisibility || 'public')}
+    ${group('lp-fo', 'ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে', u.followsVisibility || 'public')}
+    <button class="btn wide" id="lp-save" style="margin-top:14px">সংরক্ষণ</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
+  $('#lp-save').onclick = e => {
+    const fr = document.querySelector('[name=lp-fr]:checked').value, fo = document.querySelector('[name=lp-fo]:checked').value;
+    busy(e.currentTarget, async () => { await S.api.setListPrivacy({ friendsVisibility: fr, followsVisibility: fo }); Object.assign(me(), { friendsVisibility: fr, followsVisibility: fo }); toast('প্রাইভেসি সংরক্ষণ হয়েছে'); if (then) then(); else closeSheet(); });
+  };
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-plist]'); if (b) { const [uid, kind] = b.dataset.plist.split('|'); return peopleSheet(uid, kind); }
+  if (e.target.closest('#listpriv')) listPrivacySheet();
+});
+
 // ================================================================ প্রোফাইল: কভার ছবি, পোস্ট/ছবি ট্যাব, অ্যালবাম
 S.pstate = { me: { tab: 'posts', seg: 'all', album: null }, user: { tab: 'posts', seg: 'all', album: null, uid: null } };
 function coverHtml(p, own) {
@@ -905,7 +946,7 @@ async function openUser(id, silent, keepState) {
     const p = await S.api.profile(id), r = p.rel || {};
     $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}</h2><div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
-      <div class="stats"><div><b>${bn(p.friends)}</b><span>বন্ধু</span></div><div><b>${bn(p.followers)}</b><span>ফলোয়ার</span></div><div><b>${bn(p.following)}</b><span>ফলো করছেন</span></div></div>
+      ${statsHtml(p)}
       ${r.blocked ? `<p class="mut">আপনি এই ব্যক্তিকে ব্লক করেছেন।</p><button class="btn ghost" id="unblock">আনব্লক করুন</button>`
       : `<div class="row">${relBtns(p)}<button class="sbtn ${r.following ? 'ghost' : ''}" data-fo="${esc(p.id)}" data-on="${r.following ? 1 : 0}">${r.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" data-dm="${esc(p.id)}">মেসেজ</button><button class="more" id="umore" aria-label="আরও">⋯</button></div>`}</div>${r.blocked ? '' : profTabs('user')}`;
     $('#unblock')?.addEventListener('click', e => busy(e.currentTarget, async () => { await S.api.unblock(p.id); openUser(p.id, true); loadFeed('user'); }));
@@ -1171,10 +1212,10 @@ async function renderMe(mode = 'login') {
         <div class="mut" style="font-size:14px;margin-top:4px">${ic('calendar', 14)} সর্বশেষ রক্তদান: ${u.lastDonated ? esc(bnDate(u.lastDonated)) : 'দেওয়া নেই'} · ${donateStatus(u.lastDonated)}</div>
         <div class="row" style="margin-top:8px;justify-content:center"><button class="sbtn ghost" data-donor-edit>${ic('edit', 15)} ডোনার তথ্য আপডেট</button><button class="sbtn ghost" id="donated-today">${ic('drop', 15)} আজ রক্ত দিয়েছি</button></div>` : `<span class="mut" style="font-size:13px">ব্লাড গ্রুপ দেওয়া নেই</span> <button class="sbtn ghost" data-add-donor>${ic('drop', 15)} নিজের ডোনার প্রোফাইল যোগ করুন</button>`}</div>
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
-      <div class="stats" id="mystats"><div><b>…</b><span>বন্ধু</span></div><div><b>…</b><span>ফলোয়ার</span></div><div><b>…</b><span>ফলো করছেন</span></div></div>
+      <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
       <div class="row"><button class="btn ghost" id="edit">প্রোফাইল এডিট</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
       ${profTabs('me')}`;
-    S.api.profile(u.id).then(p => { $('#mystats') && ($('#mystats').innerHTML = `<div><b>${bn(p.friends)}</b><span>বন্ধু</span></div><div><b>${bn(p.followers)}</b><span>ফলোয়ার</span></div><div><b>${bn(p.following)}</b><span>ফলো করছেন</span></div>`); }).catch(() => {});
+    S.api.profile(u.id).then(p => { if ($('#mystats')) $('#mystats').innerHTML = statsHtml(p); }).catch(() => {});
     showProfPane('me');
     return;
   }
@@ -1733,6 +1774,7 @@ function renderMenu() {
     <details class="card"${u ? '' : ' hidden'}><summary>⚙️ সেটিংস ও প্রাইভেসি</summary><div class="setlist">
       <button id="edit">প্রোফাইল এডিট</button>
       <button id="chpw">পাসওয়ার্ড পরিবর্তন</button>
+      <button id="listpriv">বন্ধু ও ফলো তালিকা কারা দেখবে</button>
       <button id="blocked">ব্লক করা মানুষ</button>
       <button id="theme">থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
       <a href="./privacy.html">গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>

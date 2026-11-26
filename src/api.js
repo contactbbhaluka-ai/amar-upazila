@@ -24,12 +24,13 @@ async function supabaseApi() {
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
-  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,unions!profiles_union_id_fkey(name)';
+  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,follows_visibility,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
     id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
     union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
     bloodGroup: p.blood_group || '', donorVisible: p.donor_visible !== false, lastDonated: p.last_donated || '',
     avatar: p.avatar_url || '', cover: p.cover_url || '', bio: p.bio || '', admin: p.role === 'admin',
+    friendsVisibility: p.friends_visibility || 'public', followsVisibility: p.follows_visibility || 'public',
   });
   const toPost = (r, mine, saved) => ({
     id: r.id, body: r.body, image: r.image_url || '', images: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []),
@@ -369,13 +370,24 @@ async function supabaseApi() {
     // ---------- মানুষ, বন্ধু, ফলো, ব্লক
     async profile(id) {
       const p = toUser(ok(await sb.from('profiles').select(PROFILE).eq('id', id).single()));
-      const [friends, followers, following, rel] = await Promise.all([
-        sb.from('friendships').select('requester', { count: 'exact', head: true }).eq('status', 'accepted').or(`requester.eq.${id},addressee.eq.${id}`),
-        sb.from('follows').select('follower_id', { count: 'exact', head: true }).eq('followee_id', id),
-        sb.from('follows').select('follower_id', { count: 'exact', head: true }).eq('follower_id', id),
-        relations([id]),
-      ]);
-      return { ...p, friends: ok(friends) || 0, followers: ok(followers) || 0, following: ok(following) || 0, rel: rel.get(id) };
+      // সংখ্যা সবাই দেখে (তালিকা গোপন থাকলেও)
+      const [counts, rel] = await Promise.all([sb.rpc('profile_counts', { uid: id }), relations([id])]);
+      const c = ok(counts) || {};
+      return { ...p, friends: c.friends || 0, followers: c.followers || 0, following: c.following || 0, rel: rel.get(id) };
+    },
+    // বন্ধু/ফলোয়ার/ফলো করছেন তালিকা; মালিক গোপন রাখলে { hidden: true, visibility }
+    async listPeople(uid, kind) {
+      const r = ok(await sb.rpc('list_people', { uid, kind }));
+      if (!r.allowed) return { hidden: true, visibility: r.visibility || 'only_me', list: [] };
+      const ids = r.ids || [], out = [];
+      for (let i = 0; i < ids.length; i += 150) out.push(...ok(await sb.from('profiles').select(PROFILE).in('id', ids.slice(i, i + 150))).map(toUser));
+      const pos = new Map(ids.map((x, i) => [x, i]));
+      return { hidden: false, visibility: r.visibility, list: out.filter(u => !blocked.has(u.id)).sort((a, b) => pos.get(a.id) - pos.get(b.id)) };
+    },
+    async setListPrivacy({ friendsVisibility, followsVisibility }) {
+      const v = {}; if (friendsVisibility) v.friends_visibility = friendsVisibility; if (followsVisibility) v.follows_visibility = followsVisibility;
+      ok(await sb.from('profiles').update(v).eq('id', me.id));
+      Object.assign(me, friendsVisibility ? { friendsVisibility } : {}, followsVisibility ? { followsVisibility } : {});
     },
     async people({ q }) {
       let s = sb.from('profiles').select(PROFILE).limit(30);
@@ -569,7 +581,7 @@ function demoApi() {
   let meId = get('me', null);
   const save = () => { for (const k of ['albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
-  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '' }; };
+  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followsVisibility: p.followsVisibility || 'public' }; };
   const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
   const albumVisible = a => a.privacy === 'public' || a.userId === meId || (a.privacy === 'friends' && meId && friendIds(meId).includes(a.userId));
@@ -941,6 +953,17 @@ function demoApi() {
       const u = user(id);
       if (!u) throw new Error('not found');
       return wait({ ...u, friends: friendIds(id).length, followers: db.follows.filter(f => f.endsWith(':' + id)).length, following: db.follows.filter(f => f.startsWith(id + ':')).length, rel: rel(id) });
+    },
+    async listPeople(uid, kind) {
+      const u = user(uid); if (!u) throw new Error('not found');
+      const vis = kind === 'friends' ? u.friendsVisibility : u.followsVisibility;
+      const allowed = uid === meId || vis === 'public' || (vis === 'friends' && meId && friendIds(meId).includes(uid));
+      if (!allowed) return wait({ hidden: true, visibility: vis, list: [] });
+      const ids = kind === 'friends' ? friendIds(uid) : kind === 'followers' ? db.follows.filter(f => f.endsWith(':' + uid)).map(f => f.split(':')[0]) : db.follows.filter(f => f.startsWith(uid + ':')).map(f => f.split(':')[1]);
+      return wait({ hidden: false, visibility: vis, list: ids.filter(x => !isBlocked(x)).map(user).filter(Boolean) });
+    },
+    async setListPrivacy({ friendsVisibility, followsVisibility }) {
+      const p = person(meId); if (friendsVisibility) p.friendsVisibility = friendsVisibility; if (followsVisibility) p.followsVisibility = followsVisibility; save();
     },
     async people({ q }) {
       const t = (q || '').trim().toLowerCase();

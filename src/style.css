@@ -664,3 +664,13 @@ button.cm-rx:hover{box-shadow:0 1px 4px rgba(0,0,0,.28)}
 .pl-hidden{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--mut);padding:18px 8px}
 .pl-hidden p{margin:4px 0}
 .pv-h{display:block;font-weight:700;margin:12px 0 6px}
+
+.lp-rows{display:flex;flex-direction:column;gap:8px}
+.lp-row{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:10px 12px;font:inherit;text-align:left;cursor:pointer;min-height:0}
+.lp-row:hover{background:var(--g2)}
+.lp-l{flex:1;display:flex;flex-direction:column}
+.lp-l small{color:var(--mut);font-size:12px}
+.lp-v{display:flex;align-items:center;gap:4px;color:var(--gt);font-weight:700;font-size:14px;white-space:nowrap}
+button.pv-opt{background:var(--card);color:var(--ink);font:inherit;text-align:left;width:100%;min-height:0}
+button.pv-opt.on{border-color:var(--g);background:var(--g2)}
+.pv-ok{margin-left:auto;color:var(--gt);font-weight:800}

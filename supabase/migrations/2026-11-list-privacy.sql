@@ -67,3 +67,38 @@ begin
   return jsonb_build_object('allowed', true, 'visibility', vis, 'ids', to_jsonb(coalesce(ids, '{}')));
 end $$;
 grant execute on function public.list_people(uuid, text) to anon, authenticated;
+
+-- ---------- ফলোয়ার ও ফলো করছেন তালিকার প্রাইভেসি আলাদা ----------
+alter table public.profiles add column if not exists followers_visibility text not null default 'public' check (followers_visibility in ('public','friends','only_me'));
+alter table public.profiles add column if not exists following_visibility text not null default 'public' check (following_visibility in ('public','friends','only_me'));
+do $$ begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'follows_visibility') then
+    update public.profiles set followers_visibility = follows_visibility, following_visibility = follows_visibility;
+    alter table public.profiles drop column follows_visibility;
+  end if;
+end $$;
+
+create or replace function public.list_people(uid uuid, kind text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare vis text; ok boolean; ids uuid[];
+begin
+  select case kind when 'friends' then friends_visibility when 'followers' then followers_visibility when 'following' then following_visibility end
+    into vis from public.profiles where id = uid;
+  if vis is null then return jsonb_build_object('allowed', false, 'ids', '[]'::jsonb); end if;
+  ok := uid = auth.uid() or public.is_admin() or vis = 'public' or (vis = 'friends' and private.are_friends(auth.uid(), uid));
+  if not ok then return jsonb_build_object('allowed', false, 'visibility', vis, 'ids', '[]'::jsonb); end if;
+  if kind = 'friends' then
+    select array_agg(x order by t desc) into ids from (
+      select case when requester = uid then addressee else requester end x, created_at t from public.friendships
+       where status = 'accepted' and uid in (requester, addressee)) s
+     where auth.uid() is null or not private.is_blocked(auth.uid(), x);
+  elsif kind = 'followers' then
+    select array_agg(follower_id order by created_at desc) into ids from public.follows
+     where followee_id = uid and (auth.uid() is null or not private.is_blocked(auth.uid(), follower_id));
+  else
+    select array_agg(followee_id order by created_at desc) into ids from public.follows
+     where follower_id = uid and (auth.uid() is null or not private.is_blocked(auth.uid(), followee_id));
+  end if;
+  return jsonb_build_object('allowed', true, 'visibility', vis, 'ids', to_jsonb(coalesce(ids, '{}')));
+end $$;
+grant execute on function public.list_people(uuid, text) to anon, authenticated;

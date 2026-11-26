@@ -756,9 +756,9 @@ async function peopleSheet(uid, kind) {
   openSheet(`<h2>${PLIST[kind]}</h2><div class="skel"></div>`);
   try {
     const [r, prof] = await Promise.all([S.api.listPeople(uid, kind), own ? me() : S.api.profile(uid).catch(() => null)]);
-    const visKey = kind === 'friends' ? 'friendsVisibility' : 'followsVisibility', vis = r.visibility || prof?.[visKey] || 'public';
+    const vis = r.visibility || prof?.[kind + 'Visibility'] || 'public';
     const head = `<h2>${PLIST[kind]}${r.hidden ? '' : ` <span class="mut" style="font-weight:400;font-size:15px">(${bn(r.list.length)})</span>`}</h2>
-      ${own ? `<button class="vis-line" id="pl-priv">${ic(PRIVACY[vis][0], 15)} কারা দেখবে: <b>${PRIVACY[vis][1]}</b> <span class="link">বদলান</span></button>` : ''}`;
+      ${own ? `<button class="vis-line" id="pl-priv">${ic(PRIVACY[vis][0], 15)} এই তালিকা কারা দেখবে: <b>${PRIVACY[vis][1]}</b> <span class="link">বদলান</span></button>` : ''}`;
     if (r.hidden) {
       openSheet(`${head}<div class="empty pl-hidden">${ic('lock', 34)}<p><b>${esc(prof?.name || 'এই ব্যক্তি')}</b> ${PLIST[kind]} তালিকা ${vis === 'friends' ? 'শুধু বন্ধুদের জন্য রেখেছেন' : 'গোপন রেখেছেন'}।</p><p class="mut">মোট সংখ্যা প্রোফাইলেই দেখা যাচ্ছে।</p></div><button class="btn ghost wide" data-close>বন্ধ করুন</button>`);
       return;
@@ -768,20 +768,28 @@ async function peopleSheet(uid, kind) {
       <div class="pl-list">${r.list.length ? r.list.map(row).join('') : `<p class="mut">${own ? 'এখনো কেউ নেই।' : 'এখনো কেউ নেই।'}</p>`}</div>
       <button class="btn ghost wide" data-close style="margin-top:10px">বন্ধ করুন</button>`);
     $('#pl-q')?.addEventListener('input', e => { const t = e.target.value.trim().toLowerCase(); document.querySelectorAll('.pl-list .person').forEach(x => { x.hidden = t && !x.dataset.pname.includes(t); }); });
-    $('#sheet').onclick = ev => { if (ev.target.closest('#pl-priv')) return listPrivacySheet(() => peopleSheet(uid, kind)); if (ev.target.closest('[data-user]')) closeSheet(); };
+    $('#sheet').onclick = ev => { if (ev.target.closest('#pl-priv')) return oneListPrivacy(kind, () => peopleSheet(uid, kind)); if (ev.target.closest('[data-user]')) closeSheet(); };
   } catch (e) { openSheet(`<h2>${PLIST[kind]}</h2><div class="empty">${esc(errText(e))}</div><button class="btn ghost wide" data-close>বন্ধ করুন</button>`); }
 }
-function listPrivacySheet(then) {
+// প্রতিটা তালিকার আলাদা প্রাইভেসি: তালিকা বাছলে পাশের সেটিং বদলানো যায়
+function listPrivacySheet() {
   const u = me(); if (!u) return;
-  const group = (name, label, cur) => `<label class="pv-h">${label}</label><div class="pv-pick">${Object.entries(PRIVACY).map(([k, [icn, l, sub]]) => `<label class="pv-opt"><input type="radio" name="${name}" value="${k}" ${k === cur ? 'checked' : ''}><span>${ic(icn, 18)}</span><span><b>${l}</b><small>${sub}</small></span></label>`).join('')}</div>`;
-  openSheet(`<h2>বন্ধু ও ফলো তালিকার প্রাইভেসি</h2>
-    <p class="mut" style="margin-top:0">তালিকা লুকালেও অন্যরা প্রোফাইলে মোট সংখ্যা দেখতে পাবে, শুধু কারা আছে তা দেখবে না।</p>
-    ${group('lp-fr', 'বন্ধু তালিকা কারা দেখবে', u.friendsVisibility || 'public')}
-    ${group('lp-fo', 'ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে', u.followsVisibility || 'public')}
-    <button class="btn wide" id="lp-save" style="margin-top:14px">সংরক্ষণ</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
-  $('#lp-save').onclick = e => {
-    const fr = document.querySelector('[name=lp-fr]:checked').value, fo = document.querySelector('[name=lp-fo]:checked').value;
-    busy(e.currentTarget, async () => { await S.api.setListPrivacy({ friendsVisibility: fr, followsVisibility: fo }); Object.assign(me(), { friendsVisibility: fr, followsVisibility: fo }); toast('প্রাইভেসি সংরক্ষণ হয়েছে'); if (then) then(); else closeSheet(); });
+  openSheet(`<h2>তালিকা কারা দেখবে</h2>
+    <p class="mut" style="margin-top:0">প্রতিটা তালিকার জন্য আলাদা বেছে নিন। লুকালেও অন্যরা প্রোফাইলে মোট সংখ্যা দেখবে, শুধু কারা আছে তা দেখবে না।</p>
+    <div class="lp-rows">${Object.entries(PLIST).map(([k, l]) => { const v = u[k + 'Visibility'] || 'public'; return `<button class="lp-row" data-lpk="${k}"><span class="lp-l"><b>${l} তালিকা</b><small>${PRIVACY[v][2]}</small></span><span class="lp-v">${ic(PRIVACY[v][0], 15)} ${PRIVACY[v][1]} ›</span></button>`; }).join('')}</div>
+    <button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
+  $('#sheet').onclick = ev => { const b = ev.target.closest('[data-lpk]'); if (b) oneListPrivacy(b.dataset.lpk, listPrivacySheet); };
+}
+function oneListPrivacy(kind, back) {
+  const u = me(), cur = u[kind + 'Visibility'] || 'public';
+  openSheet(`<h2>${PLIST[kind]} তালিকা কারা দেখবে</h2>
+    <div class="pv-pick">${Object.entries(PRIVACY).map(([k, [icn, l, sub]]) => `<button class="pv-opt${k === cur ? ' on' : ''}" data-pv1="${k}"><span>${ic(icn, 18)}</span><span><b>${l}</b><small>${sub}</small></span>${k === cur ? '<span class="pv-ok">✓</span>' : ''}</button>`).join('')}</div>
+    <button class="btn ghost wide" id="lp-back" style="margin-top:12px">ফিরে যান</button>`);
+  $('#lp-back').onclick = () => back();
+  $('#sheet').onclick = ev => {
+    const b = ev.target.closest('[data-pv1]'); if (!b) return;
+    const v = b.dataset.pv1; if (v === cur) return back();
+    busy(b, async () => { await S.api.setListPrivacy({ [kind]: v }); u[kind + 'Visibility'] = v; toast(`${PLIST[kind]} তালিকা: ${PRIVACY[v][1]}`); back(); });
   };
 }
 document.addEventListener('click', e => {
@@ -1774,7 +1782,7 @@ function renderMenu() {
     <details class="card"${u ? '' : ' hidden'}><summary>⚙️ সেটিংস ও প্রাইভেসি</summary><div class="setlist">
       <button id="edit">প্রোফাইল এডিট</button>
       <button id="chpw">পাসওয়ার্ড পরিবর্তন</button>
-      <button id="listpriv">বন্ধু ও ফলো তালিকা কারা দেখবে</button>
+      <button id="listpriv">বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
       <button id="blocked">ব্লক করা মানুষ</button>
       <button id="theme">থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
       <a href="./privacy.html">গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>

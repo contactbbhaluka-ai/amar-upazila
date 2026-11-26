@@ -1240,8 +1240,26 @@ function detailRows(u, keys) {
   }
   return out;
 }
+// প্রোফাইলে নামের নিচে: শুধু আইকন + মান, কোনো শিরোনাম নয়
+function introRows(u, keys) {
+  const out = [];
+  for (const k of keys) {
+    if (k === 'works') (u.works || []).forEach(w => out.push(row('work', w.title ? `${esc(w.title)}, ${esc(w.place)}` : esc(w.place))));
+    if (k === 'educations') (u.educations || []).forEach(e => out.push(row('school', esc(e.school))));
+    if (k === 'addr' && u.union) out.push(row('pin', esc(u.union)));
+    if (k === 'gender' && GENDERS[u.gender]) out.push(row('users', GENDERS[u.gender]));
+    if (k === 'birth' && birthText(u)) out.push(row('calendar', u.birthDate ? birthText(u) : bn(u.birthYear)));
+    if (k === 'relationship' && RELATIONSHIPS[u.relationship]) out.push(row('heart', RELATIONSHIPS[u.relationship]));
+    if (k === 'religion' && RELIGIONS[u.religion]) out.push(row('book', RELIGIONS[u.religion]));
+    if (k === 'orgs') (u.orgs || []).forEach(o => out.push(row('users', o.role ? `${esc(o.role)}, ${esc(o.name)}` : esc(o.name))));
+    if (k === 'phone' && u.phone) out.push(row('mobile', `<a href="tel:${esc(u.phone)}" class="link">${bn(u.phone)}</a>`));
+    if (k === 'social' && SOCIALS.some(([sk]) => u.social?.[sk])) out.push(socialHtml(u, false));
+    if (k === 'joined' && u.joinedAt) { const t = new Date(u.joinedAt); out.push(row('clock', `${MONTHS_BN[t.getMonth()]} ${bn(t.getFullYear())}`)); }
+  }
+  return out;
+}
 function introCard(u, own) {
-  const rows = detailRows(u, u.featured || FEATURED0);
+  const rows = introRows(u, u.featured || FEATURED0);
   if (!rows.length && !own) return '';
   return `<div class="intro-card">${rows.join('')}
     ${!rows.length ? '<p class="mut" style="margin:0;font-size:13px">কাজ, শিক্ষা, ঠিকানা ইত্যাদি এখানে দেখাতে পারেন</p>' : ''}

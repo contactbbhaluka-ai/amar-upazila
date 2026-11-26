@@ -1120,8 +1120,7 @@ function profTabs(key) {
 }
 function profComposer() {
   const u = me();
-  return `<div class="card composer-mini prof-comp"><div class="cm-top">${av(u)}<button class="cm-open" data-pcompose="">আপনার মনে কী আছে, ${esc(u.name.split(' ')[0])}?</button></div>
-    <div class="cm-quick"><button data-pcompose="photo"><span class="qi">${ic('photo', 20)}</span>ছবি</button><button data-pcompose="tag"><span class="qi">${ic('tag', 20)}</span>ট্যাগ</button><button data-pcompose="privacy"><span class="qi">${ic('globe', 20)}</span>প্রাইভেসি</button></div></div>`;
+  return `<div class="card composer-mini prof-comp"><div class="cm-top">${av(u)}<button class="cm-open" data-pcompose="">আপনার মনে কী আছে, ${esc(u.name.split(' ')[0])}?</button><button class="cm-photo" data-pcompose="photo" aria-label="ছবি দিয়ে পোস্ট করুন" title="ছবি">${ic('photo', 24)}</button></div></div>`;
 }
 // কোন ট্যাব খোলা সেই অনুযায়ী নিচের অংশ দেখানো
 function showProfPane(key) {
@@ -1143,8 +1142,7 @@ const profUid = key => (key === 'me' ? me()?.id : key === 'page' ? S.curPage?.ow
 const ownPane = key => key === 'me' || (key === 'page' && !!S.curPage?.isOwner);
 const panePage = key => (key === 'page' ? S.curPage?.id : undefined);
 function pageComposer(pg) {
-  return `<div class="card composer-mini prof-comp"><div class="cm-top">${entAv(pg)}<button class="cm-open" data-pgcompose="">${esc(pg.name)}-এর পক্ষে কিছু লিখুন…</button></div>
-    <div class="cm-quick"><button data-pgcompose="photo"><span class="qi">${ic('photo', 20)}</span>ছবি</button><button data-pgcompose="album"><span class="qi">${ic('album', 20)}</span>অ্যালবাম</button></div></div>`;
+  return `<div class="card composer-mini prof-comp"><div class="cm-top">${entAv(pg)}<button class="cm-open" data-pgcompose="">${esc(pg.name)}-এর পক্ষে কিছু লিখুন…</button><button class="cm-photo" data-pgcompose="photo" aria-label="ছবি দিয়ে পোস্ট করুন" title="ছবি">${ic('photo', 24)}</button><button class="cm-photo cm-album" data-pgcompose="album" aria-label="নতুন অ্যালবাম" title="অ্যালবাম">${ic('album', 24)}</button></div></div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-pgcompose]'); if (!b || !S.curPage) return;

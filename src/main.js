@@ -35,6 +35,12 @@ const ICONS = {
   send: '<path d="M4 12l16-8-6 16-2.5-6.5z"/>',
   photo: '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/>',
   camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  // সোশ্যাল লিংকের সাধারণ আইকন (কোম্পানির আসল লোগো নয়; পাশে নাম লেখা থাকে)
+  s_facebook: '<circle cx="12" cy="12" r="9"/><path d="M13.5 8.5h-1.2c-.9 0-1.3.5-1.3 1.3V21M9 13h5"/>',
+  s_whatsapp: '<path d="M4 20l1.3-3.8A8 8 0 1 1 8 19z"/><path d="M9.5 9.5c.3 2 2.5 4.6 5 5l1-1.2-1.6-.9-.8.7c-.9-.4-1.8-1.3-2.2-2.2l.7-.8-.9-1.6z"/>',
+  s_tiktok: '<path d="M14 4v10.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 4c.4 2.3 2 3.8 4.5 4"/>',
+  s_youtube: '<rect x="3" y="6" width="18" height="12" rx="3.5"/><path d="M10.5 9.5v5l4-2.5z"/>',
+  s_instagram: '<rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="16.8" cy="7.2" r=".6"/>',
   album: '<rect x="3" y="6" width="15" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/><path d="M3 16l4-4 4 4 3-3 4 4"/>',
   tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.6"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
@@ -748,6 +754,47 @@ document.addEventListener('click', async e => {
 });
 
 // ================================================================ অন্যের প্রোফাইল
+// ================================================================ সোশ্যাল লিংক
+// [key, নাম, ইনপুটের উদাহরণ]
+const SOCIALS = [
+  ['facebook', 'Facebook', 'লিংক বা ইউজারনেম, যেমন facebook.com/arif'],
+  ['whatsapp', 'WhatsApp', 'WhatsApp নম্বর, যেমন ০১৭১২৩৪৫৬৭৮'],
+  ['tiktok', 'TikTok', '@ইউজারনেম বা লিংক'],
+  ['youtube', 'YouTube', '@চ্যানেল বা লিংক'],
+  ['instagram', 'Instagram', 'ইউজারনেম বা লিংক'],
+];
+// সার্ভারের নিয়মের সাথে মিল রেখে: প্রতিটা লিংক শুধু নিজের সাইটের
+const SOCIAL_RX = {
+  facebook: /^https:\/\/(www\.|m\.|web\.)?(facebook\.com|fb\.com)\/.+/i, instagram: /^https:\/\/(www\.)?instagram\.com\/.+/i,
+  tiktok: /^https:\/\/(www\.|vm\.|vt\.)?tiktok\.com\/.+/i, youtube: /^https:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/.+/i, whatsapp: /^https:\/\/wa\.me\/[0-9]{8,15}$/,
+};
+const enDigits = t => t.replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
+// লিংক, ইউজারনেম বা নম্বর থেকে ঠিকঠাক লিংক; খালি হলে '', ভুল হলে null
+function normSocial(k, raw) {
+  let v = enDigits((raw || '').trim()); if (!v) return '';
+  if (k === 'whatsapp') {
+    const m = v.match(/wa\.me\/(\d{8,15})/); if (m) return 'https://wa.me/' + m[1];
+    let d = v.replace(/[^\d]/g, '');
+    if (d.startsWith('00')) d = d.slice(2); else if (/^01\d{9}$/.test(d)) d = '88' + d;
+    return /^\d{8,15}$/.test(d) ? 'https://wa.me/' + d : null;
+  }
+  if (!/^https?:\/\//i.test(v)) {
+    if (/^(www\.|m\.|web\.|vm\.|vt\.)?(facebook\.com|fb\.com|instagram\.com|tiktok\.com|youtube\.com|youtu\.be)\//i.test(v)) v = 'https://' + v;
+    else {
+      const h = v.replace(/^@/, ''); if (!/^[\w.\-]{1,60}$/.test(h)) return null;
+      v = { facebook: `https://facebook.com/${h}`, instagram: `https://instagram.com/${h}`, tiktok: `https://www.tiktok.com/@${h}`, youtube: `https://youtube.com/@${h}` }[k];
+    }
+  }
+  v = v.replace(/^http:/i, 'https:');
+  return v.length <= 200 && !/[\s<>"'\\]/.test(v) && SOCIAL_RX[k].test(v) ? v : null;
+}
+const socialHtml = (p, own) => {
+  const s = p.social || {}, list = SOCIALS.filter(([k]) => s[k] && SOCIAL_RX[k].test(s[k]));
+  if (!list.length) return own ? '<button class="soc-add" id="soc-add">+ সোশ্যাল লিংক যোগ করুন</button>' : '';
+  return `<div class="soc-row">${list.map(([k, l]) => `<a class="soc-b soc-${k}" href="${esc(s[k])}" target="_blank" rel="noopener noreferrer" aria-label="${l}-এ ${esc(p.name)}"><span class="soc-ic">${ic('s_' + k, 17)}</span>${l}</a>`).join('')}</div>`;
+};
+document.addEventListener('click', e => { if (e.target.closest('#soc-add')) { document.getElementById('edit')?.click(); setTimeout(() => $('#soc-facebook')?.scrollIntoView({ block: 'center' }), 80); } });
+
 // ================================================================ বন্ধু / ফলোয়ার / ফলো করছেন তালিকা ও তার প্রাইভেসি
 const PLIST = { friends: 'বন্ধু', followers: 'ফলোয়ার', following: 'ফলো করছেন' };
 const PLIST_IC = { friends: 'users', followers: 'user', following: 'user' };
@@ -956,6 +1003,7 @@ async function openUser(id, silent, keepState) {
     const p = await S.api.profile(id), r = p.rel || {};
     $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}</h2><div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
+      ${socialHtml(p, false)}
       ${statsHtml(p)}
       ${r.blocked ? `<p class="mut">আপনি এই ব্যক্তিকে ব্লক করেছেন।</p><button class="btn ghost" id="unblock">আনব্লক করুন</button>`
       : `<div class="row">${relBtns(p)}<button class="sbtn ${r.following ? 'ghost' : ''}" data-fo="${esc(p.id)}" data-on="${r.following ? 1 : 0}">${r.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" data-dm="${esc(p.id)}">মেসেজ</button><button class="more" id="umore" aria-label="আরও">⋯</button></div>`}</div>${r.blocked ? '' : profTabs('user')}`;
@@ -1222,6 +1270,7 @@ async function renderMe(mode = 'login') {
         <div class="mut" style="font-size:14px;margin-top:4px">${ic('calendar', 14)} সর্বশেষ রক্তদান: ${u.lastDonated ? esc(bnDate(u.lastDonated)) : 'দেওয়া নেই'} · ${donateStatus(u.lastDonated)}</div>
         <div class="row" style="margin-top:8px;justify-content:center"><button class="sbtn ghost" data-donor-edit>${ic('edit', 15)} ডোনার তথ্য আপডেট</button><button class="sbtn ghost" id="donated-today">${ic('drop', 15)} আজ রক্ত দিয়েছি</button></div>` : `<span class="mut" style="font-size:13px">ব্লাড গ্রুপ দেওয়া নেই</span> <button class="sbtn ghost" data-add-donor>${ic('drop', 15)} নিজের ডোনার প্রোফাইল যোগ করুন</button>`}</div>
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
+      ${socialHtml(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
       <div class="row"><button class="btn ghost" id="edit">প্রোফাইল এডিট</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
       ${profTabs('me')}`;
@@ -1293,6 +1342,8 @@ document.addEventListener('click', async e => {
       <label for="pe-ph">${ic('mobile', 16)} মোবাইল নম্বর</label><input id="pe-ph" required inputmode="tel" maxlength="17" value="${esc(u.phone ? bn(u.phone) : '')}" placeholder="০১XXXXXXXXX">
       ${bloodHtml('pe', u.bloodGroup || '', u.donorVisible, u.lastDonated || '')}
       <label for="pb">${ic('note', 16)} নিজের সম্পর্কে (ঐচ্ছিক)</label><input id="pb" maxlength="160" value="${esc(u.bio || '')}" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">
+      <div class="soc-edit"><b>সোশ্যাল লিংক <span class="mut" style="font-weight:400">(ঐচ্ছিক)</span></b>
+        ${SOCIALS.map(([k, l, ph]) => `<label for="soc-${k}" class="soc-l"><span class="soc-ic">${ic('s_' + k, 16)}</span>${l}</label><input id="soc-${k}" maxlength="200" inputmode="${k === 'whatsapp' ? 'tel' : 'url'}" autocomplete="off" value="${esc(k === 'whatsapp' && u.social?.[k] ? '+' + u.social[k].split('/').pop() : (u.social?.[k] || ''))}" placeholder="${esc(ph)}">`).join('')}</div>
       <div class="row" style="margin-top:16px"><button class="btn" style="flex:1">সেভ করুন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div></form>`);
     addrRefresh('pe', u);
     if ($('#pe-never')?.checked) $('#pe-ld').disabled = true;
@@ -1302,7 +1353,13 @@ document.addEventListener('click', async e => {
       if (!addr.upazila || (addr.upazila === HOME_UPAZILA && !addr.unionId)) return toast('ঠিকানা সম্পূর্ণ বাছাই করুন');
       if (!validPhone(phone)) return toast('সঠিক মোবাইল নম্বর দিন (যেমন ০১৭১২৩৪৫৬৭৮)');
       if (blood.err) return toast(blood.err);
-      busy(ev.submitter, async () => { await S.api.updateProfile({ name: $('#pn').value.trim(), ...addr, phone, ...blood, donorVisible: !!$('#pe-donor')?.checked, bio: $('#pb').value.trim() }); closeSheet(); renderMe(); renderComposer(); renderMenu(); toast('সেভ হয়েছে'); });
+      const social = {};
+      for (const [k, l] of SOCIALS) {
+        const v = normSocial(k, $('#soc-' + k).value);
+        if (v === null) { $('#soc-' + k).focus(); return toast(k === 'whatsapp' ? 'WhatsApp নম্বর ঠিক নেই (যেমন ০১৭১২৩৪৫৬৭৮)' : `${l} লিংক ঠিক নেই। ${l}-এর নিজের লিংক বা ইউজারনেম দিন।`); }
+        if (v) social[k] = v;
+      }
+      busy(ev.submitter, async () => { await S.api.updateProfile({ name: $('#pn').value.trim(), ...addr, phone, ...blood, donorVisible: !!$('#pe-donor')?.checked, bio: $('#pb').value.trim(), social }); closeSheet(); renderMe(); renderComposer(); renderMenu(); toast('সেভ হয়েছে'); });
     };
   }
   if (id === 'delacc') {

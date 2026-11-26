@@ -1389,3 +1389,9 @@ button.av-edit{border:0;background:none;padding:0;border-radius:50%}
 .req-dot{position:absolute;top:7px;left:calc(50% + 8px);width:11px;height:11px;border-radius:50%;background:#f59e0b;border:2px solid var(--card)}
 .req-dot.with-badge{top:22px;left:calc(50% + 14px)}
 .req-dot[hidden]{display:none}
+/* স্টোরির বৃত্ত সব ফোনে নিখুঁত গোল: শতাংশের বদলে নির্দিষ্ট মাপ (কিছু পুরোনো WebView-এ শতাংশ উচ্চতা ঠিকমতো ধরে না) */
+.st-ring{box-sizing:border-box;flex:none;width:64px;height:64px;min-width:64px;min-height:64px;aspect-ratio:1/1;overflow:visible}
+.st-ring .av,.st-ring img.av{width:58px!important;height:58px!important;min-width:58px!important;max-width:58px;aspect-ratio:1/1;border-radius:50%;object-fit:cover;box-sizing:border-box}
+.av-story{box-sizing:border-box;display:grid;place-items:center;flex:none;width:48px;height:48px;aspect-ratio:1/1}
+.av-story .av{width:42px;height:42px;min-width:42px;aspect-ratio:1/1;box-sizing:border-box}
+img.av{aspect-ratio:1/1}

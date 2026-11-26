@@ -616,7 +616,7 @@ document.addEventListener('submit', e => {
   e.preventDefault(); const key = feedOf(f), body = f.c.value.trim();
   if (!body || !needUser()) return;
   const p = findPost(key, f.dataset.cf);
-  busy(f.querySelector('button'), async () => { await S.api.addComment(p.id, body); p.comments++; S.open.set(p.id, await S.api.comments(p.id)); renderFeed(key); });
+  busy(f.querySelector('button'), async () => { await S.api.addComment(p.id, body, null, [], S.actAs?.id || null); p.comments++; S.open.set(p.id, await S.api.comments(p.id)); renderFeed(key); });
 });
 // রিয়্যাক্ট সেট (সঙ্গে সঙ্গে স্ক্রিনে দেখাই, সার্ভারে ব্যর্থ হলে ফিরিয়ে আনি)
 async function setReaction(key, p, reaction) {
@@ -827,7 +827,7 @@ function renderComposerSheet() {
   const tagLine = d.tags.length ? ` <span class="pc-with">— ${d.tags.length === 1 ? `<b>${esc(d.tags[0].name)}</b>-এর সাথে` : d.tags.length === 2 ? `<b>${esc(d.tags[0].name)}</b> ও <b>${esc(d.tags[1].name)}</b>-এর সাথে` : `<b>${esc(d.tags[0].name)}</b> ও আরও ${bn(d.tags.length - 1)} জনের সাথে`}</span>` : '';
   openSheet(`<div class="pc">
     <div class="pc-head"><b>${esc(d.title || 'পোস্ট তৈরি করুন')}</b><button class="pc-x" data-close aria-label="বন্ধ করুন">${ic('close', 20)}</button></div>
-    <div class="pc-author">${av(u)}<div><div class="pc-name"><b>${esc(d.authorName || u.name)}</b>${tagLine}</div>
+    <div class="pc-author">${d.pageId && d.authorName ? entAv({ name: d.authorName, avatar: d.authorAvatar }) : av(u)}<div><div class="pc-name"><b>${esc(d.authorName || u.name)}</b>${tagLine}</div>
       ${d.albumId ? `<span class="pc-priv static" title="অ্যালবামের প্রাইভেসি">${ic(pv[0], 14)} ${pv[1]}</span>` : own ? `<button class="pc-priv" id="pc-priv" aria-label="কারা দেখবে: ${pv[1]}">${ic(pv[0], 14)} ${pv[1]} ▾</button>` : `<span class="pc-priv static">${ic('globe', 14)} পাবলিক</span>`}</div></div>
     ${d.albumId ? `<div class="pc-album">${ic('album', 16)} অ্যালবাম: <b>${esc(d.albumName)}</b></div>` : ''}
     <textarea id="pc-text" maxlength="1000" placeholder="আপনার মনে কী আছে, ${esc(u.name.split(' ')[0])}? (কাউকে উল্লেখ করতে @ লিখুন)">${esc(d.body)}</textarea>
@@ -915,8 +915,8 @@ async function tagPicker() {
 document.querySelector('[data-compose="photo"] .qi').innerHTML = ic('photo', 20);
 document.querySelector('[data-compose="tag"] .qi').innerHTML = ic('tag', 20);
 document.querySelector('[data-compose="privacy"] .qi').innerHTML = ic('globe', 20);
-$('#cm-open').addEventListener('click', () => openPostComposer());
-$('#composer').addEventListener('click', e => { const b = e.target.closest('[data-compose]'); if (b) openPostComposer({}, b.dataset.compose); });
+$('#cm-open').addEventListener('click', () => openPostComposer(actAsOpts()));
+$('#composer').addEventListener('click', e => { const b = e.target.closest('[data-compose]'); if (b) openPostComposer(actAsOpts(), S.actAs && b.dataset.compose !== 'photo' ? undefined : b.dataset.compose); });
 
 function renderFilters() {
   $('#fchips').innerHTML = ['', ...POST_CATS].map(c => `<button class="chip${c === S.fcat ? ' on' : ''}" data-f="${esc(c)}">${esc(c || 'সব')}</button>`).join('');
@@ -1579,8 +1579,9 @@ async function loadConvs() {
   if (!me()) { box.innerHTML = `<div class="empty">মেসেজ দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
   try {
     const list = await S.api.conversations();
+    if (S.actAs && !S.convPage) S.convPage = S.actAs;
     const f = S.convPage, rows = f ? list.filter(c => c.asPage && c.pageId === f.id) : list.filter(c => !c.asPage);   // নিজের পেইজের মেসেজ শুধু পেইজের মেসেজ পাতায়
-    const head = f ? `<div class="card conv-filter">${entAv(f)}<div class="info"><b>${esc(f.name)}</b><small>পেইজের মেসেজ · আপনি পেইজের নামে উত্তর দেবেন</small></div>${f.isOwner ? `<button class="sbtn ghost" id="auto-reply">⚡ অটো মেসেজ${f.autoReplyOn ? ' ✓' : ''}</button><button class="sbtn ghost" id="faq-btn">❓ প্রশ্ন-উত্তর${f.faqs?.length ? ' ✓' : ''}</button>` : ''}<button class="link" id="conv-all">← আমার মেসেজ</button></div>` : '';
+    const head = f ? `<div class="card conv-filter">${entAv(f)}<div class="info"><b>${esc(f.name)}</b><small>পেইজের মেসেজ · আপনি পেইজের নামে উত্তর দেবেন</small></div>${f.isOwner ? `<button class="sbtn ghost" id="auto-reply">⚡ অটো মেসেজ${f.autoReplyOn ? ' ✓' : ''}</button><button class="sbtn ghost" id="faq-btn">❓ প্রশ্ন-উত্তর${f.faqs?.length ? ' ✓' : ''}</button>` : ''}${S.actAs ? '' : '<button class="link" id="conv-all">← আমার মেসেজ</button>'}</div>` : '';
     box.innerHTML = head + (rows.length ? rows.map(c => `<button class="conv${c.unread ? ' unread' : ''}" data-thread="${esc(c.userId)}" data-tpage="${esc(c.pageId || '')}">${c.pageId && !c.asPage ? entAv({ name: c.name, avatar: c.avatar }) : av(c)}<div class="info"><b>${esc(c.name)}</b>${c.pageId ? `<span class="conv-tag">${c.asPage ? `📄 ${esc(c.pageName)} পেইজে` : '📄 পেইজ'}</span>` : ''}<div class="last">${c.lastMine ? (c.asPage ? 'পেইজ: ' : 'আপনি: ') : ''}${esc(c.last)}</div></div><div style="text-align:right"><div class="time">${esc(ago(c.lastAt))}</div>${c.unread ? `<span class="badge">${bn(c.unread)}</span>` : ''}</div></button>`).join('')
       : `<div class="empty">${f ? 'এই পেইজে এখনো কেউ মেসেজ পাঠাননি।' : 'এখনো কোনো মেসেজ নেই।<br>কারও প্রোফাইলে গিয়ে "মেসেজ" চাপুন।'}</div>`);
     $('#conv-all')?.addEventListener('click', () => { S.convPage = null; loadConvs(); });
@@ -1619,7 +1620,7 @@ $('#tform').addEventListener('submit', e => {
 async function refreshBadges() {
   if (!me()) { $('#b-msgs').hidden = $('#b-friends').hidden = $('#b-notif').hidden = true; return; }
   try {
-    const [n, reqs, nt] = await Promise.all([S.api.unreadCount(), S.api.friendRequests(), S.api.unreadNotifications()]);
+    const [n, reqs, nt] = await Promise.all([S.actAs ? S.api.pageUnread().then(m => m.get(S.actAs.id) || 0) : S.api.unreadCount(), S.api.friendRequests(), S.api.unreadNotifications()]);
     const setB = (id, v) => { $(id).hidden = !v; $(id).textContent = v > 99 ? '৯৯+' : bn(v); };
     setB('#b-msgs', n); setB('#b-friends', reqs.length); setB('#b-notif', S.view === 'notif' ? 0 : nt);
   } catch { /* badge না দেখালেও চলে */ }
@@ -1922,13 +1923,52 @@ document.addEventListener('click', async e => {
 });
 const TAB_ME_ICON = $('#tab-av').innerHTML;
 function renderComposer() {
-  const u = me(); $('#comp-av').innerHTML = u ? av(u) : `<div class="av" aria-hidden="true">?</div>`; $('#tab-av').innerHTML = u ? av(u) : TAB_ME_ICON;
-  $('#cm-open').textContent = u ? `আপনার মনে কী আছে, ${u.name.split(' ')[0]}?` : 'আপনার মনে কী আছে? পোস্ট করতে লগইন করুন';
+  const u = me(), pg = u && S.actAs;
+  $('#comp-av').innerHTML = pg ? entAv(pg) : u ? av(u) : `<div class="av" aria-hidden="true">?</div>`; $('#tab-av').innerHTML = pg ? entAv(pg) : u ? av(u) : TAB_ME_ICON;
+  $('#cm-open').textContent = pg ? `${pg.name}-এর পক্ষে কিছু লিখুন…` : u ? `আপনার মনে কী আছে, ${u.name.split(' ')[0]}?` : 'আপনার মনে কী আছে? পোস্ট করতে লগইন করুন';
+  document.querySelectorAll('#composer [data-compose="tag"], #composer [data-compose="privacy"]').forEach(b => { b.hidden = !!pg; });   // পেইজের পোস্ট সবসময় পাবলিক
+  renderActAsBar();
 }
+// ---------- পেইজ হিসেবে চলা (ফেসবুকের মতো প্রোফাইল বদল)
+const actAsOpts = () => (S.actAs ? { pageId: S.actAs.id, authorName: S.actAs.name, authorAvatar: S.actAs.avatar, title: `${S.actAs.name}-এর পক্ষে পোস্ট` } : {});
+function renderActAsBar() {
+  let bar = $('#actas-bar');
+  if (!S.actAs || !me()) { bar?.remove(); document.body.classList.remove('acting'); return; }
+  if (!bar) { bar = document.createElement('div'); bar.id = 'actas-bar'; document.querySelector('header').after(bar); }
+  bar.innerHTML = `${entAv(S.actAs)}<span>আপনি এখন <b>${esc(S.actAs.name)}</b> হিসেবে আছেন</span><button id="actas-back">নিজের প্রোফাইলে ফিরুন</button>`;
+  document.body.classList.add('acting');
+  $('#actas-back').onclick = () => setActAs(null);
+}
+function setActAs(pg, quiet) {
+  S.actAs = pg ? { id: pg.id, name: pg.name, avatar: pg.avatar || '', verified: pg.verified || '', autoReplyOn: pg.autoReplyOn, autoReply: pg.autoReply, faqs: pg.faqs, isOwner: pg.isOwner !== false && !pg.isAdmin, canManage: true } : null;
+  local.set('actAs', S.actAs ? S.actAs.id : null);
+  S.convPage = null; S.draft = null;
+  renderComposer(); refreshBadges(); if (S.view === 'menu') renderMenu(); if (S.view === 'msgs') loadConvs();
+  if (!quiet) toast(pg ? `এখন "${pg.name}" হিসেবে আছেন: পোস্ট, মন্তব্য ও মেসেজ পেইজের নামে যাবে` : 'নিজের প্রোফাইলে ফিরেছেন');
+}
+async function restoreActAs() {
+  const id = local.get('actAs', null); if (!id || !me()) return;
+  try { const pg = await S.api.page(id); if (pg.canManage) setActAs(pg, true); else local.set('actAs', null); } catch { local.set('actAs', null); }
+}
+async function switcherHtml() {
+  const pages = await S.api.myPages().catch(() => []);
+  if (!pages.length) return '';
+  const u = me(), cur = S.actAs?.id;
+  return `<div class="card switcher"><b class="sw-h">প্রোফাইল বদলান</b>
+    <button class="sw-row${!cur ? ' on' : ''}" data-actas="">${av(u, 'sm')}<span><b>${esc(u.name)}</b><small>আপনার প্রোফাইল</small></span>${!cur ? '<i>✓</i>' : ''}</button>
+    ${pages.map(pg => `<button class="sw-row${cur === pg.id ? ' on' : ''}" data-actas="${esc(pg.id)}">${entAv(pg)}<span><b>${esc(pg.name)}${vb(pg.verified)}</b><small>পেইজ · ${pg.isAdmin ? 'অ্যাডমিন' : 'মালিক'}</small></span>${cur === pg.id ? '<i>✓</i>' : ''}</button>`).join('')}</div>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-actas]'); if (!b) return;
+  const id = b.dataset.actas;
+  if (!id) return setActAs(null);
+  await busy(b, async () => { const pg = await S.api.page(Number(id)); if (!pg.canManage) throw new Error('এই পেইজ চালানোর অনুমতি নেই'); setActAs(pg); });
+});
 function afterAuth() {
   if (!me() && S.scope === 'friends') S.scope = 'area';
   renderComposer(); renderFilters(); listenMessages(); refreshBadges(); loadFeed('home'); renderDemoBar();
   if (me()) S.api.weeklyReport?.().then(() => refreshBadges()).catch(() => {});
+  if (me()) restoreActAs(); else if (S.actAs) setActAs(null, true);
   if (S.view === 'me') renderMe(); if (S.view === 'friends') loadFriends(); if (S.view === 'msgs') loadConvs(); if (S.view === 'notif') loadNotifs(); if (S.view === 'menu') renderMenu();
 }
 
@@ -2097,7 +2137,7 @@ async function openPost(id) {
   open('post'); $('#cm-wrap').hidden = true; $('#cm-comp').hidden = true; $('#cm-list').innerHTML = '';
   await loadFeed('post');
   if (!S.feeds.post.posts.length) return;
-  $('#cm-wrap').hidden = false; $('#cm-comp').hidden = false; $('#cm-av').innerHTML = me() ? av(me(), 'sm') : '';
+  $('#cm-wrap').hidden = false; $('#cm-comp').hidden = false; $('#cm-av').innerHTML = S.actAs ? entAv(S.actAs) : me() ? av(me(), 'sm') : '';
   loadComments();
 }
 async function loadComments() {
@@ -2128,8 +2168,8 @@ function commentHtml(c, post, pinned) {
   const top = Object.entries(c.reactions || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
   return `<div class="cm${pinned ? ' pinned' : ''}${c.parentId ? ' reply' : ''}" data-cid="${esc(c.id)}">
     ${pinned ? `<div class="pin-label">${ic('pushpin', 13)} পিন করা মন্তব্য</div>` : ''}
-    <div class="cm-row">${userLink(c.userId, av(c, 'sm'))}
-      <div class="cm-main"><div class="cm-bubble">${userLink(c.userId, esc(c.author) + vb(c.badge), 'who-btn')}<div class="cm-text">${moreText(c.body, 'c' + c.id, { chars: 200, lines: 4, mentions: c.mentions })}</div>
+    <div class="cm-row">${c.pageId ? `<button class="avbtn" data-page="${esc(c.pageId)}">${entAv({ name: c.author, avatar: c.avatar })}</button>` : userLink(c.userId, av(c, 'sm'))}
+      <div class="cm-main"><div class="cm-bubble">${c.pageId ? `<button class="who-btn" data-page="${esc(c.pageId)}">${esc(c.author)}${vb(c.badge)}</button>` : userLink(c.userId, esc(c.author) + vb(c.badge), 'who-btn')}<div class="cm-text">${moreText(c.body, 'c' + c.id, { chars: 200, lines: 4, mentions: c.mentions })}</div>
         ${c.likes ? `<button class="cm-rx" data-crx="${esc(c.id)}" aria-label="কে কে রিয়্যাক্ট দিয়েছেন">${top.map(([k]) => `<span class="rs-i">${rxIcon(k, 16)}</span>`).join('')}<span>${bn(c.likes)}</span></button>` : ''}</div>
         <div class="cm-meta"><span>${esc(ago(c.createdAt))}${c.editedAt ? ' · সম্পাদিত' : ''}</span>
           <button class="cm-react${c.myReaction ? ' on rx-' + c.myReaction : ''}" data-clike="${esc(c.id)}" aria-label="${c.myReaction ? rxName(c.myReaction) + ' দিয়েছেন' : 'রিয়্যাক্ট দিন'}">${c.myReaction ? rxIcon(c.myReaction, 18) : ic('thumb', 17)}</button>
@@ -2142,7 +2182,7 @@ $('#cm-form').addEventListener('submit', e => {
   const post = S.feeds.post.posts[0];
   const rt = S.replyTo, ments = mentionIds(body, S.cmMentions);
   busy(e.submitter, async () => {
-    await S.api.addComment(post.id, body, rt?.id || null, ments); S.cmMentions.clear(); $('#cm-input').value = ''; post.comments++; renderFeed('post');
+    await S.api.addComment(post.id, body, rt?.id || null, ments, S.actAs?.id || null); S.cmMentions.clear(); $('#cm-input').value = ''; post.comments++; renderFeed('post');
     if (rt) { S.cmOpen.add(rt.id); setReplyTo(null); } else S.csort = 'new';
     await loadComments();
     if (rt) document.querySelector(`.cm-replies[data-rof="${rt.id}"] .cm:last-child`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -2407,7 +2447,7 @@ function renderMenu() {
     return `<button class="sc${off ? ' off' : ''}" data-mgo="${go2}"><span class="si">${icon}</span>${esc(label)}${off ? '<small>বন্ধ আছে (শুধু অ্যাডমিন দেখছেন)</small>' : sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
   };
   $('#menu').innerHTML = `
-    ${u ? `<button class="me-row" data-v="me">${av(u)}<div class="info"><b>${esc(u.name)}</b><div class="sub">আপনার প্রোফাইল দেখুন</div></div></button>`
+    ${u ? `<button class="me-row" data-v="me">${S.actAs ? entAv(S.actAs) : av(u)}<div class="info"><b>${esc(S.actAs ? S.actAs.name : u.name)}</b><div class="sub">${S.actAs ? 'পেইজ দেখুন' : 'আপনার প্রোফাইল দেখুন'}</div></div></button><div id="switcher"></div>`
       : `${demoCard()}<div class="card"><b>আপনি লগইন করেননি</b><p class="mut" style="margin:4px 0 10px">পোস্ট, বন্ধু, গ্রুপ ও পেইজ ব্যবহার করতে লগইন করুন।</p><button class="btn wide" data-v="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`}
     ${u?.admin ? `<button class="me-row admin-row" data-mgo="admin"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('shield', 22)}</span><div class="info"><b>অ্যাডমিন ড্যাশবোর্ড</b><div class="sub">অ্যাপের সংখ্যা ও সেটিংস</div></div></button>` : ''}
     <div class="sc-grid">
@@ -2434,6 +2474,7 @@ function renderMenu() {
       <button id="about">অ্যাপ সম্পর্কে<span class="val">${esc(versionLabel())}</span></button></div></details>
     ${u ? '<button class="btn ghost wide" id="logout" style="margin-top:4px">লগআউট</button>' : ''}`;
   document.querySelectorAll('#menu details').forEach((d, i) => { d.open = !!wasOpen[i]; });
+  if (u) switcherHtml().then(h => { const el = $('#switcher'); if (el) el.innerHTML = h; });
 }
 $('#menu').addEventListener('click', e => {
   const b = e.target.closest('[data-mgo]'); if (!b) return;
@@ -2846,7 +2887,7 @@ async function openPage(id, silent) {
       ${pg.about ? `<p class="about">${esc(pg.about)}</p>` : ''}${pg.phone ? `<p class="meta" style="margin:6px 0 0">📞 ${esc(bn(pg.phone))}</p>` : ''}
       ${pageAddrHtml(pg)}
       <div class="row">${pg.canManage
-        ? `<button class="sbtn" id="pg-inbox">💬 মেসেজ<span class="badge" id="pg-unread" hidden></span></button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button>${pg.isOwner ? `<button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button>` : ''}<button class="sbtn ghost" id="pg-share">🔗 শেয়ার</button><button class="more" id="pg-set" aria-label="পেইজের সেটিং">⚙️</button>`
+        ? `<button class="sbtn" id="pg-inbox">💬 মেসেজ<span class="badge" id="pg-unread" hidden></span></button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button>${pg.isOwner ? `<button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button>` : ''}<button class="sbtn ghost" id="pg-share">🔗 শেয়ার</button><button class="sbtn ghost" data-actas="${S.actAs?.id === pg.id ? '' : esc(pg.id)}">${S.actAs?.id === pg.id ? '👤 নিজের প্রোফাইলে ফিরুন' : '🔄 পেইজ হিসেবে চলুন'}</button><button class="more" id="pg-set" aria-label="পেইজের সেটিং">⚙️</button>`
         : `<button class="sbtn ${pg.following ? 'ghost' : ''}" data-pf="${esc(pg.id)}" data-on="${pg.following ? 1 : 0}">${pg.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" id="pg-msg">💬 মেসেজ</button><button class="sbtn ghost" id="pg-share">🔗</button>${tel ? `<a class="sbtn ghost" style="text-decoration:none;display:inline-grid;place-items:center" href="tel:${esc(tel)}">কল করুন</a>` : ''}<button class="more" id="pg-more" aria-label="আরও">⋯</button>`}</div></div>${profTabs('page')}`;
     if (!pg.isOwner && !silent) S.api.entVisit?.('page', pg.id).catch(() => {});
     $('#pg-badge')?.addEventListener('click', () => pageBadgeSheet(pg));
@@ -3140,6 +3181,7 @@ function show(v) {
 }
 // প্রধান ট্যাবে যাওয়া
 function go(v) {
+  if (v === 'me' && S.actAs && me()) { closeSheet(); S.stack = []; return openPage(S.actAs.id); }
   closeSheet(); S.stack = [];
   show(v);
   if (v === 'me') renderMe(); if (v === 'friends') loadFriends(); if (v === 'msgs') loadConvs();

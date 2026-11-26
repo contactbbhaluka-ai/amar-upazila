@@ -459,13 +459,13 @@ async function supabaseApi() {
     },
     // sort: 'top' (বেশি রিয়্যাক্ট), 'new' (নতুন), 'old' (পুরাতন)
     async comments(postId, sort = 'old') {
-      let q = sb.from('comments').select('id,body,created_at,edited_at,parent_id,user_id,like_count,reactions,profiles!comments_user_id_fkey(name,avatar_url,verified,verified_until),comment_mentions(profiles(id,name))').eq('post_id', postId).limit(300);
+      let q = sb.from('comments').select('id,body,created_at,edited_at,parent_id,user_id,like_count,reactions,page_id,pg:pages!comments_page_id_fkey(name,avatar_url,verified,verified_until),profiles!comments_user_id_fkey(name,avatar_url,verified,verified_until),comment_mentions(profiles(id,name))').eq('post_id', postId).limit(300);
       q = sort === 'top' ? q.order('like_count', { ascending: false }).order('created_at') : q.order('created_at', { ascending: sort === 'old' });
       const rows = ok(await q).filter(r => !blocked.has(r.user_id));
       let mine = new Map();
       if (me && rows.length) mine = new Map(ok(await sb.from('comment_likes').select('comment_id,reaction').eq('user_id', me.id).in('comment_id', rows.map(r => r.id))).map(x => [x.comment_id, x.reaction]));
       return rows.map(r => ({ id: r.id, body: r.body, createdAt: r.created_at, editedAt: r.edited_at || null, parentId: r.parent_id || null, userId: r.user_id,
-        mentions: (r.comment_mentions || []).map(t => t.profiles).filter(Boolean).map(t => ({ id: t.id, name: t.name })), author: r.profiles?.name || 'সদস্য', avatar: r.profiles?.avatar_url || '', badge: badgeOf(r.profiles),
+        mentions: (r.comment_mentions || []).map(t => t.profiles).filter(Boolean).map(t => ({ id: t.id, name: t.name })), author: r.pg?.name || r.profiles?.name || 'সদস্য', avatar: (r.page_id ? r.pg?.avatar_url : r.profiles?.avatar_url) || '', badge: r.page_id ? badgeOf(r.pg) : badgeOf(r.profiles), pageId: r.page_id || null,
         likes: r.like_count, reactions: r.reactions || {}, myReaction: mine.get(r.id) || '' }));
     },
     async reactComment(id, reaction, prev) {
@@ -480,8 +480,8 @@ async function supabaseApi() {
       const rows = ok(await sb.from(t).select('reaction, p:profiles(' + PROFILE + ')').eq(col, id).limit(500));
       return { list: rows.filter(r => r.p && !blocked.has(r.p.id)).map(r => ({ ...toUser(r.p), reaction: r.reaction })), unnamed: 0 };
     },
-    async addComment(postId, body, parentId = null, mentions = []) {
-      const row = ok(await sb.from('comments').insert({ post_id: postId, user_id: me.id, body, parent_id: parentId }).select('id').single());
+    async addComment(postId, body, parentId = null, mentions = [], pageId = null) {
+      const row = ok(await sb.from('comments').insert({ post_id: postId, user_id: me.id, body, parent_id: parentId, page_id: pageId || null }).select('id').single());
       await setMentions('comment', row.id, mentions);
     },
     async editComment(id, body, mentions = []) { ok(await sb.rpc('edit_comment', { p_id: id, p_body: body })); await setMentions('comment', id, mentions, true); },
@@ -1229,7 +1229,7 @@ function demoApi() {
     async deletePost(id) { db.posts = db.posts.filter(p => p.id !== id); save(); },
     async react(id, reaction, prev) { reactAs(meId, id, reaction, prev); },
     async comments(postId, sort = 'old') {
-      const list = (db.posts.find(p => p.id === Number(postId))?.cm || []).filter(c => !isBlocked(c.userId)).map(c => ({ ...c, mentions: (c.mentions || []).map(uid => user(uid)).filter(Boolean).map(u => ({ id: u.id, name: u.name })), author: user(c.userId)?.name || 'সদস্য', avatar: user(c.userId)?.avatar || '', badge: user(c.userId)?.verified || '',
+      const list = (db.posts.find(p => p.id === Number(postId))?.cm || []).filter(c => !isBlocked(c.userId)).map(c => ({ ...c, mentions: (c.mentions || []).map(uid => user(uid)).filter(Boolean).map(u => ({ id: u.id, name: u.name })), author: c.pageId && pageOf(c.pageId) ? pageOf(c.pageId).name : user(c.userId)?.name || 'সদস্য', avatar: c.pageId && pageOf(c.pageId) ? pageOf(c.pageId).avatar || '' : user(c.userId)?.avatar || '', badge: c.pageId && pageOf(c.pageId) ? badgeOf(pageOf(c.pageId)) : user(c.userId)?.verified || '', pageId: c.pageId || null,
         likes: c.likes || 0, reactions: c.rx || {}, myReaction: (c.rk || {})[meId] || '' }));
       list.sort((a, b) => sort === 'top' ? (b.likes - a.likes) || a.createdAt.localeCompare(b.createdAt) : sort === 'new' ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt));
       return wait(list);
@@ -1259,10 +1259,10 @@ function demoApi() {
       // ডেমোতে সবাই অ্যাডমিন, তাই যেকোনো পোস্টে পিন করা যায় (আসল সার্ভারে: পোস্টের মালিক, গ্রুপ অ্যাডমিন বা অ্যাপ অ্যাডমিন)
       p.pinned = commentId || null; save();
     },
-    async addComment(postId, body, parentId = null, mentions = []) {
+    async addComment(postId, body, parentId = null, mentions = [], pageId = null) {
       const p = db.posts.find(x => x.id === postId), parent = parentId && p.cm.find(c => c.id === parentId);
       if (parentId && (!parent || parent.parentId)) throw new Error('row-level security');
-      const c = { id: Date.now(), userId: meId, body, createdAt: new Date().toISOString(), parentId: parentId || null }; p.cm.push(c);
+      const c = { id: Date.now(), userId: meId, body, createdAt: new Date().toISOString(), parentId: parentId || null, pageId: pageId || null }; p.cm.push(c);
       c.mentions = mentionNotify(p, mentions, meId);
       if (parent) notify(parent.userId, meId, 'reply', p.id);
       if (!parent || parent.userId !== p.userId) notify(p.userId, meId, 'comment', p.id);

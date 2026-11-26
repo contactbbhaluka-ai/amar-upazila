@@ -996,3 +996,21 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 
 .pg-ub{position:static;display:inline-block;margin-right:6px;padding:2px 8px;font-size:12px}
 #pg-inbox .badge{position:static;margin-left:4px}
+
+/* ===== v36: পেইজ হিসেবে চলা ===== */
+#actas-bar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:8px;padding:7px 12px;background:#0b5d43;color:#fff;font-size:13.5px}
+#actas-bar .ent-av{width:26px;height:26px;min-width:26px;font-size:12px;border-radius:7px;border:0}
+#actas-bar span{flex:1;min-width:0}
+#actas-bar button{border:0;background:rgba(255,255,255,.18);color:#fff;border-radius:99px;padding:5px 10px;font:inherit;font-size:12.5px;cursor:pointer;min-height:0;white-space:nowrap}
+.switcher .sw-h{display:block;font-size:14px;margin-bottom:6px}
+.sw-row{display:flex;align-items:center;gap:10px;width:100%;padding:8px;border:0;background:none;border-radius:12px;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.sw-row.on{background:var(--g2)}
+.sw-row .ent-av{width:36px;height:36px;min-width:36px;font-size:15px;border-radius:10px}
+.sw-row span{flex:1;display:flex;flex-direction:column}
+.sw-row small{color:var(--mut);font-size:12px}
+.sw-row i{font-style:normal;color:var(--g);font-weight:700}
+#comp-av .ent-av,#tab-av .ent-av,#cm-av .ent-av{width:40px;height:40px;min-width:40px;font-size:16px;border-radius:10px}
+#tab-av .ent-av{width:30px;height:30px;min-width:30px;font-size:13px;border-radius:8px}
+#cm-av .ent-av{width:32px;height:32px;min-width:32px;font-size:13px;border-radius:8px}
+.cm-row .avbtn .ent-av{width:34px;height:34px;min-width:34px;font-size:14px;border-radius:9px}
+.pc-author .ent-av{width:42px;height:42px;min-width:42px;font-size:17px;border-radius:11px}

@@ -5750,6 +5750,7 @@ function show(v) {
   if (v !== 'thread') { try { VP.a.pause(); } catch { /* প্লেয়ার এখনো তৈরি হয়নি */ } }
   if (v !== 'msgs' && v !== 'thread') S.convPage = null;   // পেইজের মেসেজ-ফিল্টার শুধু ওই পাতায়
   S.view = v;
+  document.body.classList.remove('upz-root');
   if (TABS.includes(v)) S.tab = v;
   document.body.classList.toggle('searching', v === 'search');
   document.querySelectorAll('.view').forEach(e => e.classList.toggle('on', e.id === 'v-' + v));
@@ -5766,6 +5767,11 @@ function go(v) {
     return loadInsights();
   }
   if (v === 'friends' && S.actAs) return go('pinsights');
+  if (v === 'upz') {   // নিচের "উপজেলা" ট্যাব: সেবা ডিরেক্টরি
+    closeSheet(); S.stack = []; S.dcat = ''; if ($('#q')) $('#q').value = '';
+    show('dir'); S.tab = 'upz'; document.body.classList.add('upz-root'); document.querySelectorAll('header [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === 'upz'));
+    return loadDir();
+  }
   closeSheet(); S.stack = [];
   show(v);
   if (v === 'me') renderMe(); if (v === 'friends') loadFriends(); if (v === 'msgs') loadConvs();
@@ -5887,6 +5893,7 @@ function restoreNav() {
   const scroll = () => { if (n.y > 0) setTimeout(() => window.scrollTo(0, n.y), 700); };
   const base = TABS.includes(n.tab) ? n.tab : 'home';
   try {
+    if (n.tab === 'upz' && n.v === 'dir') { go('upz'); return scroll(); }
     if (TABS.includes(n.v)) { go(n.v); return scroll(); }
     if (base !== 'home') go(base);
     if (n.v === 'thread' && n.th) return openConv(n.th);

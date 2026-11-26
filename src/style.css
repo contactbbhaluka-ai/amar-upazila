@@ -1681,3 +1681,4 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .act-row:disabled{cursor:default;opacity:.7}.act-ic{font-size:20px;width:30px;text-align:center;flex:none}.act-b{display:flex;flex-direction:column;gap:2px;min-width:0}
 .act-q{font-size:14px}.act-p{color:var(--mut,#6b7280);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--line);padding-left:6px}.act-note{font-size:12.5px;text-align:center;margin:10px}
 .faq-i{border-bottom:1px solid var(--line);padding:10px 2px}.faq-i summary{font-weight:700;cursor:pointer}.faq-i p{margin:8px 0 2px;line-height:1.55}
+.upz-root #v-dir .back{display:none}

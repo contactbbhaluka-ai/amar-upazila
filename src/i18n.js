@@ -144,6 +144,7 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'উপজেলা সেবা ডিরেক্টরি': 'Upazila service directory',
   'আমার শর্টকাট': 'My shortcuts', 'সাজান': 'Arrange', '"সাজান" চেপে পছন্দের শর্টকাট এখানে রাখুন': 'Tap "Arrange" to keep favorite shortcuts here',
   'শর্টকাট সাজান': 'Arrange shortcuts', 'মেনুর একদম উপরে কোন শর্টকাটগুলো থাকবে বেছে নিন। ↑ ↓ দিয়ে আগে-পরে করুন। সর্বোচ্চ {x}টি': 'Choose which shortcuts stay at the top of the menu. Reorder with ↑ ↓. Up to {x}',
   'উপরে আছে ({x}': 'At the top ({x}', 'বাকি শর্টকাট': 'Other shortcuts', '＋ যোগ': '＋ Add', 'যোগ': 'Add', 'কিছু নেই': 'Nothing', 'হয়ে গেছে': 'Done', 'উপরে': 'Up', 'নিচে': 'Down',

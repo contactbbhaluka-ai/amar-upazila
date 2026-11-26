@@ -947,3 +947,12 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .notif .up{color:var(--g)} .notif .down{color:var(--r)}
 
 .in-sub{font-size:12.5px;margin:-4px 0 10px}
+
+/* ===== v32: পেইজের ব্যাজ ===== */
+.vf-for{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:14px}
+.vf-for .ent-av{width:28px;height:28px;font-size:13px}
+.vreq-page{display:flex;align-items:center;gap:8px;width:100%;margin-top:8px;padding:8px 10px;border-radius:10px;border:1px dashed var(--line);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.vreq-page .ent-av{width:34px;height:34px;font-size:14px}
+.vreq-page span{display:flex;flex-direction:column}
+.vreq-page small{color:var(--mut);font-size:12px}
+.vreq-page{justify-content:flex-start}.vreq-page span{align-items:flex-start}

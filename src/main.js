@@ -2021,7 +2021,8 @@ async function loadNotifs(keep) {
     const pending = new Set(reqs.map(r => r.id));
     box.innerHTML = list.length ? list.map(n => {
       if (SELF_TYPES.includes(n.type)) return selfNotif(n);
-      const [ic, txt] = NT[n.type] || ['•', ''];
+      const [ic, txt0] = NT[n.type] || ['•', ''];
+      const txt = n.meta?.page && (n.type === 'verify_ok' || n.type === 'verify_no') ? `আপনার পেইজ "${n.meta.page}"-এর ভেরিফাইড ব্যাজের আবেদন ${n.type === 'verify_ok' ? 'অনুমোদন করেছেন' : 'গ্রহণ করেননি'}` : txt0;
       const snip = n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
       const reqBtns = n.type === 'friend_request' && pending.has(n.actor.id)
         ? `<div class="acts2"><button class="sbtn" data-fr="accept" data-id="${esc(n.actor.id)}">গ্রহণ করুন</button><button class="sbtn ghost" data-fr="remove" data-id="${esc(n.actor.id)}">মুছুন</button></div>` : '';
@@ -2464,22 +2465,64 @@ $('#wallet').addEventListener('click', async e => {
     busy(e.target, async () => { await S.api.cancelVerification(Number(e.target.dataset.id)); toast('আবেদন বাতিল হয়েছে'); loadWallet(); });
   }
 });
-function verifySheet(kind) {
+// পেইজের মালিক: পেইজের ব্যাজের অবস্থা ও আবেদন
+async function pageBadgeSheet(pg) {
+  openSheet('<div class="skel"></div>');
+  try {
+    const [req, w] = await Promise.all([S.api.myVerifyRequest(pg.id), S.api.wallet()]);
+    S.walletCoins = w.coins;
+    const price = setN('badgePrice'), days = setN('badgeDays'), pending = req?.status === 'pending';
+    const status = pg.verified === 'authentic' ? `<div class="vb-status ok">${vb('authentic')} <span><b>পেইজটি ভেরিফাইড</b><small>পরিচিত প্রতিষ্ঠান হিসেবে যাচাই করা</small></span></div>`
+      : pg.verified === 'paid' ? `<div class="vb-status ok">${vb('paid')} <span><b>পেইজের ব্যাজ চালু আছে</b><small>মেয়াদ ${dateBn(pg.verifiedUntil)} পর্যন্ত</small></span></div>`
+      : `<div class="vb-status"><span class="vb-off">${VB_SVG}</span><span><b>পেইজে এখনো ব্যাজ নেই</b><small>পেইজের নামের পাশে নীল ব্যাজ দেখাতে আবেদন করুন</small></span></div>`;
+    const reqBox = pending ? `<div class="vreq-box"><b>${req.kind === 'paid' ? 'কয়েন দিয়ে ব্যাজের' : 'প্রতিষ্ঠান হিসেবে'} আবেদন বিবেচনাধীন</b><small>${esc(ago(req.createdAt))} জমা দিয়েছেন${req.coinsHeld ? ` · ${coin(req.coinsHeld)} রাখা আছে` : ''}</small><button class="btn ghost sm" id="pvreq-cancel">আবেদন বাতিল করুন</button></div>`
+      : req?.status === 'rejected' ? `<div class="vreq-box no"><b>আগের আবেদন গ্রহণ করা হয়নি</b>${req.adminNote ? `<small>কারণ: ${esc(req.adminNote)}</small>` : ''}</div>` : '';
+    const canApply = !pending && pg.verified !== 'authentic';
+    openSheet(`<h2>${esc(pg.name)}: ভেরিফাইড ব্যাজ</h2>${status}${reqBox}
+      ${canApply ? `<div class="vb-opts">
+        ${pg.verified === 'paid' ? '' : `<button class="vb-opt" data-pvapply="public_figure"><b>পরিচিত প্রতিষ্ঠান বা ব্র্যান্ড? ফ্রিতে আবেদন করুন</b><small>সরকারি অফিস, স্কুল-কলেজ, হাসপাতাল, পরিচিত দোকান বা সংগঠন। অ্যাডমিন যাচাই করে অনুমোদন দেবেন।</small></button>`}
+        <button class="vb-opt" data-pvapply="paid"><b>${pg.verified === 'paid' ? 'মেয়াদ বাড়ান' : 'কয়েন দিয়ে ব্যাজ নিন'}: ${coin(price)} · ${bn(days)} দিন</b><small>${w.coins >= price ? `আপনার কয়েন থেকে কাটা হবে (আছে ${bn(w.coins)})। অ্যাডমিন অনুমোদন দিলে চালু হবে।` : `আপনার আছে ${bn(w.coins)}, আরও ${bn(price - w.coins)} কয়েন দরকার।`}</small></button>
+      </div>` : ''}
+      <button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
+    $('#sheet').onclick = ev => {
+      const a = ev.target.closest('[data-pvapply]'); if (a) return verifySheet(a.dataset.pvapply, pg);
+      if (ev.target.id === 'pvreq-cancel') busy(ev.target, async () => { await S.api.cancelVerification(req.id); toast('আবেদন বাতিল হয়েছে'); pageBadgeSheet(pg); });
+    };
+  } catch (e) { closeSheet(); toast(errText(e)); }
+}
+function adminPageBadgeSheet(pg) {
+  const cur = pg.verified || '';
+  openSheet(`<h2>${esc(pg.name)}${vb(pg.verified)}</h2><p class="mut" style="margin-top:0">শুধু অ্যাডমিন দেখছেন</p>
+    <div class="adm-sec"><b>${ic('check', 16)} পেইজের ভেরিফাইড ব্যাজ</b><div class="adm-opts">
+      <label><input type="radio" name="apb" value="" ${cur ? '' : 'checked'}><span>ব্যাজ নেই</span></label>
+      <label><input type="radio" name="apb" value="authentic" ${cur === 'authentic' ? 'checked' : ''}><span>${vb('authentic')} পরিচিত প্রতিষ্ঠান (স্থায়ী)</span></label>
+      <label><input type="radio" name="apb" value="paid" ${cur === 'paid' ? 'checked' : ''}><span>${vb('paid')} মেয়াদি ব্যাজ</span></label></div>
+      <label class="adm-days" id="apb-days-w" ${cur === 'paid' ? '' : 'hidden'}>কত দিন (আজ থেকে)<input class="f" type="number" id="apb-days" min="1" max="3650" value="${setN('badgeDays')}"></label>
+      <button class="btn sm" id="apb-save" style="margin-top:8px">ব্যাজ সংরক্ষণ</button></div>
+    <button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
+  $('#sheet').onchange = ev => { if (ev.target.name === 'apb') $('#apb-days-w').hidden = ev.target.value !== 'paid'; };
+  $('#apb-save').onclick = ev => {
+    const v = document.querySelector('[name="apb"]:checked').value, d = Math.max(1, parseInt($('#apb-days').value, 10) || 30);
+    busy(ev.currentTarget, async () => { await S.api.adminSetPageBadge(pg.id, v || null, v === 'paid' ? d : null); closeSheet(); toast(v ? 'পেইজে ব্যাজ দেওয়া হয়েছে' : 'পেইজের ব্যাজ সরানো হয়েছে'); openPage(pg.id, true); });
+  };
+}
+const VCATS_PAGE = ['সরকারি প্রতিষ্ঠান', 'শিক্ষাপ্রতিষ্ঠান', 'হাসপাতাল / ক্লিনিক', 'ব্যবসা প্রতিষ্ঠান / ব্র্যান্ড', 'সংবাদমাধ্যম', 'স্বেচ্ছাসেবী সংগঠন', 'রাজনৈতিক সংগঠন', 'অন্যান্য'];
+function verifySheet(kind, page) {
   const u = me(), paid = kind === 'paid', price = setN('badgePrice'), days = setN('badgeDays');
   if (paid && (S.walletCoins ?? 0) < price) return toast(`যথেষ্ট কয়েন নেই, দরকার ${bn(price)}`);
-  openSheet(`<h2>${paid ? 'কয়েন দিয়ে ভেরিফাইড ব্যাজ' : 'পাবলিক ফিগার হিসেবে আবেদন'}</h2>
-    <p class="mut" style="margin-top:0">${paid ? `${coin(price)} কাটা হবে, অনুমোদন পেলে ${bn(days)} দিন নামের পাশে নীল ব্যাজ দেখাবে। আবেদন বাতিল বা প্রত্যাখ্যাত হলে কয়েন ফেরত পাবেন।` : 'অ্যাডমিন আপনার পরিচয় যাচাই করে অনুমোদন দিলে নামের পাশে স্থায়ী নীল ব্যাজ দেখাবে। এটা ফ্রি।'}</p>
+  openSheet(`<h2>${paid ? 'কয়েন দিয়ে ভেরিফাইড ব্যাজ' : page ? 'পরিচিত প্রতিষ্ঠান হিসেবে আবেদন' : 'পাবলিক ফিগার হিসেবে আবেদন'}</h2>${page ? `<p class="vf-for">${entAv(page)} <b>${esc(page.name)}</b> পেইজের জন্য</p>` : ''}
+    <p class="mut" style="margin-top:0">${paid ? `${coin(price)} কাটা হবে, অনুমোদন পেলে ${bn(days)} দিন নামের পাশে নীল ব্যাজ দেখাবে। আবেদন বাতিল বা প্রত্যাখ্যাত হলে কয়েন ফেরত পাবেন।` : (page ? 'অ্যাডমিন প্রতিষ্ঠানটি যাচাই করে অনুমোদন দিলে পেইজের নামের পাশে স্থায়ী নীল ব্যাজ দেখাবে। এটা ফ্রি।' : 'অ্যাডমিন আপনার পরিচয় যাচাই করে অনুমোদন দিলে নামের পাশে স্থায়ী নীল ব্যাজ দেখাবে। এটা ফ্রি।')}</p>
     <form id="vform">
-      <label for="vf-name">পুরো নাম (পরিচয়পত্র বা পরিচিতি অনুযায়ী)</label><input id="vf-name" required minlength="2" maxlength="80" value="${esc(u.name)}">
-      ${paid ? '' : `<label for="vf-cat">আপনি কে</label><select id="vf-cat" required><option value="">বেছে নিন</option>${VCATS.map(c => `<option>${c}</option>`).join('')}</select>
-      <label for="vf-links">পরিচিতির প্রমাণ (লিংক)</label><textarea id="vf-links" rows="2" maxlength="500" required placeholder="যেমন: আপনাকে নিয়ে খবর, অফিসিয়াল ওয়েবসাইট বা ফেসবুক পেইজের লিংক"></textarea>`}
+      <label for="vf-name">${page ? 'প্রতিষ্ঠানের পুরো নাম' : 'পুরো নাম (পরিচয়পত্র বা পরিচিতি অনুযায়ী)'}</label><input id="vf-name" required minlength="2" maxlength="80" value="${esc(page ? page.name : u.name)}">
+      ${paid ? '' : `<label for="vf-cat">${page ? 'প্রতিষ্ঠানের ধরন' : 'আপনি কে'}</label><select id="vf-cat" required><option value="">বেছে নিন</option>${(page ? VCATS_PAGE : VCATS).map(c => `<option>${c}</option>`).join('')}</select>
+      <label for="vf-links">পরিচিতির প্রমাণ (লিংক)</label><textarea id="vf-links" rows="2" maxlength="500" required placeholder="${page ? 'যেমন: প্রতিষ্ঠানের ওয়েবসাইট, ট্রেড লাইসেন্স বা নিবন্ধনের তথ্য, খবরের লিংক' : 'যেমন: আপনাকে নিয়ে খবর, অফিসিয়াল ওয়েবসাইট বা ফেসবুক পেইজের লিংক'}"></textarea>`}
       <label for="vf-note">${paid ? 'অ্যাডমিনকে কিছু জানাতে চাইলে (ঐচ্ছিক)' : 'আরও কিছু জানাতে চাইলে (ঐচ্ছিক)'}</label><textarea id="vf-note" rows="2" maxlength="500"></textarea>
       <div class="row" style="margin-top:14px"><button class="btn" style="flex:1">${paid ? `${coin(price)} দিয়ে আবেদন` : 'আবেদন জমা দিন'}</button><button class="btn ghost" type="button" data-close>বাতিল</button></div>
     </form>`);
   $('#vform').onsubmit = ev => {
     ev.preventDefault();
-    const v = { kind, name: $('#vf-name').value.trim(), category: $('#vf-cat')?.value || '', links: $('#vf-links')?.value.trim() || '', note: $('#vf-note').value.trim() };
-    busy(ev.submitter, async () => { await S.api.requestVerification(v); closeSheet(); toast('আবেদন জমা হয়েছে, অ্যাডমিন দেখে জানাবেন'); loadWallet(); });
+    const v = { kind, pageId: page?.id || null, name: $('#vf-name').value.trim(), category: $('#vf-cat')?.value || '', links: $('#vf-links')?.value.trim() || '', note: $('#vf-note').value.trim() };
+    busy(ev.submitter, async () => { await S.api.requestVerification(v); closeSheet(); toast('আবেদন জমা হয়েছে, অ্যাডমিন দেখে জানাবেন'); if (page) openPage(page.id, true); else loadWallet(); });
   };
 }
 // প্রোফাইলে ব্যাজে চাপলে কী ধরনের ব্যাজ তা দেখায়
@@ -2590,7 +2633,8 @@ async function adminUserSheet(u, after) {
 }
 const adminReqCard = r => `<div class="card vreq-card">
   <div class="person" style="padding:0">${userLink(r.userId, av(r.user || { name: r.name }))}<div class="info">${userLink(r.userId, esc(r.user?.name || r.name) + vb(r.user?.verified), 'who-btn')}<div class="sub">${esc(ago(r.createdAt))}</div></div>
-    <span class="vk ${r.kind}">${r.kind === 'paid' ? `কয়েন (${bn(r.coinsHeld)})` : 'পাবলিক ফিগার'}</span></div>
+    <span class="vk ${r.kind}">${r.kind === 'paid' ? `কয়েন (${bn(r.coinsHeld)})` : r.pageId ? 'প্রতিষ্ঠান' : 'পাবলিক ফিগার'}</span></div>
+  ${r.page ? `<button class="vreq-page" data-page="${esc(r.page.id)}">${entAv(r.page)}<span><small>পেইজের জন্য আবেদন</small><b>${esc(r.page.name)}</b></span></button>` : ''}
   <dl class="vreq-dl"><dt>পুরো নাম</dt><dd>${esc(r.name)}</dd>${r.category ? `<dt>পরিচয়</dt><dd>${esc(r.category)}</dd>` : ''}${r.links ? `<dt>প্রমাণ</dt><dd>${linkify(r.links)}</dd>` : ''}${r.note ? `<dt>বার্তা</dt><dd>${esc(r.note)}</dd>` : ''}</dl>
   <div class="row"><button class="btn sm" style="flex:1" data-vreq="${r.id}" data-ok="1">অনুমোদন</button><button class="btn ghost sm" style="flex:1" data-vreq="${r.id}" data-ok="0">প্রত্যাখ্যান</button></div></div>`;
 function decideReq(id, ok, btn) {
@@ -2735,7 +2779,7 @@ function watchPhoto(store, max = 600) {
 function openComposer({ pageId, groupId, title }) { openPostComposer({ pageId, groupId, title, authorName: title }); }
 
 // ================================================================ পেইজ
-const pageRow = (pg, btn) => `<div class="ent-row"><button class="ent-btn" data-page="${esc(pg.id)}">${entAv(pg)}</button><div class="info"><button class="ent-btn" data-page="${esc(pg.id)}">${esc(pg.name)}</button><div class="sub">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div></div>${btn || ''}</div>`;
+const pageRow = (pg, btn) => `<div class="ent-row"><button class="ent-btn" data-page="${esc(pg.id)}">${entAv(pg)}</button><div class="info"><button class="ent-btn" data-page="${esc(pg.id)}">${esc(pg.name)}${vb(pg.verified)}</button><div class="sub">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div></div>${btn || ''}</div>`;
 async function loadPages() {
   const box = $('#pages'); box.innerHTML = '<div class="skel"></div>';
   try {
@@ -2752,16 +2796,17 @@ async function openPage(id, silent) {
   try {
     const pg = await S.api.page(S.pageId);
     const tel = String(pg.phone || '').replace(/[^\d+]/g, '');
-    $('#page').innerHTML = `<div class="card ent-head">${entAv(pg)}<h2 style="margin:4px 0 0">${esc(pg.name)}</h2><div class="meta">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div>
+    $('#page').innerHTML = `<div class="card ent-head">${entAv(pg)}<h2 style="margin:4px 0 0">${esc(pg.name)}${vb(pg.verified, true)}</h2><div class="meta">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div>
       ${pg.about ? `<p class="about">${esc(pg.about)}</p>` : ''}${pg.phone ? `<p class="meta" style="margin:6px 0 0">📞 ${esc(bn(pg.phone))}</p>` : ''}
       <div class="row">${pg.isOwner
-        ? `<button class="sbtn" id="pg-post">+ পোস্ট করুন</button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button><button class="sbtn ghost" id="pg-edit">এডিট</button><button class="sbtn ghost" id="pg-del" style="color:var(--r)">মুছুন</button>`
+        ? `<button class="sbtn" id="pg-post">+ পোস্ট করুন</button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button><button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button><button class="sbtn ghost" id="pg-edit">এডিট</button><button class="sbtn ghost" id="pg-del" style="color:var(--r)">মুছুন</button>`
         : `<button class="sbtn ${pg.following ? 'ghost' : ''}" data-pf="${esc(pg.id)}" data-on="${pg.following ? 1 : 0}">${pg.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button>${tel ? `<a class="sbtn ghost" style="text-decoration:none;display:inline-grid;place-items:center" href="tel:${esc(tel)}">কল করুন</a>` : ''}<button class="more" id="pg-more" aria-label="আরও">⋯</button>`}</div></div>`;
     if (!pg.isOwner && !silent) S.api.entVisit?.('page', pg.id).catch(() => {});
+    $('#pg-badge')?.addEventListener('click', () => pageBadgeSheet(pg));
     $('#pg-post')?.addEventListener('click', () => openPostComposer({ pageId: pg.id, title: `${pg.name}-এর পক্ষে পোস্ট`, authorName: pg.name }));
     $('#pg-edit')?.addEventListener('click', () => pageForm(pg));
     $('#pg-del')?.addEventListener('click', async () => { if (await confirmSheet(`"${pg.name}" পেইজ ও এর সব পোস্ট মুছে ফেলবেন?`, 'মুছুন', true)) busy(null, async () => { await S.api.deletePage(pg.id); toast('পেইজ মুছে ফেলা হয়েছে'); back(); }); });
-    $('#pg-more')?.addEventListener('click', () => { if (!needUser()) return; openSheet('<div class="menu"><button data-act="r">পেইজ রিপোর্ট করুন</button><button data-close>বন্ধ করুন</button></div>'); $('#sheet').onclick = ev => { if (ev.target.closest('[data-act=r]')) reportSheet('user', 'page:' + pg.id); }; });
+    $('#pg-more')?.addEventListener('click', () => { if (!needUser()) return; openSheet(`<div class="menu">${me()?.admin ? `<button data-act="ab">${ic('shield', 16)} অ্যাডমিন: পেইজের ব্যাজ</button>` : ''}<button data-act="r">পেইজ রিপোর্ট করুন</button><button data-close>বন্ধ করুন</button></div>`); $('#sheet').onclick = ev => { if (ev.target.closest('[data-act=r]')) reportSheet('user', 'page:' + pg.id); if (ev.target.closest('[data-act=ab]')) adminPageBadgeSheet(pg); }; });
     if (!silent) loadFeed('page');
   } catch (e) { $('#page').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }

@@ -29,7 +29,7 @@ const SELF_NT = ['milestone', 'follower_milestone', 'weekly'];
 const toGrowth = r => ({ visits: r.visits || 0, visitors: r.visitors || 0, visitsDaily: r.visits_daily || [], followers: r.followers || 0, gained: r.gained || 0, lost: r.lost || 0, followDaily: r.follow_daily || [] });
 const toEnt = r => ({ ...toInsights(r), growth: toGrowth(r), pending: r.pending || 0, activeMembers: r.active_members || 0 });
 const lastDays = n => Array.from({ length: n }, (_, i) => { const d = new Date(Date.now() + 6 * 3600e3 - (n - 1 - i) * 864e5); return d.toISOString().slice(0, 10); });
-const toReq = r => r && ({ id: r.id, userId: r.user_id, kind: r.kind, name: r.full_name, category: r.category || '', links: r.links || '', note: r.note || '', status: r.status, adminNote: r.admin_note || '', coinsHeld: r.coins_held || 0, createdAt: r.created_at, decidedAt: r.decided_at || null });
+const toReq = r => r && ({ id: r.id, userId: r.user_id, pageId: r.page_id || null, kind: r.kind, name: r.full_name, category: r.category || '', links: r.links || '', note: r.note || '', status: r.status, adminNote: r.admin_note || '', coinsHeld: r.coins_held || 0, createdAt: r.created_at, decidedAt: r.decided_at || null });
 const settingDefaults = () => Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d]));
 
 export const PAGE = 20;
@@ -58,17 +58,17 @@ async function supabaseApi() {
     mentions: (r.post_mentions || []).map(t => t.profiles).filter(Boolean).map(t => ({ id: t.id, name: t.name })),
     category: r.category, createdAt: r.created_at, editedAt: r.edited_at || null, rawImages: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []),
     likes: r.like_count, reactions: r.reactions || {}, myReaction: mine.get(r.id) || '', comments: r.comment_count, userId: r.user_id,
-    author: r.pages?.name || r.profiles?.name || 'সদস্য', avatar: (r.page_id ? r.pages?.avatar_url : r.profiles?.avatar_url) || '', badge: r.page_id ? '' : badgeOf(r.profiles),
+    author: r.pages?.name || r.profiles?.name || 'সদস্য', avatar: (r.page_id ? r.pages?.avatar_url : r.profiles?.avatar_url) || '', badge: r.page_id ? badgeOf(r.pages) : badgeOf(r.profiles),
     union: r.unions?.name || r.profiles?.upazila || '', liked: mine.has(r.id), saved: saved.has(r.id),
     pageId: r.page_id || null, groupId: r.group_id || null, groupName: r.groups?.name || '', poster: r.profiles?.name || '',
     shares: r.share_count || 0, saves: r.save_count || 0, pinnedCommentId: r.pinned_comment_id || null,
     sharedPostId: r.shared_post_id || null, sharedMissing: !!r.shared_post_id && !r.sp,
     kind: r.kind || 'normal', albumId: r.album_id || null, albumName: r.al?.name || '',
     shared: r.sp ? { id: r.sp.id, body: r.sp.body, image: r.sp.image_urls?.[0] || r.sp.image_url || '', createdAt: r.sp.created_at, userId: r.sp.user_id, pageId: r.sp.page_id || null,
-      author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '', badge: r.sp.page_id ? '' : badgeOf(r.sp.profiles) } : null,
+      author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '', badge: r.sp.page_id ? badgeOf(r.sp.pages) : badgeOf(r.sp.profiles) } : null,
   });
-  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url,verified,verified_until),pages!posts_page_id_fkey(name,avatar_url)),kind,album_id,al:albums!posts_album_id_fkey(id,name),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila,verified,verified_until),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url),groups!posts_group_id_fkey(name)';
-  const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count });
+  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url,verified,verified_until),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until)),kind,album_id,al:albums!posts_album_id_fkey(id,name),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila,verified,verified_until),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until),groups!posts_group_id_fkey(name)';
+  const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count, verified: badgeOf(r), verifiedUntil: r.verified_until || null });
   const toGroup = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, about: r.about || '', privacy: r.privacy, avatar: r.avatar_url || '', members: r.member_count });
   const inList = ids => `(${ids.join(',')})`;
 
@@ -224,17 +224,20 @@ async function supabaseApi() {
       ]);
       return { coins: ok(w)?.coins || 0, today: ok(today).reduce((t, r) => t + r.amount, 0), ledger: ok(led).map(r => ({ amount: r.amount, reason: r.reason, ref: r.ref, createdAt: r.created_at })) };
     },
-    async myVerifyRequest() {
-      const rows = ok(await sb.from('verify_requests').select('*').eq('user_id', me.id).order('created_at', { ascending: false }).limit(1));
+    async myVerifyRequest(pageId) {
+      let q = sb.from('verify_requests').select('*').eq('user_id', me.id);
+      q = pageId ? q.eq('page_id', pageId) : q.is('page_id', null);
+      const rows = ok(await q.order('created_at', { ascending: false }).limit(1));
       return toReq(rows[0]) || null;
     },
-    async requestVerification(v) { return ok(await sb.rpc('request_verification', { p_kind: v.kind, p_name: v.name, p_category: v.category || '', p_links: v.links || '', p_note: v.note || '' })); },
+    async requestVerification(v) { return ok(await sb.rpc('request_verification', { p_kind: v.kind, p_name: v.name, p_category: v.category || '', p_links: v.links || '', p_note: v.note || '', p_page: v.pageId || null })); },
     async cancelVerification(id) { ok(await sb.rpc('cancel_verification', { p_id: id })); },
     async adminVerifyRequests() {
-      const rows = ok(await sb.from('verify_requests').select('*, p:profiles!verify_requests_user_id_fkey(' + PROFILE + ')').eq('status', 'pending').order('created_at'));
-      return rows.map(r => ({ ...toReq(r), user: toUser(r.p) }));
+      const rows = ok(await sb.from('verify_requests').select('*, p:profiles!verify_requests_user_id_fkey(' + PROFILE + '), pg:pages!verify_requests_page_id_fkey(*)').eq('status', 'pending').order('created_at'));
+      return rows.map(r => ({ ...toReq(r), user: toUser(r.p), page: toPage(r.pg) }));
     },
     async decideVerification(id, approve, note) { ok(await sb.rpc('decide_verification', { p_id: id, p_approve: approve, p_note: note || null })); },
+    async adminSetPageBadge(pid, verified, days) { ok(await sb.rpc('admin_set_page_badge', { p_page: pid, p_verified: verified || null, p_days: days || null })); },
     async adminSetBadge(uid, verified, days) { ok(await sb.rpc('admin_set_badge', { p_user: uid, p_verified: verified || null, p_days: days || null })); },
     async adminAdjustCoins(uid, amount, note) { ok(await sb.rpc('admin_adjust_coins', { p_user: uid, p_amount: amount, p_note: note || null })); },
     async adminUserWallet(uid) { return { coins: ok(await sb.from('wallets').select('coins').eq('user_id', uid).maybeSingle())?.coins || 0 }; },
@@ -657,7 +660,7 @@ function demoApi() {
       { id: 1, createdBy: 'd3', name: 'আব্দুল করিম', district: 'ময়মনসিংহ', upazila: 'ভালুকা', unionId: 7, phone: '01700000140', bloodGroup: 'O-', lastDonated: '' },
     ]),
     pages: get('pages', [
-      { id: 1, ownerId: 'd1', name: 'জননী ডায়াগনস্টিক সেন্টার', category: 'স্বাস্থ্য', about: 'সব ধরনের পরীক্ষা ও বিশেষজ্ঞ ডাক্তার। শুক্রবার খোলা।', phone: '01700-000020', avatar: '' },
+      { id: 1, ownerId: 'd1', verified: 'authentic', name: 'জননী ডায়াগনস্টিক সেন্টার', category: 'স্বাস্থ্য', about: 'সব ধরনের পরীক্ষা ও বিশেষজ্ঞ ডাক্তার। শুক্রবার খোলা।', phone: '01700-000020', avatar: '' },
       { id: 2, ownerId: 'd6', name: 'উপজেলা চাকরির খবর', category: 'চাকরি ও প্রশিক্ষণ', about: 'উপজেলার সরকারি-বেসরকারি চাকরি ও প্রশিক্ষণের খবর।', phone: '', avatar: '' },
     ]),
     pageFollows: get('pageFollows', ['d2:1', 'd3:1', 'd4:2']),
@@ -747,7 +750,7 @@ function demoApi() {
   const canSeeGroup = gid => { const g = db.groups.find(x => x.id === gid); return !g || g.privacy === 'public' || member(gid, meId)?.status === 'active'; };
   const pageOf = id => db.pages.find(x => x.id === Number(id));
   const groupOut = g => ({ ...g, members: db.members.filter(m => m.groupId === g.id && m.status === 'active').length });
-  const pageOut = pg => ({ ...pg, followers: db.pageFollows.filter(f => f.endsWith(':' + pg.id)).length });
+  const pageOut = pg => ({ ...pg, followers: db.pageFollows.filter(f => f.endsWith(':' + pg.id)).length, verified: badgeOf(pg), verifiedUntil: pg.verifiedUntil || null });
   // ডেমো: মেনশন — শুধু যাঁরা পোস্ট দেখতে পারেন তাঁদের নোটিফিকেশন
   function mentionNotify(p, ids, from, old = []) {
     const fr = new Set(friendIds(p.userId)), g = p.groupId && db.groups.find(x => x.id === p.groupId);
@@ -975,32 +978,34 @@ function demoApi() {
       const since = dhakaMidnight().toISOString(), w = db.wallet;
       return wait({ coins: w.coins, today: w.ledger.filter(l => EARN_REASONS.includes(l.reason) && l.createdAt >= since).reduce((t, l) => t + l.amount, 0), ledger: w.ledger.slice(0, 60) });
     },
-    async myVerifyRequest() { return wait(toReq([...db.vreqs].reverse().find(r => r.user_id === meId)) || null); },
+    async myVerifyRequest(pageId) { return wait(toReq([...db.vreqs].reverse().find(r => r.user_id === meId && (r.page_id || null) === (pageId || null))) || null); },
     async requestVerification(v) {
-      const me = person(meId);
-      if (badgeOf(me) === 'authentic') throw new Error('আপনার অ্যাকাউন্ট আগেই ভেরিফাইড');
-      if (db.vreqs.some(r => r.user_id === meId && r.status === 'pending')) throw new Error('আপনার একটি আবেদন এখনো বিবেচনাধীন');
+      const pg = v.pageId ? pageOf(v.pageId) : null;
+      if (v.pageId && (!pg || pg.ownerId !== meId)) throw new Error('শুধু পেইজের মালিক আবেদন করতে পারেন');
+      if (badgeOf(pg || person(meId)) === 'authentic') throw new Error('আগেই ভেরিফাইড');
+      if (db.vreqs.some(r => r.user_id === meId && (r.page_id || null) === (v.pageId || null) && r.status === 'pending')) throw new Error('একটি আবেদন এখনো বিবেচনাধীন');
       const price = v.kind === 'paid' ? sett('badgePrice') : 0;
       if (db.wallet.coins < price) throw new Error(`যথেষ্ট কয়েন নেই (দরকার ${price})`);
-      const r = { id: nid(db.vreqs), user_id: meId, kind: v.kind, full_name: v.name, category: v.category || '', links: v.links || '', note: v.note || '', status: 'pending', coins_held: price, created_at: new Date().toISOString() };
+      const r = { id: nid(db.vreqs), user_id: meId, page_id: v.pageId || null, kind: v.kind, full_name: v.name, category: v.category || '', links: v.links || '', note: v.note || '', status: 'pending', coins_held: price, created_at: new Date().toISOString() };
       db.vreqs.push(r); if (price) addCoins(-price, 'badge', r.id); save(); return r.id;
     },
     async cancelVerification(id) {
       const r = db.vreqs.find(x => x.id === id && x.user_id === meId && x.status === 'pending'); if (!r) throw new Error('আবেদন পাওয়া যায়নি');
       r.status = 'cancelled'; if (r.coins_held) addCoins(r.coins_held, 'refund', id); save();
     },
-    async adminVerifyRequests() { return wait(db.vreqs.filter(r => r.status === 'pending').map(r => ({ ...toReq(r), user: user(r.user_id) }))); },
+    async adminVerifyRequests() { return wait(db.vreqs.filter(r => r.status === 'pending').map(r => ({ ...toReq(r), user: user(r.user_id), page: r.page_id && pageOf(r.page_id) ? pageOut(pageOf(r.page_id)) : null }))); },
     async decideVerification(id, approve, note) {
       const r = db.vreqs.find(x => x.id === id && x.status === 'pending'); if (!r) throw new Error('আবেদন পাওয়া যায়নি');
       Object.assign(r, { status: approve ? 'approved' : 'rejected', admin_note: note || '', decided_at: new Date().toISOString() });
-      const p = person(r.user_id);
+      const p = r.page_id ? pageOf(r.page_id) : person(r.user_id);
       if (approve && p) {
         if (r.kind === 'public_figure') Object.assign(p, { verified: 'authentic', verifiedUntil: null });
         else { const base = p.verified === 'paid' && new Date(p.verifiedUntil) > Date.now() ? new Date(p.verifiedUntil).getTime() : Date.now(); Object.assign(p, { verified: 'paid', verifiedUntil: new Date(base + sett('badgeDays') * 864e5).toISOString() }); }
       } else if (!approve && r.coins_held && r.user_id === meId) addCoins(r.coins_held, 'refund', id);
-      if (r.user_id === meId) notify(meId, 'd6', approve ? 'verify_ok' : 'verify_no', null);
+      if (r.user_id === meId) notify(meId, 'd6', approve ? 'verify_ok' : 'verify_no', null, null, r.page_id ? { page: pageOf(r.page_id)?.name } : null);
       save();
     },
+    async adminSetPageBadge(pid, verified, days) { const p = pageOf(pid); if (p) Object.assign(p, { verified: verified || null, verifiedUntil: verified === 'paid' ? new Date(Date.now() + (days || 30) * 864e5).toISOString() : null }); save(); },
     async adminSetBadge(uid, verified, days) { const p = person(uid); if (p) Object.assign(p, { verified: verified || null, verifiedUntil: verified === 'paid' ? new Date(Date.now() + (days || 30) * 864e5).toISOString() : null }); save(); },
     async adminAdjustCoins(uid, amount, note) {
       const cur = uid === meId ? db.wallet.coins : (person(uid)?.coins || 0);
@@ -1091,8 +1096,8 @@ function demoApi() {
           mentions: (p.mentions || []).map(uid => user(uid)).filter(Boolean).map(u => ({ id: u.id, name: u.name })),
           category: p.category, createdAt: p.createdAt, editedAt: p.editedAt || null, rawImages: p.images?.length ? p.images : (p.image ? [p.image] : []), likes: p.likes, comments: p.cm.length, userId: p.userId,
           shares: db.posts.filter(x => x.sharedPostId === p.id).length, saves: (p.sv || 0) + db.saved.filter(k => k.endsWith(':' + p.id)).length, pinnedCommentId: p.pinned || null, sharedPostId: p.sharedPostId || null, sharedMissing: !!p.sharedPostId && !sp,
-          shared: sp ? { id: sp.id, body: sp.body, image: demoPic(sp.images?.[0] || sp.image || ''), createdAt: sp.createdAt, userId: sp.userId, pageId: sp.pageId || null, author: spPg ? spPg.name : spU?.name || 'সদস্য', avatar: spPg ? spPg.avatar : spU?.avatar || '', badge: spPg ? '' : (spU?.verified || '') } : null,
-          author: pg ? pg.name : u.name, avatar: pg ? pg.avatar : u.avatar, badge: pg ? '' : (u.verified || ''), poster: u.name, union: uname(p.unionId), liked: db.likes.includes(meId + ':' + p.id),
+          shared: sp ? { id: sp.id, body: sp.body, image: demoPic(sp.images?.[0] || sp.image || ''), createdAt: sp.createdAt, userId: sp.userId, pageId: sp.pageId || null, author: spPg ? spPg.name : spU?.name || 'সদস্য', avatar: spPg ? spPg.avatar : spU?.avatar || '', badge: spPg ? badgeOf(spPg) : (spU?.verified || '') } : null,
+          author: pg ? pg.name : u.name, avatar: pg ? pg.avatar : u.avatar, badge: pg ? badgeOf(pg) : (u.verified || ''), poster: u.name, union: uname(p.unionId), liked: db.likes.includes(meId + ':' + p.id),
           reactions: p.rx || { like: p.likes }, myReaction: db.reacts[meId + ':' + p.id] || (db.likes.includes(meId + ':' + p.id) ? 'like' : ''),
           saved: db.saved.includes(meId + ':' + p.id), pageId: p.pageId || null, groupId: p.groupId || null, groupName: g ? g.name : '',
           views: p.userId === meId ? demoViews(p).views : 0, kind: p.kind || 'normal', albumId: p.albumId || null, albumName: p.albumId ? (db.albums.find(a => a.id === p.albumId && albumVisible(a))?.name || '') : '' };

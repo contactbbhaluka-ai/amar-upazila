@@ -2279,7 +2279,7 @@ function activeText(t) {
   if (min < 24 * 60) return `${bn(Math.floor(min / 60))} ঘণ্টা আগে সক্রিয় ছিলেন`;
   return '';
 }
-const groupAv = (name, cls = '') => `<div class="av grp-av ${cls}" aria-hidden="true">${ic('users', 22)}</div>`;
+const groupAv = (name, cls = '', photo = '') => (photo ? `<img class="av ${cls}" src="${esc(photo)}" alt="" loading="lazy" decoding="async">` : `<div class="av grp-av ${cls}" aria-hidden="true">${ic('users', 22)}</div>`);
 async function loadConvs() {
   const box = $('#convs');
   if (!me()) { box.innerHTML = `<div class="empty">মেসেজ দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
@@ -2304,13 +2304,13 @@ function renderConvs() {
   let rows = f ? list.filter(c => c.asPage && c.pageId === f.id) : list.filter(c => !c.asPage && (S.cvTab === 'req' ? c.request : !c.request));
   if (q) rows = rows.filter(c => (c.name || '').toLowerCase().includes(q));
   const head = f ? `<div class="card conv-filter">${entAv(f)}<div class="info"><b>${esc(f.name)}</b><small>পেইজের মেসেজ · আপনি পেইজের নামে উত্তর দেবেন</small></div>${f.isOwner ? `<button class="sbtn ghost" id="auto-reply">⚡ অটো মেসেজ${f.autoReplyOn ? ' ✓' : ''}</button><button class="sbtn ghost" id="faq-btn">❓ প্রশ্ন-উত্তর${f.faqs?.length ? ' ✓' : ''}</button>` : ''}${S.actAs ? '' : '<button class="link" id="conv-all">← আমার মেসেজ</button>'}</div>`
-    : `<div class="inbox-top"><input type="search" id="cv-q" placeholder="নাম দিয়ে চ্যাট খুঁজুন…" aria-label="চ্যাট খুঁজুন" value="${esc(S.cvQ || '')}"><button class="sbtn" id="cv-newgroup">${ic('users', 16)} নতুন গ্রুপ</button></div>
+    : `<div class="inbox-top"><input type="search" id="cv-q" placeholder="নাম দিয়ে চ্যাট খুঁজুন…" aria-label="চ্যাট খুঁজুন" value="${esc(S.cvQ || '')}"><button class="sbtn ghost" id="cv-saved" aria-label="সেভ করা মেসেজ" title="সেভ করা মেসেজ">🔖</button><button class="sbtn" id="cv-newgroup">${ic('users', 16)} নতুন গ্রুপ</button></div>
       ${activeRowHtml()}
       <div class="seg cv-tabs"><button data-cvtab="chats" class="${S.cvTab === 'chats' ? 'on' : ''}">চ্যাট</button><button data-cvtab="req" class="${S.cvTab === 'req' ? 'on' : ''}">মেসেজ রিকোয়েস্ট${reqs.length ? ` <span class="badge">${bn(reqs.length)}</span>` : ''}</button></div>
       ${S.cvTab === 'req' ? '<p class="mut cv-reqnote">যারা আপনার বন্ধু নন তাদের মেসেজ এখানে আসে। উত্তর দিলে বা গ্রহণ করলে সাধারণ চ্যাটে চলে যাবে। আপনি না খোলা পর্যন্ত তারা জানবেন না আপনি দেখেছেন।</p>' : ''}`;
   const row = c => {
     const online = c.kind === 'dm' && isOnline(S.pres.get(c.userId));
-    const avHtml = c.kind === 'group' ? groupAv(c.name) : c.pageId && !c.asPage ? entAv({ name: c.name, avatar: c.avatar }) : av(c);
+    const avHtml = c.kind === 'group' ? groupAv(c.name, '', c.avatar) : c.pageId && !c.asPage ? entAv({ name: c.name, avatar: c.avatar }) : av(c);
     const who = c.lastMine ? (c.asPage ? 'পেইজ: ' : 'আপনি: ') : '';
     return `<div class="conv-row"><button class="conv${c.unread ? ' unread' : ''}" data-cv="${esc(cvKey(c))}"><span class="cv-av">${avHtml}${online ? '<i class="on-dot" title="সক্রিয়"></i>' : ''}</span>
       <div class="info"><b>${esc(c.name)}${c.muted ? ' <span class="cv-mute" title="মিউট করা">🔕</span>' : ''}</b>${c.kind === 'group' ? `<span class="conv-tag">👥 ${bn(c.members)} জন</span>` : c.pageId ? `<span class="conv-tag">${c.asPage ? `📄 ${esc(c.pageName)} পেইজে` : '📄 পেইজ'}</span>` : ''}<div class="last">${who}${esc(c.last || '')}</div></div>
@@ -2348,6 +2348,7 @@ $('#convs').addEventListener('click', async e => {
   const sg = e.target.closest('[data-stg]'); if (sg) return openStories(Number(sg.dataset.stg));
   const ac = e.target.closest('[data-actchat]'); if (ac) return openThread(ac.dataset.actchat);
   if (e.target.closest('#cv-newgroup')) return newGroupSheet();
+  if (e.target.closest('#cv-saved')) return savedSheet();
   const mb = e.target.closest('[data-cvmenu]');
   if (mb) { const c = convOf(mb.dataset.cvmenu); if (c) convMenu(tOf(c), c); return; }
   const b = e.target.closest('[data-cv]'); if (!b) return;
@@ -2362,9 +2363,11 @@ function convMenu(t, c) {
     ${c?.request ? '<button data-act="accept">✅ রিকোয়েস্ট গ্রহণ করুন</button>' : ''}
     <button data-act="clear" class="danger">🗑 চ্যাট মুছে ফেলুন</button>
     ${t.kind === 'group' ? '<button data-act="leave" class="danger">🚪 গ্রুপ ছেড়ে দিন</button>' : ''}
+    ${!c ? chatExtrasHtml(t) : ''}
     <button data-close>বন্ধ করুন</button></div>`);
   $('#sheet').onclick = async ev => {
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    if (EXTRA_ACTS.has(a)) return chatExtra(a);
     closeSheet();
     if (a === 'mute') return busy(null, async () => { await S.api.convSet(t, { muted: !muted }); if (S.th && sameT(S.th, t)) S.th.muted = !muted; toast(muted ? 'আনমিউট করা হয়েছে' : 'মিউট করা হয়েছে, এই চ্যাটের নতুন মেসেজে আর জানানো হবে না'); afterConvChange(); });
     if (a === 'accept') return busy(null, async () => { await S.api.convSet(t, { accepted: true }); toast('গ্রহণ করা হয়েছে'); afterConvChange(); });
@@ -2396,7 +2399,7 @@ function openThread(id, silent, pageId = null) { return openConv({ kind: pageId 
 function openChatGroup(chatId, silent) { return openConv({ kind: 'group', id: Number(chatId) || chatId }, silent); }
 async function openConv(t, silent) {
   if (!silent) {
-    S.th = { ...t }; S.threadId = t.kind === 'group' ? null : t.id; S.threadPage = t.pageId || null; S.reply = null;
+    S.th = { ...t }; S.threadId = t.kind === 'group' ? null : t.id; S.threadPage = t.pageId || null; S.reply = null; S.edit = null; S.tq = ''; $('#t-search').hidden = true; $('#t-mention').hidden = true; $('#t-top').innerHTML = ''; $('#v-thread').dataset.theme = '';
     open('thread'); $('#thread').innerHTML = '<div class="mut">লোড হচ্ছে…</div>'; $('#t-req').innerHTML = ''; setReplyBar(); $('#t-typing').hidden = true; $('#t-emoji').hidden = true;
     S.typingCh?.stop(); S.typingCh = null;
   }
@@ -2410,8 +2413,9 @@ async function openConv(t, silent) {
     }
     const data = await S.api.thread(th);
     if (S.th !== th) return;
-    th.muted = data.muted; th.members = data.members; th.msgs = data.msgs;
-    renderThreadHead();
+    th.muted = data.muted; th.members = data.members; th.msgs = data.msgs; th.shared = data.shared || { nicknames: {} };
+    $('#v-thread').dataset.theme = th.shared.theme || '';
+    renderThreadHead(); renderThreadTop();
     if (th.partner?.rel?.blocked) { $('#thread').innerHTML = '<div class="empty">আপনি এই ব্যক্তিকে ব্লক করেছেন।</div>'; return; }
     if (th.kind === 'group' && !th.info) { $('#thread').innerHTML = '<div class="empty">আপনি আর এই গ্রুপে নেই।</div>'; return; }
     th.request = th.kind === 'dm' && th.partner && th.partner.rel?.friend !== 'friends' && !data.accepted && data.msgs.length > 0 && !data.msgs.some(m => m.mine);
@@ -2429,9 +2433,9 @@ async function openConv(t, silent) {
 function renderThreadHead() {
   const th = S.th, pg = th.pg;
   let h;
-  if (th.kind === 'group') h = `${groupAv(th.info?.name, 'sm')}<span class="t-who"><b>${esc(th.info?.name || 'গ্রুপ')}</b><small>${bn(th.members?.length || 0)} জন সদস্য${th.muted ? ' · 🔕' : ''}</small></span>`;
+  if (th.kind === 'group') h = `${groupAv(th.info?.name, 'sm', th.info?.photo)}<span class="t-who"><b>${esc(th.info?.name || 'গ্রুপ')}</b><small>${bn(th.members?.length || 0)} জন সদস্য${th.muted ? ' · 🔕' : ''}</small></span>`;
   else if (pg && !th.asPage) h = `<button class="ent-btn" data-page="${esc(pg.id)}">${entAv(pg)}</button><button class="who-btn" data-page="${esc(pg.id)}">${esc(pg.name)}${vb(pg.verified)}</button>`;
-  else if (th.partner) { const p = th.partner, act = activeText(th.seen); h = `<span class="cv-av sm">${userLink(p.id, av(p, 'sm'))}${isOnline(th.seen) ? '<i class="on-dot"></i>' : ''}</span><span class="t-who">${userLink(p.id, esc(p.name), 'who-btn')}${th.asPage ? `<small>📄 ${esc(pg.name)}-এর পক্ষে উত্তর দিচ্ছেন</small>` : act ? `<small class="${isOnline(th.seen) ? 'act-on' : ''}">${act}</small>` : ''}${th.muted ? '<small>🔕 মিউট করা</small>' : ''}</span>`; }
+  else if (th.partner) { const p = th.partner, act = activeText(th.seen); h = `<span class="cv-av sm">${userLink(p.id, av(p, 'sm'))}${isOnline(th.seen) ? '<i class="on-dot"></i>' : ''}</span><span class="t-who">${userLink(p.id, esc(nickOf(p.id, p.name)), 'who-btn')}${th.asPage ? `<small>📄 ${esc(pg.name)}-এর পক্ষে উত্তর দিচ্ছেন</small>` : act ? `<small class="${isOnline(th.seen) ? 'act-on' : ''}">${act}</small>` : ''}${th.muted ? '<small>🔕 মিউট করা</small>' : ''}</span>`; }
   $('#t-head').innerHTML = h || '';
 }
 function renderRequestBar() {
@@ -2452,7 +2456,10 @@ function msgBody(m) {
   const quote = r ? `<span class="rq"><b>${r.mine ? 'আপনি' : 'উত্তর'}</b>${esc(r.deleted ? 'মুছে ফেলা মেসেজ' : r.voice ? '🎤 ভয়েস মেসেজ' : r.image && !r.body ? '📷 ছবি' : (r.body || '').slice(0, 80))}</span>` : '';
   const img = m.image ? `<button class="m-img" data-mimg="${esc(m.image)}" aria-label="ছবি বড় করে দেখুন"><img alt="" data-path="${esc(m.image)}"></button>` : '';
   const voice = m.voice ? `<span class="m-voice">🎤 <audio controls preload="none" data-path="${esc(m.voice)}"></audio><small>${fmtSecs(m.voiceSecs || 0)}</small></span>` : '';
-  return quote + img + voice + (m.body ? `<span class="m-t">${linkify(m.body)}</span>` : '');
+  const fwd = m.forwarded ? '<span class="m-fwd">↪ ফরওয়ার্ড করা</span>' : '';
+  const stk = m.sticker && STICKERS[m.sticker] ? stickerHtml(m.sticker) : '';
+  const loc = m.loc ? `<a class="m-loc" href="https://www.google.com/maps?q=${Number(m.loc.lat)},${Number(m.loc.lng)}" target="_blank" rel="noopener"><span class="ml-pin">📍</span><span><b>লোকেশন</b><small>ম্যাপে দেখতে চাপুন ↗</small></span></a>` : '';
+  return fwd + quote + img + voice + stk + loc + (m.poll ? chatPollHtml(m) : '') + (m.body ? `<span class="m-t">${mentionify(linkify(m.body))}</span>` : '');
 }
 function renderMsgs() {
   const th = S.th, msgs = th.msgs || [], meId0 = me().id, group = th.kind === 'group';
@@ -2463,6 +2470,7 @@ function renderMsgs() {
     const day = dayLabel(m.createdAt);
     if (day !== prevDay) { html += `<div class="day-sep"><span>${day}</span></div>`; prevDay = day; prevSender = ''; }
     const showName = group && !m.mine && m.senderId !== prevSender;
+    if (m.sender) m.sender.name = nickOf(m.senderId, m.sender.name);
     prevSender = m.senderId;
     const rx = Object.entries(m.reactions || {}).filter(([, n]) => n > 0);
     // যে পাঠিয়েছেন তার ছবি (একটানা কয়েকটা মেসেজের শেষটার পাশে); চাপলে প্রোফাইল, পেইজ হলে পেইজ
@@ -2471,7 +2479,7 @@ function renderMsgs() {
     const avBtn = pgSender ? `<button class="avbtn" data-page="${esc(th.pg.id)}" aria-label="${esc(th.pg.name)} পেইজ দেখুন">${entAv(th.pg)}</button>` : userLink(m.senderId, av(m.sender || (th.partner?.id === m.senderId ? th.partner : {}), 'xs'));
     html += `<div class="mrow${m.mine ? ' mine' : ''}">${!m.mine ? `<span class="m-av">${lastOfRun ? avBtn : ''}</span>` : ''}
       <div class="mcol">${showName ? `<span class="m-name">${esc(m.sender?.name || '')}</span>` : ''}
-      <div class="bub${m.mine ? ' mine' : ''}${m.deleted ? ' deleted' : ''}${m.image && !m.body ? ' imgonly' : ''}" data-mid="${esc(m.id)}" tabindex="0">${msgBody(m)}<small>${m.auto ? '⚡ অটো মেসেজ · ' : ''}${esc(clock(m.createdAt))}</small></div>
+      <div class="bub${m.mine ? ' mine' : ''}${m.deleted ? ' deleted' : ''}${m.image && !m.body ? ' imgonly' : ''}${m.sticker && !m.deleted ? ' stkonly' : ''}${m.poll && !m.deleted ? ' pollb' : ''}${m.pinnedAt ? ' pinned' : ''}" data-mid="${esc(m.id)}" tabindex="0">${msgBody(m)}<small>${m.pinnedAt ? '📌 ' : ''}${m.saved ? '🔖 ' : ''}${m.expiresAt ? '⏱ ' : ''}${m.auto ? '⚡ অটো মেসেজ · ' : ''}${m.editedAt && !m.deleted ? 'সম্পাদিত · ' : ''}${esc(clock(m.createdAt))}</small></div>
       ${rx.length ? `<button class="m-rx" data-mrx="${esc(m.id)}" aria-label="রিয়্যাক্ট">${rx.map(([e]) => e).join('')}${rx.reduce((a, [, n]) => a + n, 0) > 1 ? `<b>${bn(rx.reduce((a, [, n]) => a + n, 0))}</b>` : ''}</button>` : ''}</div></div>`;
     if (m === lastMine) {
       if (group) {
@@ -2481,6 +2489,7 @@ function renderMsgs() {
     }
   });
   $('#thread').innerHTML = html;
+  if (S.tq) applySearch(false);
   const paths = msgs.flatMap(m => [m.image, m.voice]).filter(Boolean);
   if (paths.length) S.api.fileUrls(paths).then(map => {
     document.querySelectorAll('#thread [data-path]').forEach(el => { const u = map.get(el.dataset.path); if (u) el.src = u; });
@@ -2491,15 +2500,31 @@ function renderMsgs() {
 $('#thread').addEventListener('click', e => {
   const im = e.target.closest('[data-mimg]'); if (im) { if (im.dataset.url) openViewer({ images: [im.dataset.url] }); return; }
   if (e.target.closest('a, audio, .who-btn, .avbtn')) return;
+  const pv = e.target.closest('[data-pvote]');
+  if (pv) { const m = (S.th?.msgs || []).find(x => String(x.id) === pv.dataset.pvote); if (m) busy(null, async () => { const o = Number(pv.dataset.opt); await S.api.voteChatPoll(m.id, m.poll.my === o ? null : o); openConv(S.th, true); }); return; }
   const rxb = e.target.closest('[data-mrx]'); const b = rxb ? null : e.target.closest('[data-mid]');
   const id = (rxb || b)?.dataset.mrx || (rxb || b)?.dataset.mid; if (!id) return;
   const m = (S.th?.msgs || []).find(x => String(x.id) === String(id)); if (!m) return;
-  msgActions(m);
+  if (rxb) return msgActions(m);
+  // দুবার চাপলে ❤️, একবার চাপলে অপশন
+  if (tapId === id && tapT) { clearTimeout(tapT); tapT = null; tapId = null; return quickHeart(m, b); }
+  clearTimeout(tapT); tapId = id; tapT = setTimeout(() => { tapT = null; tapId = null; msgActions(m); }, 260);
 });
+let tapT = null, tapId = null;
+function quickHeart(m, el) {
+  if (m.deleted) return;
+  const on = m.myReaction !== '❤️';
+  if (on && el) { const h = document.createElement('span'); h.className = 'heart-pop'; h.textContent = '❤️'; el.appendChild(h); setTimeout(() => h.remove(), 800); }
+  S.api.reactMessage(m.id, on ? '❤️' : null).then(() => openConv(S.th, true)).catch(e => toast(errText(e)));
+}
 function msgActions(m) {
   const canRx = !m.deleted;
   openSheet(`${canRx ? `<div class="mx-rx">${MSG_RX.map(e => `<button data-mx="${e}" class="${m.myReaction === e ? 'on' : ''}" aria-label="${e}">${e}</button>`).join('')}</div>` : ''}
     <div class="menu">${m.deleted ? '' : `<button data-act="reply">${ic('reply', 18)} উত্তর দিন</button>`}
+      ${m.mine && !m.deleted && m.body && !m.poll && Date.now() - new Date(m.createdAt) < 15 * 6e4 ? '<button data-act="edit">✏️ এডিট করুন <small class="mut">(১৫ মিনিটের মধ্যে)</small></button>' : ''}
+      ${!m.deleted && !m.poll ? '<button data-act="fwd">↪ ফরওয়ার্ড করুন</button>' : ''}
+      ${!m.deleted ? `<button data-act="pin">📌 ${m.pinnedAt ? 'পিন সরান' : 'পিন করুন (সবাই উপরে দেখবেন)'}</button>` : ''}
+      ${!m.deleted ? `<button data-act="save">🔖 ${m.saved ? 'সেভ থেকে সরান' : 'সেভ করুন (শুধু আপনি দেখবেন)'}</button>` : ''}
       ${m.body && !m.deleted ? `<button data-act="copy">${ic('link', 18)} লেখা কপি করুন</button>` : ''}
       ${m.mine && !m.deleted && !S.th.asPage ? `<button data-act="unsend" class="danger">${ic('trash', 18)} সবার জন্য মুছে ফেলুন</button>` : ''}
       <button data-act="hide">${ic('trash', 18)} শুধু আমার জন্য মুছুন</button>
@@ -2509,7 +2534,11 @@ function msgActions(m) {
     if (rx) { closeSheet(); return busy(null, async () => { await S.api.reactMessage(m.id, m.myReaction === rx.dataset.mx ? null : rx.dataset.mx); openConv(S.th, true); }); }
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
     closeSheet();
-    if (a === 'reply') { S.reply = m; setReplyBar(); $('#tmsg').focus(); }
+    if (a === 'reply') { S.reply = m; S.edit = null; setReplyBar(); $('#tmsg').focus(); }
+    if (a === 'edit') { S.edit = m; S.reply = null; $('#tmsg').value = m.body; setReplyBar(); composeState(); $('#tmsg').focus(); }
+    if (a === 'fwd') forwardSheet(m);
+    if (a === 'pin') busy(null, async () => { await S.api.pinMessage(m.id, !m.pinnedAt); toast(m.pinnedAt ? 'পিন সরানো হয়েছে' : 'পিন করা হয়েছে'); openConv(S.th, true); });
+    if (a === 'save') busy(null, async () => { await S.api.saveMessage(m.id, !m.saved); toast(m.saved ? 'সেভ থেকে সরানো হয়েছে' : 'সেভ হয়েছে। মেসেজ পাতার 🔖 বাটনে পাবেন'); openConv(S.th, true); });
     if (a === 'copy') { try { await navigator.clipboard.writeText(m.body); toast('কপি হয়েছে'); } catch { toast('কপি করা যায়নি'); } }
     if (a === 'unsend') { if (await confirmSheet('মেসেজটি সবার জন্য মুছে ফেলবেন? সবাই দেখবেন "মেসেজটি মুছে ফেলা হয়েছে"।', 'মুছে ফেলুন', true)) busy(null, async () => { await S.api.unsendMessage(m); openConv(S.th, true); }); }
     if (a === 'hide') busy(null, async () => { await S.api.hideMessage(m.id); openConv(S.th, true); });
@@ -2517,6 +2546,12 @@ function msgActions(m) {
 }
 function setReplyBar() {
   const r = S.reply, bar = $('#t-reply'); if (!bar) return;
+  if (S.edit) {
+    bar.hidden = false;
+    bar.innerHTML = `✏️ <span><b>মেসেজ এডিট করছেন</b></span><button type="button" id="t-reply-x" aria-label="এডিট বাতিল">${ic('close', 14)}</button>`;
+    $('#t-reply-x').onclick = () => { S.edit = null; $('#tmsg').value = ''; setReplyBar(); composeState(); };
+    return;
+  }
   bar.hidden = !r;
   bar.innerHTML = r ? `${ic('reply', 14)} <span><b>${r.mine ? 'নিজের মেসেজের' : 'এই মেসেজের'} উত্তর:</b> ${esc(r.voice ? '🎤 ভয়েস মেসেজ' : r.image && !r.body ? '📷 ছবি' : (r.body || '').slice(0, 60))}</span><button type="button" id="t-reply-x" aria-label="উত্তর বাতিল">${ic('close', 14)}</button>` : '';
   $('#t-reply-x')?.addEventListener('click', () => { S.reply = null; setReplyBar(); });
@@ -2530,16 +2565,21 @@ function showTyping(p) {
 }
 function composeState() { const has = !!$('#tmsg').value.trim(); $('#t-send').hidden = !has; $('#t-mic').hidden = has; }
 $('#tmsg').addEventListener('input', () => {
-  composeState();
+  composeState(); mentionSuggest();
   if (S.typingCh && Date.now() - typingSent > 2500 && $('#tmsg').value.trim()) { typingSent = Date.now(); S.typingCh.send(); }
 });
 // ইমোজি
-$('#t-emo').addEventListener('click', () => {
-  const p = $('#t-emoji');
-  if (!p.innerHTML) p.innerHTML = EMOJIS.map(e => `<button type="button" data-emo="${e}">${e}</button>`).join('');
-  p.hidden = !p.hidden;
-});
+function emojiPanel(tab) {
+  const p = $('#t-emoji'); S.emoTab = tab;
+  p.innerHTML = `<div class="emo-tabs"><button type="button" data-emotab="emo" class="${tab === 'emo' ? 'on' : ''}">😊 ইমোজি</button><button type="button" data-emotab="stk" class="${tab === 'stk' ? 'on' : ''}">✨ স্টিকার</button></div>`
+    + (tab === 'stk' ? `<div class="stk-grid">${Object.keys(STICKERS).map(k => `<button type="button" data-stk="${k}" aria-label="${esc(STICKERS[k][1])}">${stickerHtml(k)}</button>`).join('')}</div>`
+      : `<div class="emo-grid">${EMOJIS.map(e => `<button type="button" data-emo="${e}">${e}</button>`).join('')}</div>`);
+  p.hidden = false;
+}
+$('#t-emo').addEventListener('click', () => { if ($('#t-emoji').hidden) emojiPanel(S.emoTab || 'emo'); else $('#t-emoji').hidden = true; });
 $('#t-emoji').addEventListener('click', e => {
+  const tb = e.target.closest('[data-emotab]'); if (tb) return emojiPanel(tb.dataset.emotab);
+  const sk = e.target.closest('[data-stk]'); if (sk) { $('#t-emoji').hidden = true; return sendNow({ sticker: sk.dataset.stk }); }
   const b = e.target.closest('[data-emo]'); if (!b) return;
   const i = $('#tmsg'), s0 = i.selectionStart ?? i.value.length;
   i.value = i.value.slice(0, s0) + b.dataset.emo + i.value.slice(i.selectionEnd ?? s0); i.focus(); i.setSelectionRange(s0 + b.dataset.emo.length, s0 + b.dataset.emo.length); composeState();
@@ -2547,18 +2587,27 @@ $('#t-emoji').addEventListener('click', e => {
 // পাঠানো (লেখা, ছবি, ভয়েস)
 async function sendNow(opts = {}, btn) {
   const th = S.th; if (!th || th.partner?.rel?.blocked) return;
-  const body = opts.voice ? '' : $('#tmsg').value.trim();
-  if (!body && !opts.image && !opts.voice) return;
+  const raw = !(opts.voice || opts.sticker || opts.loc || opts.poll);
+  const body = raw ? $('#tmsg').value.trim() : '';
+  if (S.edit && raw && !opts.image) {
+    if (!body) return;
+    const em = S.edit;
+    return busy(btn, async () => { await S.api.editMessage(em.id, body); S.edit = null; $('#tmsg').value = ''; setReplyBar(); composeState(); await openConv(th, true); });
+  }
+  if (!body && !opts.image && !opts.voice && !opts.sticker && !opts.loc && !opts.poll) return;
+  if ((opts.image || opts.voice) && th.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ছবি ও ভয়েস পাঠানো যায় না');
+  if (th.kind === 'group' && body.includes('@')) opts.mentions = (th.members || []).filter(x => x.id !== me().id && body.includes('@' + x.name)).map(x => x.id);
   await busy(btn, async () => {
     await S.api.send(th, body, { replyTo: S.reply?.id || null, ...opts });
-    if (!opts.voice) $('#tmsg').value = '';
+    if (raw) $('#tmsg').value = '';
+    $('#t-mention').hidden = true;
     S.reply = null; setReplyBar(); composeState(); $('#t-emoji').hidden = true;
     if (th.request) { await S.api.convSet(th, { accepted: true }).catch(() => {}); th.request = false; }
     await openConv(th, true); $('#tmsg').focus();
   });
 }
 $('#tform').addEventListener('submit', e => { e.preventDefault(); sendNow({}, $('#t-send')); });
-$('#t-img').addEventListener('click', () => $('#t-file').click());
+$('#t-img').addEventListener('click', () => { if (S.th?.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ছবি পাঠানো যায় না'); $('#t-file').click(); });
 $('#t-file').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   try { const blob = await compress(f, 1280, 0.75); await sendNow({ image: blob }, $('#t-img')); } catch { toast('ছবিটি পাঠানো যায়নি'); }
@@ -2567,6 +2616,7 @@ $('#t-file').addEventListener('change', async e => {
 let rec = null;
 $('#t-mic').addEventListener('click', async () => {
   if (rec) return;
+  if (S.th?.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ভয়েস পাঠানো যায় না');
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return toast('এই ফোনে ভয়েস রেকর্ড করা যাচ্ছে না');
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast('মাইক্রোফোনের অনুমতি দিন। ফোনের সেটিংস থেকে এই অ্যাপের মাইক্রোফোন চালু করুন।'); }
@@ -2597,11 +2647,13 @@ $('#t-menu').addEventListener('click', () => {
   openSheet(`<div class="menu"><button data-act="prof">${ic('user', 18)} প্রোফাইল দেখুন</button>
     <button data-act="mute">${th.muted ? '🔔 আনমিউট করুন' : '🔕 মিউট করুন'}</button>
     <button data-act="clear" class="danger">🗑 চ্যাট মুছে ফেলুন</button>
+    ${chatExtrasHtml(th)}
     <button data-act="report">⚠️ রিপোর্ট করুন</button>
     <button data-act="block" class="danger">⛔ ${esc(p?.name || '')}-কে ব্লক করুন</button>
     <button data-close>বন্ধ করুন</button></div>`);
   $('#sheet').onclick = async ev => {
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    if (EXTRA_ACTS.has(a)) return chatExtra(a);
     if (a === 'report') return reportSheet('user', th.id);
     closeSheet();
     if (a === 'prof') return openUser(th.id);
@@ -2613,6 +2665,244 @@ $('#t-menu').addEventListener('click', () => {
     }
   };
 });
+// ================================================================ মেসেজ: বাড়তি সুবিধা
+// স্টিকার: ছবি নয়, শুধু বড় ইমোজি আর বাংলা লেখা (CSS দিয়ে আঁকা, তাই একদম হালকা)
+const STICKERS = {
+  salam: ['🤲', 'আসসালামু আলাইকুম'], thanks: ['🙏', 'ধন্যবাদ'], ok: ['👍', 'ঠিক আছে'], love: ['❤️', 'ভালোবাসা রইল'],
+  haha: ['😂', 'হা হা হা'], congrats: ['🎉', 'অভিনন্দন'], eid: ['🌙', 'ঈদ মোবারক'], insha: ['🤲', 'ইনশাআল্লাহ'],
+  alhamdu: ['✨', 'আলহামদুলিল্লাহ'], morning: ['🌅', 'শুভ সকাল'], night: ['🌙', 'শুভ রাত্রি'], bday: ['🎂', 'শুভ জন্মদিন'],
+  tea: ['☕', 'চা খাবেন?'], coming: ['🏃', 'আসছি!'], wait: ['⏳', 'একটু অপেক্ষা'], sad: ['😢', 'মন খারাপ'],
+  wow: ['😮', 'বাহ!'], call: ['📞', 'ফোন দিও'], busy: ['📵', 'এখন ব্যস্ত'], miss: ['🥺', 'মিস করছি'],
+};
+const stickerHtml = k => { const [e, t] = STICKERS[k] || ['✨', '']; return `<span class="stk stk-${Object.keys(STICKERS).indexOf(k) % 6}"><i>${e}</i><b>${esc(t)}</b></span>`; };
+const nickOf = (id, name) => S.th?.shared?.nicknames?.[id] || name;
+function mentionify(html) {
+  const th = S.th; if (th?.kind !== 'group' || !html.includes('@')) return html;
+  for (const x of [...(th.members || [])].sort((a, b) => b.name.length - a.name.length)) {
+    const tag = esc('@' + x.name); if (html.includes(tag)) html = html.split(tag).join(`<b class="mention${x.id === me()?.id ? ' me' : ''}">${tag}</b>`);
+  }
+  return html;
+}
+function chatPollHtml(m) {
+  const p = m.poll, total = p.votes.reduce((a, b) => a + b, 0);
+  return `<div class="m-poll"><b class="mp-q">📊 ${esc(p.q)}</b>${p.options.map((o, i) => {
+    const pct = total ? Math.round((p.votes[i] / total) * 100) : 0;
+    return `<button type="button" class="mp-opt${p.my === i ? ' on' : ''}" data-pvote="${esc(m.id)}" data-opt="${i}"><span class="mp-bar" style="width:${pct}%"></span><span class="mp-r">${p.my === i ? '✓' : ''}</span><span class="mp-t">${esc(o)}</span><span class="mp-n">${bn(p.votes[i])}</span></button>`;
+  }).join('')}<span class="mp-f">${total ? `${bn(total)}টি ভোট` : 'এখনো কেউ ভোট দেননি'} · যেকোনো একটিতে চাপুন</span></div>`;
+}
+const msgPreview = m => (m.deleted ? 'মুছে ফেলা মেসেজ' : m.poll ? '📊 ' + m.poll.q : m.sticker ? '✨ ' + (STICKERS[m.sticker]?.[1] || 'স্টিকার') : m.loc ? '📍 লোকেশন' : m.voice ? '🎤 ভয়েস মেসেজ' : m.image && !m.body ? '📷 ছবি' : (m.body || '').slice(0, 80));
+// থ্রেডের উপরে: পিন করা মেসেজ, অদৃশ্য মেসেজ চালু থাকলে জানান
+function renderThreadTop() {
+  const th = S.th, pins = (th.msgs || []).filter(m => m.pinnedAt && !m.deleted).sort((a, b) => b.pinnedAt.localeCompare(a.pinnedAt));
+  $('#t-top').innerHTML = (pins.length ? `<button class="t-pin" data-pinjump="${esc(pins[0].id)}">📌 <span><b>পিন করা${pins.length > 1 ? ` (${bn(pins.length)})` : ''}</b>${esc(msgPreview(pins[0]))}</span></button>` : '')
+    + (th.shared?.disappear ? '<div class="t-dis">⏱ অদৃশ্য মেসেজ চালু: নতুন মেসেজ ২৪ ঘণ্টা পর সবার কাছ থেকে মুছে যাবে। ছবি ও ভয়েস পাঠানো যাবে না।</div>' : '');
+}
+function jumpTo(id) {
+  const el = document.querySelector(`#thread [data-mid="${CSS.escape(String(id))}"]`); if (!el) return toast('মেসেজটি আর নেই');
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+$('#t-top').addEventListener('click', e => {
+  const b = e.target.closest('[data-pinjump]'); if (!b) return;
+  const pins = (S.th?.msgs || []).filter(m => m.pinnedAt && !m.deleted);
+  if (pins.length > 1) return pinnedSheet(); jumpTo(b.dataset.pinjump);
+});
+function pinnedSheet() {
+  const pins = (S.th?.msgs || []).filter(m => m.pinnedAt && !m.deleted).sort((a, b) => b.pinnedAt.localeCompare(a.pinnedAt));
+  openSheet(`<h2>📌 পিন করা মেসেজ</h2>${pins.length ? pins.map(m => `<button class="sv-row" data-pj="${esc(m.id)}"><b>${esc(m.mine ? 'আপনি' : m.sender?.name || '')}</b><span>${esc(msgPreview(m))}</span><small>${esc(ago(m.createdAt))}</small></button>`).join('') : '<p class="mut">এই চ্যাটে কোনো পিন করা মেসেজ নেই। কোনো মেসেজে চেপে "পিন করুন" বাছাই করুন।</p>'}<button class="btn ghost wide" data-close style="margin-top:10px">বন্ধ করুন</button>`);
+  $('#sheet').onclick = e => { const b = e.target.closest('[data-pj]'); if (b) { closeSheet(); jumpTo(b.dataset.pj); } };
+}
+// ⋯ মেনুর বাড়তি অপশন
+const EXTRA_ACTS = new Set(['x-search', 'x-media', 'x-pins', 'x-theme', 'x-nick', 'x-dis']);
+function chatExtrasHtml(th) {
+  const shared = th.kind !== 'page';
+  return `<button data-act="x-search">🔍 চ্যাটে খুঁজুন</button><button data-act="x-media">🖼 শেয়ার করা ছবি</button><button data-act="x-pins">📌 পিন করা মেসেজ</button>
+    ${shared ? `<button data-act="x-theme">🎨 চ্যাটের রং</button><button data-act="x-nick">🏷 ডাকনাম</button>
+    <button data-act="x-dis">⏱ অদৃশ্য মেসেজ (২৪ ঘণ্টা): ${th.shared?.disappear ? '<b class="on-t">চালু</b>' : 'বন্ধ'}</button>` : ''}`;
+}
+function chatExtra(a) {
+  const th = S.th; if (!th) return;
+  if (a === 'x-search') { closeSheet(); return openChatSearch(); }
+  if (a === 'x-media') return mediaSheet();
+  if (a === 'x-pins') return pinnedSheet();
+  if (a === 'x-theme') return themeSheet();
+  if (a === 'x-nick') return nickSheet();
+  if (a === 'x-dis') {
+    const on = !th.shared?.disappear;
+    return confirmSheet(on ? 'অদৃশ্য মেসেজ চালু করবেন? এখন থেকে নতুন মেসেজ ২৪ ঘণ্টা পর সবার কাছ থেকে চিরতরে মুছে যাবে। এ সময় ছবি ও ভয়েস পাঠানো যাবে না। চ্যাটের সবাই এটা দেখবেন।' : 'অদৃশ্য মেসেজ বন্ধ করবেন? এরপরের মেসেজ আর নিজে থেকে মুছবে না।', on ? 'চালু করুন' : 'বন্ধ করুন')
+      .then(ok => { if (ok) busy(null, async () => { await S.api.setShared(th, { disappear: on }); toast(on ? 'অদৃশ্য মেসেজ চালু হয়েছে' : 'অদৃশ্য মেসেজ বন্ধ হয়েছে'); openConv(th, true); }); });
+  }
+}
+// চ্যাটের ভেতরে খোঁজা
+function openChatSearch() {
+  const bar = $('#t-search'); bar.hidden = false;
+  bar.innerHTML = `<input type="search" id="tq" placeholder="এই চ্যাটে খুঁজুন…" aria-label="চ্যাটে খুঁজুন" autocomplete="off"><span id="tq-n" class="mut"></span><button type="button" data-tq="up" aria-label="আগেরটি">▲</button><button type="button" data-tq="down" aria-label="পরেরটি">▼</button><button type="button" data-tq="x" aria-label="খোঁজা বন্ধ">${ic('close', 16)}</button>`;
+  const i = $('#tq'); i.focus();
+  i.oninput = () => { S.tq = i.value.trim(); S.tqi = 0; applySearch(true); };
+  i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); stepSearch(1); } };
+}
+$('#t-search').addEventListener('click', e => {
+  const a = e.target.closest('[data-tq]')?.dataset.tq; if (!a) return;
+  if (a === 'x') { S.tq = ''; $('#t-search').hidden = true; document.querySelectorAll('#thread .hit').forEach(x => x.classList.remove('hit', 'hit-cur')); return; }
+  stepSearch(a === 'up' ? 1 : -1);
+});
+function searchHits() {
+  const q = (S.tq || '').toLowerCase(); if (!q) return [];
+  return (S.th?.msgs || []).filter(m => !m.deleted && ((m.body || '').toLowerCase().includes(q) || (m.poll?.q || '').toLowerCase().includes(q))).map(m => m.id).reverse();
+}
+function applySearch(scroll) {
+  document.querySelectorAll('#thread .hit').forEach(x => x.classList.remove('hit', 'hit-cur'));
+  const hits = searchHits(), n = $('#tq-n');
+  if (n) n.textContent = S.tq ? (hits.length ? `${bn(Math.min((S.tqi || 0) + 1, hits.length))}/${bn(hits.length)}` : 'পাওয়া যায়নি') : '';
+  hits.forEach(id => document.querySelector(`#thread [data-mid="${CSS.escape(String(id))}"]`)?.classList.add('hit'));
+  const cur = hits[S.tqi || 0];
+  if (cur != null) { const el = document.querySelector(`#thread [data-mid="${CSS.escape(String(cur))}"]`); el?.classList.add('hit-cur'); if (scroll) el?.scrollIntoView({ block: 'center' }); }
+}
+function stepSearch(d) { const hits = searchHits(); if (!hits.length) return; S.tqi = ((S.tqi || 0) + d + hits.length) % hits.length; applySearch(true); }
+// শেয়ার করা ছবি
+async function mediaSheet() {
+  openSheet('<h2>🖼 শেয়ার করা ছবি</h2><div id="md-grid" class="md-grid"><div class="mut">লোড হচ্ছে…</div></div>');
+  $('#sheet').classList.add('tall');
+  try {
+    const list = await S.api.mediaOf(S.th), urls = await S.api.fileUrls(list.map(x => x.path));
+    const imgs = list.map(x => urls.get(x.path)).filter(Boolean);
+    $('#md-grid').innerHTML = imgs.length ? imgs.map((u, i) => `<button data-md="${i}" aria-label="ছবি ${bn(i + 1)}"><img src="${esc(u)}" alt="" loading="lazy" decoding="async"></button>`).join('') : '<p class="mut">এই চ্যাটে এখনো কোনো ছবি পাঠানো হয়নি।</p>';
+    $('#sheet').onclick = e => { const b = e.target.closest('[data-md]'); if (b) openViewer({ images: imgs }, Number(b.dataset.md)); };
+  } catch (e) { $('#md-grid').innerHTML = `<p class="mut">${esc(errText(e))}</p>`; }
+}
+// চ্যাটের রং (দুজনেই/গ্রুপের সবাই একই রং দেখবেন)
+const CHAT_THEMES = [['', 'সবুজ (আসল)', '#006a4e'], ['blue', 'নীল', '#2563eb'], ['purple', 'বেগুনি', '#7c3aed'], ['pink', 'গোলাপি', '#db2777'], ['red', 'লাল', '#dc2626'], ['orange', 'কমলা', '#ea580c'], ['teal', 'ফিরোজা', '#0d9488'], ['black', 'কালো', '#1f2937']];
+function themeSheet() {
+  const cur = S.th.shared?.theme || '';
+  openSheet(`<h2>🎨 চ্যাটের রং</h2><p class="mut">চ্যাটের সবাই এই রং দেখবেন।</p><div class="th-grid">${CHAT_THEMES.map(([k, n, c]) => `<button data-th="${k}" class="${cur === k ? 'on' : ''}"><i style="background:${c}"></i>${n}</button>`).join('')}</div>`);
+  $('#sheet').onclick = e => {
+    const b = e.target.closest('[data-th]'); if (!b) return; const k = b.dataset.th;
+    closeSheet(); $('#v-thread').dataset.theme = k;
+    busy(null, async () => { await S.api.setShared(S.th, { theme: k || '' }); toast('রং বদলানো হয়েছে'); openConv(S.th, true); });
+  };
+}
+// ডাকনাম
+function nickSheet() {
+  const th = S.th, u = me();
+  const people = th.kind === 'group' ? th.members.map(x => ({ id: x.id, name: x.name, avatar: x.avatar })) : [{ id: u.id, name: u.name, avatar: u.avatar }, th.partner].filter(Boolean);
+  const nick = th.shared?.nicknames || {};
+  openSheet(`<h2>🏷 ডাকনাম</h2><p class="mut">এই চ্যাটে নামের বদলে ডাকনাম দেখাবে। সবাই দেখবেন। খালি রাখলে আসল নাম।</p>
+    ${people.map(p => `<div class="person nk-row">${av(p)}<div class="info"><b>${esc(p.name)}${p.id === u.id ? ' (আপনি)' : ''}</b><input class="f" data-nk="${esc(p.id)}" maxlength="40" placeholder="ডাকনাম লিখুন" value="${esc(nick[p.id] || '')}"></div></div>`).join('')}
+    <button class="btn wide" id="nk-go" style="margin-top:12px">সংরক্ষণ</button>`);
+  $('#sheet').classList.add('tall');
+  $('#nk-go').onclick = e => busy(e.currentTarget, async () => {
+    for (const i of document.querySelectorAll('#sheet [data-nk]')) { const v = i.value.trim(); if (v !== (nick[i.dataset.nk] || '')) await S.api.setShared(th, { nickUser: i.dataset.nk, nick: v }); }
+    closeSheet(); toast('ডাকনাম সংরক্ষণ হয়েছে'); openConv(th, true);
+  });
+}
+// ফরওয়ার্ড
+async function forwardSheet(m) {
+  openSheet(`<h2>↪ ফরওয়ার্ড করুন</h2><div class="fw-prev">${esc(msgPreview(m))}</div><input type="search" id="fw-q" placeholder="চ্যাট খুঁজুন…" aria-label="চ্যাট খুঁজুন"><div id="fw-list" style="margin-top:8px"><div class="mut">লোড হচ্ছে…</div></div><button class="btn wide" id="fw-go" style="margin-top:12px">পাঠান</button>`);
+  $('#sheet').classList.add('tall');
+  const list = (await S.api.inbox().catch(() => [])).filter(c => !c.asPage && !c.request), sel = new Set();
+  const draw = () => {
+    const q = ($('#fw-q')?.value || '').trim().toLowerCase(), rows = list.filter(c => !q || (c.name || '').toLowerCase().includes(q));
+    $('#fw-list').innerHTML = rows.length ? rows.map(c => `<label class="person tg-row">${c.kind === 'group' ? groupAv(c.name, '', c.avatar) : c.pageId ? entAv({ name: c.name, avatar: c.avatar }) : av(c)}<div class="info"><b>${esc(c.name)}</b><div class="sub">${c.kind === 'group' ? `👥 ${bn(c.members)} জন` : c.pageId ? '📄 পেইজ' : ''}</div></div><input type="checkbox" data-fw="${esc(cvKey(c))}" ${sel.has(cvKey(c)) ? 'checked' : ''} aria-label="${esc(c.name)}"></label>`).join('') : '<p class="mut">কোনো চ্যাট পাওয়া যায়নি</p>';
+  };
+  draw(); $('#fw-q').oninput = draw;
+  $('#sheet').onchange = e => { const k = e.target.dataset?.fw; if (!k) return; if (e.target.checked) sel.add(k); else sel.delete(k); };
+  $('#fw-go').onclick = e => {
+    if (!sel.size) return toast('অন্তত একটি চ্যাট বাছাই করুন');
+    busy(e.currentTarget, async () => {
+      let fail = 0;
+      for (const k of sel) {
+        const c = list.find(x => cvKey(x) === k); if (!c) continue;
+        try { await S.api.send(tOf(c), m.body || '', { forwarded: true, imagePath: m.image || null, voicePath: m.voice || null, voiceSecs: m.voiceSecs, sticker: m.sticker || null, loc: m.loc || null }); } catch { fail++; }
+      }
+      closeSheet(); toast(fail ? `${bn(sel.size - fail)}টি চ্যাটে পাঠানো হয়েছে, ${bn(fail)}টিতে যায়নি` : 'ফরওয়ার্ড করা হয়েছে');
+      if (S.th) openConv(S.th, true);
+    });
+  };
+}
+// সেভ করা মেসেজ (শুধু নিজে দেখেন)
+async function savedSheet() {
+  openSheet('<h2>🔖 সেভ করা মেসেজ</h2><p class="mut">যে মেসেজগুলো আপনি সেভ করেছেন। শুধু আপনি দেখতে পান।</p><div id="sv-list"><div class="mut">লোড হচ্ছে…</div></div>');
+  $('#sheet').classList.add('tall');
+  try {
+    const list = await S.api.savedMessages();
+    const pv = x => (x.deleted ? 'মুছে ফেলা মেসেজ' : x.sticker ? '✨ ' + (STICKERS[x.sticker]?.[1] || 'স্টিকার') : x.loc ? '📍 লোকেশন' : x.image && !x.body ? '📷 ছবি' : x.body.slice(0, 100));
+    $('#sv-list').innerHTML = list.length ? list.map((x, i) => `<div class="sv-item"><button class="sv-row" data-sv="${i}"><b>${esc(x.mine ? 'আপনি' : x.sender)}</b><span>${esc(pv(x))}</span><small>${esc(ago(x.createdAt))}</small></button><button class="sbtn ghost" data-svx="${i}" aria-label="সেভ থেকে সরান">✕</button></div>`).join('')
+      : '<p class="mut">এখনো কিছু সেভ করেননি। কোনো মেসেজে চেপে "সেভ করুন" বাছাই করুন।</p>';
+    $('#sheet').onclick = e => {
+      const x = e.target.closest('[data-svx]'); if (x) return busy(null, async () => { await S.api.saveMessage(list[Number(x.dataset.svx)].id, false); savedSheet(); });
+      const b = e.target.closest('[data-sv]'); if (!b) return;
+      const it = list[Number(b.dataset.sv)]; closeSheet();
+      openConv(it.t).then(() => setTimeout(() => jumpTo(it.id), 300));
+    };
+  } catch (e) { $('#sv-list').innerHTML = `<p class="mut">${esc(errText(e))}</p>`; }
+}
+// গ্রুপে @উল্লেখ
+function mentionSuggest() {
+  const box = $('#t-mention'), th = S.th, i = $('#tmsg');
+  if (th?.kind !== 'group') { box.hidden = true; return; }
+  const before = i.value.slice(0, i.selectionStart ?? i.value.length), mm = before.match(/(^|\s)@([^\s@]*)$/);
+  if (!mm) { box.hidden = true; return; }
+  const q = mm[2].toLowerCase(), list = (th.members || []).filter(x => x.id !== me().id && (x.name.toLowerCase().includes(q) || (nickOf(x.id, '') || '').toLowerCase().includes(q))).slice(0, 6);
+  if (!list.length) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = list.map(x => `<button type="button" data-mn="${esc(x.id)}">${av(x, 'xs')}<span>${esc(x.name)}</span></button>`).join('');
+}
+$('#t-mention').addEventListener('click', e => {
+  const b = e.target.closest('[data-mn]'); if (!b) return;
+  const x = S.th.members.find(y => y.id === b.dataset.mn), i = $('#tmsg'), pos = i.selectionStart ?? i.value.length;
+  const before = i.value.slice(0, pos).replace(/@([^\s@]*)$/, '@' + x.name + ' ');
+  i.value = before + i.value.slice(pos); i.focus(); i.setSelectionRange(before.length, before.length);
+  $('#t-mention').hidden = true; composeState();
+});
+// ➕ মেনু: স্টিকার, লোকেশন, পোল
+$('#t-plus').addEventListener('click', () => {
+  const th = S.th; if (!th) return;
+  openSheet(`<div class="menu"><button data-act="stk">✨ স্টিকার পাঠান</button><button data-act="loc">📍 আমার লোকেশন পাঠান</button>
+    ${th.kind === 'group' ? '<button data-act="poll">📊 পোল (ভোট) তৈরি করুন</button>' : ''}<button data-act="img">🖼 ছবি পাঠান</button><button data-close>বন্ধ করুন</button></div>`);
+  $('#sheet').onclick = ev => {
+    const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    closeSheet();
+    if (a === 'stk') return emojiPanel('stk');
+    if (a === 'img') return $('#t-img').click();
+    if (a === 'loc') return sendLocation();
+    if (a === 'poll') return pollSheet();
+  };
+});
+async function sendLocation() {
+  if (!navigator.geolocation) return toast('এই ফোনে লোকেশন পাওয়া যাচ্ছে না');
+  if (!(await confirmSheet('আপনার এখনকার লোকেশন এই চ্যাটে পাঠাবেন? যারা চ্যাটে আছেন তারা ম্যাপে দেখতে পাবেন।', 'পাঠান'))) return;
+  toast('লোকেশন খোঁজা হচ্ছে…');
+  navigator.geolocation.getCurrentPosition(
+    pos => sendNow({ loc: { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5) } }),
+    () => toast('লোকেশন পাওয়া যায়নি। ফোনের লোকেশন (GPS) চালু করে এই অ্যাপকে অনুমতি দিন।'),
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+}
+function pollSheet() {
+  const optRow = (i, v = '') => `<input class="f pl-opt" maxlength="80" placeholder="অপশন ${bn(i + 1)}" value="${esc(v)}">`;
+  openSheet(`<h2>📊 গ্রুপ পোল</h2><input class="f" id="pl-q" maxlength="200" placeholder="প্রশ্ন লিখুন (যেমন: কবে খেলা হবে?)"><div id="pl-opts">${[0, 1].map(i => optRow(i)).join('')}</div>
+    <button class="link" id="pl-add" type="button">+ আরেকটি অপশন</button><button class="btn wide" id="pl-go" style="margin-top:12px">পোল পাঠান</button>`);
+  $('#pl-add').onclick = () => { const n = document.querySelectorAll('.pl-opt').length; if (n >= 6) return toast('সর্বোচ্চ ৬টি অপশন'); $('#pl-opts').insertAdjacentHTML('beforeend', optRow(n)); document.querySelectorAll('.pl-opt')[n].focus(); };
+  $('#pl-go').onclick = () => {
+    const q = $('#pl-q').value.trim(), options = [...document.querySelectorAll('.pl-opt')].map(x => x.value.trim()).filter(Boolean);
+    if (!q) return toast('প্রশ্ন লিখুন'); if (options.length < 2) return toast('অন্তত ২টি অপশন দিন');
+    closeSheet(); sendNow({ poll: { q, options } });
+  };
+}
+// গ্রুপের নাম, ছবি ও বিবরণ (সদস্যরা বদলাতে পারেন)
+function groupEditSheet() {
+  const th = S.th, inf = th.info || {};
+  let photo = null, remove = false;
+  openSheet(`<h2>গ্রুপের তথ্য</h2><div class="ge-ph"><span id="ge-av">${groupAv(inf.name, '', inf.photo)}</span><button class="sbtn ghost" id="ge-pick" type="button">📷 ছবি বদলান</button>${inf.photo ? '<button class="sbtn ghost danger-t" id="ge-rm" type="button">সরান</button>' : ''}<input type="file" id="ge-file" accept="image/*" hidden></div>
+    <label for="ge-name">নাম</label><input class="f" id="ge-name" maxlength="60" value="${esc(inf.name || '')}">
+    <label for="ge-about">বিবরণ</label><textarea class="f" id="ge-about" maxlength="300" rows="3" placeholder="গ্রুপটা কী নিয়ে (ঐচ্ছিক)">${esc(inf.about || '')}</textarea>
+    <button class="btn wide" id="ge-go" style="margin-top:10px">সংরক্ষণ</button>`);
+  $('#ge-pick').onclick = () => $('#ge-file').click();
+  $('#ge-rm') && ($('#ge-rm').onclick = () => { remove = true; photo = null; $('#ge-av').innerHTML = groupAv(inf.name); });
+  $('#ge-file').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { photo = await compress(f, 400, 0.8); remove = false; $('#ge-av').innerHTML = `<img class="av" src="${URL.createObjectURL(photo)}" alt="">`; } catch { toast('ছবিটি নেওয়া যায়নি'); } };
+  $('#ge-go').onclick = e => {
+    const name = $('#ge-name').value.trim(); if (!name) return toast('নাম দিন');
+    busy(e.currentTarget, async () => { await S.api.updateChat(th.id, { name, about: $('#ge-about').value.trim(), photo, removePhoto: remove }); th.info = await S.api.chatInfo(th.id); closeSheet(); renderThreadHead(); toast('গ্রুপের তথ্য সংরক্ষণ হয়েছে'); });
+  };
+}
 // ================================================================ গ্রুপ চ্যাট
 async function friendPicker(title, exclude, btnLabel, onPick, withName) {
   openSheet(`<h2>${title}</h2>${withName ? '<input class="f" id="gp-name" maxlength="60" placeholder="গ্রুপের নাম (যেমন: পরিবার, বন্ধুরা)">' : ''}<input type="search" id="gp-q" placeholder="বন্ধু খুঁজুন…" aria-label="বন্ধু খুঁজুন"><div id="gp-list" style="margin-top:8px"><div class="mut">লোড হচ্ছে…</div></div>
@@ -2639,9 +2929,10 @@ function newGroupSheet() {
 }
 function groupMenu() {
   const th = S.th, meIsAdmin = th.members?.find(x => x.id === me().id)?.role === 'admin';
-  openSheet(`<h2>${esc(th.info?.name || 'গ্রুপ')}</h2><h3 class="res-h">সদস্য (${bn(th.members.length)})</h3>
+  openSheet(`<div class="gm-head">${groupAv(th.info?.name, '', th.info?.photo)}<div><h2>${esc(th.info?.name || 'গ্রুপ')}</h2>${th.info?.about ? `<p class="gm-about">${esc(th.info.about)}</p>` : ''}</div></div><h3 class="res-h">সদস্য (${bn(th.members.length)})</h3>
     <div class="gm-list">${th.members.map(x => `<div class="person">${userLink(x.id, av(x))}<div class="info">${userLink(x.id, esc(x.name), 'who-btn')}${x.role === 'admin' ? '<div class="sub">অ্যাডমিন</div>' : ''}</div>${meIsAdmin && x.id !== me().id ? `<button class="sbtn ghost" data-gmrm="${esc(x.id)}">বাদ দিন</button>` : ''}</div>`).join('')}</div>
-    <div class="menu"><button data-act="add">➕ সদস্য যোগ করুন</button><button data-act="rename">✏️ গ্রুপের নাম বদলান</button>
+    <div class="menu"><button data-act="add">➕ সদস্য যোগ করুন</button><button data-act="rename">✏️ নাম, ছবি ও বিবরণ</button>
+      ${chatExtrasHtml(th)}
       <button data-act="mute">${th.muted ? '🔔 আনমিউট করুন' : '🔕 মিউট করুন'}</button><button data-act="clear" class="danger">🗑 চ্যাট মুছে ফেলুন</button>
       <button data-act="leave" class="danger">🚪 গ্রুপ ছেড়ে দিন</button><button data-close>বন্ধ করুন</button></div>`);
   $('#sheet').classList.add('tall');
@@ -2649,12 +2940,9 @@ function groupMenu() {
     const rm = ev.target.closest('[data-gmrm]');
     if (rm) { if (await confirmSheet('এই সদস্যকে গ্রুপ থেকে বাদ দেবেন?', 'বাদ দিন', true)) busy(null, async () => { await S.api.removeChatMember(th.id, rm.dataset.gmrm); toast('বাদ দেওয়া হয়েছে'); await openConv(th, true); groupMenu(); }); return; }
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    if (EXTRA_ACTS.has(a)) return chatExtra(a);
     if (a === 'add') return friendPicker('সদস্য যোগ করুন', new Set(th.members.map(x => x.id)), 'যোগ করুন', async ids => { await S.api.addChatMembers(th.id, ids); closeSheet(); toast('যোগ করা হয়েছে'); openConv(th, true); });
-    if (a === 'rename') {
-      openSheet(`<h2>গ্রুপের নাম</h2><input class="f" id="gr-name" maxlength="60" value="${esc(th.info?.name || '')}"><button class="btn wide" id="gr-go" style="margin-top:10px">সংরক্ষণ</button>`);
-      $('#gr-go').onclick = e => { const n = $('#gr-name').value.trim(); if (!n) return toast('নাম দিন'); busy(e.currentTarget, async () => { await S.api.renameChat(th.id, n); th.info.name = n; closeSheet(); renderThreadHead(); toast('নাম বদলানো হয়েছে'); }); };
-      return;
-    }
+    if (a === 'rename') return groupEditSheet();
     convMenuAction(a, th);
   };
 }
@@ -3147,6 +3435,7 @@ const NT = {
   page_admin: ['📄', 'আপনাকে একটি পেইজের অ্যাডমিন বানিয়েছেন'],
   blood_request: ['🩸', ''],
   event_reminder: ['📅', '-এর অনুষ্ঠান আগামী ২৪ ঘণ্টার মধ্যে, আপনি যাচ্ছেন'],
+  chat_mention: ['@', 'গ্রুপ চ্যাটে আপনাকে উল্লেখ করেছেন'],
 };
 // নিজের অর্জনের নোটিফিকেশন (মাইলফলক, সাপ্তাহিক রিপোর্ট): কারো নাম নয়, শুধু খবরটা
 const SELF_TYPES = ['milestone', 'follower_milestone', 'weekly'];
@@ -3175,11 +3464,11 @@ async function loadNotifs(keep) {
       const [ic, txt0] = NT[n.type] || ['•', ''];
       const txt1 = n.type === 'page_admin' && n.meta?.page ? `আপনাকে "${n.meta.page}" পেইজের অ্যাডমিন বানিয়েছেন` : n.meta?.page && (n.type === 'verify_ok' || n.type === 'verify_no') ? `আপনার পেইজ "${n.meta.page}"-এর ভেরিফাইড ব্যাজের আবেদন ${n.type === 'verify_ok' ? 'অনুমোদন করেছেন' : 'গ্রহণ করেননি'}` : txt0;
       const txt2 = n.type === 'blood_request' ? `-এর ${n.meta?.bg || ''} রক্ত দরকার। আপনি কাছাকাছি একজন ${n.meta?.bg || ''} ডোনার, সাহায্য করতে পারবেন?` : txt1;
-      const txt = S.actAs ? txt2.replace('আপনার পোস্ট', 'পেইজের পোস্ট').replace('আপনার পেইজ', 'পেইজ') : txt1;
-      const snip = n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
+      const txt = S.actAs ? txt2.replace('আপনার পোস্ট', 'পেইজের পোস্ট').replace('আপনার পেইজ', 'পেইজ') : txt2;
+      const snip = n.type === 'chat_mention' ? ` <span class="q">${esc(n.meta?.chat || '')}${n.meta?.text ? ` · "${esc(n.meta.text.slice(0, 40))}"` : ''}</span>` : n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
       const reqBtns = n.type === 'friend_request' && pending.has(n.actor.id)
         ? `<div class="acts2"><button class="sbtn" data-fr="accept" data-id="${esc(n.actor.id)}">গ্রহণ করুন</button><button class="sbtn ghost" data-fr="remove" data-id="${esc(n.actor.id)}">মুছুন</button></div>` : '';
-      return `<div class="notif${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="${esc(n.groupId ?? '')}" data-n-user="${esc(n.actor.id)}" data-n-page="${esc(n.meta?.page_id ?? '')}" role="button" tabindex="0">
+      return `<div class="notif${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="${esc(n.groupId ?? '')}" data-n-user="${esc(n.actor.id)}" data-n-page="${esc(n.meta?.page_id ?? '')}" data-n-chat="${esc(n.meta?.chat_id ?? '')}" role="button" tabindex="0">
         <span class="ico">${av(n.actor)}<i>${ic}</i></span>
         <span class="txt"><b>${esc(n.actor.name)}</b>${n.type === 'event_reminder' || n.type === 'blood_request' ? '' : ' '}${esc(txt)}${n.type === 'event_reminder' && n.meta?.at ? ` <span class="q">${esc(bnWhen(n.meta.at, true))}${n.meta.place ? ' · ' + esc(n.meta.place) : ''}</span>` : snip}<span class="time">${esc(ago(n.createdAt))}</span>${reqBtns}</span></div>`;
     }).join('') : (S.actAs ? `<div class="empty">${esc(S.actAs.name)} পেইজের এখনো কোনো নোটিফিকেশন নেই।<br>কেউ পেইজের পোস্টে রিয়্যাক্ট বা মন্তব্য করলে এখানে দেখাবে।</div>` : '<div class="empty">এখনো কোনো নোটিফিকেশন নেই।<br>কেউ আপনার পোস্টে লাইক বা মন্তব্য করলে, বা ফ্রেন্ড রিকোয়েস্ট পাঠালে এখানে দেখাবে।</div>');
@@ -3190,6 +3479,7 @@ function openNotif(el) {
   if (!el || el.closest('button')) return;
   const t = el.dataset.nType;
   if ((t === 'blood_request' || t === 'event_reminder' || t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag' || t === 'boost_ok' || t === 'boost_no') && el.dataset.nPost) openPost(el.dataset.nPost);
+  else if (t === 'chat_mention' && el.dataset.nChat) openChatGroup(el.dataset.nChat);
   else if (t === 'friend_request') go('friends');
   else if (t === 'verify_ok' || t === 'verify_no') { open('wallet'); loadWallet(); }
   else if (t === 'milestone' && el.dataset.nPost) openPost(el.dataset.nPost);

@@ -69,6 +69,12 @@ jobs:
           grep -q RECORD_AUDIO "$M" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-feature android:name="android.hardware.microphone" android:required="false" />\n</manifest>#' "$M"
           grep -n "AUDIO\|microphone" "$M"
 
+      - name: Location permission (মেসেজে লোকেশন পাঠানোর জন্য)
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q ACCESS_FINE_LOCATION "$M" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="false" />\n</manifest>#' "$M"
+          grep -n "LOCATION\|location" "$M"
+
       - name: Generate app icon and splash
         continue-on-error: true
         run: npx @capacitor/assets generate --android --iconBackgroundColor '#006a4e' --iconBackgroundColorDark '#006a4e' --splashBackgroundColor '#006a4e' --splashBackgroundColorDark '#006a4e'

@@ -612,7 +612,10 @@ async function supabaseApi() {
     // ---------- মেসেজ
     // ইনবক্স: সাধারণ, পেইজ ও গ্রুপ কথোপকথন; মিউট ও মেসেজ রিকোয়েস্টসহ
     async inbox() {
-      return ok(await sb.rpc('my_inbox')).filter(c => !c.partner_id || !blocked.has(c.partner_id)).map(c => ({
+      const rows = ok(await sb.rpc('my_inbox')), gp = rows.filter(c => c.kind === 'group' && c.avatar_url).map(c => c.avatar_url);
+      const urls = gp.length ? await this.fileUrls(gp) : new Map();
+      rows.forEach(c => { if (c.kind === 'group' && c.avatar_url) c.avatar_url = urls.get(c.avatar_url) || ''; });
+      return rows.filter(c => !c.partner_id || !blocked.has(c.partner_id)).map(c => ({
         kind: c.kind, userId: c.partner_id || null, pageId: c.page_id || null, chatId: c.chat_id || null, asPage: !!c.as_page, pageName: c.page_name || '',
         name: c.name, avatar: c.avatar_url || '', last: c.last_body, lastAt: c.last_at, lastMine: c.last_mine, unread: Number(c.unread) || 0,
         muted: !!c.muted, request: !!c.request, members: c.members || 0 }));
@@ -622,7 +625,7 @@ async function supabaseApi() {
     async msgBadges() { const l = await this.inbox(); return { unread: l.filter(c => !c.asPage && !c.muted && !c.request).reduce((a, c) => a + c.unread, 0), requests: l.filter(c => c.request && c.unread > 0).length }; },
     // t = { kind: 'dm'|'page'|'group', id, pageId, asPage }
     async thread(t) {
-      const sel = 'id,sender_id,recipient_id,body,created_at,read_at,is_auto,image_path,voice_path,voice_secs,reply_to,deleted_at,chat_id,rt:reply_to(id,body,sender_id,image_path,voice_path,deleted_at),sp:profiles!messages_sender_id_fkey(id,name,avatar_url)';
+      const sel = 'id,sender_id,recipient_id,body,created_at,read_at,is_auto,image_path,voice_path,voice_secs,reply_to,deleted_at,chat_id,edited_at,forwarded,pinned_at,sticker,loc,poll,mentions,expires_at,rt:reply_to(id,body,sender_id,image_path,voice_path,deleted_at),sp:profiles!messages_sender_id_fkey(id,name,avatar_url)';
       let q = sb.from('messages').select(sel);
       const cust = t.asPage ? t.id : me.id;
       if (t.kind === 'group') q = q.eq('chat_id', t.id);
@@ -634,8 +637,13 @@ async function supabaseApi() {
       let rows = ok(rowsR).reverse();
       if (set.cleared_at) rows = rows.filter(m => m.created_at > set.cleared_at);
       const ids = rows.map(m => m.id);
-      const [rx, hid] = ids.length ? await Promise.all([sb.from('message_reactions').select('message_id,user_id,emoji').in('message_id', ids), sb.from('message_hidden').select('message_id').eq('user_id', me.id).in('message_id', ids)]) : [{ data: [] }, { data: [] }];
-      const hidden = new Set((hid.data || []).map(h => h.message_id)), rxBy = new Map();
+      const pollIds = rows.filter(m => m.poll).map(m => m.id), shKey = t.kind === 'page' ? null : chatFolder(t);
+      const shQ = () => (shKey ? sb.from('conv_shared').select('theme,nicknames,disappear').eq('key', shKey).maybeSingle() : Promise.resolve({ data: null }));
+      const [rx, hid, sv, pv, sh] = ids.length ? await Promise.all([sb.from('message_reactions').select('message_id,user_id,emoji').in('message_id', ids), sb.from('message_hidden').select('message_id').eq('user_id', me.id).in('message_id', ids),
+        sb.from('message_saved').select('message_id').eq('user_id', me.id).in('message_id', ids), pollIds.length ? sb.from('chat_poll_votes').select('message_id,user_id,opt').in('message_id', pollIds) : { data: [] }, shQ()])
+        : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, await shQ()];
+      const hidden = new Set((hid.data || []).map(h => h.message_id)), saved = new Set((sv.data || []).map(x => x.message_id)), rxBy = new Map(), votesBy = new Map();
+      for (const v of pv.data || []) { if (!votesBy.has(v.message_id)) votesBy.set(v.message_id, []); votesBy.get(v.message_id).push(v); }
       for (const r of rx.data || []) { if (!rxBy.has(r.message_id)) rxBy.set(r.message_id, []); rxBy.get(r.message_id).push(r); }
       const mineOf = m => (t.pageId ? (t.asPage ? m.sender_id !== cust : m.sender_id === me.id) : m.sender_id === me.id);
       const msgs = rows.filter(m => !hidden.has(m.id)).map(m => {
@@ -644,19 +652,25 @@ async function supabaseApi() {
         return { id: m.id, mine: mineOf(m), senderId: m.sender_id, sender: m.sp ? { id: m.sp.id, name: m.sp.name, avatar: m.sp.avatar_url || '' } : null,
           body: m.body || '', createdAt: m.created_at, read: !!m.read_at, auto: !!m.is_auto, image: m.image_path || '', voice: m.voice_path || '', voiceSecs: m.voice_secs || 0,
           deleted: !!m.deleted_at, reactions: counts, myReaction: rs.find(r => r.user_id === me.id)?.emoji || '',
-          reply: m.rt ? { id: m.rt.id, body: m.rt.body || '', mine: m.rt.sender_id === me.id, image: !!m.rt.image_path, voice: !!m.rt.voice_path, deleted: !!m.rt.deleted_at } : null };
+          reply: m.rt ? { id: m.rt.id, body: m.rt.body || '', mine: m.rt.sender_id === me.id, image: !!m.rt.image_path, voice: !!m.rt.voice_path, deleted: !!m.rt.deleted_at } : null,
+          editedAt: m.edited_at || null, forwarded: !!m.forwarded, pinnedAt: m.pinned_at || null, sticker: m.sticker || '', loc: m.loc || null, mentions: m.mentions || [], expiresAt: m.expires_at || null, saved: saved.has(m.id),
+          poll: m.poll ? { q: m.poll.q || '', options: m.poll.options || [], votes: (m.poll.options || []).map((_, i) => (votesBy.get(m.id) || []).filter(v => v.opt === i).length), my: (votesBy.get(m.id) || []).find(v => v.user_id === me.id)?.opt ?? null } : null };
       });
       let members = [];
       if (t.kind === 'group') members = ok(await sb.from('chat_members').select('user_id,role,last_read_at,p:profiles(name,avatar_url)').eq('chat_id', t.id)).map(x => ({ id: x.user_id, role: x.role, lastReadAt: x.last_read_at, name: x.p?.name || 'সদস্য', avatar: x.p?.avatar_url || '' }));
-      return { msgs, muted: !!set.muted, accepted: !!set.accepted, members };
+      const shared = sh?.data || {};
+      return { msgs, muted: !!set.muted, accepted: !!set.accepted, members, shared: { theme: shared.theme || '', nicknames: shared.nicknames || {}, disappear: !!shared.disappear } };
     },
     async messages(id, pageId, asPage) { return (await this.thread({ kind: pageId ? 'page' : 'dm', id, pageId, asPage })).msgs; },
     async sendMessage(id, body, pageId, opts = {}) { return this.send({ kind: pageId ? 'page' : 'dm', id, pageId, asPage: opts.asPage }, body, opts); },
-    async send(t, body, { replyTo, image, voice, voiceSecs } = {}) {
+    async send(t, body, { replyTo, image, voice, voiceSecs, sticker, loc, poll, mentions, forwarded, imagePath, voicePath } = {}) {
       const folder = chatFolder(t), up = async (blob, ext) => { const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`; ok(await sb.storage.from('chat').upload(path, blob, { contentType: blob.type, cacheControl: '31536000' })); return path; };
-      const image_path = image ? await up(image, image.type === 'image/webp' ? 'webp' : 'jpg') : null;
-      const voice_path = voice ? await up(voice, (voice.type.split('/')[1] || 'webm').split(';')[0]) : null;
-      const row = { sender_id: me.id, body: body || '', image_path, voice_path, voice_secs: voice ? Math.max(1, Math.min(180, Math.round(voiceSecs || 1))) : null, reply_to: replyTo || null };
+      // ফরওয়ার্ড: আগের ফাইল নতুন চ্যাটের ফোল্ডারে কপি
+      const cp = async (from, ext) => { const to = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`; ok(await sb.storage.from('chat').copy(from, to)); return to; };
+      const image_path = image ? await up(image, image.type === 'image/webp' ? 'webp' : 'jpg') : imagePath ? await cp(imagePath, imagePath.split('.').pop()) : null;
+      const voice_path = voice ? await up(voice, (voice.type.split('/')[1] || 'webm').split(';')[0]) : voicePath ? await cp(voicePath, voicePath.split('.').pop()) : null;
+      const row = { sender_id: me.id, body: body || '', image_path, voice_path, voice_secs: voice || voicePath ? Math.max(1, Math.min(180, Math.round(voiceSecs || 1))) : null, reply_to: replyTo || null,
+        sticker: sticker || null, loc: loc || null, poll: poll || null, mentions: mentions?.length ? mentions : null, forwarded: !!forwarded };
       if (t.kind === 'group') Object.assign(row, { chat_id: t.id, recipient_id: null });
       else Object.assign(row, { recipient_id: t.id, page_id: t.pageId || null });
       ok(await sb.from('messages').insert(row));
@@ -675,6 +689,29 @@ async function supabaseApi() {
       ok(await sb.rpc('unsend_message', { p_id: m.id }));
       if (paths.length) await sb.storage.from('chat').remove(paths).catch(() => {});
     },
+    async editMessage(id, body) { ok(await sb.rpc('edit_message', { p_id: id, p_body: body })); },
+    async pinMessage(id, on) { ok(await sb.rpc('pin_message', { p_id: id, p_on: !!on })); },
+    async saveMessage(id, on) { if (on) ok(await sb.from('message_saved').upsert({ user_id: me.id, message_id: id }, { ignoreDuplicates: true })); else ok(await sb.from('message_saved').delete().eq('user_id', me.id).eq('message_id', id)); },
+    async savedMessages() {
+      return ok(await sb.from('message_saved').select('created_at,m:messages(id,body,sender_id,recipient_id,chat_id,page_id,created_at,image_path,sticker,loc,deleted_at,sp:profiles!messages_sender_id_fkey(name,avatar_url))').eq('user_id', me.id).order('created_at', { ascending: false }).limit(100))
+        .filter(r => r.m).map(r => ({ id: r.m.id, body: r.m.body || '', mine: r.m.sender_id === me.id, sender: r.m.sp?.name || '', avatar: r.m.sp?.avatar_url || '', createdAt: r.m.created_at, image: !!r.m.image_path, sticker: r.m.sticker || '', loc: !!r.m.loc, deleted: !!r.m.deleted_at,
+          t: r.m.chat_id ? { kind: 'group', id: r.m.chat_id } : { kind: r.m.page_id ? 'page' : 'dm', id: r.m.sender_id === me.id ? r.m.recipient_id : r.m.sender_id, pageId: r.m.page_id || null } }));
+    },
+    async voteChatPoll(id, opt) { ok(await sb.rpc('vote_chat_poll', { p_id: id, p_opt: opt == null ? -1 : opt })); },
+    async mediaOf(t) {
+      let q = sb.from('messages').select('id,image_path,created_at').not('image_path', 'is', null);
+      const cust = t.asPage ? t.id : me.id;
+      if (t.kind === 'group') q = q.eq('chat_id', t.id);
+      else if (t.pageId) q = q.eq('page_id', t.pageId).or(`sender_id.eq.${cust},recipient_id.eq.${cust}`);
+      else q = q.is('page_id', null).is('chat_id', null).or(`and(sender_id.eq.${me.id},recipient_id.eq.${t.id}),and(sender_id.eq.${t.id},recipient_id.eq.${me.id})`);
+      return ok(await q.order('created_at', { ascending: false }).limit(100)).map(r => ({ id: r.id, path: r.image_path, createdAt: r.created_at }));
+    },
+    async setShared(t, { theme, nickUser, nick, disappear }) { ok(await sb.rpc('set_conv_shared', { p_key: chatFolder(t), p_theme: theme ?? null, p_nick_user: nickUser || null, p_nick: nick ?? null, p_disappear: disappear ?? null })); },
+    async updateChat(id, { name, about, photo, removePhoto }) {
+      let path = null;
+      if (photo) { path = `g_${id}/group-${Date.now()}.${photo.type === 'image/webp' ? 'webp' : 'jpg'}`; ok(await sb.storage.from('chat').upload(path, photo, { contentType: photo.type, cacheControl: '31536000' })); }
+      ok(await sb.rpc('update_chat', { p_chat: id, p_name: name || '', p_about: about || '', p_photo: removePhoto ? '' : path }));
+    },
     async hideMessage(id) { ok(await sb.from('message_hidden').upsert({ user_id: me.id, message_id: id }, { ignoreDuplicates: true })); },
     async convSet(t, patch) {
       const key = convKey(t), cur = ok(await sb.from('conv_settings').select('muted,accepted,cleared_at').eq('user_id', me.id).eq('key', key).maybeSingle()) || {};
@@ -690,7 +727,7 @@ async function supabaseApi() {
     async setShowActive(on) { ok(await sb.rpc('set_show_active', { p_on: !!on })); },
     // গ্রুপ চ্যাট
     async createChat(name, ids) { return ok(await sb.rpc('create_chat', { p_name: name, p_members: ids })); },
-    async chatInfo(id) { const c = ok(await sb.from('chats').select('id,name,created_by,created_at').eq('id', id).maybeSingle()); return c && { id: c.id, name: c.name, createdBy: c.created_by }; },
+    async chatInfo(id) { const c = ok(await sb.from('chats').select('id,name,created_by,created_at,about,photo_path').eq('id', id).maybeSingle()); return c && { id: c.id, name: c.name, createdBy: c.created_by, about: c.about || '', photo: c.photo_path ? (await this.fileUrls([c.photo_path])).get(c.photo_path) || '' : '' }; },
     async addChatMembers(id, ids) { ok(await sb.rpc('add_chat_members', { p_chat: id, p_members: ids })); },
     async removeChatMember(id, uid) { ok(await sb.rpc('remove_chat_member', { p_chat: id, p_user: uid })); },
     async renameChat(id, name) { ok(await sb.rpc('rename_chat', { p_chat: id, p_name: name })); },
@@ -714,6 +751,7 @@ async function supabaseApi() {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => ev('new', p.new))
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, p => ev('update', p.new))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, p => cb({ type: 'rx', id: (p.new || p.old)?.message_id }))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_poll_votes' }, p => cb({ type: 'rx', id: (p.new || p.old)?.message_id }))
         .subscribe();
       return () => sb.removeChannel(ch);
     },
@@ -929,6 +967,8 @@ function demoApi() {
     return { friend: !f ? 'none' : f.status === 'accepted' ? 'friends' : f.requester === meId ? 'sent' : 'received', following: db.follows.includes(meId + ':' + id), blocked: isBlocked(id) };
   };
   const listeners = new Set(), notifyListeners = new Set(), typingListeners = new Set();
+  const demoShKey = t => (t.kind === 'group' ? 'g_' + t.id : 'd_' + [meId, t.id].sort().join('_'));
+  const demoSh = t => { db.shared = db.shared || {}; return db.shared[demoShKey(t)] || {}; };
   const demoKey = t => (t.kind === 'group' ? 'g:' + t.id : t.pageId ? `p:${t.pageId}:${t.id}` : 'u:' + t.id);
   // ডেমোর নমুনা ছবি (মাঠ, আকাশ, খেলোয়াড়)
   const PICS = [['#7fc8f8', '#5cb85c', '#f5b700'], ['#ffb37a', '#4caf50', '#e5303f'], ['#9ad0ff', '#3f9b4f', '#1d6fd8'], ['#c6b8ff', '#66bb6a', '#ff7043']];
@@ -1589,7 +1629,8 @@ function demoApi() {
     // ---------- মেসেজ (ডেমো)
     async inbox() {
       const map = new Map(), mine = new Set(db.pages.filter(p => p.ownerId === meId).map(p => p.id));
-      const label = m => (m.deletedAt ? '🚫 মেসেজটি মুছে ফেলা হয়েছে' : m.voice ? '🎤 ভয়েস মেসেজ' : m.image ? (m.body ? '📷 ' + m.body : '📷 ছবি') : m.body);
+      const label = m => (m.deletedAt ? '🚫 মেসেজটি মুছে ফেলা হয়েছে' : m.voice ? '🎤 ভয়েস মেসেজ' : m.image ? (m.body ? '📷 ' + m.body : '📷 ছবি') : m.sticker ? '✨ স্টিকার' : m.loc ? '📍 লোকেশন' : m.poll ? '📊 পোল: ' + m.poll.q : m.body);
+      const nowIso = new Date().toISOString(); db.messages = db.messages.filter(m => !m.expiresAt || m.expiresAt > nowIso);
       for (const m of db.messages) {
         if (m.chatId || (m.from !== meId && m.to !== meId) || (m.hid || []).includes(meId)) continue;
         const other = m.from === meId ? m.to : m.from, key = other + ':' + (m.pageId || 0);
@@ -1608,7 +1649,7 @@ function demoApi() {
       for (const g of db.chats.filter(g => g.members.some(x => x.id === meId))) {
         const me2 = g.members.find(x => x.id === meId), ms = db.messages.filter(m => m.chatId === g.id && !(m.hid || []).includes(meId)), lm = ms.at(-1), set = db.convSet['g:' + g.id] || {};
         const lastAt = lm?.createdAt || g.createdAt; if (set.clearedAt && lastAt <= set.clearedAt) continue;
-        out.push({ kind: 'group', userId: null, pageId: null, chatId: g.id, asPage: false, pageName: '', name: g.name, avatar: '', last: lm ? label(lm) : 'গ্রুপ তৈরি হয়েছে', lastAt, lastMine: lm?.from === meId,
+        out.push({ kind: 'group', userId: null, pageId: null, chatId: g.id, asPage: false, pageName: '', name: g.name, avatar: g.photo || '', last: lm ? label(lm) : 'গ্রুপ তৈরি হয়েছে', lastAt, lastMine: lm?.from === meId,
           unread: ms.filter(m => m.from !== meId && m.createdAt > me2.lastReadAt).length, muted: !!set.muted, request: false, members: g.members.length });
       }
       return wait(out.sort((a, b) => b.lastAt.localeCompare(a.lastAt)));
@@ -1620,22 +1661,31 @@ function demoApi() {
       const set = db.convSet[demoKey(t)] || {};
       const rows = db.messages.filter(m => (t.kind === 'group' ? m.chatId === Number(t.id) : !m.chatId && ((m.from === meId && m.to === t.id) || (m.from === t.id && m.to === meId)) && (m.pageId || null) === (t.pageId ? Number(t.pageId) : null))
         && !(m.hid || []).includes(meId) && (!set.clearedAt || m.createdAt > set.clearedAt));
-      const msgs = rows.map(m => {
+      const nowIso = new Date().toISOString();
+      const msgs = rows.filter(m => !m.expiresAt || m.expiresAt > nowIso).map(m => {
         const counts = {}; Object.values(m.rx || {}).forEach(e => { counts[e] = (counts[e] || 0) + 1; });
         const r = m.replyTo && db.messages.find(x => x.id === m.replyTo), u = user(m.from) || { id: m.from, name: 'সদস্য', avatar: '' };
         return { id: m.id, mine: m.from === meId, senderId: m.from, sender: { id: u.id, name: u.name, avatar: u.avatar }, body: m.body || '', createdAt: m.createdAt, read: !!m.read, auto: !!m.auto,
           image: m.image || '', voice: m.voice || '', voiceSecs: m.voiceSecs || 0, deleted: !!m.deletedAt, reactions: counts, myReaction: (m.rx || {})[meId] || '',
-          reply: r ? { id: r.id, body: r.body || '', mine: r.from === meId, image: !!r.image, voice: !!r.voice, deleted: !!r.deletedAt } : null };
+          reply: r ? { id: r.id, body: r.body || '', mine: r.from === meId, image: !!r.image, voice: !!r.voice, deleted: !!r.deletedAt } : null,
+          editedAt: m.editedAt || null, forwarded: !!m.forwarded, pinnedAt: m.pinnedAt || null, sticker: m.sticker || '', loc: m.loc || null, mentions: m.mentions || [], expiresAt: m.expiresAt || null, saved: (db.saved || []).includes(m.id),
+          poll: m.poll ? { q: m.poll.q, options: m.poll.options, votes: m.poll.options.map((_, i) => Object.values(m.votes || {}).filter(v => v === i).length), my: (m.votes || {})[meId] ?? null } : null };
       });
       const g = t.kind === 'group' && db.chats.find(x => x.id === Number(t.id));
       const members = g ? g.members.map(x => { const u = user(x.id) || { name: 'সদস্য', avatar: '' }; return { id: x.id, role: x.role, lastReadAt: x.lastReadAt, name: u.name, avatar: u.avatar }; }) : [];
-      return wait({ msgs, muted: !!set.muted, accepted: !!set.accepted, members });
+      const sh = t.kind === 'page' || t.pageId ? {} : demoSh(t);
+      return wait({ msgs, muted: !!set.muted, accepted: !!set.accepted, members, shared: { theme: sh.theme || '', nicknames: sh.nicknames || {}, disappear: !!sh.disappear } });
     },
     async messages(id, pageId) { return (await this.thread({ kind: pageId ? 'page' : 'dm', id, pageId })).msgs; },
     async sendMessage(id, body, pageId, opts = {}) { return this.send({ kind: pageId ? 'page' : 'dm', id, pageId }, body, opts); },
-    async send(t, body, { replyTo, image, voice, voiceSecs } = {}) {
+    async send(t, body, { replyTo, image, voice, voiceSecs, sticker, loc, poll, mentions, forwarded, imagePath, voicePath } = {}) {
       const toData = b => b ? new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); }) : null;
-      const base = { id: nid(db.messages), from: meId, body: body || '', image: await toData(image), voice: await toData(voice), voiceSecs: voice ? Math.round(voiceSecs || 1) : 0, replyTo: replyTo || null, createdAt: new Date().toISOString(), read: false, rx: {} };
+      const dis = !t.pageId && t.kind !== 'page' && demoSh(t).disappear;
+      if (dis && (image || voice || imagePath || voicePath)) throw new Error('disappearing: no media');
+      if (poll && t.kind !== 'group') throw new Error('poll only in groups');
+      const base = { id: nid(db.messages), from: meId, body: body || '', image: (await toData(image)) || imagePath || null, voice: (await toData(voice)) || voicePath || null, voiceSecs: voice || voicePath ? Math.round(voiceSecs || 1) : 0, replyTo: replyTo || null, createdAt: new Date().toISOString(), read: false, rx: {},
+        sticker: sticker || null, loc: loc || null, poll: poll ? { q: poll.q.trim(), options: poll.options.map(o => o.trim()).filter(Boolean).slice(0, 6) } : null, forwarded: !!forwarded, expiresAt: dis ? new Date(Date.now() + 864e5).toISOString() : null };
+      if (t.kind === 'group') { const g0 = db.chats.find(x => x.id === Number(t.id)); base.mentions = (mentions || []).filter(u => g0?.members.some(x => x.id === u && u !== meId)); }
       if (t.kind === 'group') {
         const g = db.chats.find(x => x.id === Number(t.id)); if (!g || !g.members.some(x => x.id === meId)) throw new Error('row-level security');
         db.messages.push({ ...base, chatId: g.id, to: null }); save();
@@ -1669,6 +1719,39 @@ function demoApi() {
     async fileUrls(paths) { return new Map(paths.filter(Boolean).map(p => [p, p])); },
     async reactMessage(id, emoji) { const m = db.messages.find(x => x.id === id); if (!m || m.deletedAt) return; m.rx = m.rx || {}; if (emoji) m.rx[meId] = emoji; else delete m.rx[meId]; save(); return wait(); },
     async unsendMessage(m0) { const m = db.messages.find(x => x.id === m0.id); if (!m || m.from !== meId) throw new Error('not allowed'); Object.assign(m, { deletedAt: new Date().toISOString(), body: '', image: null, voice: null, rx: {} }); save(); return wait(); },
+    async editMessage(id, body) {
+      const m = db.messages.find(x => x.id === id);
+      if (!m || m.from !== meId || m.deletedAt) throw new Error('not allowed');
+      if (Date.now() - new Date(m.createdAt) > 15 * 6e4) throw new Error('edit window over');
+      if (!(body || '').trim()) throw new Error('empty');
+      Object.assign(m, { body: body.trim(), editedAt: new Date().toISOString() }); save(); listeners.forEach(cb => cb({ type: 'update', id })); return wait();
+    },
+    async pinMessage(id, on) { const m = db.messages.find(x => x.id === id); if (m) { m.pinnedAt = on ? new Date().toISOString() : null; save(); } return wait(); },
+    async saveMessage(id, on) { db.saved = (db.saved || []).filter(x => x !== id); if (on) db.saved.unshift(id); save(); return wait(); },
+    async savedMessages() {
+      return wait((db.saved || []).map(id => db.messages.find(m => m.id === id)).filter(Boolean).map(m => {
+        const u = user(m.from) || { name: 'সদস্য', avatar: '' };
+        return { id: m.id, body: m.body || '', mine: m.from === meId, sender: u.name, avatar: u.avatar, createdAt: m.createdAt, image: !!m.image, sticker: m.sticker || '', loc: !!m.loc, deleted: !!m.deletedAt,
+          t: m.chatId ? { kind: 'group', id: m.chatId } : { kind: m.pageId ? 'page' : 'dm', id: m.from === meId ? m.to : m.from, pageId: m.pageId || null } };
+      }));
+    },
+    async voteChatPoll(id, opt) { const m = db.messages.find(x => x.id === id); if (!m?.poll) return; m.votes = m.votes || {}; if (opt == null || m.votes[meId] === opt) delete m.votes[meId]; else m.votes[meId] = opt; save(); return wait(); },
+    async mediaOf(t) { const { msgs } = await this.thread(t); return msgs.filter(m => m.image && !m.deleted).reverse().map(m => ({ id: m.id, path: m.image, createdAt: m.createdAt })); },
+    async setShared(t, { theme, nickUser, nick, disappear }) {
+      db.shared = db.shared || {}; const k = demoShKey(t), cur = { nicknames: {}, ...(db.shared[k] || {}) };
+      if (theme != null) cur.theme = theme;
+      if (nickUser) { if ((nick || '').trim()) cur.nicknames = { ...cur.nicknames, [nickUser]: nick.trim().slice(0, 40) }; else { const n = { ...cur.nicknames }; delete n[nickUser]; cur.nicknames = n; } }
+      if (disappear != null) cur.disappear = !!disappear;
+      db.shared[k] = cur; save(); return wait();
+    },
+    async updateChat(id, { name, about, photo, removePhoto }) {
+      const g = db.chats.find(x => x.id === Number(id)); if (!g) return;
+      if (!g.members.some(x => x.id === meId)) throw new Error('not allowed');
+      if ((name || '').trim()) g.name = name.trim(); g.about = (about || '').trim().slice(0, 300);
+      if (photo) g.photo = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(photo); });
+      if (removePhoto) g.photo = '';
+      save(); return wait();
+    },
     async hideMessage(id) { const m = db.messages.find(x => x.id === id); if (m) { m.hid = [...new Set([...(m.hid || []), meId])]; save(); } return wait(); },
     async convSet(t, patch) { const k = demoKey(t); db.convSet[k] = { ...(db.convSet[k] || {}), ...Object.fromEntries(Object.entries(patch).map(([a, b]) => [a === 'cleared_at' ? 'clearedAt' : a, b])) }; save(); return wait(); },
     async clearConversation(t) { await this.convSet(t, { cleared_at: new Date().toISOString() }); await this.markThreadRead(t); },
@@ -1686,7 +1769,7 @@ function demoApi() {
       const g = { id: nid(db.chats), name: name.trim(), createdBy: meId, createdAt: now, members: [{ id: meId, role: 'admin', lastReadAt: now, joinedAt: now }, ...ids.filter(i => fr.has(i)).map(i => ({ id: i, role: 'member', lastReadAt: now, joinedAt: now }))] };
       db.chats.push(g); save(); return wait(g.id);
     },
-    async chatInfo(id) { const g = db.chats.find(x => x.id === Number(id)); return wait(g && g.members.some(x => x.id === meId) ? { id: g.id, name: g.name, createdBy: g.createdBy } : null); },
+    async chatInfo(id) { const g = db.chats.find(x => x.id === Number(id)); return wait(g && g.members.some(x => x.id === meId) ? { id: g.id, name: g.name, createdBy: g.createdBy, about: g.about || '', photo: g.photo || '' } : null); },
     async addChatMembers(id, ids) { const g = db.chats.find(x => x.id === Number(id)), fr = new Set(friendIds(meId)), now = new Date().toISOString(); ids.filter(i => fr.has(i) && !g.members.some(x => x.id === i)).forEach(i => g.members.push({ id: i, role: 'member', lastReadAt: now, joinedAt: now })); save(); return wait(); },
     async removeChatMember(id, uid) {
       const g = db.chats.find(x => x.id === Number(id)); if (!g) return;

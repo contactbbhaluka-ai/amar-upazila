@@ -784,3 +784,17 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 
 .ab-sub>input,.ab-sub>textarea,.ab-sub>select,.ab-sub>.un-wrap,.ab-sub>.date3{margin-top:2px}
 .ab-sub summary small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+
+/* ===== v25: প্রোফাইলের পরিচিতি কার্ড ===== */
+.intro-card{display:flex;flex-direction:column;gap:8px;text-align:left;margin:12px 0 4px;padding:12px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--g2) 25%,var(--card))}
+.intro-card .av-row{font-size:14px;gap:10px}
+.intro-card .av-i{width:30px;height:30px}
+.intro-card .soc-row{justify-content:flex-start;margin:2px 0 0}
+.intro-edit{display:flex;align-items:center;justify-content:center;gap:6px;border:0;background:var(--g2);color:var(--gt);font:inherit;font-size:14px;font-weight:700;border-radius:10px;padding:8px;cursor:pointer;min-height:0;margin-top:2px}
+.feat-list{display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow:auto}
+.feat-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:9px 12px;cursor:pointer;font-weight:400;margin:0}
+.feat-row:has(input:checked){border-color:var(--g);background:color-mix(in srgb,var(--g2) 60%,var(--card))}
+.feat-row input{width:20px;height:20px;accent-color:var(--g);flex:none}
+.feat-t{display:flex;flex-direction:column;align-items:flex-start;text-align:left;flex:1}
+.feat-t small{color:var(--mut);font-size:12px;display:flex;align-items:center;gap:3px}
+.feat-row.empty .feat-t b{color:var(--mut)}

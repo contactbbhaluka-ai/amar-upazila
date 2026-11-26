@@ -1211,31 +1211,68 @@ const ABOUT = [
   { id: 'lists', ic: 'lock', t: 'বন্ধু ও ফলো তালিকার প্রাইভেসি', own: true, action: () => listPrivacySheet(),
     sum: u => Object.entries(PLIST).map(([k, l]) => `${l}: ${PRIVACY[u[k + 'Visibility'] || 'public'][1]}`).join(' · ') },
 ];
+// ================================================================ প্রোফাইলের "পরিচিতি" কার্ড: কোন বিষয় দেখাবে মালিক বেছে নেন
+const FEATURED0 = ['works', 'educations', 'addr', 'social', 'joined'];
+const DETAIL_ITEMS = [   // [key, নাম, প্রাইভেসির key (না থাকলে সবসময় দেখা যায়)]
+  ['works', 'কাজ', 'works'], ['educations', 'শিক্ষা', 'educations'], ['addr', 'কোথায় থাকেন', null], ['gender', 'লিঙ্গ', null],
+  ['birth', 'জন্মতারিখ', 'birth'], ['relationship', 'সম্পর্কের অবস্থা', 'relationship'], ['religion', 'ধর্ম', 'religion'],
+  ['orgs', 'সংগঠন ও ক্লাব', 'orgs'], ['phone', 'মোবাইল নম্বর', 'contact'], ['social', 'সোশ্যাল লিংক', 'social'], ['joined', 'কবে থেকে সদস্য', null],
+];
+const ALL_DETAIL_KEYS = DETAIL_ITEMS.map(x => x[0]);
+const row = (i, t) => `<div class="av-row"><span class="av-i">${ic(i, 18)}</span><span>${t}</span></div>`;
+// একেকটা বিষয়ের লাইন (যা দেখার অনুমতি নেই তা আগেই সার্ভার থেকে বাদ পড়ে আসে)
+function detailRows(u, keys) {
+  const out = [];
+  for (const k of keys) {
+    if (k === 'works') (u.works || []).forEach(w => out.push(row('work', w.title ? `<b>${esc(w.place)}</b>-এ <b>${esc(w.title)}</b> হিসেবে কাজ করেন` : `<b>${esc(w.place)}</b>-এ কাজ করেন`)));
+    if (k === 'educations') (u.educations || []).forEach(e => out.push(row('school', e.status === 'running'
+      ? `<b>${esc(e.school)}</b>-এ ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পড়ছেন`
+      : `<b>${esc(e.school)}</b> থেকে ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পাশ করেছেন${e.year ? ` (${bn(e.year)})` : ''}`)));
+    if (k === 'addr' && u.union) out.push(row('pin', `থাকেন <b>${esc(u.union)}</b>`));
+    if (k === 'gender' && GENDERS[u.gender]) out.push(row('users', GENDERS[u.gender]));
+    if (k === 'birth' && birthText(u)) out.push(row('calendar', u.birthDate ? `জন্মতারিখ <b>${birthText(u)}</b>` : `জন্ম <b>${bn(u.birthYear)}</b> সালে`));
+    if (k === 'relationship' && RELATIONSHIPS[u.relationship]) out.push(row('heart', RELATIONSHIPS[u.relationship]));
+    if (k === 'religion' && RELIGIONS[u.religion]) out.push(row('book', `ধর্ম: <b>${RELIGIONS[u.religion]}</b>`));
+    if (k === 'orgs') (u.orgs || []).forEach(o => out.push(row('users', o.role ? `<b>${esc(o.name)}</b>-এর <b>${esc(o.role)}</b>` : `<b>${esc(o.name)}</b>-এর সদস্য`)));
+    if (k === 'phone' && u.phone) out.push(row('mobile', `<a href="tel:${esc(u.phone)}" class="link">${bn(u.phone)}</a>`));
+    if (k === 'social' && SOCIALS.some(([sk]) => u.social?.[sk])) out.push(socialHtml(u, false));
+    if (k === 'joined' && u.joinedAt) out.push(row('calendar', joinedText(u.joinedAt)));
+  }
+  return out;
+}
+function introCard(u, own) {
+  const rows = detailRows(u, u.featured || FEATURED0);
+  if (!rows.length && !own) return '';
+  return `<div class="intro-card">${rows.join('')}
+    ${!rows.length ? '<p class="mut" style="margin:0;font-size:14px">প্রোফাইলে আপনার কাজ, শিক্ষা, ঠিকানা ইত্যাদি দেখাতে পারেন।</p>' : ''}
+    ${own ? `<button class="intro-edit" id="feat-edit">${ic('edit', 15)} প্রোফাইলে কী দেখাবে</button>` : ''}</div>`;
+}
+const profileBase = u => ({ name: u.name, district: u.district, upazila: u.upazila, unionId: u.unionId, bio: u.bio, phone: u.phone, bloodGroup: u.bloodGroup, donorVisible: u.donorVisible, lastDonated: u.lastDonated });
+function featuredSheet() {
+  const u = me(), cur = new Set(u.featured || FEATURED0);
+  const has = k => detailRows(u, [k]).length > 0;
+  openSheet(`<h2>প্রোফাইলে কী দেখাবে</h2>
+    <p class="mut" style="margin-top:0">যেগুলোতে টিক দেবেন, প্রোফাইলের উপরে নামের নিচে দেখাবে। এবাউট ট্যাবে সবকিছুই থাকবে। প্রতিটা বিষয় কারা দেখবে, তা প্রাইভেসি সেটিং অনুযায়ী।</p>
+    <div class="feat-list">${DETAIL_ITEMS.map(([k, l, vk]) => `<label class="feat-row${has(k) ? '' : ' empty'}">
+      <input type="checkbox" value="${k}" ${cur.has(k) ? 'checked' : ''}>
+      <span class="feat-t"><b>${l}</b><small>${has(k) ? (vk ? `${ic(PRIVACY[aVis(u, vk)][0], 11)} ${PRIVACY[aVis(u, vk)][1]}` : `${ic('globe', 11)} সবাই দেখে`) : 'এখনো দেওয়া নেই'}</small></span></label>`).join('')}</div>
+    <button class="btn wide" id="feat-save" style="margin-top:12px">সংরক্ষণ</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
+  $('#feat-save').onclick = e => {
+    const featured = [...document.querySelectorAll('.feat-list input:checked')].map(x => x.value);
+    busy(e.currentTarget, async () => { await S.api.updateProfile({ ...profileBase(me()), featured }); closeSheet(); renderMe(); toast('প্রোফাইল আপডেট হয়েছে'); });
+  };
+}
+document.addEventListener('click', e => { if (e.target.closest('#feat-edit')) featuredSheet(); });
+
 function renderAbout(key) {
   const pane = $('#' + key + '-pane'); if (!pane) return;
   const own = key === 'me', u = own ? me() : S.viewProfile, open = S.pstate[key].open;
   if (!u) return;
   if (!own) {
-    const blood = ABOUT.find(a => a.id === 'blood').pub(u);
-    const rows = [
-      ...(u.works || []).map(w => [ic('work', 18), w.title ? `<b>${esc(w.place)}</b>-এ <b>${esc(w.title)}</b> হিসেবে কাজ করেন` : `<b>${esc(w.place)}</b>-এ কাজ করেন`]),
-      ...(u.educations || []).map(e => [ic('school', 18), e.status === 'running'
-        ? `<b>${esc(e.school)}</b>-এ ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পড়ছেন`
-        : `<b>${esc(e.school)}</b> থেকে ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পাশ করেছেন${e.year ? ` (${bn(e.year)})` : ''}`]),
-      u.union && [ic('pin', 18), `থাকেন <b>${esc(u.union)}</b>`],
-      GENDERS[u.gender] && [ic('users', 18), GENDERS[u.gender]],
-      RELATIONSHIPS[u.relationship] && [ic('heart', 18), RELATIONSHIPS[u.relationship]],
-      RELIGIONS[u.religion] && [ic('book', 18), `ধর্ম: <b>${RELIGIONS[u.religion]}</b>`],
-      ...(u.orgs || []).map(o => [ic('org', 18), o.role ? `<b>${esc(o.name)}</b>-এর <b>${esc(o.role)}</b>` : `<b>${esc(o.name)}</b>-এর সদস্য`]),
-      birthText(u) && [ic('calendar', 18), u.birthDate ? `জন্মতারিখ <b>${birthText(u)}</b>` : `জন্ম <b>${bn(u.birthYear)}</b> সালে`],
-      u.phone && [ic('mobile', 18), `<a href="tel:${esc(u.phone)}" class="link">${bn(u.phone)}</a>`],
-      blood && [ic('drop', 18), esc(blood)],
-      u.joinedAt && [ic('calendar', 18), joinedText(u.joinedAt)],
-    ].filter(Boolean);
+    const rows = detailRows(u, ALL_DETAIL_KEYS);
     pane.innerHTML = `<div class="card about-view">${u.bio ? `<p class="about-bio">${esc(u.bio)}</p>` : ''}
-      ${rows.map(([i, t]) => `<div class="av-row"><span class="av-i">${i}</span><span>${t}</span></div>`).join('')}
-      ${socialHtml(u, false)}
-      ${!rows.length && !u.bio && !Object.keys(u.social || {}).length ? '<p class="mut" style="margin:0">এখনো কোনো তথ্য দেওয়া নেই।</p>' : ''}</div>`;
+      ${rows.join('')}
+      ${!rows.length && !u.bio ? '<p class="mut" style="margin:0">এখনো কোনো তথ্য দেওয়া নেই।</p>' : ''}</div>`;
     return;
   }
   pane.innerHTML = `<div class="card about-edit">${ABOUT.map(a => {
@@ -1292,7 +1329,7 @@ async function openUser(id, silent, keepState) {
     S.viewProfile = p;
     $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}<div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
-      ${socialHtml(p, false)}
+      ${introCard(p, false)}
       ${statsHtml(p)}
       ${r.blocked ? `<p class="mut">আপনি এই ব্যক্তিকে ব্লক করেছেন।</p><button class="btn ghost" id="unblock">আনব্লক করুন</button>`
       : `<div class="row">${relBtns(p)}<button class="sbtn ${r.following ? 'ghost' : ''}" data-fo="${esc(p.id)}" data-on="${r.following ? 1 : 0}">${r.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" data-dm="${esc(p.id)}">মেসেজ</button><button class="more" id="umore" aria-label="আরও">⋯</button></div>`}</div>${r.blocked ? '' : profTabs('user')}`;
@@ -1559,7 +1596,7 @@ async function renderMe(mode = 'login') {
         <div class="mut" style="font-size:14px;margin-top:4px">${ic('calendar', 14)} সর্বশেষ রক্তদান: ${u.lastDonated ? esc(bnDate(u.lastDonated)) : 'দেওয়া নেই'} · ${donateStatus(u.lastDonated)}</div>
         <div class="row" style="margin-top:8px;justify-content:center"><button class="sbtn ghost" data-donor-edit>${ic('edit', 15)} ডোনার তথ্য আপডেট</button><button class="sbtn ghost" id="donated-today">${ic('drop', 15)} আজ রক্ত দিয়েছি</button></div>` : `<span class="mut" style="font-size:13px">ব্লাড গ্রুপ দেওয়া নেই</span> <button class="sbtn ghost" data-add-donor>${ic('drop', 15)} নিজের ডোনার প্রোফাইল যোগ করুন</button>`}</div>
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
-      ${socialHtml(u, true)}
+      ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
       <div class="row"><button class="btn ghost" id="edit">${ic('edit', 15)} এবাউট এডিট</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
       ${profTabs('me')}`;

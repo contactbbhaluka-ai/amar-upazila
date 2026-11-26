@@ -99,3 +99,28 @@ returns jsonb language sql stable security definer set search_path = public as $
   where p.id = uid;
 $$;
 grant execute on function public.profile_about(uuid) to anon, authenticated;
+
+-- ---------- প্রোফাইলের "পরিচিতি" কার্ডে কোন কোন বিষয় দেখাবে (ফেসবুকের মতো) ----------
+-- শুধু কোন বিষয় দেখাবে তার তালিকা; আসল তথ্য তবুও প্রাইভেসি মেনেই আসে
+alter table public.profile_details add column if not exists featured text[] not null default '{works,educations,addr,social,joined}'
+  check (featured <@ array['works','educations','addr','gender','birth','relationship','religion','orgs','phone','social','joined']::text[]);
+
+create or replace function public.profile_about(uid uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'works',        case when private.can_view(p.id, coalesce(d.works_visibility, 'public'))          then coalesce(d.works, '[]'::jsonb) end,
+    'educations',   case when private.can_view(p.id, coalesce(d.educations_visibility, 'public'))     then coalesce(d.educations, '[]'::jsonb) end,
+    'social',       case when private.can_view(p.id, coalesce(d.social_visibility, 'public'))         then coalesce(d.social, '{}'::jsonb) end,
+    'phone',        case when private.can_view(p.id, coalesce(d.contact_visibility, 'only_me'))       then pp.phone end,
+    'birth_year',   case when private.can_view(p.id, coalesce(d.birth_visibility, 'only_me'))         then d.birth_year end,
+    'birth_date',   case when private.can_view(p.id, coalesce(d.birth_visibility, 'only_me'))         then d.birth_date end,
+    'relationship', case when private.can_view(p.id, coalesce(d.relationship_visibility, 'only_me'))  then d.relationship end,
+    'religion',     case when private.can_view(p.id, coalesce(d.religion_visibility, 'only_me'))      then d.religion end,
+    'orgs',         case when private.can_view(p.id, coalesce(d.orgs_visibility, 'public'))           then coalesce(d.orgs, '[]'::jsonb) end,
+    'featured',     to_jsonb(coalesce(d.featured, '{works,educations,addr,social,joined}'::text[])))
+  from public.profiles p
+  left join public.profile_details d on d.user_id = p.id
+  left join public.profile_private pp on pp.user_id = p.id
+  where p.id = uid;
+$$;
+grant execute on function public.profile_about(uuid) to anon, authenticated;

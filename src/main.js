@@ -751,9 +751,7 @@ document.addEventListener('click', async e => {
 // ================================================================ বন্ধু / ফলোয়ার / ফলো করছেন তালিকা ও তার প্রাইভেসি
 const PLIST = { friends: 'বন্ধু', followers: 'ফলোয়ার', following: 'ফলো করছেন' };
 const PLIST_IC = { friends: 'users', followers: 'user', following: 'user' };
-const statsHtml = p => `<div class="stats stat-tiles">${Object.entries(PLIST).map(([k, l]) => `<button class="stat-b" data-plist="${esc(p.id)}|${k}" aria-label="${l}: ${typeof p[k] === 'number' ? bn(p[k]) : ''} জন, তালিকা দেখুন">
-  <span class="st-top"><span class="st-ic">${ic(PLIST_IC[k], 15)}</span><b>${typeof p[k] === 'number' ? bn(p[k]) : esc(p[k])}</b></span>
-  <span class="st-l">${l} <span class="st-arr" aria-hidden="true">›</span></span></button>`).join('')}</div>`;
+const statsHtml = p => `<div class="stats stat-tiles">${Object.entries(PLIST).map(([k, l]) => `<button class="stat-b" data-plist="${esc(p.id)}|${k}" aria-label="${l}: ${typeof p[k] === 'number' ? bn(p[k]) : ''} জন, তালিকা দেখুন"><b>${typeof p[k] === 'number' ? bn(p[k]) : esc(p[k])}</b> <span class="st-l">${l}</span><span class="st-arr" aria-hidden="true">›</span></button>`).join('')}</div>`;
 async function peopleSheet(uid, kind) {
   const own = me()?.id === uid;
   openSheet(`<h2>${PLIST[kind]}</h2><div class="skel"></div>`);

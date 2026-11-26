@@ -831,6 +831,10 @@ async function supabaseApi() {
       const rows = ok(await sb.from('notifications').select('id,type,meta,p:posts!notifications_post_id_fkey(page_id)').eq('user_id', me.id).eq('read', false).limit(300));
       return rows.filter(n => inScope(n, pageId)).length;
     },
+    async myAnnouncer() { if (!me) return null; const r = ok(await sb.from('announcers').select('title,union_id').eq('user_id', me.id).maybeSingle()); return r && { title: r.title, unionId: r.union_id }; },
+    async announcersList() { return ok(await sb.rpc('announcers_list')).map(r => ({ id: r.user_id, name: r.name, avatar: r.avatar_url || '', title: r.title, unionId: r.union_id, unionName: r.union_name || '' })); },
+    async setAnnouncer(uid, title, unionId) { ok(await sb.rpc('admin_set_announcer', { p_user: uid, p_title: title, p_union: unionId || null })); },
+    async removeAnnouncer(uid) { ok(await sb.rpc('admin_remove_announcer', { p_user: uid })); },
     async adminBroadcast(text, unionId) { return Number(ok(await sb.rpc('admin_broadcast', { p_text: text, p_union: unionId || null }))) || 0; },
     async announcements() { return ok(await sb.from('announcements').select('id,body,union_id,recipients,created_at').order('created_at', { ascending: false }).limit(10)); },
     async deleteNotification(id) { ok(await sb.from('notifications').delete().eq('id', id).eq('user_id', me.id)); },
@@ -922,7 +926,7 @@ function demoApi() {
     settings: get('settings', { publicDonorPhone: false }),
     wallet: get('wallet', { coins: 120, ledger: [{ amount: 100, reason: 'admin', ref: 'স্বাগতম', createdAt: ago(30) }, { amount: 5, reason: 'post', ref: 'x1', createdAt: ago(20) }, { amount: 15, reason: 'like', ref: 'x2', createdAt: ago(19) }] }),
     chats: get('chats', []),
-    msgSaved: get('msgSaved', []), shared: get('shared', {}), friendMarks: get('friendMarks', {}), friendLists: get('friendLists', []), sugHidden: get('sugHidden', []), notifMutes: get('notifMutes', []), notifOff: get('notifOff', []), annc: get('annc', []),             // গ্রুপ চ্যাট { id, name, createdBy, createdAt, members: [{ id, role, lastReadAt }] }
+    msgSaved: get('msgSaved', []), shared: get('shared', {}), friendMarks: get('friendMarks', {}), friendLists: get('friendLists', []), sugHidden: get('sugHidden', []), notifMutes: get('notifMutes', []), notifOff: get('notifOff', []), annc: get('annc', []), announcers: get('announcers', []),             // গ্রুপ চ্যাট { id, name, createdBy, createdAt, members: [{ id, role, lastReadAt }] }
     convSet: get('convSet', {}),         // কথোপকথনের সেটিং (মিউট, রিকোয়েস্ট, মুছা)
     votes: get('votes', {}),             // postId -> { userId: অপশন }
     going: get('going', {}),             // postId -> [userId]
@@ -966,7 +970,7 @@ function demoApi() {
     ]),
   };
   let meId = get('me', null);
-  const save = () => { for (const k of ['chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone' }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -1953,6 +1957,10 @@ function demoApi() {
         .map(n => ({ id: n.id, type: n.type, postId: n.postId, groupId: n.groupId || null, groupName: db.groups.find(g => g.id === n.groupId)?.name || '', read: n.read, createdAt: n.createdAt, actor: user(n.from) || { id: n.from, name: 'সদস্য', avatar: '' }, snippet: db.posts.find(p => p.id === n.postId)?.body || '', postImage: demoPic((db.posts.find(p => p.id === n.postId)?.images || [])[0] || db.posts.find(p => p.id === n.postId)?.image || '') || '', postBg: db.posts.find(p => p.id === n.postId)?.bg || '', meta: n.meta || {} })));
     },
     async unreadNotifications(pageId) { return db.notifs.filter(n => n.to === meId && !n.read && !isBlocked(n.from) && inScope(demoN(n), pageId)).length; },
+    async myAnnouncer() { const a = (db.announcers || []).find(x => x.id === meId); return wait(a ? { title: a.title, unionId: a.unionId } : null); },
+    async announcersList() { return wait((db.announcers || []).map(a => { const u = user(a.id) || { name: 'সদস্য', avatar: '' }; return { ...a, name: u.name, avatar: u.avatar, unionName: uname(a.unionId) || '' }; })); },
+    async setAnnouncer(uid, title, unionId) { db.announcers = (db.announcers || []).filter(x => x.id !== uid); db.announcers.push({ id: uid, title: title.trim(), unionId: unionId || null }); save(); return wait(); },
+    async removeAnnouncer(uid) { db.announcers = (db.announcers || []).filter(x => x.id !== uid); save(); return wait(); },
     async adminBroadcast(text, unionId) {
       db.annc = db.annc || []; if (db.annc.filter(a => Date.now() - new Date(a.created_at) < 864e5).length >= 5) throw new Error('announce limit');
       db.annc.unshift({ id: nid(db.annc), body: text.trim(), union_id: unionId || null, recipients: 1, created_at: new Date().toISOString() });

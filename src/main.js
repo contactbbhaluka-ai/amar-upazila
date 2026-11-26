@@ -149,6 +149,7 @@ function errText(e) {
   if (/friend_req:upazila/.test(m)) return 'ইনি শুধু নিজের উপজেলার মানুষের কাছ থেকে ফ্রেন্ড রিকোয়েস্ট নেন। চাইলে ফলো করতে পারেন।';
   if (/lists max 20/.test(m)) return 'সর্বোচ্চ ২০টি তালিকা বানানো যায়';
   if (/friend_lists_user_id_name_key|duplicate key/.test(m)) return 'এই নামে আগে থেকেই একটা তালিকা আছে';
+  if (/union only/.test(m)) return 'আপনি শুধু নিজের ইউনিয়নে ঘোষণা পাঠাতে পারবেন';
   if (/announce limit/.test(m)) return 'দিনে সর্বোচ্চ ৫টি জরুরি ঘোষণা পাঠানো যায়';
   if (/admins only/.test(m)) return 'এই গ্রুপে শুধু অ্যাডমিনরা মেসেজ পাঠাতে পারেন';
   if (/last admin/.test(m)) return 'গ্রুপে অন্তত একজন অ্যাডমিন থাকতে হবে';
@@ -3789,6 +3790,7 @@ function afterAuth() {
   renderComposer(); renderFilters(); listenMessages(); refreshBadges(); loadFeed('home'); renderDemoBar();
   if (me()) S.api.weeklyReport?.().then(() => refreshBadges()).catch(() => {});
   if (me()) restoreActAs(); else if (S.actAs) setActAs(null, true);
+  S.announcer = null; if (me()) S.api.myAnnouncer?.().then(a => { S.announcer = a; if (S.view === 'menu') renderMenu(); }).catch(() => {});
   if (S.view === 'me') renderMe(); if (S.view === 'friends') loadFriends(); if (S.view === 'msgs') loadConvs(); if (S.view === 'notif') loadNotifs(); if (S.view === 'menu') renderMenu();
 }
 
@@ -3987,7 +3989,7 @@ function renderNotifs() {
 function specialNotif(n) {
   const m = n.meta || {}, base = (cls, icon, body) => `<div class="notif nt-sp ${cls}${n.isNew ? ' new' : ''}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="" data-n-user="${esc(n.actor.id)}" data-n-aid="${esc(n.id)}" role="button" tabindex="0">
     <span class="ico">${icon}</span><span class="txt">${body}<span class="time">${esc(ago(n.createdAt))}</span></span>${ntMoreBtn(n)}</div>`;
-  if (n.type === 'announce') return base('nt-ann', '<span class="self-ic">📢</span>', `<b class="ann-h">জরুরি ঘোষণা${m.union ? ` · ${esc(m.union)}` : ' · উপজেলা'}</b><span class="ann-t">${esc(m.text || '')}</span>`);
+  if (n.type === 'announce') return base('nt-ann', '<span class="self-ic">📢</span>', `<b class="ann-h">📢 জরুরি ঘোষণা · ${esc(m.from || 'উপজেলা')}${m.union ? ` · ${esc(m.union)}` : ''}</b><span class="ann-t">${esc(m.text || '')}</span>`);
   if (n.type === 'birthday') { const c = Number(m.count) || 1; return base('nt-bd', `${av(n.actor)}<i>🎂</i>`, `আজ <b>${esc(n.actor.name)}</b>${c > 1 ? ` ও আরও <b>${bn(c - 1)} জনের</b>` : '-এর'} জন্মদিন। শুভেচ্ছা জানাতে চাপুন 🎉`); }
   if (n.type === 'friend_anniv') return base('nt-an', `${av(n.actor)}<i>🤝</i>`, `আজ <b>${esc(n.actor.name)}</b>-এর সাথে আপনার বন্ধুত্বের <b>${bn(m.years || 1)} বছর</b> পূর্ণ হলো`);
   if (n.type === 'area_alert') return base('nt-area', `${av(n.actor)}<i>${m.cat === 'সাহায্য চাই' ? '🆘' : '🔎'}</i>`, `<b>${esc(n.actor.name)}</b> আপনার এলাকায়${m.union ? ` (${esc(m.union)})` : ''} একটি <b>${esc(m.cat || 'জরুরি')}</b> পোস্ট দিয়েছেন${n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 50))}${n.snippet.length > 50 ? '…' : ''}"</span>` : ''}`);
@@ -4076,7 +4078,7 @@ function openNotif(el) {
   else if (t === 'area_alert' && el.dataset.nPost) openPost(el.dataset.nPost);
   else if (t === 'birthday') { const u = el.dataset.nUser; birthdaySheet(); if (!u) return; }
   else if (t === 'friend_anniv' && el.dataset.nUser) { const x = (S.nt?.list || []).find(n => String(n.id) === el.dataset.nAid); openThread(el.dataset.nUser).then(() => { const i = $('#tmsg'); if (i && !i.value) { i.value = `আজ আমাদের বন্ধুত্বের ${bn(x?.meta?.years || 1)} বছর পূর্ণ হলো! 🤝`; composeState(); } }); }
-  else if (t === 'announce') { const x = (S.nt?.list || []).find(n => String(n.id) === el.dataset.nAid); openSheet(`<div class="ann-sheet"><div class="lock-ic">📢</div><h2>জরুরি ঘোষণা${x?.meta?.union ? ` · ${esc(x.meta.union)}` : ''}</h2><p class="ann-full">${linkify(x?.meta?.text || '')}</p><p class="mut">${esc(x ? bnWhen(x.createdAt, true) : '')}</p><button class="btn wide" data-close>ঠিক আছে</button></div>`); }
+  else if (t === 'announce') { const x = (S.nt?.list || []).find(n => String(n.id) === el.dataset.nAid); openSheet(`<div class="ann-sheet"><div class="lock-ic">📢</div><h2>জরুরি ঘোষণা</h2><p class="ann-as">${esc(x?.meta?.from || 'উপজেলা')}${x?.meta?.union ? ` · ${esc(x.meta.union)}` : ''}</p><p class="ann-full">${linkify(x?.meta?.text || '')}</p><p class="mut">${esc(x ? bnWhen(x.createdAt, true) : '')}</p><button class="btn wide" data-close>ঠিক আছে</button></div>`); }
   else if ((t === 'chat_mention' || t === 'chat_join_ok') && el.dataset.nChat) openChatGroup(el.dataset.nChat);
   else if (t === 'chat_join_request' && el.dataset.nChat) openChatGroup(el.dataset.nChat).then(() => { if (S.th?.isAdmin) joinReqSheet(S.th); });
   else if (t === 'friend_request') go('friends');
@@ -4547,6 +4549,7 @@ function renderMenu() {
   $('#menu').innerHTML = `
     ${u ? `<div class="me-wrap"><button class="me-row" data-v="me">${S.actAs ? entAv(S.actAs) : av(u)}<div class="info"><b>${esc(S.actAs ? S.actAs.name : u.name)}</b><div class="sub">${S.actAs ? 'পেইজ দেখুন' : 'আপনার প্রোফাইল দেখুন'}</div></div></button><button class="sw-toggle" id="sw-toggle" aria-label="প্রোফাইল বা পেইজ বদলান" aria-expanded="false" hidden>${ic('users', 16)}<span class="chev">▾</span></button><div id="switcher" class="sw-drop" hidden></div></div>`
       : `${demoCard()}<div class="card"><b>আপনি লগইন করেননি</b><p class="mut" style="margin:4px 0 10px">পোস্ট, বন্ধু, গ্রুপ ও পেইজ ব্যবহার করতে লগইন করুন।</p><button class="btn wide" data-v="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`}
+    ${!u?.admin && S.announcer ? `<button class="me-row admin-row" data-mgo="announce"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:20px">📢</span><div class="info"><b>জরুরি ঘোষণা পাঠান</b><div class="sub">${esc(S.announcer.title)} হিসেবে</div></div></button>` : ''}
     ${u?.admin ? `<button class="me-row admin-row" data-mgo="admin"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('shield', 22)}</span><div class="info"><b>অ্যাডমিন ড্যাশবোর্ড</b><div class="sub">অ্যাপের সংখ্যা ও সেটিংস</div></div></button>` : ''}
     <div class="sc-grid">
       ${sc('dir', '🏥', 'সেবা ডিরেক্টরি', 'উপজেলার সব সেবা')}
@@ -4591,6 +4594,7 @@ $('#menu').addEventListener('click', e => {
   if (t === 'dir' || t === 'sos' || t === 'blood') { S.dcat = t === 'dir' ? '' : t; $('#q').value = ''; open('dir'); loadDir(); }
   else if (t === 'friends') go('friends');
   else if (!needUser()) return;
+  else if (t === 'announce') announceSheet();
   else if (t === 'saved') { open('saved'); loadFeed('saved'); }
   else if (t === 'wallet') { open('wallet'); loadWallet(); }
   else if (t === 'insights') { S.insTarget = null; open('insights'); loadInsights(); }
@@ -4846,12 +4850,63 @@ function decideReq(id, ok, btn) {
 // অ্যাডমিন: জরুরি ঘোষণা পাঠানো ও আগের ঘোষণা
 document.addEventListener('click', async e => {
   const b = e.target.closest('#ann-go'); if (!b) return;
-  const text = $('#ann-text').value.trim(), uid = $('#ann-union').value ? Number($('#ann-union').value) : null;
+  const text = $('#ann-text').value.trim(), uid = $('#ann-union').value ? Number($('#ann-union').value) : (S.announcer?.unionId && !me()?.admin ? S.announcer.unionId : null);
   if (text.length < 5) return toast('ঘোষণার লেখা দিন');
   const where = uid ? (S.unions || []).find(u => u.id === uid)?.name : 'পুরো উপজেলার সবার';
   if (!(await confirmSheet(`এই ঘোষণা ${where}${uid ? '-এর সবার' : ''} নোটিফিকেশনে যাবে। পাঠাবেন?\n\n"${text.slice(0, 120)}"`, 'পাঠান'))) return;
-  busy(b, async () => { const n = await S.api.adminBroadcast(text, uid); toast(`${bn(n)} জনের কাছে ঘোষণা পাঠানো হয়েছে`); $('#ann-text').value = ''; annHistory(); });
+  busy(b, async () => { const n = await S.api.adminBroadcast(text, uid); toast(`${bn(n)} জনের কাছে ঘোষণা পাঠানো হয়েছে`); if ($('#ann-text')) $('#ann-text').value = ''; annHistory(); });
 });
+function annFormHtml(scope) {
+  const fixed = scope?.unionId ? (S.unions || []).find(u => u.id === scope.unionId) : null;
+  return `<p class="mut" style="margin:0 0 8px;font-size:13.5px">বন্যা, বিদ্যুৎ বিভ্রাট, টিকা কর্মসূচির মতো জরুরি খবর সবার নোটিফিকেশনে যাবে। কেউ বন্ধ করতে পারবেন না, তাই শুধু সত্যিকারের জরুরি খবরে ব্যবহার করুন (দিনে সর্বোচ্চ ৫টি)।</p>
+    <textarea class="f" id="ann-text" maxlength="500" rows="3" placeholder="ঘোষণার লেখা…"></textarea>
+    <select class="f" id="ann-union" style="margin-top:8px" ${fixed ? 'disabled' : ''}>${fixed ? `<option value="${esc(fixed.id)}">শুধু ${esc(fixed.name)}</option>` : `<option value="">পুরো উপজেলা (সবাই)</option>${(S.unions || []).map(u => `<option value="${esc(u.id)}">শুধু ${esc(u.name)}</option>`).join('')}`}</select>
+    <button class="btn wide" id="ann-go" style="margin-top:8px">📢 পাঠান</button><div id="ann-hist"></div>`;
+}
+// ঘোষণাকারীর (অ্যাডমিন নন) জন্য: মেনু থেকে
+function announceSheet() {
+  const a = S.announcer; if (!a) return;
+  openSheet(`<h2>📢 জরুরি ঘোষণা</h2><p class="ann-as">পাঠাবেন: <b>${esc(a.title)}</b> হিসেবে</p>${annFormHtml(a)}<button class="btn ghost wide" data-close style="margin-top:8px">বন্ধ করুন</button>`);
+  $('#sheet').classList.add('tall'); annHistory();
+}
+// অ্যাডমিন: অনুমতিপ্রাপ্তদের তালিকা
+async function annrList() {
+  const box = $('#annr-list'); if (!box) return;
+  try {
+    const l = await S.api.announcersList();
+    box.innerHTML = l.length ? l.map(a => `<div class="person">${userLink(a.id, av(a))}<div class="info">${userLink(a.id, esc(a.name), 'who-btn')}<div class="sub">📢 ${esc(a.title)} · ${a.unionName ? esc(a.unionName) : 'পুরো উপজেলা'}</div></div><button class="sbtn ghost" data-annredit="${esc(a.id)}">বদলান</button><button class="sbtn ghost danger-t" data-annrrm="${esc(a.id)}">সরান</button></div>`).join('')
+      : '<p class="mut">এখনো কাউকে অনুমতি দেওয়া হয়নি।</p>';
+    box.onclick = async e => {
+      const rm = e.target.closest('[data-annrrm]'), ed = e.target.closest('[data-annredit]');
+      if (rm) { const a = l.find(x => x.id === rm.dataset.annrrm); if (await confirmSheet(`${a.name}-এর ঘোষণা দেওয়ার অনুমতি তুলে নেবেন?`, 'তুলে নিন', true)) busy(null, async () => { await S.api.removeAnnouncer(a.id); toast('অনুমতি তুলে নেওয়া হয়েছে'); annrList(); }); }
+      if (ed) annrSheet(l.find(x => x.id === ed.dataset.annredit));
+    };
+  } catch (e) { box.innerHTML = `<p class="mut">${esc(errText(e))}</p>`; }
+}
+function annrSheet(cur) {
+  let pick = cur ? { id: cur.id, name: cur.name, avatar: cur.avatar } : null;
+  const unionSel = `<select class="f" id="annr-union"><option value="">পুরো উপজেলায় পাঠাতে পারবেন</option>${(S.unions || []).map(u => `<option value="${esc(u.id)}" ${cur?.unionId === u.id ? 'selected' : ''}>শুধু ${esc(u.name)}-এ</option>`).join('')}</select>`;
+  openSheet(`<h2>${cur ? 'অনুমতি বদলান' : 'ঘোষণা দেওয়ার অনুমতি দিন'}</h2>
+    <div id="annr-who">${pick ? `<div class="person">${av(pick)}<div class="info"><b>${esc(pick.name)}</b></div></div>` : `<input type="search" class="f" id="annr-q" placeholder="নাম লিখে মানুষ খুঁজুন…"><div id="annr-res" style="margin-top:6px"></div>`}</div>
+    <label for="annr-title">কোন পরিচয়ে ঘোষণা দেবেন</label><input class="f" id="annr-title" maxlength="60" placeholder="যেমন: উপজেলা প্রশাসন, উথুরা ইউনিয়ন পরিষদ, ফায়ার সার্ভিস" value="${esc(cur?.title || '')}">
+    <label for="annr-union">কোথায় পাঠাতে পারবেন</label>${unionSel}
+    <button class="btn wide" id="annr-go" style="margin-top:12px">সংরক্ষণ</button>`);
+  $('#sheet').classList.add('tall');
+  let t = null;
+  const q = $('#annr-q');
+  if (q) q.oninput = () => { clearTimeout(t); t = setTimeout(async () => {
+    const term = q.value.trim(); if (term.length < 2) { $('#annr-res').innerHTML = ''; return; }
+    const ppl = await S.api.people({ q: term }).catch(() => []);
+    $('#annr-res').innerHTML = ppl.slice(0, 8).map(u => `<button class="person tg-row" data-annrpick="${esc(u.id)}" style="width:100%;border:0;background:none;text-align:left">${av(u)}<div class="info"><b>${esc(u.name)}</b><div class="sub">${esc(u.union || '')}</div></div></button>`).join('') || '<p class="mut">কাউকে পাওয়া যায়নি</p>';
+    $('#annr-res').onclick = e => { const b = e.target.closest('[data-annrpick]'); if (!b) return; const u = ppl.find(x => x.id === b.dataset.annrpick); pick = u; $('#annr-who').innerHTML = `<div class="person">${av(u)}<div class="info"><b>${esc(u.name)}</b><div class="sub">${esc(u.union || '')}</div></div></div>`; };
+  }, 300); };
+  $('#annr-go').onclick = e => {
+    const title = $('#annr-title').value.trim(), uid = $('#annr-union').value ? Number($('#annr-union').value) : null;
+    if (!pick) return toast('আগে মানুষ বাছাই করুন'); if (title.length < 2) return toast('পরিচয় লিখুন');
+    busy(e.currentTarget, async () => { await S.api.setAnnouncer(pick.id, title, uid); closeSheet(); toast(`${pick.name} এখন ঘোষণা দিতে পারবেন`); annrList(); });
+  };
+}
+document.addEventListener('click', e => { if (e.target.closest('#annr-add')) annrSheet(null); });
 async function annHistory() {
   const box = $('#ann-hist'); if (!box) return;
   const l = await S.api.announcements().catch(() => []);
@@ -4876,10 +4931,10 @@ async function loadAdmin() {
         ${stat('flag', st.openReports, 'অমীমাংসিত রিপোর্ট')}
       </div>
       <h3 class="res-h">📢 জরুরি ঘোষণা পাঠান</h3>
-      <div class="card ann-form"><p class="mut" style="margin:0 0 8px;font-size:13.5px">বন্যা, বিদ্যুৎ বিভ্রাট, টিকা কর্মসূচির মতো জরুরি খবর সবার নোটিফিকেশনে যাবে। কেউ বন্ধ করতে পারবেন না, তাই শুধু সত্যিকারের জরুরি খবরে ব্যবহার করুন (দিনে সর্বোচ্চ ৫টি)।</p>
-        <textarea class="f" id="ann-text" maxlength="500" rows="3" placeholder="ঘোষণার লেখা…"></textarea>
-        <select class="f" id="ann-union" style="margin-top:8px"><option value="">পুরো উপজেলা (সবাই)</option>${(S.unions || []).map(u => `<option value="${esc(u.id)}">শুধু ${esc(u.name)}</option>`).join('')}</select>
-        <button class="btn wide" id="ann-go" style="margin-top:8px">📢 পাঠান</button><div id="ann-hist"></div></div>
+      <div class="card ann-form">${annFormHtml(null)}</div>
+      <div class="card"><div class="sec-h"><h3 style="margin:0">👥 ঘোষণা দেওয়ার অনুমতি</h3><button class="sbtn" id="annr-add">+ যোগ করুন</button></div>
+        <p class="mut" style="font-size:13px;margin:6px 0">উপজেলা প্রশাসন, ইউনিয়ন পরিষদ, ফায়ার সার্ভিসের মতো কাউকে পুরো অ্যাডমিন না বানিয়ে শুধু জরুরি ঘোষণা পাঠানোর অনুমতি দিন। তারা মেনুতে "জরুরি ঘোষণা পাঠান" পাবেন।</p>
+        <div id="annr-list"><div class="mut">লোড হচ্ছে…</div></div></div>
       <h3 class="res-h">ভেরিফাইড ব্যাজের আবেদন${vreqs.length ? ` <span class="cnt">${bn(vreqs.length)}</span>` : ''}</h3>
       ${vreqs.length ? vreqs.map(adminReqCard).join('') : '<div class="card mut">এখন কোনো আবেদন অপেক্ষায় নেই।</div>'}
       <h3 class="res-h">বুস্টের আবেদন${aboosts.length ? ` <span class="cnt">${bn(aboosts.length)}</span>` : ''}</h3>
@@ -4924,7 +4979,7 @@ async function loadAdmin() {
         <p class="mut" style="margin:8px 0 0;font-size:13px">এই ডিভাইস: ${esc(versionLabel())}</p>
       </div>
       <p class="note">সেটিং বদলালে সঙ্গে সঙ্গে সব ব্যবহারকারীর জন্য কার্যকর হয়।</p>`;
-    annHistory();
+    annHistory(); annrList();
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 $('#admin').addEventListener('change', async e => {

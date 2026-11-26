@@ -1615,3 +1615,4 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .nt-sum{background:light-dark(#ecfdf5,#052e1f);border:1px solid light-dark(#a7f3d0,#065f46);border-radius:12px;padding:10px 12px;margin:8px 0 4px;font-size:14px}
 .nt-sum-i{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px}
 .ann-h1{display:flex;flex-direction:column;border-top:1px solid var(--line);padding:8px 0;font-size:14px}.ann-h1 small{color:var(--mut)}
+.ann-as{margin:0 0 10px;color:var(--mut);font-size:14px}

@@ -85,9 +85,10 @@ const rxEmoji = k => rxIcon(k, 18);
 const rxName = k => (REACTIONS.find(r => r[0] === k) || REACTIONS[0])[2];
 const FB_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-7.5h2.6l.4-3h-3V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4a21 21 0 0 0-2.4-.1c-2.3 0-3.9 1.4-3.9 4v2.2H7.7v3h2.6V21z"/></svg>';
 const postLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#post-${id}`;
+const profileLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#u-${id}`;
 const pageLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#page-${id}`;
 // মেসেজে লিংক থাকলে চাপা যায়; অ্যাপের পোস্টের লিংক অ্যাপের ভেতরেই খোলে
-const linkify = t => esc(t).replace(/https?:\/\/[^\s<]+/g, u => { const m = u.match(/#post-(\d+)$/), pm = u.match(/#page-(\d+)$/); return pm ? `<a href="${u}" data-page="${pm[1]}">পেইজটি দেখুন ↗</a>` : m ? `<a href="${u}" data-openpost="${m[1]}">পোস্টটি দেখুন ↗</a>` : `<a href="${u}" target="_blank" rel="noopener">${u}</a>`; });
+const linkify = t => esc(t).replace(/https?:\/\/[^\s<]+/g, u => { const m = u.match(/#post-(\d+)$/), pm = u.match(/#page-(\d+)$/), um = u.match(/#u-([\w-]{2,40})$/); return um ? `<a href="${u}" data-user="${um[1]}">প্রোফাইল দেখুন ↗</a>` : pm ? `<a href="${u}" data-page="${pm[1]}">পেইজটি দেখুন ↗</a>` : m ? `<a href="${u}" data-openpost="${m[1]}">পোস্টটি দেখুন ↗</a>` : `<a href="${u}" target="_blank" rel="noopener">${u}</a>`; });
 
 // ================================================================ সহায়ক
 const $ = s => document.querySelector(s);
@@ -361,7 +362,8 @@ function postHtml(p) {
       <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${folBtn(p)}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.sponsored ? `<span class="spons">স্পন্সরড</span> · ` : ''}${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
       ${own ? `<button class="pinfo" data-pinfo="${esc(p.id)}" aria-label="পোস্টটি কতজন দেখেছেন" title="পোস্টের হিসাব">${ic('info', 19)}</button>` : ''}<button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
     <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>${urgent ? '<span class="urg-lbl">🚨 জরুরি</span>' : ''}${p.bloodGroup ? `<span class="blood-lbl">🩸 ${esc(p.bloodGroup)} রক্ত দরকার</span>` : ''}${p.resolvedAt && RESOLVE[p.category] ? `<span class="resolved">${RESOLVE[p.category][0]}</span>` : ''}
-    ${showBg ? `<div class="pbg ${esc(p.bg)}">${esc(p.body)}</div>` : p.body ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
+    ${lifeHtml(p)}
+    ${showBg ? `<div class="pbg ${esc(p.bg)}">${esc(p.body)}</div>` : p.body && !(p.lifeEvent && p.body === LIFE[p.lifeEvent]?.[1]) ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
     ${photosHtml(p)}
     ${p.poll ? pollHtml(p) : ''}${p.eventAt ? eventHtml(p) : ''}${p.link && !p.images.length && !p.shared ? linkCardHtml(p.link) : ''}
     ${p.shared ? `<button class="shared-embed" data-openpost="${esc(p.shared.id)}"><span class="se-top">${av(p.shared, 'sm')}<span><b>${esc(p.shared.author)}${vb(p.shared.badge)}</b><span class="mut"> · ${esc(ago(p.shared.createdAt))}</span></span></span>${p.shared.body ? `<span class="se-body">${esc(p.shared.body)}</span>` : ''}${p.shared.image ? `<img src="${esc(p.shared.image)}" alt="" loading="lazy" decoding="async">` : ''}</button>`
@@ -1327,6 +1329,10 @@ function renderComposerSheet() {
     ${d.poll ? `<div class="pc-poll"><div class="pc-blk-h">${ic('poll', 16)} পোল<button type="button" class="link" data-rmpoll>বাদ দিন</button></div>${d.poll.map((o, i) => `<div class="pc-po"><input class="f pc-poll-opt" data-pi="${i}" maxlength="80" placeholder="অপশন ${bn(i + 1)}" value="${esc(o)}">${d.poll.length > 2 ? `<button type="button" data-rmopt="${i}" aria-label="অপশন বাদ দিন">${ic('close', 14)}</button>` : ''}</div>`).join('')}${d.poll.length < 4 ? '<button type="button" class="link pc-addopt" data-addopt>+ আরেকটি অপশন</button>' : ''}</div>` : ''}
     ${d.event ? `<div class="pc-ev"><div class="pc-blk-h">${ic('calendar', 16)} অনুষ্ঠানের সময় ও জায়গা<button type="button" class="link" data-rmev>বাদ দিন</button></div><label class="pc-evl">কবে, কখন<input type="datetime-local" class="f" id="pc-ev-at" min="${localDT(new Date())}" value="${esc(d.event.at || '')}"></label><label class="pc-evl">কোথায়<input class="f" id="pc-ev-place" maxlength="120" placeholder="যেমন: উথুরা স্কুল মাঠ" value="${esc(d.event.place || '')}"></label><p class="mut pc-evn">যারা "যাব" চাপবেন তারা অনুষ্ঠানের আগের দিন রিমাইন্ডার পাবেন।</p></div>` : ''}
     ${extras && BLOOD_OK(d) ? `<div class="pc-blood"><label for="pc-bg">🩸 রক্ত লাগবে?</label><select class="f" id="pc-bg"><option value="">না</option>${BLOOD_GROUPS.map(g => `<option ${d.blood === g ? 'selected' : ''}>${g}</option>`).join('')}</select>${d.blood ? `<p class="mut">উপজেলার যেসব ${esc(d.blood)} ডোনার গত ৯০ দিনে রক্ত দেননি, তারা নোটিফিকেশন পাবেন। পোস্টটি পাবলিক থাকলে তবেই পাঠানো হবে।</p>` : ''}</div>` : ''}
+    ${d.life ? `<div class="pc-ev pc-lifeb"><div class="pc-blk-h">🎉 জীবনের ঘটনা<button type="button" class="link" data-rmlife>বাদ দিন</button></div>
+      <select class="f" id="pc-life-t" aria-label="কী ঘটেছে">${Object.entries(LIFE).map(([k, [e, t]]) => `<option value="${k}" ${d.life.type === k ? 'selected' : ''}>${e} ${t}</option>`).join('')}</select>
+      <label class="pc-evl">কবে<input type="date" class="f" id="pc-life-d" max="${new Date().toISOString().slice(0, 10)}" value="${esc(d.life.date || '')}"></label>
+      <p class="mut pc-evn">এটি আপনার প্রোফাইলের "জীবনের ঘটনা" অংশেও থাকবে।</p></div>` : ''}
     <div id="pc-link">${!d.photos.length && d.link ? linkCardHtml(d.link, true) : ''}</div>
     ${d.photos.length ? `<div class="pc-photos">${d.photos.map((ph, i) => `<div class="pc-ph"><img loading="lazy" decoding="async" src="${esc(ph.url)}" alt="ছবি ${bn(i + 1)}"><button type="button" data-rmph="${i}" aria-label="ছবি বাদ দিন">${ic('close', 14)}</button></div>`).join('')}
       ${d.photos.length < MAX_PHOTOS && photosOk ? `<label class="pc-ph add" aria-label="আরও ছবি">${ic('plus', 24)}<span>${bn(d.photos.length)}/${bn(MAX_PHOTOS)}</span><input type="file" accept="image/*" multiple class="pc-more" hidden></label>` : ''}</div>` : ''}
@@ -1335,6 +1341,7 @@ function renderComposerSheet() {
       ${own ? `<button class="pc-tool" id="pc-tag" title="বন্ধুদের ট্যাগ করুন" aria-label="বন্ধুদের ট্যাগ করুন">${ic('tag', 22)}</button>` : ''}
       ${extras && !d.photos.length && !d.poll ? `<button class="pc-tool pc-aa${d.bgOpen ? ' on' : ''}" id="pc-bgt" title="রঙিন ব্যাকগ্রাউন্ড" aria-label="রঙিন ব্যাকগ্রাউন্ড">Aa</button>` : ''}
       ${extras && !d.photos.length && !d.poll ? `<button class="pc-tool" id="pc-pollt" title="পোল" aria-label="পোল যোগ করুন">${ic('poll', 22)}</button>` : ''}
+      ${extras && !d.life && !d.pageId && !d.groupId ? `<button class="pc-tool pc-life" id="pc-lifet" title="জীবনের ঘটনা" aria-label="জীবনের ঘটনা যোগ করুন">🎉</button>` : ''}
       ${extras && !d.event ? `<button class="pc-tool" id="pc-evt" title="অনুষ্ঠান" aria-label="অনুষ্ঠানের তারিখ যোগ করুন">${ic('calendar', 22)}</button>` : ''}
       <select class="f pc-cat" id="pc-cat" aria-label="পোস্টের ধরন">${POST_CATS.map(c => `<option ${c === d.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
     <button class="btn wide" id="pc-post">${d.editId ? 'সংরক্ষণ করুন' : 'পোস্ট করুন'}</button></div></div>`);
@@ -1343,6 +1350,7 @@ function renderComposerSheet() {
     d.body = $('#pc-text')?.value ?? d.body; d.category = $('#pc-cat')?.value || d.category;
     if (d.poll) document.querySelectorAll('#sheet .pc-poll-opt').forEach(x => { d.poll[Number(x.dataset.pi)] = x.value; });
     if (d.event) { d.event.at = $('#pc-ev-at')?.value ?? d.event.at; d.event.place = $('#pc-ev-place')?.value ?? d.event.place; }
+    if (d.life) { d.life.type = $('#pc-life-t')?.value || d.life.type; d.life.date = $('#pc-life-d')?.value ?? d.life.date; }
   };
   // লিংক দিলে নিচে প্রিভিউ (শিরোনাম, ছবি)
   const linkCheck = () => {
@@ -1367,7 +1375,7 @@ function renderComposerSheet() {
   };
   $('#pc-cat').onchange = () => { keep(); if ((d.category === 'অনুষ্ঠান' && !d.event && extras) || (d.category === 'সাহায্য চাই') !== !!$('#pc-bg')) { if (d.category === 'অনুষ্ঠান' && !d.event && extras) d.event = { at: '', place: '' }; renderComposerSheet(); } };
   if ($('#pc-bg')) $('#pc-bg').onchange = () => { keep(); d.blood = $('#pc-bg').value; renderComposerSheet(); };
-  $('#sheet').oninput = e => { if (e.target.closest('.pc-poll-opt, #pc-ev-at, #pc-ev-place')) keep(); };
+  $('#sheet').oninput = e => { if (e.target.closest('.pc-poll-opt, #pc-ev-at, #pc-ev-place, #pc-life-t, #pc-life-d')) keep(); };
   if (!d.link && !d.photos.length) linkCheck();
   attachMention($('#pc-text'), d.mentions);
   const addFiles = async files => {
@@ -1381,7 +1389,7 @@ function renderComposerSheet() {
   if ($('#pc-file')) $('#pc-file').onchange = e => addFiles(e.target.files);
   $('#sheet .pc-more')?.addEventListener('change', e => addFiles(e.target.files));
   $('#sheet').onclick = e => {
-    const x = e.target.closest('[data-bg],[data-rmpoll],[data-addopt],[data-rmopt],[data-rmev],[data-rmlink],#pc-bgt,#pc-pollt,#pc-evt');
+    const x = e.target.closest('[data-bg],[data-rmpoll],[data-addopt],[data-rmopt],[data-rmev],[data-rmlink],[data-rmlife],#pc-bgt,#pc-pollt,#pc-evt,#pc-lifet');
     if (x) {
       keep();
       if (x.id === 'pc-bgt') d.bgOpen = !d.bgOpen;
@@ -1393,6 +1401,8 @@ function renderComposerSheet() {
       else if (x.id === 'pc-evt') { d.event = { at: '', place: '' }; d.category = 'অনুষ্ঠান'; }
       else if (x.dataset.rmev !== undefined) d.event = null;
       else if (x.dataset.rmlink !== undefined) { d.linkOff = d.link?.url || ''; d.link = null; }
+      else if (x.id === 'pc-lifet') { d.life = { type: 'job', date: new Date(Date.now() + 6 * 36e5).toISOString().slice(0, 10) }; d.bg = ''; d.bgOpen = false; }
+      else if (x.dataset.rmlife !== undefined) d.life = null;
       renderComposerSheet();
       if (x.dataset.addopt !== undefined) document.querySelectorAll('#sheet .pc-poll-opt')[d.poll.length - 1]?.focus();
       if (x.id === 'pc-pollt') $('#sheet .pc-poll-opt')?.focus();
@@ -1405,6 +1415,7 @@ function renderComposerSheet() {
   };
   $('#pc-post').onclick = e => {
     keep();
+    if (d.life && !d.body.trim() && !d.photos.length) d.body = LIFE[d.life.type][1];
     if (!d.body.trim() && !d.photos.length && !d.shared) return toast(d.poll ? 'পোলের প্রশ্নটি লিখুন' : 'কিছু লিখুন বা ছবি দিন');
     if (d.editId) return saveEdit(e.currentTarget);
     const poll = d.poll ? d.poll.map(o => o.trim()).filter(Boolean) : null;
@@ -1417,7 +1428,8 @@ function renderComposerSheet() {
       if (d.albumId && !d.photos.length) return toast('অ্যালবামে যোগ করতে অন্তত একটা ছবি দিন');
       await S.api.createPost({ body: d.body.trim(), category: d.category, images: d.photos.map(p => p.blob), pageId: d.pageId, groupId: d.groupId, privacy: d.privacy, tags: d.tags.map(t => t.id), mentions: mentionIds(d.body, d.mentions), albumId: d.albumId || null,
         bg: d.bg && canBg(d) ? d.bg : null, poll, eventAt: evAt ? evAt.toISOString() : null, eventPlace: d.event?.place?.trim() || null,
-        link: !d.photos.length && d.link ? d.link : null, bloodGroup: BLOOD_OK(d) && d.blood ? d.blood : null });
+        link: !d.photos.length && d.link ? d.link : null, bloodGroup: BLOOD_OK(d) && d.blood ? d.blood : null,
+        lifeEvent: d.life?.type || null, lifeDate: d.life?.date || null });
       if (BLOOD_OK(d) && d.blood && d.privacy === 'public') setTimeout(() => toast(`🩸 উপজেলার ${d.blood} ডোনারদের জানানো হয়েছে`), 1200);
       d.photos.forEach(p => URL.revokeObjectURL(p.url));
       const where = d.pageId ? 'page' : d.groupId ? 'group' : 'home';
@@ -2112,7 +2124,8 @@ function renderAbout(key) {
     const rows = detailRows(u, (u.featured || FEATURED0).includes('blood') ? [...ALL_DETAIL_KEYS, 'blood'] : ALL_DETAIL_KEYS);
     pane.innerHTML = `<div class="card about-view">${u.bio ? `<p class="about-bio">${esc(u.bio)}</p>` : ''}
       ${rows.join('')}
-      ${!rows.length && !u.bio ? '<p class="mut" style="margin:0">এখনো কোনো তথ্য দেওয়া নেই।</p>' : ''}</div>`;
+      ${!rows.length && !u.bio ? '<p class="mut" style="margin:0">এখনো কোনো তথ্য দেওয়া নেই।</p>' : ''}</div><div id="life-${key}"></div>`;
+    if (!u.lockedOut) fillLife(key, u.id);
     return;
   }
   pane.innerHTML = `<div class="card about-edit">${ABOUT.map(a => {
@@ -2126,7 +2139,8 @@ function renderAbout(key) {
       ${isOpen ? `<form class="ab-form" data-abform="${a.id}">${a.form(u)}<div class="ab-btns"><button type="button" class="btn ghost sm" data-abcancel>বাতিল</button><button class="btn sm">সেভ করুন</button></div></form>` : ''}
     </div>`;
   }).join('')}
-  ${u.joinedAt ? `<div class="ab-joined">${ic('calendar', 15)} ${joinedText(u.joinedAt)}</div>` : ''}</div>`;
+  ${u.joinedAt ? `<div class="ab-joined">${ic('calendar', 15)} ${joinedText(u.joinedAt)}</div>` : ''}</div><div id="life-${key}"></div>`;
+  fillLife(key, u.id);
   const a = ABOUT.find(x => x.id === open);
   if (a?.after) a.after(u);
   if (a && !['work', 'intro', 'personal'].includes(a.id)) setTimeout(() => pane.querySelector('.ab-form input, .ab-form select, .ab-form textarea')?.focus({ preventScroll: true }), 30);
@@ -2168,17 +2182,19 @@ async function openUser(id, silent, keepState) {
     const p = await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
     if (!silent) S.api.profileVisit?.(id).catch(() => {});
-    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
+    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${readyChip(p, false)}${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
+      <div id="mutual"></div>
       ${p.lockedOut ? `<div class="lock-banner">🔒 <div><b>${esc(p.name)} প্রোফাইল লক করে রেখেছেন</b><small>শুধু বন্ধুরা পোস্ট, ছবি ও বিস্তারিত দেখতে পারেন।</small></div></div>` : introCard(p, false)}
       ${statsHtml(p)}
       ${r.blocked ? `<p class="mut">আপনি এই ব্যক্তিকে ব্লক করেছেন।</p><button class="btn ghost" id="unblock">আনব্লক করুন</button>`
       : `<div class="row">${relBtns(p)}<button class="sbtn ${r.following ? 'ghost' : ''}" data-fo="${esc(p.id)}" data-on="${r.following ? 1 : 0}">${r.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" data-dm="${esc(p.id)}">মেসেজ</button><button class="more" id="umore" aria-label="আরও">⋯</button></div>`}</div>${r.blocked || p.lockedOut ? '' : profTabs('user')}`;
+    if (me() && id !== me().id) S.api.mutualFriends(id).then(m => { if ($('#mutual') && S.viewProfile?.id === id) $('#mutual').innerHTML = mutualHtml(m); }).catch(() => {});
     $('#unblock')?.addEventListener('click', e => busy(e.currentTarget, async () => { await S.api.unblock(p.id); openUser(p.id, true); loadFeed('user'); }));
     $('#umore')?.addEventListener('click', () => {
       if (!needUser()) return;
-      openSheet(`<div class="menu">${me()?.admin ? `<button data-act="admin">${ic('shield', 16)} অ্যাডমিন: কয়েন ও ব্যাজ</button>` : ''}<button data-act="report">প্রোফাইল রিপোর্ট করুন</button><button data-act="block" class="danger">ব্লক করুন</button><button data-close>বন্ধ করুন</button></div>`);
-      $('#sheet').onclick = ev => { const a = ev.target.closest('[data-act]')?.dataset.act; if (a === 'admin') adminUserSheet(p, () => openUser(p.id, true)); if (a === 'report') reportSheet('user', p.id); if (a === 'block') { closeSheet(); blockUser(p.id, p.name); } };
+      openSheet(`<div class="menu"><button data-act="share">${ic('link', 16)} প্রোফাইল শেয়ার / QR</button>${me()?.admin ? `<button data-act="admin">${ic('shield', 16)} অ্যাডমিন: কয়েন ও ব্যাজ</button>` : ''}<button data-act="report">প্রোফাইল রিপোর্ট করুন</button><button data-act="block" class="danger">ব্লক করুন</button><button data-close>বন্ধ করুন</button></div>`);
+      $('#sheet').onclick = ev => { const a = ev.target.closest('[data-act]')?.dataset.act; if (a === 'share') return profileShareSheet(p); if (a === 'admin') adminUserSheet(p, () => openUser(p.id, true)); if (a === 'report') reportSheet('user', p.id); if (a === 'block') { closeSheet(); blockUser(p.id, p.name); } };
     });
     if (r.blocked || p.lockedOut) $('#feed-user').hidden = true; else showProfPane('user');
   } catch (e) { $('#user').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
@@ -2321,7 +2337,7 @@ function donorCard(d, mine) {
     ? `${av(d, 'md')}<div class="info"><b class="dname">${esc(d.name)}</b>${owner ? ' <span class="tag">আপনার যোগ করা</span>' : ''}<div class="meta">${ic('user', 13)} যোগ করেছেন: <button class="via-btn" data-user="${esc(d.addedBy)}">${esc(d.addedByName)}</button></div></div>`
     : `${userLink(d.id, av(d, 'md'))}<div class="info">${userLink(d.id, esc(d.name), 'who-btn dname')}${mine ? ' <span class="tag">আমি</span>' : ''}<div class="meta">${ic('user', 13)} প্রোফাইল দেখতে নামে চাপুন</div></div>`;
   return `<div class="card dcard${mine || owner ? ' mine' : ''}">
-    <div class="dtop">${top}${bloodDrop(d.bloodGroup)}</div>
+    ${d.ready ? '<div class="d-ready">🩸 রক্ত দিতে প্রস্তুত</div>' : ''}<div class="dtop">${top}${bloodDrop(d.bloodGroup)}</div>
     <div class="dfields">
       ${field(ic('pin'), 'এলাকা', esc(d.area || '—'))}
       ${field(ic('mobile'), 'মোবাইল', d.phone ? esc(fmtPhone(d.phone)) : '<span class="mut">লগইন করলে দেখা যাবে</span>')}
@@ -2452,13 +2468,15 @@ async function renderMe(mode = 'login') {
   const u = me();
   if (u) {
     $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
-      <h2 style="margin:6px 0 0">${esc(u.name)}${u.verified ? vb(u.verified, true) : vbGet('me')}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.locked ? '<button class="lock-chip">🔒 প্রোফাইল লক করা</button>' : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
+      <h2 style="margin:6px 0 0">${esc(u.name)}${u.verified ? vb(u.verified, true) : vbGet('me')}</h2>${readyChip(u, true)}${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.locked ? '<button class="lock-chip">🔒 প্রোফাইল লক করা</button>' : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
+      <div id="pmeter"></div>
+      <div class="row prof-tools"><button class="btn ghost" data-pshare="me">${ic('link', 15)} প্রোফাইল শেয়ার / QR</button><button class="btn ghost" data-frames>🖼️ ছবিতে ফ্রেম</button></div>
       <div class="row"><button class="btn ghost" id="edit">${ic('edit', 15)} এবাউট এডিট</button><button class="btn ghost" data-insights="1">${ic('eye', 15)} ড্যাশবোর্ড</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
       ${profTabs('me')}`;
-    S.api.profile(u.id).then(p => { if ($('#mystats')) $('#mystats').innerHTML = statsHtml(p); }).catch(() => {});
+    S.api.profile(u.id).then(p => { if ($('#mystats')) $('#mystats').innerHTML = statsHtml(p); if ($('#pmeter')) $('#pmeter').innerHTML = meterHtml({ ...u, ...p }); }).catch(() => {});
     showProfPane('me');
     return;
   }
@@ -3010,6 +3028,145 @@ async function runSearch() {
 $('#open-search').addEventListener('click', openSearch);
 $('#sq').addEventListener('input', () => { clearTimeout(sqTimer); sqTimer = setTimeout(runSearch, 350); });
 
+// ================================================================ প্রোফাইল: পূর্ণতা, মিউচুয়াল, QR, ফ্রেম, জীবনের ঘটনা, রক্ত দিতে প্রস্তুত
+// ---------- প্রোফাইল কতটা পূর্ণ (শুধু নিজে দেখেন)
+const METER = [
+  ['avatar', 'প্রোফাইল ছবি', 15, u => !!u.avatar, () => $('#avfile')?.click()],
+  ['cover', 'কভার ছবি', 10, u => !!u.cover, () => $('#coverfile')?.click()],
+  ['bio', 'নিজের সম্পর্কে', 10, u => !!u.bio, () => openAbout('intro')],
+  ['work', 'কাজ বা শিক্ষা', 15, u => !!(u.works?.length || u.educations?.length), () => openAbout('work')],
+  ['addr', 'ঠিকানা', 10, u => !!(u.unionId || u.union), () => openAbout('addr')],
+  ['birth', 'জন্মতারিখ', 10, u => !!(u.birthDate || u.birthYear), () => openAbout('intro')],
+  ['un', 'ইউজারনেম', 10, u => !!u.username, () => openAbout('intro')],
+  ['social', 'সোশ্যাল লিংক', 10, u => Object.values(u.social || {}).some(Boolean), () => openAbout('social')],
+  ['blood', 'ব্লাড গ্রুপ', 10, u => !!u.bloodGroup, () => openAbout('blood')],
+];
+function meterHtml(u) {
+  const miss = METER.filter(m => !m[3](u)), pct = 100 - miss.reduce((a, m) => a + m[2], 0);
+  if (!miss.length) return '';
+  return `<div class="pmeter"><div class="pm-top"><b>প্রোফাইল ${bn(pct)}% পূর্ণ</b><span class="mut">আরও তথ্য দিলে মানুষ সহজে চিনবে</span></div>
+    <div class="pm-bar"><i style="width:${pct}%"></i></div>
+    <div class="pm-chips">${miss.slice(0, 4).map(m => `<button class="chip" data-pmeter="${m[0]}">+ ${m[1]}</button>`).join('')}</div></div>`;
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-pmeter]'); if (b) METER.find(m => m[0] === b.dataset.pmeter)?.[4](); });
+// ---------- মিউচুয়াল বন্ধু
+function mutualHtml(m) {
+  if (!m?.count) return '';
+  const names = m.list.map(x => x.name.split(' ')[0]);
+  const txt = m.count === 1 ? `<b>${esc(names[0])}</b> আপনাদের দুজনেরই বন্ধু` : `<b>${bn(m.count)} জন মিউচুয়াল বন্ধু</b>${names.length ? `, যেমন ${names.slice(0, 2).map(esc).join(' ও ')}` : ''}`;
+  return `<div class="mutual"><span class="mu-avs">${m.list.map(x => userLink(x.id, av(x, 'sm'))).join('')}</span><span class="mu-t">${txt}</span></div>`;
+}
+// ---------- প্রোফাইলের লিংক ও QR কোড (QR-এর ছোট লাইব্রেরি শুধু দরকার হলে নামে)
+let qrLib = null;
+const loadQr = () => qrLib || (qrLib = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'; sc.onload = () => res(window.QRCode); sc.onerror = () => { qrLib = null; rej(new Error('qr')); }; document.head.append(sc); }));
+async function profileShareSheet(u) {
+  const link = profileLink(u.id);
+  openSheet(`<div class="qr-sheet"><h2>প্রোফাইল শেয়ার</h2>
+    <div class="qr-card">${av(u, 'md')}<b>${esc(u.name)}${vb(u.verified)}</b>${u.username ? `<span class="mut">@${esc(u.username)}</span>` : ''}
+      <div id="qr-box" class="qr-box" aria-label="প্রোফাইলের QR কোড"><span class="mut">QR কোড তৈরি হচ্ছে…</span></div>
+      <span class="mut qr-hint">ফোনের ক্যামেরায় স্ক্যান করলে প্রোফাইল খুলবে · আমার উপজেলা</span></div>
+    <div class="qr-link"><input class="f" readonly value="${esc(link)}" aria-label="প্রোফাইলের লিংক"><button class="sbtn" id="qr-copy">কপি</button></div>
+    ${navigator.share ? '<button class="btn wide" id="qr-share">লিংক শেয়ার করুন</button>' : ''}
+    <button class="btn ghost wide" data-close style="margin-top:8px">বন্ধ করুন</button></div>`);
+  $('#qr-copy').onclick = async () => { try { await navigator.clipboard.writeText(link); toast('লিংক কপি হয়েছে'); } catch { toast('কপি করা যায়নি'); } };
+  $('#qr-share')?.addEventListener('click', () => navigator.share({ title: u.name, text: `${u.name} — আমার উপজেলা`, url: link }).catch(() => {}));
+  try {
+    const QR = await loadQr(), box = $('#qr-box'); if (!box) return;
+    box.innerHTML = ''; new QR(box, { text: link, width: 200, height: 200, colorDark: '#0b3d2e', colorLight: '#ffffff', correctLevel: QR.CorrectLevel.M });
+  } catch { if ($('#qr-box')) $('#qr-box').innerHTML = '<span class="mut">QR কোড তৈরি করতে ইন্টারনেট লাগবে। নিচের লিংক কপি করে শেয়ার করুন।</span>'; }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-pshare]'); if (!b) return;
+  const u = b.dataset.pshare === 'me' ? me() : S.viewProfile; if (u) profileShareSheet(u);
+});
+// ---------- প্রোফাইল ছবির ফ্রেম (ফোনেই তৈরি, তারপর সাধারণ প্রোফাইল ছবির মতো সেভ)
+const FRAMES = [
+  ['victory', 'বিজয় দিবস', ['#006a4e', '#0b8f6a'], '#e5303f', 'বিজয় দিবস'],
+  ['feb21', 'অমর একুশে', ['#111827', '#374151'], '#ffffff', 'অমর একুশে'],
+  ['indep', 'স্বাধীনতা দিবস', ['#006a4e', '#e5303f'], '#006a4e', 'স্বাধীনতা দিবস'],
+  ['eid', 'ঈদ মোবারক', ['#065f46', '#d4a017'], '#065f46', 'ঈদ মোবারক'],
+  ['boishakh', 'শুভ নববর্ষ', ['#e5303f', '#f8fafc'], '#e5303f', 'শুভ নববর্ষ'],
+  ['donor', 'আমি রক্তদাতা', ['#b91c1c', '#ef4444'], '#b91c1c', 'আমি রক্তদাতা'],
+];
+function drawFrame(ctx, f, size) {
+  const [, , [c1, c2], ribbon, text] = f, R = size / 2, band = size * 0.075;
+  const g = ctx.createLinearGradient(0, 0, size, size); g.addColorStop(0, c1); g.addColorStop(1, c2);
+  ctx.save(); ctx.beginPath(); ctx.arc(R, R, R, 0, Math.PI * 2); ctx.arc(R, R, R - band, 0, Math.PI * 2, true); ctx.fillStyle = g; ctx.fill('evenodd'); ctx.restore();
+  // উপরের ছোট প্রতীক
+  ctx.save(); ctx.translate(size * 0.8, size * 0.2);
+  if (f[0] === 'eid') { ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(0, 0, size * 0.07, 0, Math.PI * 2); ctx.fill(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(size * 0.03, -size * 0.02, size * 0.06, 0, Math.PI * 2); ctx.fill(); }
+  else if (f[0] === 'donor') { ctx.fillStyle = '#ef4444'; ctx.strokeStyle = '#fff'; ctx.lineWidth = size * 0.012; ctx.beginPath(); ctx.moveTo(0, -size * 0.08); ctx.bezierCurveTo(size * 0.07, 0, size * 0.06, size * 0.07, 0, size * 0.07); ctx.bezierCurveTo(-size * 0.06, size * 0.07, -size * 0.07, 0, 0, -size * 0.08); ctx.fill(); ctx.stroke(); }
+  else if (f[0] === 'feb21') { ctx.strokeStyle = '#fff'; ctx.lineWidth = size * 0.014; ctx.fillStyle = '#e5303f'; ctx.beginPath(); ctx.arc(0, size * 0.01, size * 0.045, 0, Math.PI * 2); ctx.fill(); [-1, 0, 1].forEach(i => { ctx.beginPath(); ctx.moveTo(i * size * 0.03, size * 0.06); ctx.lineTo(i * size * 0.03, -size * 0.07); ctx.stroke(); }); }
+  else { ctx.fillStyle = '#006a4e'; ctx.strokeStyle = '#fff'; ctx.lineWidth = size * 0.012; ctx.fillRect(-size * 0.08, -size * 0.05, size * 0.16, size * 0.1); ctx.strokeRect(-size * 0.08, -size * 0.05, size * 0.16, size * 0.1); ctx.fillStyle = '#e5303f'; ctx.beginPath(); ctx.arc(-size * 0.01, 0, size * 0.03, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+  // নিচের ফিতা ও লেখা
+  const w = size * 0.62, h = size * 0.12, x = R - w / 2, y = size * 0.78;
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = size * 0.02; ctx.fillStyle = ribbon; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, h / 2) : ctx.rect(x, y, w, h); ctx.fill(); ctx.restore();
+  ctx.fillStyle = ribbon === '#ffffff' ? '#111827' : '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 ${Math.round(size * 0.058)}px "Hind Siliguri","Noto Sans Bengali",sans-serif`; ctx.fillText(text, R, y + h / 2 + size * 0.004);
+}
+function loadImg(src) { return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = rej; im.src = src; }); }
+async function frameSheet() {
+  const u = me(); if (!u) return;
+  S.frame = { id: FRAMES[0][0], img: null, src: u.avatar || '' };
+  openSheet(`<div class="fr-sheet"><h2>প্রোফাইল ছবিতে ফ্রেম</h2>
+    <canvas id="fr-cv" width="512" height="512" aria-label="ফ্রেমসহ ছবির পূর্বরূপ"></canvas>
+    <div class="fr-list">${FRAMES.map(f => `<button class="chip${f[0] === S.frame.id ? ' on' : ''}" data-fr2="${f[0]}">${f[1]}</button>`).join('')}</div>
+    <label class="btn ghost wide fr-pick">${ic('camera', 16)} অন্য ছবি বাছাই করুন<input type="file" id="fr-file" accept="image/*" hidden></label>
+    <button class="btn wide" id="fr-save" style="margin-top:8px">এই ছবি প্রোফাইলে দিন</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button></div>`);
+  const draw = () => {
+    const cv = $('#fr-cv'); if (!cv) return; const ctx = cv.getContext('2d'), S2 = 512;
+    ctx.clearRect(0, 0, S2, S2); ctx.save(); ctx.beginPath(); ctx.arc(S2 / 2, S2 / 2, S2 / 2, 0, Math.PI * 2); ctx.clip();
+    if (S.frame.img) { const im = S.frame.img, k = Math.max(S2 / im.width, S2 / im.height); ctx.drawImage(im, (S2 - im.width * k) / 2, (S2 - im.height * k) / 2, im.width * k, im.height * k); }
+    else { ctx.fillStyle = '#0b6b4f'; ctx.fillRect(0, 0, S2, S2); ctx.fillStyle = '#fff'; ctx.font = '700 200px "Hind Siliguri",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText((u.name || '?').charAt(0), S2 / 2, S2 / 2); }
+    ctx.restore(); drawFrame(ctx, FRAMES.find(f => f[0] === S.frame.id), S2);
+  };
+  if (S.frame.src) { try { S.frame.img = await loadImg(S.frame.src); } catch { S.frame.img = null; } }
+  draw();
+  $('#sheet').onclick = e => { const b = e.target.closest('[data-fr2]'); if (!b) return; S.frame.id = b.dataset.fr2; document.querySelectorAll('[data-fr2]').forEach(x => x.classList.toggle('on', x === b)); draw(); };
+  $('#fr-file').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const blob = await compress(f, 800, 0.9); S.frame.img = await loadImg(URL.createObjectURL(blob)); draw(); } catch { toast('ছবিটা খোলা যায়নি'); } };
+  $('#fr-save').onclick = () => {
+    const cv = $('#fr-cv');
+    try {
+      cv.toBlob(b => { if (!b) return toast('ছবি তৈরি করা যায়নি'); picSheet('avatar', b); }, 'image/webp', 0.85);
+    } catch { toast('এই ছবিতে ফ্রেম বসানো যাচ্ছে না। "অন্য ছবি বাছাই করুন" চেপে ফোন থেকে ছবি দিন।'); }
+  };
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-frames]')) frameSheet(); });
+// ---------- জীবনের ঘটনা
+const LIFE = { job: ['💼', 'নতুন চাকরি শুরু করেছেন'], study: ['📚', 'পড়াশোনা শুরু করেছেন'], graduate: ['🎓', 'পড়াশোনা শেষ করেছেন'], marriage: ['💍', 'বিয়ে করেছেন'], baby: ['👶', 'সন্তানের বাবা/মা হয়েছেন'], home: ['🏡', 'নতুন বাড়িতে উঠেছেন'], business: ['🏪', 'নতুন ব্যবসা শুরু করেছেন'], hajj: ['🕋', 'হজ্জ/ওমরাহ পালন করেছেন'], travel: ['✈️', 'বিদেশে গিয়েছেন'], other: ['🎉', 'জীবনের বিশেষ মুহূর্ত'] };
+const dateBnFull = d => { const x = new Date(d + (d.length === 10 ? 'T00:00:00Z' : '')); return isNaN(x) ? '' : `${bn(x.getUTCDate())} ${BN_MON[x.getUTCMonth()]} ${bn(x.getUTCFullYear())}`; };
+const lifeHtml = p => p.lifeEvent && LIFE[p.lifeEvent] ? `<div class="life"><span class="life-ic">${LIFE[p.lifeEvent][0]}</span><b>${LIFE[p.lifeEvent][1]}</b>${p.lifeDate ? `<span class="mut">${dateBnFull(p.lifeDate)}</span>` : ''}</div>` : '';
+async function fillLife(key, uid) {
+  const box = $('#life-' + key); if (!box) return;
+  const list = await S.api.lifeEvents(uid).catch(() => []);
+  if (!$('#life-' + key)) return;
+  box.innerHTML = list.length || key === 'me' ? `<div class="card life-list"><h3>জীবনের ঘটনা</h3>${list.map(x => `<button class="life-row" data-openpost="${esc(x.id)}"><span class="life-ic">${LIFE[x.type]?.[0] || '🎉'}</span><span><b>${LIFE[x.type]?.[1] || ''}</b><small class="mut">${dateBnFull(x.date)}</small></span></button>`).join('')}
+    ${key === 'me' ? `<button class="link" data-lifenew>+ জীবনের ঘটনা যোগ করুন</button>` : ''}</div>` : '';
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-lifenew]')) { openPostComposer({}); setTimeout(() => $('#pc-lifet')?.click(), 60); } });
+// ---------- রক্ত দিতে প্রস্তুত
+function readyChip(u, own) {
+  if (own) {
+    if (!u.bloodGroup) return '';
+    if (u.donorReady && !canDonate(u.lastDonated)) { const d = new Date(new Date(u.lastDonated).getTime() + 90 * 864e5).toISOString().slice(0, 10); return `<button class="ready-chip wait" data-ready>🩸 আবার রক্ত দিতে পারবেন ${dateBnFull(d)} থেকে</button>`; }
+    return u.donorReady ? `<button class="ready-chip on" data-ready>🩸 রক্ত দিতে প্রস্তুত · ${esc(u.bloodGroup)}</button>` : `<button class="ready-chip" data-ready>🩸 রক্ত দিতে প্রস্তুত? চালু করুন</button>`;
+  }
+  return u.donorReady && u.bloodGroup && canDonate(u.lastDonated) ? `<button class="ready-chip on" data-dm="${esc(u.id)}" title="মেসেজ দিন">🩸 রক্ত দিতে প্রস্তুত · ${esc(u.bloodGroup)}</button>` : '';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-ready]')) return;
+  const u = me(); if (!u) return;
+  const on = !!u.donorReady;
+  openSheet(`<div class="lock-sheet"><div class="lock-ic">🩸</div><h2>${on ? 'আপনি রক্ত দিতে প্রস্তুত' : 'রক্ত দিতে প্রস্তুত?'}</h2>
+    <ul class="lock-list"><li>✅ প্রোফাইলে নামের নিচে "🩸 রক্ত দিতে প্রস্তুত · ${esc(u.bloodGroup)}" দেখাবে, চাপলে মানুষ সরাসরি মেসেজ দিতে পারবেন</li>
+      <li>✅ ব্লাড ব্যাংকে আপনার নাম সবার উপরে "প্রস্তুত" চিহ্নসহ থাকবে</li>
+      <li>⏳ রক্ত দেওয়ার পর ৯০ দিন "প্রস্তুত" দেখাবে না, তারপর নিজে থেকে আবার দেখাবে</li>
+      <li>👁 এটা চালু করলে আপনার ব্লাড গ্রুপ প্রোফাইলে সবাই দেখবেন</li></ul>
+    <button class="btn wide${on ? ' ghost' : ''}" id="ready-go">${on ? 'বন্ধ করুন' : '🩸 চালু করুন'}</button>
+    <button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button></div>`);
+  $('#ready-go').onclick = ev => busy(ev.currentTarget, async () => { await S.api.setDonorReady(!on); u.donorReady = !on; closeSheet(); toast(on ? 'বন্ধ করা হয়েছে' : 'ধন্যবাদ! আপনি এখন "রক্ত দিতে প্রস্তুত"'); renderMe(); });
+});
 // ================================================================ ডেমো প্রোফাইল (শুধু ডেমো মোডে)
 function renderDemoBar() {
   const bar = $('#demo'); bar.hidden = S.api.mode !== 'demo'; if (bar.hidden) return;
@@ -3957,7 +4114,7 @@ async function cachedCall(key, fn) {
     refreshSettings(); setTimeout(checkLiveUpdate, 8000);
     await loadFeed('home');
     setInterval(() => { if (document.visibilityState === 'visible') refreshBadges(); }, 60000);
-    const deep = () => { const m = location.hash.match(/^#post-(\d+)$/), pm = location.hash.match(/^#page-(\d+)$/); if (m && !(S.view === 'post' && String(S.postId) === m[1])) openPost(m[1]); if (pm && !(S.view === 'page' && String(S.pageId) === pm[1])) openPage(pm[1]); };
+    const deep = () => { const m = location.hash.match(/^#post-(\d+)$/), pm = location.hash.match(/^#page-(\d+)$/), um = location.hash.match(/^#u-([\w-]{2,40})$/); if (um && !(S.view === 'user' && S.userId === um[1])) openUser(um[1]); if (m && !(S.view === 'post' && String(S.postId) === m[1])) openPost(m[1]); if (pm && !(S.view === 'page' && String(S.pageId) === pm[1])) openPage(pm[1]); };
     deep(); window.addEventListener('hashchange', deep);
   } catch (e) {
     $('#feed-home').innerHTML = `<div class="empty">${esc(errText(e))}<br><button class="btn" id="retry">আবার চেষ্টা করুন</button></div>`;

@@ -1260,3 +1260,40 @@ body{overscroll-behavior-y:contain}
 .vb-get svg{width:22px;height:22px;filter:grayscale(1);opacity:.35;transition:opacity .15s}
 .vb-get:hover svg,.vb-get:focus-visible svg{opacity:.7}
 .flash{animation:flash 1.6s ease-out}@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--g)}100%{box-shadow:0 0 0 0 transparent}}
+
+/* v50 প্রোফাইল: পূর্ণতা, মিউচুয়াল, QR, ফ্রেম, জীবনের ঘটনা, রক্ত দিতে প্রস্তুত */
+.prof-tools{margin-top:8px}
+.pmeter{margin:10px 0 2px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);text-align:left}
+.pm-top{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline}
+.pm-top .mut{font-size:12.5px}
+.pm-bar{height:8px;border-radius:99px;background:var(--g2);margin:8px 0;overflow:hidden}
+.pm-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--g),#22c1c3);border-radius:99px}
+.pm-chips{display:flex;flex-wrap:wrap;gap:6px}
+.mutual{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 2px;font-size:13.5px}
+.mu-avs{display:flex}
+.mu-avs .avbtn+.avbtn{margin-left:-10px}
+.mu-avs .av{border:2px solid var(--card)}
+.ready-chip{display:inline-flex;align-items:center;gap:4px;margin:6px auto 0;padding:4px 12px;border-radius:999px;border:1px dashed light-dark(#fda4af,#881337);background:none;color:light-dark(#be123c,#fecdd3);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.ready-chip.on{border-style:solid;background:light-dark(#ffe4e6,#4c1018)}
+.ready-chip.wait{border-style:solid;color:var(--mut);border-color:var(--line)}
+.d-ready{margin:-2px 0 6px;font-size:12.5px;font-weight:700;color:light-dark(#be123c,#fecdd3)}
+.qr-sheet{text-align:center}
+.qr-card{display:grid;justify-items:center;gap:4px;border:1px solid var(--line);border-radius:16px;padding:16px;margin:8px 0 12px;background:var(--bg)}
+.qr-box{display:grid;place-items:center;min-height:200px;margin:8px 0 4px;padding:10px;background:#fff;border-radius:12px}
+.qr-box img,.qr-box canvas{display:block;width:200px;height:200px}
+.qr-hint{font-size:12px}
+.qr-link{display:flex;gap:6px;margin-bottom:10px}
+.qr-link .f{flex:1;margin:0;font-size:13px}
+.fr-sheet{text-align:center}
+#fr-cv{width:240px;height:240px;border-radius:50%;margin:6px auto 10px;display:block;background:var(--g2)}
+.fr-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:10px}
+.fr-list .chip.on{background:var(--g);color:#fff;border-color:var(--g)}
+.fr-pick{display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.life{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:10px 0 4px;padding:12px;border-radius:12px;background:linear-gradient(135deg,light-dark(#ecfdf5,#0d2a20),light-dark(#fef9c3,#2a2508));text-align:left}
+.life b{font-size:15.5px}
+.life .mut{font-size:13px;width:100%;padding-left:38px}
+.life-ic{font-size:28px;line-height:1}
+.life-list h3{margin:0 0 6px}
+.life-row{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:8px 2px;font:inherit;color:inherit;text-align:left;cursor:pointer;border-bottom:1px solid var(--line)}
+.life-row small{display:block}
+.pc-life{font-size:18px}

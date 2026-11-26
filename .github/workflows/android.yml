@@ -63,6 +63,12 @@ jobs:
           [ -d android ] || npx cap add android
           npx cap sync android
 
+      - name: Microphone permission (মেসেজে ভয়েস রেকর্ডের জন্য)
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q RECORD_AUDIO "$M" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-feature android:name="android.hardware.microphone" android:required="false" />\n</manifest>#' "$M"
+          grep -n "AUDIO\|microphone" "$M"
+
       - name: Generate app icon and splash
         continue-on-error: true
         run: npx @capacitor/assets generate --android --iconBackgroundColor '#006a4e' --iconBackgroundColorDark '#006a4e' --splashBackgroundColor '#006a4e' --splashBackgroundColorDark '#006a4e'

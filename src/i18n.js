@@ -144,6 +144,7 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'ফন্ট সাইজ': 'Font size',
   'ডার্ক মোড': 'Dark mode', 'চালু · চোখের আরাম, রাতে ভালো': 'On · easy on the eyes at night', 'বন্ধ · এখন দিনের (লাইট) মোড': 'Off · day (light) mode now', 'লাইট': 'Light',
   'বেশি': 'more', 'কম': 'less', '(কাল': '(tomorrow', 'কাল': 'tomorrow', 'ঘণ্টা {x} মিনিট পর': 'h {x} min left', 'মিনিট পর': 'min left', 'পরের ওয়াক্ত': 'next',
   'কভার ছবি যোগ করুন': 'Add cover photo', 'আপনার প্রোফাইল দেখুন': 'View your profile', 'পোস্ট কতজন দেখছেন': 'How many see your posts', 'ডেমো ব্যবহারকারী': 'Demo User',

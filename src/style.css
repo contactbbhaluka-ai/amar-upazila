@@ -1661,3 +1661,4 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .lang-note{font-size:13px;margin:4px 12px 10px}
 .lang-card{padding:0}.lang-card .lang-row{display:flex;align-items:center;gap:10px;width:100%;padding:13px 14px;background:none;border:0;text-align:left;font:inherit;font-weight:700;color:inherit;cursor:pointer}.lang-card .lang-t{display:flex;flex-direction:column;flex:1}.lang-card .lang-t small{font-weight:400;color:var(--mut,#6b7280);font-size:12.5px}.lang-card .lang-ic{font-size:18px}
 .mn-lang{font-weight:800;font-size:14px}
+.fs-go{font-size:24px;color:var(--mut,#6b7280);line-height:1}

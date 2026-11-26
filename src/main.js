@@ -471,12 +471,12 @@ function bestWindow(hours) {
   for (let h = 0; h < 24; h++) { const s2 = hours[h] + hours[(h + 1) % 24]; if (s2 > best) { best = s2; at = h; } }
   return best > 0 ? `${hourBn(at)} থেকে ${hourBn((at + 2) % 24)}` : '';
 }
-function followChart(daily) {
+function followChart(daily, labels = ['ফলো', 'আনফলো']) {
   const max = Math.max(1, ...daily.map(d => Math.max(d.plus, d.minus))), many = daily.length > 10;
   return `<div class="ps-chart fol${many ? ' many' : ''}">${daily.map((d, i) => {
     const dt = new Date(d.day + 'T00:00:00'), lbl = many ? (i % 5 === 0 || i === daily.length - 1 ? bn(dt.getDate()) : '') : WD[dt.getDay()];
     return `<div class="pc-col" title="${bn(dt.getDate())} তারিখ: +${bn(d.plus)} / −${bn(d.minus)}"><div class="fc-bars"><i class="p" style="height:${d.plus ? Math.max(4, (d.plus / max) * 100) : 0}%"></i><i class="m" style="height:${d.minus ? Math.max(4, (d.minus / max) * 100) : 0}%"></i></div><span>${lbl}</span></div>`;
-  }).join('')}</div><div class="ps-leg" style="margin-top:6px"><span><i class="c1"></i>ফলো</span><span><i class="c3"></i>আনফলো</span></div>`;
+  }).join('')}</div><div class="ps-leg" style="margin-top:6px"><span><i class="c1"></i>${labels[0]}</span><span><i class="c3"></i>${labels[1]}</span></div>`;
 }
 async function loadInsights(days) {
   const box = $('#insights');
@@ -484,31 +484,43 @@ async function loadInsights(days) {
   S.insDays = days || S.insDays || 7;
   box.innerHTML = '<div class="skel"></div><div class="skel"></div>';
   try {
-    const [d, g] = await Promise.all([S.api.myInsights(S.insDays), S.api.myGrowth(S.insDays)]), best = bestWindow(d.hours), hmax = Math.max(1, ...d.hours);
+    const T = S.insTarget, kind = T?.kind || 'me';
+    $('#v-insights .bar b').textContent = T ? `${T.name}: ড্যাশবোর্ড` : 'ড্যাশবোর্ড';
+    let d, g;
+    if (T) { d = await S.api.entInsights(T.kind, T.id, S.insDays); g = d.growth; }
+    else [d, g] = await Promise.all([S.api.myInsights(S.insDays), S.api.myGrowth(S.insDays)]);
+    const best = bestWindow(d.hours), hmax = Math.max(1, ...d.hours);
+    const L = {   // কোন ড্যাশবোর্ডে কোন শব্দ
+      me: { visit: 'প্রোফাইল ভিজিট', fol: 'ফলোয়ার', plus: 'নতুন ফলো করেছেন', minus: 'আনফলো করেছেন', close: 'বন্ধু / ফলোয়ার', you: 'আপনার' },
+      page: { visit: 'পেইজ ভিজিট', fol: 'পেইজের ফলোয়ার', plus: 'নতুন ফলো করেছেন', minus: 'আনফলো করেছেন', close: 'পেইজের ফলোয়ার', you: 'পেইজের' },
+      group: { visit: 'গ্রুপ ভিজিট', fol: 'সদস্য', plus: 'নতুন যোগ দিয়েছেন', minus: 'গ্রুপ ছেড়েছেন', close: 'গ্রুপের সদস্য', you: 'গ্রুপের' },
+    }[kind];
     const tile = (icon, n, l) => `<div class="in-tile"><span>${icon}</span><b>${bn(n)}</b><small>${l}</small></div>`;
     box.innerHTML = `
       <div class="seg in-seg" role="tablist">${[7, 30].map(n => `<button role="tab" data-indays="${n}" class="${S.insDays === n ? 'on' : ''}" aria-selected="${S.insDays === n}">গত ${bn(n)} দিন</button>`).join('')}</div>
-      <div class="in-tiles">${tile('👥', d.people, 'জন পোস্ট দেখেছেন')}${tile('👁', d.views, 'পোস্টের মোট ভিউ')}${tile('🏠', g.visits, 'প্রোফাইল ভিজিট')}${tile('📝', d.posts, 'পোস্ট করেছেন')}</div>
+      <div class="in-tiles">${tile('👥', d.people, 'জন পোস্ট দেখেছেন')}${tile('👁', d.views, 'পোস্টের মোট ভিউ')}${tile('🏠', g.visits, L.visit)}${tile('📝', d.posts, kind === 'group' ? 'পোস্ট হয়েছে' : 'পোস্ট করেছেন')}${kind === 'group' ? tile('🙋', d.activeMembers, 'সক্রিয় সদস্য') + tile('⏳', d.pending, 'অপেক্ষমাণ অনুরোধ') : ''}</div>
+      ${kind === 'group' ? '<p class="mut in-sub">সক্রিয় সদস্য: এই সময়ে যারা গ্রুপে পোস্ট বা মন্তব্য করেছেন।</p>' : ''}
       <div class="card">${chartBlock('প্রতিদিনের পোস্ট ভিউ', d.daily)}</div>
-      <div class="card"><b class="in-h">ফলোয়ার</b>
-        <div class="in-fol"><div><b>${bn(g.followers)}</b><small>এখন মোট</small></div><div class="up"><b>+${bn(g.gained)}</b><small>নতুন ফলো করেছেন</small></div><div class="down"><b>−${bn(g.lost)}</b><small>আনফলো করেছেন</small></div><div><b>${g.gained - g.lost >= 0 ? '+' : '−'}${bn(Math.abs(g.gained - g.lost))}</b><small>মোট বদল</small></div></div>
-        ${followChart(g.followDaily)}</div>
-      <div class="card">${chartBlock(`প্রোফাইল ভিজিট · ${bn(g.visitors)} জন`, g.visitsDaily)}<p class="mut" style="margin:6px 0 0;font-size:12.5px">একজন দিনে একবার গোনা হয়। কে ভিজিট করেছেন তা দেখানো হয় না।</p></div>
+      <div class="card"><b class="in-h">${L.fol}</b>
+        <div class="in-fol"><div><b>${bn(g.followers)}</b><small>এখন মোট</small></div><div class="up"><b>+${bn(g.gained)}</b><small>${L.plus}</small></div><div class="down"><b>−${bn(g.lost)}</b><small>${L.minus}</small></div><div><b>${g.gained - g.lost >= 0 ? '+' : '−'}${bn(Math.abs(g.gained - g.lost))}</b><small>মোট বদল</small></div></div>
+        ${followChart(g.followDaily, kind === 'group' ? ['যোগ দিয়েছেন', 'ছেড়েছেন'] : ['ফলো', 'আনফলো'])}</div>
+      <div class="card">${chartBlock(`${L.visit} · ${bn(g.visitors)} জন`, g.visitsDaily)}<p class="mut" style="margin:6px 0 0;font-size:12.5px">একজন দিনে একবার গোনা হয়। কে ভিজিট করেছেন তা দেখানো হয় না।</p></div>
       <div class="card"><div class="ps-aud" style="margin:0;border:0;padding:0"><b>কারা দেখেছেন</b>
         <div class="ps-bar"><i style="width:${d.people ? (d.close / d.people) * 100 : 0}%"></i></div>
-        <div class="ps-leg"><span><i class="c1"></i>বন্ধু / ফলোয়ার <b>${bn(d.close)}</b></span><span><i class="c2"></i>অন্যরা <b>${bn(d.others)}</b></span></div></div></div>
+        <div class="ps-leg"><span><i class="c1"></i>${L.close} <b>${bn(d.close)}</b></span><span><i class="c2"></i>অন্যরা <b>${bn(d.others)}</b></span></div></div></div>
       ${srcRows(d.sources).length ? `<div class="card">${listBlock('কোথা থেকে দেখেছেন', srcRows(d.sources))}</div>` : ''}
       <div class="card"><div class="ps-box" style="border:0;padding:0;margin:0"><b>পোস্ট করার সেরা সময়</b>
-        <p class="mut" style="margin:2px 0 8px;font-size:13px">${best ? `গত ৩০ দিনে আপনার পোস্ট সবচেয়ে বেশি দেখা হয়েছে <b class="in-best">${best}</b>-এর মধ্যে। এই সময়ের একটু আগে পোস্ট করলে বেশি মানুষ দেখবেন।` : 'আরও কিছু মানুষ আপনার পোস্ট দেখলে এখানে সেরা সময় দেখাবে।'}</p>
+        <p class="mut" style="margin:2px 0 8px;font-size:13px">${best ? `গত ৩০ দিনে ${L.you} পোস্ট সবচেয়ে বেশি দেখা হয়েছে <b class="in-best">${best}</b>-এর মধ্যে। এই সময়ের একটু আগে পোস্ট করলে বেশি মানুষ দেখবেন।` : `আরও কিছু মানুষ ${L.you} পোস্ট দেখলে এখানে সেরা সময় দেখাবে।`}</p>
         <div class="in-hours">${d.hours.map((n, h) => `<i title="${hourBn(h)}: ${bn(n)}" style="height:${Math.max(3, (n / hmax) * 100)}%"></i>`).join('')}</div>
         <div class="in-hlbl"><span>রাত ১২</span><span>সকাল ৬</span><span>দুপুর ১২</span><span>সন্ধ্যা ৬</span><span>রাত ১১</span></div></div></div>
       <h3 class="res-h">সবচেয়ে বেশি দেখা পোস্ট</h3>
-      <div class="card">${d.top.length ? d.top.map(t => `<button class="bo-row" data-openpost="${t.id}">${t.image ? `<img src="${esc(t.image)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}<span class="bo-tx"><b>${esc(t.body || 'ছবি পোস্ট')}</b><small>${bn(t.people)} জন দেখেছেন · ${bn(t.views)} ভিউ · ${esc(ago(t.createdAt))}</small></span></button>`).join('') : '<p class="mut" style="margin:0">এই সময়ে আপনার কোনো পোস্ট কেউ দেখেননি। নতুন পোস্ট করুন!</p>'}</div>
-      <p class="note">এই হিসাব শুধু আপনি দেখতে পাচ্ছেন। কে কে দেখেছেন তা দেখানো হয় না। প্রতিটা পোস্টের বিস্তারিত পোস্টের ⓘ বাটনে।</p>`;
+      <div class="card">${d.top.length ? d.top.map(t => `<button class="bo-row" data-openpost="${t.id}">${t.image ? `<img src="${esc(t.image)}" alt="">` : `<span class="bo-ph">${ic('post', 18)}</span>`}<span class="bo-tx"><b>${esc(t.body || 'ছবি পোস্ট')}</b><small>${bn(t.people)} জন দেখেছেন · ${bn(t.views)} ভিউ · ${esc(ago(t.createdAt))}</small></span></button>`).join('') : `<p class="mut" style="margin:0">এই সময়ে ${L.you} কোনো পোস্ট কেউ দেখেননি। নতুন পোস্ট করুন!</p>`}</div>
+      <p class="note">${kind === 'group' ? 'এই হিসাব শুধু গ্রুপ অ্যাডমিনরা দেখতে পান।' : kind === 'page' ? 'এই হিসাব শুধু পেইজের মালিক দেখতে পান।' : 'এই হিসাব শুধু আপনি দেখতে পাচ্ছেন।'} কে কে দেখেছেন তা দেখানো হয় না।${kind === 'group' ? '' : ' প্রতিটা পোস্টের বিস্তারিত পোস্টের ⓘ বাটনে।'}</p>`;
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 document.addEventListener('click', e => {
-  if (e.target.closest('[data-insights]')) { open('insights'); loadInsights(); return; }
+  const ib = e.target.closest('[data-insights]');
+  if (ib) { S.insTarget = ib.dataset.insights === '1' ? null : { kind: ib.dataset.insights, id: Number(ib.dataset.entid), name: ib.dataset.entname || '' }; open('insights'); loadInsights(); return; }
   const dd = e.target.closest('[data-indays]'); if (dd) loadInsights(Number(dd.dataset.indays));
 });
 
@@ -2027,7 +2039,7 @@ function openNotif(el) {
   else if (t === 'friend_request') go('friends');
   else if (t === 'verify_ok' || t === 'verify_no') { open('wallet'); loadWallet(); }
   else if (t === 'milestone' && el.dataset.nPost) openPost(el.dataset.nPost);
-  else if (t === 'weekly' || t === 'follower_milestone' || t === 'milestone') { open('insights'); loadInsights(); }
+  else if (t === 'weekly' || t === 'follower_milestone' || t === 'milestone') { S.insTarget = null; open('insights'); loadInsights(); }
   else if (t.startsWith('group_') && el.dataset.nGroup) openGroup(el.dataset.nGroup);
   else openUser(el.dataset.nUser);
 }
@@ -2387,7 +2399,7 @@ $('#menu').addEventListener('click', e => {
   else if (!needUser()) return;
   else if (t === 'saved') { open('saved'); loadFeed('saved'); }
   else if (t === 'wallet') { open('wallet'); loadWallet(); }
-  else if (t === 'insights') { open('insights'); loadInsights(); }
+  else if (t === 'insights') { S.insTarget = null; open('insights'); loadInsights(); }
   else if (t === 'pages') { if (featGuard('featPages')) { open('pages'); loadPages(); } }
   else if (t === 'groups') { if (featGuard('featGroups')) { open('groups'); loadGroups(); } }
   else if (t === 'admin') { open('admin'); loadAdmin(); }
@@ -2743,8 +2755,9 @@ async function openPage(id, silent) {
     $('#page').innerHTML = `<div class="card ent-head">${entAv(pg)}<h2 style="margin:4px 0 0">${esc(pg.name)}</h2><div class="meta">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div>
       ${pg.about ? `<p class="about">${esc(pg.about)}</p>` : ''}${pg.phone ? `<p class="meta" style="margin:6px 0 0">📞 ${esc(bn(pg.phone))}</p>` : ''}
       <div class="row">${pg.isOwner
-        ? `<button class="sbtn" id="pg-post">+ পোস্ট করুন</button><button class="sbtn ghost" id="pg-edit">এডিট</button><button class="sbtn ghost" id="pg-del" style="color:var(--r)">মুছুন</button>`
+        ? `<button class="sbtn" id="pg-post">+ পোস্ট করুন</button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button><button class="sbtn ghost" id="pg-edit">এডিট</button><button class="sbtn ghost" id="pg-del" style="color:var(--r)">মুছুন</button>`
         : `<button class="sbtn ${pg.following ? 'ghost' : ''}" data-pf="${esc(pg.id)}" data-on="${pg.following ? 1 : 0}">${pg.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button>${tel ? `<a class="sbtn ghost" style="text-decoration:none;display:inline-grid;place-items:center" href="tel:${esc(tel)}">কল করুন</a>` : ''}<button class="more" id="pg-more" aria-label="আরও">⋯</button>`}</div></div>`;
+    if (!pg.isOwner && !silent) S.api.entVisit?.('page', pg.id).catch(() => {});
     $('#pg-post')?.addEventListener('click', () => openPostComposer({ pageId: pg.id, title: `${pg.name}-এর পক্ষে পোস্ট`, authorName: pg.name }));
     $('#pg-edit')?.addEventListener('click', () => pageForm(pg));
     $('#pg-del')?.addEventListener('click', async () => { if (await confirmSheet(`"${pg.name}" পেইজ ও এর সব পোস্ট মুছে ফেলবেন?`, 'মুছুন', true)) busy(null, async () => { await S.api.deletePage(pg.id); toast('পেইজ মুছে ফেলা হয়েছে'); back(); }); });
@@ -2808,9 +2821,11 @@ async function openGroup(id, silent) {
         ${!g.status ? `<button class="sbtn" data-gj="${esc(g.id)}">${g.privacy === 'private' ? 'যোগ দেওয়ার অনুরোধ' : 'গ্রুপে যোগ দিন'}</button>` : ''}
         ${g.status === 'pending' ? `<button class="sbtn ghost" id="g-cancel">অনুরোধ বাতিল</button>` : ''}
         ${member ? `<button class="sbtn" id="g-post">+ পোস্ট করুন</button>` : ''}
+        ${admin ? `<button class="sbtn ghost" data-insights="group" data-entid="${esc(g.id)}" data-entname="${esc(g.name)}">📊 ড্যাশবোর্ড</button>` : ''}
         ${admin ? `<button class="sbtn ghost" id="g-reqs">সদস্য অনুরোধ${reqs.length ? ` <span class="badge">${bn(reqs.length)}</span>` : ''}</button>` : ''}
         ${member ? `<button class="more" id="g-more" aria-label="আরও">⋯</button>` : ''}
       </div>${g.status === 'pending' ? '<p class="mut" style="margin:8px 0 0">অ্যাডমিনের অনুমোদনের অপেক্ষায়।</p>' : ''}</div>`;
+    if (!admin && !silent) S.api.entVisit?.('group', g.id).catch(() => {});
     const canSee = g.privacy === 'public' || member;
     if (!canSee) { $('#feed-group').innerHTML = '<div class="card lock"><b>🔒</b>এটি একটি প্রাইভেট গ্রুপ। শুধু সদস্যরা পোস্ট দেখতে পারেন।</div>'; }
     else if (!silent || !S.feeds.group.posts.length) loadFeed('group');

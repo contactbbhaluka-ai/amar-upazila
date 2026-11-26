@@ -27,6 +27,7 @@ const toInsights = r => ({ days: r.days || 7, people: r.people || 0, views: r.vi
   sources: r.sources || {}, daily: r.daily || [], hours: r.hours || Array(24).fill(0), top: (r.top || []).map(t => ({ id: t.id, body: t.body || '', image: t.image || '', createdAt: t.created_at, people: t.people || 0, views: t.views || 0 })) });
 const SELF_NT = ['milestone', 'follower_milestone', 'weekly'];
 const toGrowth = r => ({ visits: r.visits || 0, visitors: r.visitors || 0, visitsDaily: r.visits_daily || [], followers: r.followers || 0, gained: r.gained || 0, lost: r.lost || 0, followDaily: r.follow_daily || [] });
+const toEnt = r => ({ ...toInsights(r), growth: toGrowth(r), pending: r.pending || 0, activeMembers: r.active_members || 0 });
 const lastDays = n => Array.from({ length: n }, (_, i) => { const d = new Date(Date.now() + 6 * 3600e3 - (n - 1 - i) * 864e5); return d.toISOString().slice(0, 10); });
 const toReq = r => r && ({ id: r.id, userId: r.user_id, kind: r.kind, name: r.full_name, category: r.category || '', links: r.links || '', note: r.note || '', status: r.status, adminNote: r.admin_note || '', coinsHeld: r.coins_held || 0, createdAt: r.created_at, decidedAt: r.decided_at || null });
 const settingDefaults = () => Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d]));
@@ -193,6 +194,8 @@ async function supabaseApi() {
     },
     async profileVisit(uid) { if (me && uid !== me.id) await sb.rpc('profile_visit', { p_user: uid }); },
     async myGrowth(days) { return toGrowth(ok(await sb.rpc('my_growth', { p_days: days })) || {}); },
+    async entVisit(kind, id) { if (me) await sb.rpc('ent_visit', { p_kind: kind, p_id: id }); },
+    async entInsights(kind, id, days) { return toEnt(ok(await sb.rpc('ent_insights', { p_kind: kind, p_id: id, p_days: days })) || {}); },
     async weeklyReport() { if (me) await sb.rpc('ensure_weekly_report'); },
     async myInsights(days) { return toInsights(ok(await sb.rpc('my_insights', { p_days: days })) || {}); },
     // ---------- পোস্ট বুস্ট
@@ -908,6 +911,22 @@ function demoApi() {
       return wait({ ...demoViews(p), avgPeople: others.length ? others.reduce((t, n) => t + n, 0) / others.length : null });
     },
     async profileVisit() { return true; },
+    async entVisit() { return true; },
+    async entInsights(kind, id, days) {
+      const d = days >= 30 ? 30 : 7, seed = n => (Math.sin(n * 7919 + id * 31 + 17) + 1) / 2;
+      const posts = db.posts.filter(p => (kind === 'page' ? p.pageId : p.groupId) === Number(id)), st = posts.map(p => ({ p, v: demoViews(p) }));
+      const people = st.reduce((t, x) => t + x.v.people, 0) + 12, close = Math.round(people * (kind === 'group' ? 0.75 : 0.5));
+      const vd = lastDays(d).map((day, i) => ({ day, n: Math.round(seed(i) * 8) })), fd = lastDays(d).map((day, i) => ({ day, plus: Math.round(seed(i + 4) * 3), minus: seed(i + 11) > 0.8 ? 1 : 0 }));
+      const members = kind === 'page' ? db.pageFollows.filter(f => f.endsWith(':' + id)).length : db.members.filter(m => m.groupId === Number(id) && m.status === 'active').length;
+      return wait(toEnt({ days: d, people, views: Math.round(people * 1.5), close, others: people - close, posts: posts.length,
+        sources: kind === 'group' ? { group: Math.round(people * 0.7), feed: Math.round(people * 0.2), share: Math.round(people * 0.1) } : { feed: Math.round(people * 0.5), page: Math.round(people * 0.3), share: Math.round(people * 0.2) },
+        daily: lastDays(d).map((day, i) => ({ day, n: Math.round(seed(i + 2) * people / 3) })),
+        hours: Array.from({ length: 24 }, (_, h) => Math.round((h >= 19 && h <= 22 ? 10 : h >= 8 && h <= 10 ? 6 : h < 6 ? 0 : 3) * (0.6 + seed(h)))),
+        top: st.sort((a, b) => b.v.people - a.v.people).slice(0, 5).map(x => ({ id: x.p.id, body: (x.p.body || '').slice(0, 80), image: demoPic(x.p.images?.[0] || x.p.image || ''), created_at: x.p.createdAt, people: x.v.people, views: x.v.views })),
+        visits: vd.reduce((t, x) => t + x.n, 0), visitors: Math.round(vd.reduce((t, x) => t + x.n, 0) * 0.8), visits_daily: vd,
+        followers: members, gained: fd.reduce((t, x) => t + x.plus, 0), lost: fd.reduce((t, x) => t + x.minus, 0), follow_daily: fd,
+        pending: kind === 'group' ? db.members.filter(m => m.groupId === Number(id) && m.status === 'pending').length : null, active_members: kind === 'group' ? Math.max(1, members) : null }));
+    },
     async myGrowth(days) {
       const d = days >= 30 ? 30 : 7, seed = n => (Math.sin(n * 7919 + 104729) + 1) / 2;
       const vd = lastDays(d).map((day, i) => ({ day, n: Math.round(seed(i) * 6) })), fd = lastDays(d).map((day, i) => ({ day, plus: Math.round(seed(i + 3) * 3), minus: seed(i + 9) > 0.8 ? 1 : 0 }));

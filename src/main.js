@@ -2236,7 +2236,7 @@ async function openUser(id, silent, keepState, preview) {
     const p = S.preview ? await previewProfile(S.preview) : await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
     if (!silent) S.api.profileVisit?.(id).catch(() => {});
-    $('#user').innerHTML = (S.preview ? previewBar() : '') + `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}${S.preview ? '' : `<span class="ph-acts"><button class="pshare-btn" data-pshare="user" title="প্রোফাইল শেয়ার / QR" aria-label="প্রোফাইল শেয়ার বা QR কোড">${ic('share', 16)}</button></span>`}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
+    $('#user').innerHTML = (S.preview ? previewBar() : '') + `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}<span class="ph-acts"><button class="pshare-btn" data-pshare="user" title="প্রোফাইল শেয়ার / QR" aria-label="প্রোফাইল শেয়ার বা QR কোড">${ic('share', 16)}</button></span></h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       <div id="mutual"></div>
       ${p.lockedOut ? `<div class="lock-banner">🔒 <div><b>${esc(p.name)} প্রোফাইল লক করে রেখেছেন</b><small>শুধু বন্ধুরা পোস্ট, ছবি ও বিস্তারিত দেখতে পারেন।</small></div></div>` : introCard(p, false)}

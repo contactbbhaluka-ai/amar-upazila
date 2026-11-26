@@ -102,7 +102,27 @@ function ago(iso) {
 const clock = iso => new Date(iso).toLocaleTimeString('bn-BD', { hour: 'numeric', minute: '2-digit' });
 // জন্মসাল: বয়স অন্তত ১৩ (অ্যাপের নিয়ম)
 const MIN_AGE = 13;
-const birthSelect = (id, cur, required) => { const max = new Date().getFullYear() - MIN_AGE; let o = `<select class="f" id="${id}" ${required ? 'required' : ''}><option value="" ${cur ? '' : 'selected'} ${required ? 'disabled' : ''}>${required ? 'সাল বাছুন' : 'দেওয়া নেই'}</option>`; for (let y = max; y >= 1920; y--) o += `<option value="${y}" ${y === Number(cur) ? 'selected' : ''}>${bn(y)}</option>`; return o + '</select>'; };
+const MONTHS_BN = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+// জন্মতারিখ: দিন / মাস / সাল তিনটা ড্রপডাউন
+function dateSelect(p, cur, required) {
+  const [cy, cm, cd] = (cur || '').split('-').map(Number), max = new Date().getFullYear() - MIN_AGE, req = required ? 'required' : '';
+  let d = `<option value="">দিন</option>`; for (let i = 1; i <= 31; i++) d += `<option value="${i}" ${i === cd ? 'selected' : ''}>${bn(i)}</option>`;
+  let m = `<option value="">মাস</option>`; MONTHS_BN.forEach((n, i) => { m += `<option value="${i + 1}" ${i + 1 === cm ? 'selected' : ''}>${n}</option>`; });
+  let y = `<option value="">সাল</option>`; for (let i = max; i >= 1920; i--) y += `<option value="${i}" ${i === cy ? 'selected' : ''}>${bn(i)}</option>`;
+  return `<div class="date3"><select class="f" id="${p}-d" ${req} aria-label="জন্মের দিন">${d}</select><select class="f" id="${p}-m" ${req} aria-label="জন্মের মাস">${m}</select><select class="f" id="${p}-y" ${req} aria-label="জন্মের সাল">${y}</select></div>`;
+}
+// '' (খালি), 'YYYY-MM-DD', অথবা { err }
+function readDate(p, required) {
+  const d = Number($(`#${p}-d`).value), m = Number($(`#${p}-m`).value), y = Number($(`#${p}-y`).value);
+  if (!d && !m && !y) return required ? { err: 'জন্মতারিখ দিন (দিন, মাস, সাল)' } : '';
+  if (!d || !m || !y) return { err: 'জন্মতারিখের দিন, মাস ও সাল তিনটাই বাছাই করুন' };
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCMonth() !== m - 1) return { err: `${MONTHS_BN[m - 1]} মাসে ${bn(d)} তারিখ নেই` };
+  const t = new Date(), lim = new Date(Date.UTC(t.getFullYear() - MIN_AGE, t.getMonth(), t.getDate()));
+  if (dt > lim) return { err: `বয়স অন্তত ${bn(MIN_AGE)} বছর হতে হবে` };
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+const birthText = u => (u.birthDate ? bnDate(u.birthDate) : u.birthYear ? `${bn(u.birthYear)} সাল` : '');
 const GENDERS = { male: 'পুরুষ', female: 'নারী', other: 'অন্যান্য' };
 const genderSelect = (id, cur, required) => `<select class="f" id="${id}" ${required ? 'required' : ''}>
   <option value="" disabled ${cur === undefined ? 'selected' : ''}>বাছাই করুন</option>
@@ -1077,21 +1097,24 @@ document.addEventListener('input', e => {
 });
 const ABOUT = [
   { id: 'intro', ic: 'info', t: 'পরিচিতি',
-    chips: u => (u.birthYear ? visChip(aVis(u, 'birth'), 'জন্মসাল') : ''),
-    sum: u => [u.username && '@' + u.username, GENDERS[u.gender], u.birthYear && `জন্ম ${bn(u.birthYear)}`, u.bio].filter(Boolean).join(' · '), empty: 'ইউজারনেম, লিঙ্গ, জন্মসাল ও নিজের সম্পর্কে লিখুন',
+    chips: u => (u.birthDate || u.birthYear ? visChip(aVis(u, 'birth'), 'জন্মতারিখ') : ''),
+    sum: u => [u.username && '@' + u.username, GENDERS[u.gender], birthText(u) && `জন্ম ${birthText(u)}`, u.bio].filter(Boolean).join(' · '), empty: 'ইউজারনেম, লিঙ্গ, জন্মতারিখ ও নিজের সম্পর্কে লিখুন',
     form: u => `<label for="ab-name">${ic('user', 16)} নাম</label><input id="ab-name" required minlength="2" maxlength="40" value="${esc(u.name)}">
       <label for="ab-un">@ ইউজারনেম</label><div class="un-wrap"><span class="un-at">@</span><input id="ab-un" maxlength="21" autocomplete="off" autocapitalize="none" spellcheck="false" value="${esc(u.username || '')}" placeholder="যেমন: arif.bhaluka"></div>
       <small class="un-msg mut" id="ab-un-msg">ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . দিয়ে ৩–২০ অক্ষর। প্রত্যেকের আলাদা।</small>
       <label for="ab-g">${ic('users', 16)} লিঙ্গ</label>${genderSelect('ab-g', u.gender || '', false)}
-      <label for="ab-by">${ic('calendar', 16)} জন্মসাল</label>${birthSelect('ab-by', u.birthYear || 0, false)}
-      ${visSel('ab-vis-birth', aVis(u, 'birth'), 'জন্মসাল কারা দেখবে')}
+      <label for="ab-bd-d">${ic('calendar', 16)} জন্মতারিখ</label>${dateSelect('ab-bd', u.birthDate || '', false)}
+      ${!u.birthDate && u.birthYear ? `<small class="mut">আগে শুধু সাল (${bn(u.birthYear)}) দেওয়া আছে, পুরো তারিখ দিন।</small>` : ''}
+      ${visSel('ab-vis-birth', aVis(u, 'birth'), 'জন্মতারিখ কারা দেখবে')}
       <label for="ab-bio">${ic('note', 16)} নিজের সম্পর্কে</label><textarea id="ab-bio" maxlength="160" rows="2" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">${esc(u.bio || '')}</textarea>`,
     read: () => {
       const name = $('#ab-name').value.trim(); if (name.length < 2) return { err: 'নাম অন্তত ২ অক্ষরের দিন' };
       const username = normUsername($('#ab-un').value);
       if (username && !validUsername(username)) return { err: 'ইউজারনেমে শুধু ছোট হাতের ইংরেজি অক্ষর, সংখ্যা, _ ও . দিন (৩–২০ অক্ষর)' };
       const g = $('#ab-g').value;
-      return { name, username, gender: g === 'none' ? '' : g, birthYear: Number($('#ab-by').value) || 0, bio: $('#ab-bio').value.trim(), aboutVis: { birth: $('#ab-vis-birth').value } };
+      const bd = readDate('ab-bd', false); if (bd.err) return bd;
+      const u0 = me(), keepOld = !bd && !u0.birthDate && u0.birthYear;   // শুধু পুরনো সাল থাকলে মুছে না ফেলা
+      return { name, username, gender: g === 'none' ? '' : g, ...(keepOld ? {} : { birthDate: bd }), bio: $('#ab-bio').value.trim(), aboutVis: { birth: $('#ab-vis-birth').value } };
     } },
   { id: 'work', ic: 'work', t: 'কাজ ও শিক্ষা', chips: u => visChip(aVis(u, 'works'), 'কাজ') + visChip(aVis(u, 'educations'), 'শিক্ষা'),
     sum: u => [...(u.works || []).map(workText), ...(u.educations || []).map(eduText)].join(' · '), empty: 'কর্মস্থল ও শিক্ষাপ্রতিষ্ঠান যোগ করুন',
@@ -1162,7 +1185,7 @@ function renderAbout(key) {
         : `<b>${esc(e.school)}</b> থেকে ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পাশ করেছেন${e.year ? ` (${bn(e.year)})` : ''}`]),
       u.union && [ic('pin', 18), `থাকেন <b>${esc(u.union)}</b>`],
       GENDERS[u.gender] && [ic('users', 18), GENDERS[u.gender]],
-      u.birthYear && [ic('calendar', 18), `জন্ম <b>${bn(u.birthYear)}</b> সালে`],
+      birthText(u) && [ic('calendar', 18), u.birthDate ? `জন্মতারিখ <b>${birthText(u)}</b>` : `জন্ম <b>${bn(u.birthYear)}</b> সালে`],
       u.phone && [ic('mobile', 18), `<a href="tel:${esc(u.phone)}" class="link">${bn(u.phone)}</a>`],
       blood && [ic('drop', 18), esc(blood)],
       u.joinedAt && [ic('calendar', 18), joinedText(u.joinedAt)],
@@ -1509,7 +1532,7 @@ async function renderMe(mode = 'login') {
     <form id="aform">
       ${signup ? `<label for="an">${ic('user', 16)} আপনার নাম</label><input id="an" required minlength="2" maxlength="40" autocomplete="name">
       <label for="su-g">${ic('users', 16)} লিঙ্গ</label>${genderSelect('su-g', undefined, true)}
-      <label for="su-by">${ic('calendar', 16)} জন্মসাল <span class="mut" style="font-weight:400">(বয়স ১৩ বছরের বেশি হতে হবে)</span></label>${birthSelect('su-by', 0, true)}
+      <label for="su-bd-d">${ic('calendar', 16)} জন্মতারিখ <span class="mut" style="font-weight:400">(বয়স ১৩ বছরের বেশি হতে হবে)</span></label>${dateSelect('su-bd', '', true)}
       ${addrHtml('su')}
       <label for="su-ph">${ic('mobile', 16)} মোবাইল নম্বর <span class="mut" style="font-weight:400">(WhatsApp থাকলে এই নম্বরেই)</span></label><input id="su-ph" required inputmode="tel" autocomplete="tel" placeholder="০১XXXXXXXXX" maxlength="17">
       ${bloodHtml('su', null)}` : ''}
@@ -1532,8 +1555,8 @@ async function renderMe(mode = 'login') {
       if (!validPhone(phone)) return toast('সঠিক মোবাইল নম্বর দিন (যেমন ০১৭১২৩৪৫৬৭৮)');
       if (blood.err) return toast(blood.err);
       const g = $('#su-g').value; if (!g) return toast('লিঙ্গ বাছাই করুন');
-      const by = Number($('#su-by').value); if (!by) return toast('জন্মসাল বাছাই করুন');
-      extra = { ...addr, phone, bloodGroup: blood.bloodGroup, lastDonated: blood.lastDonated, gender: g === 'none' ? '' : g, birthYear: by };
+      const bd = readDate('su-bd', true); if (bd.err) return toast(bd.err);
+      extra = { ...addr, phone, bloodGroup: blood.bloodGroup, lastDonated: blood.lastDonated, gender: g === 'none' ? '' : g, birthDate: bd };
     }
     busy(e.submitter, async () => {
       if (signup) {

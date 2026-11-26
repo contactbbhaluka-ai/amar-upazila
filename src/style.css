@@ -778,3 +778,6 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .un-msg.good{color:var(--gt);font-weight:600}
 .un-msg.bad{color:var(--r);font-weight:600}
 .un-wrap input{background:transparent;border-radius:0}
+
+.date3{display:grid;grid-template-columns:0.8fr 1.3fr 1fr;gap:6px}
+.date3 select{margin:0}

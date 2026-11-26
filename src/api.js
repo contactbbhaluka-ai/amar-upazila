@@ -64,7 +64,7 @@ async function supabaseApi() {
     if (me) {
       // কাজ, শিক্ষা, সোশ্যাল লিংক ও তাদের প্রাইভেসি (এই টেবিল শুধু নিজে পড়তে পারে)
       const d = ok(await sb.from('profile_details').select('*').eq('user_id', me.id).maybeSingle()) || {};
-      Object.assign(me, { works: d.works || [], educations: d.educations || [], social: d.social || {}, birthYear: d.birth_year || 0,
+      Object.assign(me, { works: d.works || [], educations: d.educations || [], social: d.social || {}, birthYear: d.birth_year || 0, birthDate: d.birth_date || '',
         aboutVis: { works: d.works_visibility || 'public', educations: d.educations_visibility || 'public', contact: d.contact_visibility || 'only_me', social: d.social_visibility || 'public', birth: d.birth_visibility || 'only_me' } });
     }
     if (me) blocked = new Set(ok(await sb.from('blocks').select('blocked_id').eq('blocker_id', me.id)).map(b => b.blocked_id));
@@ -121,14 +121,14 @@ async function supabaseApi() {
     },
 
     // ---------- অ্যাকাউন্ট
-    async signUp({ email, password, name, district, upazila, unionId, phone, bloodGroup, lastDonated, gender, birthYear }) {
-      const data = ok(await sb.auth.signUp({ email, password, options: { data: { name, district, upazila, union_id: unionId ? String(unionId) : '', phone, blood_group: bloodGroup || '', last_donated: lastDonated || '', gender: gender || '', birth_year: birthYear ? String(birthYear) : '' } } }));
+    async signUp({ email, password, name, district, upazila, unionId, phone, bloodGroup, lastDonated, gender, birthDate }) {
+      const data = ok(await sb.auth.signUp({ email, password, options: { data: { name, district, upazila, union_id: unionId ? String(unionId) : '', phone, blood_group: bloodGroup || '', last_donated: lastDonated || '', gender: gender || '', birth_date: birthDate || '' } } }));
       if (!data.session) return { needsConfirm: true };
       await loadMe(data.session); return { user: me };
     },
     async signIn({ email, password }) { return loadMe(ok(await sb.auth.signInWithPassword({ email, password })).session); },
     async signOut() { await sb.auth.signOut(); me = null; },
-    async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations, aboutVis, gender, username, birthYear }) {
+    async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations, aboutVis, gender, username, birthDate }) {
       const row = { name, district, upazila, union_id: unionId || null, bio: bio || null, blood_group: bloodGroup || null, donor_visible: donorVisible !== false, last_donated: (bloodGroup && lastDonated) || null };
       if (gender !== undefined) row.gender = gender || null;
       if (username !== undefined) row.username = username || null;
@@ -136,7 +136,7 @@ async function supabaseApi() {
       // কাজ/শিক্ষা/সোশ্যাল লিংক ও প্রাইভেসি আলাদা সুরক্ষিত টেবিলে; যা দেওয়া হয়নি তা যেমন আছে থাকে
       const d = { user_id: me.id };
       if (social) d.social = social; if (works) d.works = works; if (educations) d.educations = educations;
-      if (birthYear !== undefined) d.birth_year = birthYear || null;
+      if (birthDate !== undefined) { d.birth_date = birthDate || null; if (!birthDate) d.birth_year = null; }
       if (aboutVis) for (const [k, col] of [['works', 'works_visibility'], ['educations', 'educations_visibility'], ['contact', 'contact_visibility'], ['social', 'social_visibility'], ['birth', 'birth_visibility']]) if (aboutVis[k]) d[col] = aboutVis[k];
       if (Object.keys(d).length > 1) ok(await sb.from('profile_details').upsert(d, { onConflict: 'user_id' }));
       ok(await sb.from('profile_private').upsert({ user_id: me.id, phone: phone || null }));
@@ -391,7 +391,7 @@ async function supabaseApi() {
       const [counts, rel, about] = await Promise.all([sb.rpc('profile_counts', { uid: id }), relations([id]), sb.rpc('profile_about', { uid: id })]);
       const c = ok(counts) || {}, a = ok(about) || {};
       // মালিকের প্রাইভেসি অনুযায়ী যা দেখার অনুমতি আছে শুধু তাই আসে
-      return { ...p, works: a.works || [], educations: a.educations || [], social: a.social || {}, phone: a.phone || '', birthYear: a.birth_year || 0,
+      return { ...p, works: a.works || [], educations: a.educations || [], social: a.social || {}, phone: a.phone || '', birthYear: a.birth_year || 0, birthDate: a.birth_date || '',
         friends: c.friends || 0, followers: c.followers || 0, following: c.following || 0, rel: rel.get(id) };
     },
     // ইউজারনেম খালি আছে কিনা (নিজেরটা হলে খালি ধরা হয়)
@@ -606,7 +606,7 @@ function demoApi() {
   let meId = get('me', null);
   const save = () => { for (const k of ['albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
-  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0 }; };
+  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '' }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me' };
   const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true, aboutVis: { ...ABOUT_VIS0, ...(person(meId).aboutVis || {}) } } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
@@ -736,9 +736,9 @@ function demoApi() {
     async upazila() { return { id: 1, name: 'ভালুকা', district: 'ময়মনসিংহ' }; },
     async unions() { return UNIONS; },
 
-    async signUp({ email, password, name, district, upazila, unionId, phone, bloodGroup, lastDonated, gender, birthYear }) {
+    async signUp({ email, password, name, district, upazila, unionId, phone, bloodGroup, lastDonated, gender, birthDate }) {
       if (db.users.some(u => u.email === email)) throw new Error('User already registered');
-      const u = { id: 'u' + Date.now(), email, password, name, gender: gender || '', birthYear: birthYear || 0, district, upazila, unionId: unionId ? Number(unionId) : null, phone: phone || '', bloodGroup: bloodGroup || '', lastDonated: (bloodGroup && lastDonated) || '', donorVisible: true, avatar: '', bio: '' };
+      const u = { id: 'u' + Date.now(), email, password, name, gender: gender || '', birthDate: birthDate || '', birthYear: birthDate ? Number(birthDate.slice(0, 4)) : 0, district, upazila, unionId: unionId ? Number(unionId) : null, phone: phone || '', bloodGroup: bloodGroup || '', lastDonated: (bloodGroup && lastDonated) || '', donorVisible: true, avatar: '', bio: '' };
       db.users.push(u); meId = u.id; seedFor(u.id); save(); return { user: meUser() };
     },
     async signIn({ email, password }) {
@@ -749,8 +749,8 @@ function demoApi() {
     async signOut() { meId = null; save(); },
     demoInfo: { email: DEMO_EMAIL, password: DEMO_PASS },
     async demoLogin({ reset } = {}) { if (reset || !db.users.some(u => u.id === DEMO_ID)) seedDemo(); else { meId = DEMO_ID; save(); } return meUser(); },
-    async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations, aboutVis, gender, username, birthYear }) {
-      if (birthYear !== undefined) person(meId).birthYear = birthYear || 0;
+    async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated, social, works, educations, aboutVis, gender, username, birthDate }) {
+      if (birthDate !== undefined) { person(meId).birthDate = birthDate || ''; if (birthDate) person(meId).birthYear = Number(birthDate.slice(0, 4)); }
       if (username && [...PEOPLE, ...db.users].some(x => x.id !== meId && (x.username || '').toLowerCase() === username.toLowerCase())) throw new Error('duplicate key value violates unique constraint "profiles_username_key"');
       if (gender !== undefined) person(meId).gender = gender || '';
       if (username !== undefined) person(meId).username = username || '';
@@ -988,7 +988,7 @@ function demoApi() {
       // ডেমো: মালিকের প্রাইভেসি মেনে কাজ/শিক্ষা/সোশ্যাল/মোবাইল
       const vis = { ...ABOUT_VIS0, ...(person(id).aboutVis || {}) };
       const can = v => id === meId || v === 'public' || (v === 'friends' && meId && friendIds(meId).includes(id));
-      Object.assign(u, { works: can(vis.works) ? u.works : [], educations: can(vis.educations) ? u.educations : [], social: can(vis.social) ? u.social : {}, phone: can(vis.contact) ? (person(id).phone || '') : '', birthYear: can(vis.birth) ? (person(id).birthYear || 0) : 0 });
+      Object.assign(u, { works: can(vis.works) ? u.works : [], educations: can(vis.educations) ? u.educations : [], social: can(vis.social) ? u.social : {}, phone: can(vis.contact) ? (person(id).phone || '') : '', birthYear: can(vis.birth) ? (person(id).birthYear || 0) : 0, birthDate: can(vis.birth) ? (person(id).birthDate || '') : '' });
       return wait({ ...u, friends: friendIds(id).length, followers: db.follows.filter(f => f.endsWith(':' + id)).length, following: db.follows.filter(f => f.startsWith(id + ':')).length, rel: rel(id) });
     },
     async usernameFree(u) { return wait(![...PEOPLE, ...db.users].some(x => x.id !== meId && (x.username || '').toLowerCase() === u.toLowerCase())); },

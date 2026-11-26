@@ -195,6 +195,9 @@ function av(u, cls = '') {
   return src ? `<img class="av ${cls}" src="${esc(src)}" alt="" loading="lazy">` : `<div class="av ${cls}" aria-hidden="true">${esc(name.charAt(0))}</div>`;
 }
 const userLink = (id, inner, cls = 'avbtn') => `<button class="${cls}" data-user="${esc(id)}">${inner}</button>`;
+// নীল ভেরিফাইড ব্যাজ (পাবলিক ফিগার ও কেনা ব্যাজ দুটোই নীল; প্রোফাইলে চাপলে কোনটা তা লেখা থাকে)
+const VB_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#1d9bf0" d="M12 1.8l2.4 1.9 3-.3 1 2.9 2.6 1.6-.6 3 1.4 2.7-2.2 2.1-.2 3-3 .6-1.8 2.5-2.8-1.1-2.8 1.1-1.8-2.5-3-.6-.2-3-2.2-2.1L2.3 11l-.6-3 2.6-1.6 1-2.9 3 .3z"/><path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const vb = (b, big) => (b ? `<span class="vbadge${big ? ' vb-lg' : ''}" ${big ? `role="button" tabindex="0" data-vbinfo="${b}"` : ''} title="ভেরিফাইড" aria-label="ভেরিফাইড">${VB_SVG}</span>` : '');
 const entAv = (e, icon) => e?.avatar ? `<img class="ent-av" src="${esc(e.avatar)}" alt="">` : `<div class="ent-av" aria-hidden="true">${icon || esc((e?.name || '?').charAt(0))}</div>`;
 const PAGE_CATS = ['দোকান ও ব্যবসা', 'স্বাস্থ্য', 'শিক্ষা', 'সংগঠন ও ক্লাব', 'সরকারি প্রতিষ্ঠান', 'খাবার ও রেস্টুরেন্ট', 'চাকরি ও প্রশিক্ষণ', 'খবর ও মিডিয়া', 'কৃষি', 'ধর্মীয় প্রতিষ্ঠান', 'অন্যান্য'];
 
@@ -338,12 +341,12 @@ function postHtml(p) {
   const via = p.groupId && S.view !== 'group' ? ` <span class="via">▸ <button data-group="${esc(p.groupId)}">${esc(p.groupName)}</button></span>` : '';
   return `<article class="card post">
     <div class="top">${link(av(p), 'avbtn')}
-      <div>${link(esc(p.author), 'who-btn')}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
+      <div>${link(esc(p.author) + vb(p.badge), 'who-btn')}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
       <button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
     <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>
     ${p.body ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
     ${photosHtml(p)}
-    ${p.shared ? `<button class="shared-embed" data-openpost="${esc(p.shared.id)}"><span class="se-top">${av(p.shared, 'sm')}<span><b>${esc(p.shared.author)}</b><span class="mut"> · ${esc(ago(p.shared.createdAt))}</span></span></span>${p.shared.body ? `<span class="se-body">${esc(p.shared.body)}</span>` : ''}${p.shared.image ? `<img src="${esc(p.shared.image)}" alt="" loading="lazy">` : ''}</button>`
+    ${p.shared ? `<button class="shared-embed" data-openpost="${esc(p.shared.id)}"><span class="se-top">${av(p.shared, 'sm')}<span><b>${esc(p.shared.author)}${vb(p.shared.badge)}</b><span class="mut"> · ${esc(ago(p.shared.createdAt))}</span></span></span>${p.shared.body ? `<span class="se-body">${esc(p.shared.body)}</span>` : ''}${p.shared.image ? `<img src="${esc(p.shared.image)}" alt="" loading="lazy">` : ''}</button>`
       : p.sharedMissing ? '<div class="shared-embed missing">এই পোস্টটি আর দেখা যাচ্ছে না</div>' : ''}
     ${p.likes ? `<div class="rsum"><button class="rsum-l" data-rxlist="${esc(p.id)}" aria-label="কে কে রিয়্যাক্ট দিয়েছেন"><span class="rsum-e">${Object.entries(p.reactions || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => `<span class="rs-i">${rxIcon(k, 18)}</span>`).join('')}</span><span class="rsum-who">কে কে রিয়্যাক্ট দিয়েছেন</span></button></div>` : ''}
     <div class="acts icons">
@@ -748,7 +751,7 @@ const relBtns = u => {
     : `<button class="sbtn" data-fr="add" data-id="${esc(u.id)}">বন্ধু হোন</button>`;
   return main;
 };
-const personRow = (u, btns) => `<div class="person">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name), 'who-btn')}<div class="sub">${esc(u.union || '')}</div></div><div class="pbtns">${btns}</div></div>`;
+const personRow = (u, btns) => `<div class="person">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name) + vb(u.verified), 'who-btn')}<div class="sub">${esc(u.union || '')}</div></div><div class="pbtns">${btns}</div></div>`;
 async function loadFriends() {
   const box = $('#friends');
   if (!me()) { box.innerHTML = `<div class="card empty">বন্ধু খুঁজতে ও যুক্ত হতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
@@ -850,7 +853,7 @@ async function peopleSheet(uid, kind) {
       openSheet(`${head}<div class="empty pl-hidden">${ic('lock', 34)}<p><b>${esc(prof?.name || 'এই ব্যক্তি')}</b> ${PLIST[kind]} তালিকা ${vis === 'friends' ? 'শুধু বন্ধুদের জন্য রেখেছেন' : 'গোপন রেখেছেন'}।</p><p class="mut">মোট সংখ্যা প্রোফাইলেই দেখা যাচ্ছে।</p></div><button class="btn ghost wide" data-close>বন্ধ করুন</button>`);
       return;
     }
-    const row = u => `<div class="person" data-pname="${esc(u.name.toLowerCase())}">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name), 'who-btn')}<div class="sub">${esc(u.union)}</div></div></div>`;
+    const row = u => `<div class="person" data-pname="${esc(u.name.toLowerCase())}">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name) + vb(u.verified), 'who-btn')}<div class="sub">${esc(u.union)}</div></div></div>`;
     openSheet(`${head}${r.list.length > 8 ? `<input class="f" id="pl-q" placeholder="নাম দিয়ে খুঁজুন" style="margin-bottom:8px">` : ''}
       <div class="pl-list">${r.list.length ? r.list.map(row).join('') : `<p class="mut">${own ? 'এখনো কেউ নেই।' : 'এখনো কেউ নেই।'}</p>`}</div>
       <button class="btn ghost wide" data-close style="margin-top:10px">বন্ধ করুন</button>`);
@@ -1345,7 +1348,7 @@ async function openUser(id, silent, keepState) {
   try {
     const p = await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
-    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}<div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
+    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}<div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       ${introCard(p, false)}
       ${statsHtml(p)}
@@ -1609,7 +1612,7 @@ async function renderMe(mode = 'login') {
   const u = me();
   if (u) {
     $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
-      <h2 style="margin:6px 0 0">${esc(u.name)}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}<div class="mut">${ic('pin', 14)} ${esc(u.union)}${u.admin && S.api.mode !== 'demo' ? ' · অ্যাডমিন' : ''}</div>
+      <h2 style="margin:6px 0 0">${esc(u.name)}${vb(u.verified, true)}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}<div class="mut">${ic('pin', 14)} ${esc(u.union)}${u.admin && S.api.mode !== 'demo' ? ' · অ্যাডমিন' : ''}</div>
       <div style="margin-top:6px">${u.bloodGroup ? `${bgBadge(u.bloodGroup)} <span class="mut" style="font-size:13px">${u.donorVisible ? 'ব্লাড ব্যাংকে ডোনার হিসেবে আছেন' : 'ব্লাড ব্যাংকে দেখানো বন্ধ'}</span>
         <div class="mut" style="font-size:14px;margin-top:4px">${ic('calendar', 14)} সর্বশেষ রক্তদান: ${u.lastDonated ? esc(bnDate(u.lastDonated)) : 'দেওয়া নেই'} · ${donateStatus(u.lastDonated)}</div>
         <div class="row" style="margin-top:8px;justify-content:center"><button class="sbtn ghost" data-donor-edit>${ic('edit', 15)} ডোনার তথ্য আপডেট</button><button class="sbtn ghost" id="donated-today">${ic('drop', 15)} আজ রক্ত দিয়েছি</button></div>` : `<span class="mut" style="font-size:13px">ব্লাড গ্রুপ দেওয়া নেই</span> <button class="sbtn ghost" data-add-donor>${ic('drop', 15)} নিজের ডোনার প্রোফাইল যোগ করুন</button>`}</div>
@@ -1802,6 +1805,8 @@ const NT = {
   follow: ['➕', 'আপনাকে ফলো করছেন'],
   group_request: ['👥', 'আপনার গ্রুপে যোগ দিতে চান'],
   group_approved: ['✅', 'আপনাকে গ্রুপে যুক্ত করেছেন'],
+  verify_ok: ['✔', 'আপনার ভেরিফাইড ব্যাজের আবেদন অনুমোদন করেছেন'],
+  verify_no: ['✖', 'আপনার ভেরিফাইড ব্যাজের আবেদন গ্রহণ করেননি'],
 };
 async function loadNotifs(keep) {
   const box = $('#notifs');
@@ -1827,6 +1832,7 @@ function openNotif(el) {
   const t = el.dataset.nType;
   if ((t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag') && el.dataset.nPost) openPost(el.dataset.nPost);
   else if (t === 'friend_request') go('friends');
+  else if (t === 'verify_ok' || t === 'verify_no') { open('wallet'); loadWallet(); }
   else if (t.startsWith('group_') && el.dataset.nGroup) openGroup(el.dataset.nGroup);
   else openUser(el.dataset.nUser);
 }
@@ -1871,7 +1877,7 @@ function commentHtml(c, post, pinned) {
   return `<div class="cm${pinned ? ' pinned' : ''}${c.parentId ? ' reply' : ''}" data-cid="${esc(c.id)}">
     ${pinned ? `<div class="pin-label">${ic('pushpin', 13)} পিন করা মন্তব্য</div>` : ''}
     <div class="cm-row">${userLink(c.userId, av(c, 'sm'))}
-      <div class="cm-main"><div class="cm-bubble">${userLink(c.userId, esc(c.author), 'who-btn')}<div class="cm-text">${moreText(c.body, 'c' + c.id, { chars: 200, lines: 4, mentions: c.mentions })}</div>
+      <div class="cm-main"><div class="cm-bubble">${userLink(c.userId, esc(c.author) + vb(c.badge), 'who-btn')}<div class="cm-text">${moreText(c.body, 'c' + c.id, { chars: 200, lines: 4, mentions: c.mentions })}</div>
         ${c.likes ? `<button class="cm-rx" data-crx="${esc(c.id)}" aria-label="কে কে রিয়্যাক্ট দিয়েছেন">${top.map(([k]) => `<span class="rs-i">${rxIcon(k, 16)}</span>`).join('')}<span>${bn(c.likes)}</span></button>` : ''}</div>
         <div class="cm-meta"><span>${esc(ago(c.createdAt))}${c.editedAt ? ' · সম্পাদিত' : ''}</span>
           <button class="cm-react${c.myReaction ? ' on rx-' + c.myReaction : ''}" data-clike="${esc(c.id)}" aria-label="${c.myReaction ? rxName(c.myReaction) + ' দিয়েছেন' : 'রিয়্যাক্ট দিন'}">${c.myReaction ? rxIcon(c.myReaction, 18) : ic('thumb', 17)}</button>
@@ -1984,7 +1990,7 @@ async function reactorsSheet(kind, id) {
       </div>
       <div class="rx-people">${rows.length ? rows.map(u => `<div class="person">
           <span class="rxp-av">${userLink(u.id, av(u))}<span class="rxp-badge">${rxIcon(u.reaction, 18)}</span></span>
-          <div class="info">${userLink(u.id, esc(u.name), 'who-btn')}<div class="sub">${esc(u.union || '')}</div></div>
+          <div class="info">${userLink(u.id, esc(u.name) + vb(u.verified), 'who-btn')}<div class="sub">${esc(u.union || '')}</div></div>
           ${me() && u.id !== me().id ? `<button class="sbtn ghost" data-dm="${esc(u.id)}" aria-label="মেসেজ">${ic('message', 16)}</button>` : ''}</div>`).join('')
         : '<p class="mut">এখনো কেউ রিয়্যাক্ট দেননি।</p>'}
         ${!tab && unnamed ? `<p class="mut" style="margin:10px 0 0">এবং আরও ${bn(unnamed)} জন</p>` : ''}</div>
@@ -2157,6 +2163,7 @@ function renderMenu() {
       ${sc('blood', '🩸', 'ব্লাড ব্যাংক', 'রক্তদাতা খুঁজুন', 'featBlood')}
       ${sc('sos', '🚨', 'জরুরি নম্বর', '৯৯৯ ও হেল্পলাইন')}
       ${sc('saved', '🔖', 'সেভ করা পোস্ট', '')}
+      ${sc('wallet', '🪙', 'কয়েন ও ব্যাজ', 'ভেরিফাইড ব্যাজ নিন')}
       ${sc('groups', '👥', 'গ্রুপ', 'যোগ দিন বা তৈরি করুন', 'featGroups')}
       ${sc('pages', '🏳️', 'পেইজ', 'ব্যবসা ও প্রতিষ্ঠান', 'featPages')}
     </div>
@@ -2183,10 +2190,106 @@ $('#menu').addEventListener('click', e => {
   else if (t === 'friends') go('friends');
   else if (!needUser()) return;
   else if (t === 'saved') { open('saved'); loadFeed('saved'); }
+  else if (t === 'wallet') { open('wallet'); loadWallet(); }
   else if (t === 'pages') { if (featGuard('featPages')) { open('pages'); loadPages(); } }
   else if (t === 'groups') { if (featGuard('featGroups')) { open('groups'); loadGroups(); } }
   else if (t === 'admin') { open('admin'); loadAdmin(); }
 });
+
+// ================================================================ কয়েন ও ভেরিফাইড ব্যাজ
+const COIN_RULES = [['earnPost', 'পোস্ট করলে'], ['earnComment', 'মন্তব্য করলে'], ['earnLike', 'লাইক/রিয়্যাক্ট দিলে'], ['earnShare', 'শেয়ার করলে'], ['earnCap', 'দিনে সর্বোচ্চ আয়'], ['badgePrice', 'ব্যাজের দাম (কয়েন)'], ['badgeDays', 'ব্যাজের মেয়াদ (দিন)']];
+const COIN_WHY = { post: 'পোস্ট করেছেন', comment: 'মন্তব্য করেছেন', like: 'রিয়্যাক্ট দিয়েছেন', share: 'শেয়ার করেছেন', badge: 'ভেরিফাইড ব্যাজ', refund: 'কয়েন ফেরত', admin: 'অ্যাডমিন দিয়েছেন' };
+const VCATS = ['জনপ্রতিনিধি', 'রাজনীতিবিদ', 'সরকারি কর্মকর্তা', 'সাংবাদিক', 'শিল্পী / লেখক', 'খেলোয়াড়', 'ব্যবসায়ী / প্রতিষ্ঠান', 'শিক্ষক / চিকিৎসক', 'সমাজকর্মী', 'অন্যান্য'];
+const coin = n => `🪙 ${bn(n)}`;
+const setN = k => Number(S.settings[k] ?? SETTING_KEYS[k][1]) || 0;
+const dateBn = d => new Date(d).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+
+async function loadWallet() {
+  const box = $('#wallet'), u = me();
+  if (!u) { box.innerHTML = '<div class="empty">কয়েন ও ব্যাজ দেখতে লগইন করুন।</div>'; return; }
+  box.innerHTML = '<div class="skel"></div>';
+  try {
+    const [w, req] = await Promise.all([S.api.wallet(), S.api.myVerifyRequest(), S.api.settings().then(v => { S.settings = { ...S.settings, ...v }; }).catch(() => {})]);
+    S.walletCoins = w.coins;
+    const price = setN('badgePrice'), days = setN('badgeDays'), cap = setN('earnCap'), pending = req?.status === 'pending';
+    const badge = u.verified;
+    let status;
+    if (badge === 'authentic') status = `<div class="vb-status ok">${vb('authentic')} <span><b>আপনার অ্যাকাউন্ট ভেরিফাইড</b><small>পাবলিক ফিগার হিসেবে যাচাই করা</small></span></div>`;
+    else if (badge === 'paid') status = `<div class="vb-status ok">${vb('paid')} <span><b>ব্যাজ চালু আছে</b><small>মেয়াদ ${dateBn(u.verifiedUntil)} পর্যন্ত</small></span></div>`;
+    else status = `<div class="vb-status"><span class="vb-off">${VB_SVG}</span><span><b>এখনো ব্যাজ নেই</b><small>নামের পাশে নীল ব্যাজ দেখাতে আবেদন করুন</small></span></div>`;
+    const reqBox = pending
+      ? `<div class="vreq-box"><b>${req.kind === 'paid' ? 'কয়েন দিয়ে ব্যাজের' : 'পাবলিক ফিগার ব্যাজের'} আবেদন বিবেচনাধীন</b><small>${esc(ago(req.createdAt))} জমা দিয়েছেন${req.coinsHeld ? ` · ${coin(req.coinsHeld)} রাখা আছে, বাতিল বা প্রত্যাখ্যান হলে ফেরত পাবেন` : ''}</small><button class="btn ghost sm" id="vreq-cancel" data-id="${req.id}">আবেদন বাতিল করুন</button></div>`
+      : req?.status === 'rejected' ? `<div class="vreq-box no"><b>আগের আবেদন গ্রহণ করা হয়নি</b>${req.adminNote ? `<small>কারণ: ${esc(req.adminNote)}</small>` : ''}</div>` : '';
+    const canApply = !pending && badge !== 'authentic';
+    box.innerHTML = `
+      <div class="card wal-top"><span class="mut">আপনার কয়েন</span><b class="wal-n">${coin(w.coins)}</b>
+        <div class="wal-bar" aria-label="আজকের আয়"><i style="width:${Math.min(100, cap ? (w.today / cap) * 100 : 0)}%"></i></div>
+        <small class="mut">আজ পেয়েছেন ${bn(w.today)} / সর্বোচ্চ ${bn(cap)}</small></div>
+      <h3 class="res-h">ভেরিফাইড ব্যাজ</h3>
+      <div class="card">${status}${reqBox}
+        ${canApply ? `<div class="vb-opts">
+          ${badge === 'paid' ? '' : `<button class="vb-opt" data-vapply="public_figure"><b>পাবলিক ফিগার? ফ্রিতে আবেদন করুন</b><small>জনপ্রতিনিধি, সাংবাদিক, শিল্পী, পরিচিত প্রতিষ্ঠান ইত্যাদি। অ্যাডমিন যাচাই করে অনুমোদন দেবেন।</small></button>`}
+          <button class="vb-opt" data-vapply="paid"><b>${badge === 'paid' ? 'মেয়াদ বাড়ান' : 'কয়েন দিয়ে ব্যাজ নিন'}: ${coin(price)} · ${bn(days)} দিন</b><small>${w.coins >= price ? 'যে কেউ নিতে পারেন। অ্যাডমিন অনুমোদন দিলে চালু হবে।' : `আরও ${bn(price - w.coins)} কয়েন দরকার। পোস্ট, মন্তব্য, লাইক ও শেয়ার করে কয়েন জমান।`}</small></button>
+        </div>` : ''}
+      </div>
+      <h3 class="res-h">কীভাবে কয়েন পাবেন</h3>
+      <div class="card earn-rules">
+        ${[['post', 'পোস্ট করলে', 'earnPost'], ['comment', 'অন্যের পোস্টে মন্তব্য করলে', 'earnComment'], ['like', 'অন্যের পোস্টে লাইক বা রিয়্যাক্ট দিলে', 'earnLike'], ['share', 'অন্যের পোস্ট শেয়ার করলে', 'earnShare']]
+          .map(([, l, k]) => `<div class="er-row"><span>${l}</span><b>+${bn(setN(k))}</b></div>`).join('')}
+        <p class="mut" style="margin:8px 0 0;font-size:13px">দিনে সর্বোচ্চ ${bn(cap)} কয়েন। একই পোস্টে বারবার লাইক দিলে বা নিজের পোস্টে কয়েন হয় না। কয়েন শুধু অ্যাপের ভেতরে ব্যাজ নিতে খরচ করা যায় (শীঘ্রই বিজ্ঞাপনেও), টাকা হিসেবে তোলা যায় না।</p>
+      </div>
+      <h3 class="res-h">কয়েনের হিসাব</h3>
+      <div class="card ledger">${w.ledger.length ? w.ledger.map(l => `<div class="lg-row"><span><b>${COIN_WHY[l.reason] || l.reason}</b><small>${esc(ago(l.createdAt))}</small></span><b class="${l.amount < 0 ? 'neg' : 'pos'}">${l.amount < 0 ? '−' : '+'}${bn(Math.abs(l.amount))}</b></div>`).join('') : '<p class="mut" style="margin:0">এখনো কোনো হিসাব নেই।</p>'}</div>`;
+  } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+}
+$('#wallet').addEventListener('click', async e => {
+  const a = e.target.closest('[data-vapply]');
+  if (a) return verifySheet(a.dataset.vapply);
+  if (e.target.id === 'vreq-cancel') {
+    if (!(await confirmSheet('ব্যাজের আবেদন বাতিল করবেন? কয়েন রাখা থাকলে ফেরত পাবেন।', 'হ্যাঁ, বাতিল করুন', true))) return;
+    busy(e.target, async () => { await S.api.cancelVerification(Number(e.target.dataset.id)); toast('আবেদন বাতিল হয়েছে'); loadWallet(); });
+  }
+});
+function verifySheet(kind) {
+  const u = me(), paid = kind === 'paid', price = setN('badgePrice'), days = setN('badgeDays');
+  if (paid && (S.walletCoins ?? 0) < price) return toast(`যথেষ্ট কয়েন নেই, দরকার ${bn(price)}`);
+  openSheet(`<h2>${paid ? 'কয়েন দিয়ে ভেরিফাইড ব্যাজ' : 'পাবলিক ফিগার হিসেবে আবেদন'}</h2>
+    <p class="mut" style="margin-top:0">${paid ? `${coin(price)} কাটা হবে, অনুমোদন পেলে ${bn(days)} দিন নামের পাশে নীল ব্যাজ দেখাবে। আবেদন বাতিল বা প্রত্যাখ্যাত হলে কয়েন ফেরত পাবেন।` : 'অ্যাডমিন আপনার পরিচয় যাচাই করে অনুমোদন দিলে নামের পাশে স্থায়ী নীল ব্যাজ দেখাবে। এটা ফ্রি।'}</p>
+    <form id="vform">
+      <label for="vf-name">পুরো নাম (পরিচয়পত্র বা পরিচিতি অনুযায়ী)</label><input id="vf-name" required minlength="2" maxlength="80" value="${esc(u.name)}">
+      ${paid ? '' : `<label for="vf-cat">আপনি কে</label><select id="vf-cat" required><option value="">বেছে নিন</option>${VCATS.map(c => `<option>${c}</option>`).join('')}</select>
+      <label for="vf-links">পরিচিতির প্রমাণ (লিংক)</label><textarea id="vf-links" rows="2" maxlength="500" required placeholder="যেমন: আপনাকে নিয়ে খবর, অফিসিয়াল ওয়েবসাইট বা ফেসবুক পেইজের লিংক"></textarea>`}
+      <label for="vf-note">${paid ? 'অ্যাডমিনকে কিছু জানাতে চাইলে (ঐচ্ছিক)' : 'আরও কিছু জানাতে চাইলে (ঐচ্ছিক)'}</label><textarea id="vf-note" rows="2" maxlength="500"></textarea>
+      <div class="row" style="margin-top:14px"><button class="btn" style="flex:1">${paid ? `${coin(price)} দিয়ে আবেদন` : 'আবেদন জমা দিন'}</button><button class="btn ghost" type="button" data-close>বাতিল</button></div>
+    </form>`);
+  $('#vform').onsubmit = ev => {
+    ev.preventDefault();
+    const v = { kind, name: $('#vf-name').value.trim(), category: $('#vf-cat')?.value || '', links: $('#vf-links')?.value.trim() || '', note: $('#vf-note').value.trim() };
+    busy(ev.submitter, async () => { await S.api.requestVerification(v); closeSheet(); toast('আবেদন জমা হয়েছে, অ্যাডমিন দেখে জানাবেন'); loadWallet(); });
+  };
+}
+// প্রোফাইলে ব্যাজে চাপলে কী ধরনের ব্যাজ তা দেখায়
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-vbinfo]'); if (!b) return;
+  e.stopPropagation();
+  const auth = b.dataset.vbinfo === 'authentic';
+  openSheet(`<div class="vb-info">${vb(b.dataset.vbinfo)}<h2>ভেরিফাইড অ্যাকাউন্ট</h2>
+    <p>${auth ? 'অ্যাডমিন যাচাই করেছেন যে এটি এই পাবলিক ফিগার বা প্রতিষ্ঠানের আসল অ্যাকাউন্ট।' : 'এই অ্যাকাউন্ট কয়েন দিয়ে ভেরিফাইড ব্যাজ নিয়েছে এবং অ্যাডমিন অনুমোদন দিয়েছেন।'}</p>
+    ${me() ? '<button class="btn wide" data-mgo2="wallet">আমিও ব্যাজ নিতে চাই</button>' : ''}<button class="btn ghost wide" data-close style="margin-top:8px">ঠিক আছে</button></div>`);
+});
+document.addEventListener('click', e => { if (e.target.closest('[data-mgo2="wallet"]')) { closeSheet(); open('wallet'); loadWallet(); } });
+
+const adminReqCard = r => `<div class="card vreq-card">
+  <div class="person" style="padding:0">${userLink(r.userId, av(r.user || { name: r.name }))}<div class="info">${userLink(r.userId, esc(r.user?.name || r.name) + vb(r.user?.verified), 'who-btn')}<div class="sub">${esc(ago(r.createdAt))}</div></div>
+    <span class="vk ${r.kind}">${r.kind === 'paid' ? `কয়েন (${bn(r.coinsHeld)})` : 'পাবলিক ফিগার'}</span></div>
+  <dl class="vreq-dl"><dt>পুরো নাম</dt><dd>${esc(r.name)}</dd>${r.category ? `<dt>পরিচয়</dt><dd>${esc(r.category)}</dd>` : ''}${r.links ? `<dt>প্রমাণ</dt><dd>${linkify(r.links)}</dd>` : ''}${r.note ? `<dt>বার্তা</dt><dd>${esc(r.note)}</dd>` : ''}</dl>
+  <div class="row"><button class="btn sm" style="flex:1" data-vreq="${r.id}" data-ok="1">অনুমোদন</button><button class="btn ghost sm" style="flex:1" data-vreq="${r.id}" data-ok="0">প্রত্যাখ্যান</button></div></div>`;
+function decideReq(id, ok, btn) {
+  if (ok) return busy(btn, async () => { await S.api.decideVerification(id, true); toast('অনুমোদন হয়েছে, ব্যাজ চালু'); loadAdmin(); });
+  openSheet(`<h2>আবেদন প্রত্যাখ্যান</h2><form id="rjform"><label for="rj-note">কারণ (আবেদনকারী দেখবেন)</label><textarea id="rj-note" rows="3" maxlength="300" placeholder="যেমন: পরিচয়ের যথেষ্ট প্রমাণ পাওয়া যায়নি"></textarea>
+    <div class="row" style="margin-top:14px"><button class="btn danger" style="flex:1">প্রত্যাখ্যান করুন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div></form>`);
+  $('#rjform').onsubmit = ev => { ev.preventDefault(); busy(ev.submitter, async () => { await S.api.decideVerification(id, false, $('#rj-note').value.trim()); closeSheet(); toast('প্রত্যাখ্যান করা হয়েছে, কয়েন থাকলে ফেরত গেছে'); loadAdmin(); }); };
+}
 
 // ================================================================ অ্যাডমিন ড্যাশবোর্ড
 async function loadAdmin() {
@@ -2194,7 +2297,7 @@ async function loadAdmin() {
   if (!me()?.admin) { box.innerHTML = '<div class="empty">এই পাতা শুধু অ্যাডমিনদের জন্য।</div>'; return; }
   box.innerHTML = '<div class="skel"></div>';
   try {
-    const [st, set] = await Promise.all([S.api.adminStats(), S.api.settings()]);
+    const [st, set, vreqs] = await Promise.all([S.api.adminStats(), S.api.settings(), S.api.adminVerifyRequests().catch(() => [])]);
     S.settings = set;
     const stat = (icon, n, label, go) => `<button class="astat" ${go ? `data-ago="${go}"` : 'disabled'}><span class="ai">${ic(icon, 20)}</span><b>${bn(n)}</b><span>${label}</span></button>`;
     box.innerHTML = `
@@ -2206,6 +2309,15 @@ async function loadAdmin() {
         ${stat('post', st.posts, 'মোট পোস্ট')}
         ${stat('store', st.pendingServices, 'যাচাই বাকি সেবা', 'dir')}
         ${stat('flag', st.openReports, 'অমীমাংসিত রিপোর্ট')}
+      </div>
+      <h3 class="res-h">ভেরিফাইড ব্যাজের আবেদন${vreqs.length ? ` <span class="cnt">${bn(vreqs.length)}</span>` : ''}</h3>
+      ${vreqs.length ? vreqs.map(adminReqCard).join('') : '<div class="card mut">এখন কোনো আবেদন অপেক্ষায় নেই।</div>'}
+      <div class="card">
+        <b>কয়েন ও ব্যাজের নিয়ম</b><p class="mut" style="margin:2px 0 8px">প্রতিটা কাজে কত কয়েন, দিনে সর্বোচ্চ কত, আর ব্যাজের দাম ও মেয়াদ।</p>
+        <div class="ver-grid coin-grid">
+          ${COIN_RULES.map(([k, l]) => `<label>${l}<input class="f" type="number" min="0" max="100000" data-coinset="${k}" value="${Number(set[k]) || 0}"></label>`).join('')}
+        </div>
+        <button class="btn sm" id="save-coin" style="margin-top:8px">নিয়ম সংরক্ষণ</button>
       </div>
       <h3 class="res-h">সেটিংস</h3>
       <div class="card">
@@ -2259,6 +2371,13 @@ $('#admin').addEventListener('change', async e => {
   });
 });
 $('#admin').addEventListener('click', e => {
+  const vr = e.target.closest('[data-vreq]');
+  if (vr) return decideReq(Number(vr.dataset.vreq), vr.dataset.ok === '1', vr);
+  if (e.target.id === 'save-coin') {
+    const vals = [...document.querySelectorAll('[data-coinset]')].map(i => [i.dataset.coinset, Math.max(0, parseInt(i.value, 10) || 0)]);
+    if (vals.find(([k]) => k === 'badgeDays')[1] < 1) return toast('ব্যাজের মেয়াদ অন্তত ১ দিন দিন');
+    return busy(e.target, async () => { for (const [k, v] of vals) { await S.api.setSetting(k, v); S.settings[k] = v; } settingsChanged(); toast('নিয়ম সংরক্ষণ হয়েছে'); });
+  }
   if (e.target.id === 'save-ann') {
     const v = $('#set-ann').value.trim();
     return busy(e.target, async () => { await S.api.setSetting('announcement', v); S.settings.announcement = v; settingsChanged(); toast(v ? 'ঘোষণা প্রকাশ হয়েছে' : 'ঘোষণা সরানো হয়েছে'); });
@@ -2412,7 +2531,7 @@ async function openGroup(id, silent) {
 async function memberSheet(g, admin) {
   if (g.privacy === 'private' && !g.status) return toast('প্রাইভেট গ্রুপের সদস্য তালিকা শুধু সদস্যরা দেখতে পারেন');
   const list = await S.api.groupMembers(g.id).catch(() => []);
-  openSheet(`<h2>সদস্য (${bn(list.length)})</h2>${list.map(u => `<div class="person">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name), 'who-btn')}<div class="sub">${u.role === 'admin' ? 'অ্যাডমিন' : 'সদস্য'}</div></div>${admin && u.id !== g.ownerId && u.id !== me()?.id ? `<button class="sbtn ghost" data-rm="${esc(u.id)}">বাদ দিন</button>` : ''}</div>`).join('')}<button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
+  openSheet(`<h2>সদস্য (${bn(list.length)})</h2>${list.map(u => `<div class="person">${userLink(u.id, av(u))}<div class="info">${userLink(u.id, esc(u.name) + vb(u.verified), 'who-btn')}<div class="sub">${u.role === 'admin' ? 'অ্যাডমিন' : 'সদস্য'}</div></div>${admin && u.id !== g.ownerId && u.id !== me()?.id ? `<button class="sbtn ghost" data-rm="${esc(u.id)}">বাদ দিন</button>` : ''}</div>`).join('')}<button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
   $('#sheet').onclick = ev => { const b = ev.target.closest('[data-rm]'); if (b) busy(b, async () => { await S.api.removeMember(g.id, b.dataset.rm); b.closest('.person').remove(); openGroup(g.id, true); }); if (ev.target.closest('[data-user]')) closeSheet(); };
 }
 function requestSheet(g, reqs) {

@@ -801,3 +801,44 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .feat-t{display:flex;flex-direction:column;align-items:flex-start;text-align:left;flex:1}
 .feat-t small{color:var(--mut);font-size:12px;display:flex;align-items:center;gap:3px}
 .feat-row.empty .feat-t b{color:var(--mut)}
+
+/* ===== v26: ভেরিফাইড ব্যাজ ও কয়েন ===== */
+.vbadge{display:inline-flex;vertical-align:-2px;margin-left:3px}
+.vbadge svg{width:15px;height:15px}
+.vbadge.vb-lg{vertical-align:-3px;margin-left:5px;cursor:pointer}
+.vbadge.vb-lg svg{width:21px;height:21px}
+.wal-top{text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px}
+.wal-n{font-size:34px;line-height:1.2}
+.wal-bar{width:100%;max-width:260px;height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:4px}
+.wal-bar i{display:block;height:100%;background:linear-gradient(90deg,#f5b700,#f59e0b);border-radius:99px}
+.vb-status{display:flex;align-items:center;gap:10px}
+.vb-status span:last-child{display:flex;flex-direction:column}
+.vb-status small{color:var(--mut);font-size:13px}
+.vb-status .vbadge svg{width:30px;height:30px}
+.vb-off svg{width:30px;height:30px;filter:grayscale(1);opacity:.35}
+.vb-opts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.vb-opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1px solid var(--line);background:var(--card);color:inherit;font:inherit;border-radius:12px;padding:10px 12px;cursor:pointer}
+.vb-opt:hover{border-color:#1d9bf0}
+.vb-opt b{color:#1d9bf0;font-size:15px}
+.vb-opt small{color:var(--mut);font-size:13px;line-height:1.45}
+.vreq-box{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:12px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,#1d9bf0 10%,var(--card))}
+.vreq-box.no{background:color-mix(in srgb,var(--r) 10%,var(--card))}
+.vreq-box small{color:var(--mut);font-size:13px}
+.vreq-box .btn{margin-top:4px}
+.earn-rules .er-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.earn-rules .er-row b{color:#d97706}
+.ledger .lg-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.ledger .lg-row:last-child{border-bottom:0}
+.ledger .lg-row span{display:flex;flex-direction:column;font-size:14px}
+.ledger .lg-row small{color:var(--mut);font-size:12px}
+.ledger .pos{color:var(--g)} .ledger .neg{color:var(--r)}
+.vb-info{text-align:center}
+.vb-info .vbadge svg{width:48px;height:48px}
+.vb-info h2{margin:6px 0}
+.vreq-card .person{align-items:center}
+.vreq-card .vk{font-size:12px;font-weight:700;padding:3px 8px;border-radius:99px;background:color-mix(in srgb,#1d9bf0 14%,var(--card));color:#1d9bf0;white-space:nowrap}
+.vreq-card .vk.paid{background:color-mix(in srgb,#f59e0b 16%,var(--card));color:#b45309}
+.vreq-dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:10px 0;font-size:14px}
+.vreq-dl dt{color:var(--mut)} .vreq-dl dd{margin:0;word-break:break-word}
+.res-h .cnt{display:inline-block;min-width:20px;padding:0 6px;border-radius:99px;background:var(--r);color:#fff;font-size:12px;text-align:center}
+.coin-grid{grid-template-columns:1fr 1fr}

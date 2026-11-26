@@ -13,6 +13,11 @@ const flattenPhotos = rows => rows.flatMap(r => (r.images || []).map((url, i) =>
 const VIRTUAL_ALBUMS = { avatar: 'প্রোফাইল ছবি', cover: 'কভার ছবি', uploads: 'মোবাইল আপলোড' };
 const inVirtual = (k, p) => (k === 'uploads' ? (p.kind || 'normal') === 'normal' && !p.albumId : p.kind === k);
 const FEATURED0 = ['works', 'educations', 'addr', 'social', 'joined'];
+// ব্যাজ চালু আছে কিনা: পাবলিক ফিগার (authentic) স্থায়ী, কেনা ব্যাজ (paid) মেয়াদ পর্যন্ত
+export const badgeOf = p => (p?.verified === 'authentic' ? 'authentic' : p?.verified === 'paid' && new Date(p.verified_until ?? p.verifiedUntil) > Date.now() ? 'paid' : '');
+const EARN_REASONS = ['post', 'comment', 'like', 'share'];
+const dhakaMidnight = () => { const d = new Date(Date.now() + 6 * 3600e3); d.setUTCHours(0, 0, 0, 0); return new Date(d.getTime() - 6 * 3600e3); };
+const toReq = r => r && ({ id: r.id, userId: r.user_id, kind: r.kind, name: r.full_name, category: r.category || '', links: r.links || '', note: r.note || '', status: r.status, adminNote: r.admin_note || '', coinsHeld: r.coins_held || 0, createdAt: r.created_at, decidedAt: r.decided_at || null });
 const settingDefaults = () => Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d]));
 
 export const PAGE = 20;
@@ -25,14 +30,14 @@ async function supabaseApi() {
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
-  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,unions!profiles_union_id_fkey(name)';
+  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
     id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
     union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
     bloodGroup: p.blood_group || '', donorVisible: p.donor_visible !== false, lastDonated: p.last_donated || '',
     avatar: p.avatar_url || '', cover: p.cover_url || '', bio: p.bio || '', admin: p.role === 'admin',
     friendsVisibility: p.friends_visibility || 'public', followersVisibility: p.followers_visibility || 'public', followingVisibility: p.following_visibility || 'public', joinedAt: p.created_at || '',
-    gender: p.gender || '', username: p.username || '',
+    gender: p.gender || '', username: p.username || '', verified: badgeOf(p), verifiedUntil: p.verified_until || null,
     social: {}, works: [], educations: [],
   });
   const toPost = (r, mine, saved) => ({
@@ -41,16 +46,16 @@ async function supabaseApi() {
     mentions: (r.post_mentions || []).map(t => t.profiles).filter(Boolean).map(t => ({ id: t.id, name: t.name })),
     category: r.category, createdAt: r.created_at, editedAt: r.edited_at || null, rawImages: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []),
     likes: r.like_count, reactions: r.reactions || {}, myReaction: mine.get(r.id) || '', comments: r.comment_count, userId: r.user_id,
-    author: r.pages?.name || r.profiles?.name || 'সদস্য', avatar: (r.page_id ? r.pages?.avatar_url : r.profiles?.avatar_url) || '',
+    author: r.pages?.name || r.profiles?.name || 'সদস্য', avatar: (r.page_id ? r.pages?.avatar_url : r.profiles?.avatar_url) || '', badge: r.page_id ? '' : badgeOf(r.profiles),
     union: r.unions?.name || r.profiles?.upazila || '', liked: mine.has(r.id), saved: saved.has(r.id),
     pageId: r.page_id || null, groupId: r.group_id || null, groupName: r.groups?.name || '', poster: r.profiles?.name || '',
     shares: r.share_count || 0, saves: r.save_count || 0, pinnedCommentId: r.pinned_comment_id || null,
     sharedPostId: r.shared_post_id || null, sharedMissing: !!r.shared_post_id && !r.sp,
     kind: r.kind || 'normal', albumId: r.album_id || null, albumName: r.al?.name || '',
     shared: r.sp ? { id: r.sp.id, body: r.sp.body, image: r.sp.image_urls?.[0] || r.sp.image_url || '', createdAt: r.sp.created_at, userId: r.sp.user_id, pageId: r.sp.page_id || null,
-      author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '' } : null,
+      author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '', badge: r.sp.page_id ? '' : badgeOf(r.sp.profiles) } : null,
   });
-  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url),pages!posts_page_id_fkey(name,avatar_url)),kind,album_id,al:albums!posts_album_id_fkey(id,name),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url),groups!posts_group_id_fkey(name)';
+  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url,verified,verified_until),pages!posts_page_id_fkey(name,avatar_url)),kind,album_id,al:albums!posts_album_id_fkey(id,name),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila,verified,verified_until),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url),groups!posts_group_id_fkey(name)';
   const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count });
   const toGroup = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, about: r.about || '', privacy: r.privacy, avatar: r.avatar_url || '', members: r.member_count });
   const inList = ids => `(${ids.join(',')})`;
@@ -167,6 +172,28 @@ async function supabaseApi() {
       const key = SETTING_KEYS[name]?.[0]; if (!key) throw new Error('unknown setting');
       ok(await sb.from('app_settings').upsert({ key, value, updated_by: me.id, updated_at: new Date().toISOString() }));
     },
+    // ---------- কয়েন ও ভেরিফাইড ব্যাজ
+    async wallet() {
+      const [w, led, today] = await Promise.all([
+        sb.from('wallets').select('coins').eq('user_id', me.id).maybeSingle(),
+        sb.from('coin_ledger').select('amount,reason,ref,created_at').eq('user_id', me.id).order('created_at', { ascending: false }).limit(60),
+        sb.from('coin_ledger').select('amount').eq('user_id', me.id).in('reason', EARN_REASONS).gte('created_at', dhakaMidnight().toISOString()),
+      ]);
+      return { coins: ok(w)?.coins || 0, today: ok(today).reduce((t, r) => t + r.amount, 0), ledger: ok(led).map(r => ({ amount: r.amount, reason: r.reason, ref: r.ref, createdAt: r.created_at })) };
+    },
+    async myVerifyRequest() {
+      const rows = ok(await sb.from('verify_requests').select('*').eq('user_id', me.id).order('created_at', { ascending: false }).limit(1));
+      return toReq(rows[0]) || null;
+    },
+    async requestVerification(v) { return ok(await sb.rpc('request_verification', { p_kind: v.kind, p_name: v.name, p_category: v.category || '', p_links: v.links || '', p_note: v.note || '' })); },
+    async cancelVerification(id) { ok(await sb.rpc('cancel_verification', { p_id: id })); },
+    async adminVerifyRequests() {
+      const rows = ok(await sb.from('verify_requests').select('*, p:profiles!verify_requests_user_id_fkey(' + PROFILE + ')').eq('status', 'pending').order('created_at'));
+      return rows.map(r => ({ ...toReq(r), user: toUser(r.p) }));
+    },
+    async decideVerification(id, approve, note) { ok(await sb.rpc('decide_verification', { p_id: id, p_approve: approve, p_note: note || null })); },
+    async adminSetBadge(uid, verified, days) { ok(await sb.rpc('admin_set_badge', { p_user: uid, p_verified: verified || null, p_days: days || null })); },
+    async adminAdjustCoins(uid, amount, note) { ok(await sb.rpc('admin_adjust_coins', { p_user: uid, p_amount: amount, p_note: note || null })); },
     async adminStats() {
       const r = ok(await sb.rpc('admin_stats'));
       return { users: r.users, donors: r.donors, manualDonors: r.manual_donors, posts: r.posts, pendingServices: r.pending_services, openReports: r.open_reports };
@@ -361,13 +388,13 @@ async function supabaseApi() {
     },
     // sort: 'top' (বেশি রিয়্যাক্ট), 'new' (নতুন), 'old' (পুরাতন)
     async comments(postId, sort = 'old') {
-      let q = sb.from('comments').select('id,body,created_at,edited_at,parent_id,user_id,like_count,reactions,profiles!comments_user_id_fkey(name,avatar_url),comment_mentions(profiles(id,name))').eq('post_id', postId).limit(300);
+      let q = sb.from('comments').select('id,body,created_at,edited_at,parent_id,user_id,like_count,reactions,profiles!comments_user_id_fkey(name,avatar_url,verified,verified_until),comment_mentions(profiles(id,name))').eq('post_id', postId).limit(300);
       q = sort === 'top' ? q.order('like_count', { ascending: false }).order('created_at') : q.order('created_at', { ascending: sort === 'old' });
       const rows = ok(await q).filter(r => !blocked.has(r.user_id));
       let mine = new Map();
       if (me && rows.length) mine = new Map(ok(await sb.from('comment_likes').select('comment_id,reaction').eq('user_id', me.id).in('comment_id', rows.map(r => r.id))).map(x => [x.comment_id, x.reaction]));
       return rows.map(r => ({ id: r.id, body: r.body, createdAt: r.created_at, editedAt: r.edited_at || null, parentId: r.parent_id || null, userId: r.user_id,
-        mentions: (r.comment_mentions || []).map(t => t.profiles).filter(Boolean).map(t => ({ id: t.id, name: t.name })), author: r.profiles?.name || 'সদস্য', avatar: r.profiles?.avatar_url || '',
+        mentions: (r.comment_mentions || []).map(t => t.profiles).filter(Boolean).map(t => ({ id: t.id, name: t.name })), author: r.profiles?.name || 'সদস্য', avatar: r.profiles?.avatar_url || '', badge: badgeOf(r.profiles),
         likes: r.like_count, reactions: r.reactions || {}, myReaction: mine.get(r.id) || '' }));
     },
     async reactComment(id, reaction, prev) {
@@ -542,9 +569,9 @@ function demoApi() {
   const PEOPLE = [
     { id: 'd1', name: 'রাশেদুল হক', ...BH, unionId: 2, bio: 'শিক্ষক, উথুরা উচ্চ বিদ্যালয়', bloodGroup: 'A+', phone: '01700000101', lastDonated: daysAgo(150) },
     { id: 'd2', name: 'সুমি আক্তার', ...BH, unionId: 2, bio: '', bloodGroup: 'O+', phone: '01700000102', lastDonated: '' },
-    { id: 'd3', name: 'নাসরিন সুলতানা', ...BH, unionId: 3, bio: 'স্বেচ্ছাসেবী, রক্তদান ক্লাব', bloodGroup: 'B+', phone: '01700000103', lastDonated: daysAgo(40) },
+    { id: 'd3', name: 'নাসরিন সুলতানা', verified: 'authentic', ...BH, unionId: 3, bio: 'স্বেচ্ছাসেবী, রক্তদান ক্লাব', bloodGroup: 'B+', phone: '01700000103', lastDonated: daysAgo(40) },
     { id: 'd4', name: 'তানভীর আহমেদ', ...BH, unionId: 3, bio: 'নিয়মিত রক্তদাতা', bloodGroup: 'B+', phone: '01700000104', lastDonated: daysAgo(120) },
-    { id: 'd5', name: 'মিজানুর রহমান', ...BH, unionId: 4, bio: 'ব্যবসায়ী, ডাকাতিয়া বাজার', bloodGroup: 'AB+', phone: '01700000105', lastDonated: daysAgo(200) },
+    { id: 'd5', name: 'মিজানুর রহমান', verified: 'paid', verifiedUntil: new Date(Date.now() + 20 * 864e5).toISOString(), ...BH, unionId: 4, bio: 'ব্যবসায়ী, ডাকাতিয়া বাজার', bloodGroup: 'AB+', phone: '01700000105', lastDonated: daysAgo(200) },
     { id: 'd6', name: 'উপজেলা যুব উন্নয়ন', ...BH, unionId: 1, bio: 'প্রশিক্ষণ ও চাকরির খবর', bloodGroup: '', phone: '' },
     { id: 'd7', name: 'রুমানা আক্তার', ...BH, unionId: 12, bio: '', bloodGroup: 'A-', phone: '01700000107', lastDonated: daysAgo(20) },
     { id: 'd8', name: 'জাহিদ হাসান', district: 'ময়মনসিংহ', upazila: 'ত্রিশাল', unionId: null, bio: '', bloodGroup: 'O-', phone: '01700000108', lastDonated: daysAgo(95) },
@@ -574,6 +601,8 @@ function demoApi() {
     notifs: get('notifs', []),           // { id, to, from, type, postId, groupId, createdAt, read }
     saved: get('saved', []),             // "userId:postId"
     settings: get('settings', { publicDonorPhone: false }),
+    wallet: get('wallet', { coins: 120, ledger: [{ amount: 100, reason: 'admin', ref: 'স্বাগতম', createdAt: ago(30) }, { amount: 5, reason: 'post', ref: 'x1', createdAt: ago(20) }, { amount: 15, reason: 'like', ref: 'x2', createdAt: ago(19) }] }),
+    vreqs: get('vreqs', [{ id: 1, user_id: 'd7', kind: 'public_figure', full_name: 'রুমানা আক্তার', category: 'সাংবাদিক', links: 'https://example.com/rumana', note: 'স্থানীয় পত্রিকার প্রতিবেদক', status: 'pending', coins_held: 0, created_at: ago(5) }]),
     albums: get('albums', []),           // { id, userId, name, privacy, createdAt }
     manual: get('manual', [            // হাতে যোগ করা ডোনার
       { id: 1, createdBy: 'd3', name: 'আব্দুল করিম', district: 'ময়মনসিংহ', upazila: 'ভালুকা', unionId: 7, phone: '01700000140', bloodGroup: 'O-', lastDonated: '' },
@@ -609,12 +638,24 @@ function demoApi() {
     ]),
   };
   let meId = get('me', null);
-  const save = () => { for (const k of ['albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
-  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0 }; };
+  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
   const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true, aboutVis: { ...ABOUT_VIS0, ...(person(meId).aboutVis || {}) } } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
+  // ডেমো: কাজ করলে কয়েন (আসল সার্ভারে এটা ডাটাবেসের ট্রিগার করে)
+  const sett = k => Number(db.settings[k] ?? SETTING_KEYS[k][1]);
+  function earn(why, ref, ownerId) {
+    if (!meId || ownerId === meId) return;
+    const w = db.wallet, key = why + ':' + ref, since = dhakaMidnight().toISOString();
+    if (w.ledger.some(l => l.reason === why && l.ref === key)) return;
+    const today = w.ledger.filter(l => EARN_REASONS.includes(l.reason) && l.createdAt >= since).reduce((t, l) => t + l.amount, 0);
+    const amt = Math.min(sett('earn' + why[0].toUpperCase() + why.slice(1)), sett('earnCap') - today);
+    if (amt <= 0) return;
+    w.coins += amt; w.ledger.unshift({ amount: amt, reason: why, ref: key, createdAt: new Date().toISOString() }); save();
+  }
+  const addCoins = (amount, reason, ref) => { db.wallet.coins += amount; db.wallet.ledger.unshift({ amount, reason, ref: String(ref), createdAt: new Date().toISOString() }); };
   const albumVisible = a => a.privacy === 'public' || a.userId === meId || (a.privacy === 'friends' && meId && friendIds(meId).includes(a.userId));
   const friendRow = (a, b) => db.friendships.find(f => (f.requester === a && f.addressee === b) || (f.requester === b && f.addressee === a));
   const friendIds = of => db.friendships.filter(f => f.status === 'accepted' && (f.requester === of || f.addressee === of)).map(f => (f.requester === of ? f.addressee : f.requester));
@@ -634,7 +675,7 @@ function demoApi() {
     const k = uid + ':' + postId, p = db.posts.find(x => x.id === postId); if (!p) return;
     p.rx = p.rx || { like: p.likes };
     if (prev) { p.rx[prev] = Math.max((p.rx[prev] || 0) - 1, 0); }
-    if (reaction) { p.rx[reaction] = (p.rx[reaction] || 0) + 1; db.reacts[k] = reaction; if (!db.likes.includes(k)) db.likes.push(k); }
+    if (reaction) { p.rx[reaction] = (p.rx[reaction] || 0) + 1; db.reacts[k] = reaction; if (!db.likes.includes(k)) db.likes.push(k); if (uid === meId && !prev) earn('like', postId, p.userId); }
     else { delete db.reacts[k]; db.likes = db.likes.filter(x => x !== k); }
     p.likes += (reaction ? 1 : 0) - (prev ? 1 : 0);
     save();
@@ -778,6 +819,38 @@ function demoApi() {
     },
     async settings() { return { ...settingDefaults(), ...db.settings }; },
     async setSetting(name, value) { db.settings[name] = value; save(); },
+    async wallet() {
+      const since = dhakaMidnight().toISOString(), w = db.wallet;
+      return wait({ coins: w.coins, today: w.ledger.filter(l => EARN_REASONS.includes(l.reason) && l.createdAt >= since).reduce((t, l) => t + l.amount, 0), ledger: w.ledger.slice(0, 60) });
+    },
+    async myVerifyRequest() { return wait(toReq([...db.vreqs].reverse().find(r => r.user_id === meId)) || null); },
+    async requestVerification(v) {
+      const me = person(meId);
+      if (badgeOf(me) === 'authentic') throw new Error('আপনার অ্যাকাউন্ট আগেই ভেরিফাইড');
+      if (db.vreqs.some(r => r.user_id === meId && r.status === 'pending')) throw new Error('আপনার একটি আবেদন এখনো বিবেচনাধীন');
+      const price = v.kind === 'paid' ? sett('badgePrice') : 0;
+      if (db.wallet.coins < price) throw new Error(`যথেষ্ট কয়েন নেই (দরকার ${price})`);
+      const r = { id: nid(db.vreqs), user_id: meId, kind: v.kind, full_name: v.name, category: v.category || '', links: v.links || '', note: v.note || '', status: 'pending', coins_held: price, created_at: new Date().toISOString() };
+      db.vreqs.push(r); if (price) addCoins(-price, 'badge', r.id); save(); return r.id;
+    },
+    async cancelVerification(id) {
+      const r = db.vreqs.find(x => x.id === id && x.user_id === meId && x.status === 'pending'); if (!r) throw new Error('আবেদন পাওয়া যায়নি');
+      r.status = 'cancelled'; if (r.coins_held) addCoins(r.coins_held, 'refund', id); save();
+    },
+    async adminVerifyRequests() { return wait(db.vreqs.filter(r => r.status === 'pending').map(r => ({ ...toReq(r), user: user(r.user_id) }))); },
+    async decideVerification(id, approve, note) {
+      const r = db.vreqs.find(x => x.id === id && x.status === 'pending'); if (!r) throw new Error('আবেদন পাওয়া যায়নি');
+      Object.assign(r, { status: approve ? 'approved' : 'rejected', admin_note: note || '', decided_at: new Date().toISOString() });
+      const p = person(r.user_id);
+      if (approve && p) {
+        if (r.kind === 'public_figure') Object.assign(p, { verified: 'authentic', verifiedUntil: null });
+        else { const base = p.verified === 'paid' && new Date(p.verifiedUntil) > Date.now() ? new Date(p.verifiedUntil).getTime() : Date.now(); Object.assign(p, { verified: 'paid', verifiedUntil: new Date(base + sett('badgeDays') * 864e5).toISOString() }); }
+      } else if (!approve && r.coins_held && r.user_id === meId) addCoins(r.coins_held, 'refund', id);
+      if (r.user_id === meId) notify(meId, 'd6', approve ? 'verify_ok' : 'verify_no', null);
+      save();
+    },
+    async adminSetBadge(uid, verified, days) { const p = person(uid); if (p) Object.assign(p, { verified: verified || null, verifiedUntil: verified === 'paid' ? new Date(Date.now() + (days || 30) * 864e5).toISOString() : null }); save(); },
+    async adminAdjustCoins(uid, amount, note) { if (uid === meId) { if (db.wallet.coins + amount < 0) throw new Error('ব্যালান্স শূন্যের নিচে যাবে'); addCoins(amount, 'admin', note || ''); save(); } },
     async adminStats() {
       const all = [...PEOPLE, ...db.users];
       return wait({ users: all.length, donors: all.filter(p => p.bloodGroup && p.donorVisible !== false).length, manualDonors: db.manual.length,
@@ -859,8 +932,8 @@ function demoApi() {
           mentions: (p.mentions || []).map(uid => user(uid)).filter(Boolean).map(u => ({ id: u.id, name: u.name })),
           category: p.category, createdAt: p.createdAt, editedAt: p.editedAt || null, rawImages: p.images?.length ? p.images : (p.image ? [p.image] : []), likes: p.likes, comments: p.cm.length, userId: p.userId,
           shares: db.posts.filter(x => x.sharedPostId === p.id).length, saves: (p.sv || 0) + db.saved.filter(k => k.endsWith(':' + p.id)).length, pinnedCommentId: p.pinned || null, sharedPostId: p.sharedPostId || null, sharedMissing: !!p.sharedPostId && !sp,
-          shared: sp ? { id: sp.id, body: sp.body, image: demoPic(sp.images?.[0] || sp.image || ''), createdAt: sp.createdAt, userId: sp.userId, pageId: sp.pageId || null, author: spPg ? spPg.name : spU?.name || 'সদস্য', avatar: spPg ? spPg.avatar : spU?.avatar || '' } : null,
-          author: pg ? pg.name : u.name, avatar: pg ? pg.avatar : u.avatar, poster: u.name, union: uname(p.unionId), liked: db.likes.includes(meId + ':' + p.id),
+          shared: sp ? { id: sp.id, body: sp.body, image: demoPic(sp.images?.[0] || sp.image || ''), createdAt: sp.createdAt, userId: sp.userId, pageId: sp.pageId || null, author: spPg ? spPg.name : spU?.name || 'সদস্য', avatar: spPg ? spPg.avatar : spU?.avatar || '', badge: spPg ? '' : (spU?.verified || '') } : null,
+          author: pg ? pg.name : u.name, avatar: pg ? pg.avatar : u.avatar, badge: pg ? '' : (u.verified || ''), poster: u.name, union: uname(p.unionId), liked: db.likes.includes(meId + ':' + p.id),
           reactions: p.rx || { like: p.likes }, myReaction: db.reacts[meId + ':' + p.id] || (db.likes.includes(meId + ':' + p.id) ? 'like' : ''),
           saved: db.saved.includes(meId + ':' + p.id), pageId: p.pageId || null, groupId: p.groupId || null, groupName: g ? g.name : '',
           kind: p.kind || 'normal', albumId: p.albumId || null, albumName: p.albumId ? (db.albums.find(a => a.id === p.albumId && albumVisible(a))?.name || '') : '' };
@@ -931,8 +1004,9 @@ function demoApi() {
         albumId: albumId ? Number(albumId) : null, kind };
       post.tags.forEach(uid => notify(uid, meId, 'tag', post.id));
       post.mentions = mentionNotify(post, mentions, meId);
-      if (post.sharedPostId) { const o = db.posts.find(x => x.id === post.sharedPostId); db.posts.push(post); save(); notify(o.userId, meId, 'share', o.id); return; }
+      if (post.sharedPostId) { const o = db.posts.find(x => x.id === post.sharedPostId); db.posts.push(post); save(); notify(o.userId, meId, 'share', o.id); earn('share', o.id, o.userId); return; }
       db.posts.push(post); save();
+      if (kind === 'normal') earn('post', post.id, null);
       // ডেমো: কিছুক্ষণ পর নমুনা মানুষেরা লাইক ও মন্তব্য করে, যাতে নোটিফিকেশন দেখা যায়
       const uid = meId;
       setTimeout(() => { if (!db.posts.includes(post)) return; reactAs('d2', post.id, 'love', ''); notify(uid, 'd2', 'like', post.id); }, 3000);
@@ -941,7 +1015,7 @@ function demoApi() {
     async deletePost(id) { db.posts = db.posts.filter(p => p.id !== id); save(); },
     async react(id, reaction, prev) { reactAs(meId, id, reaction, prev); },
     async comments(postId, sort = 'old') {
-      const list = (db.posts.find(p => p.id === Number(postId))?.cm || []).filter(c => !isBlocked(c.userId)).map(c => ({ ...c, mentions: (c.mentions || []).map(uid => user(uid)).filter(Boolean).map(u => ({ id: u.id, name: u.name })), author: user(c.userId)?.name || 'সদস্য', avatar: user(c.userId)?.avatar || '',
+      const list = (db.posts.find(p => p.id === Number(postId))?.cm || []).filter(c => !isBlocked(c.userId)).map(c => ({ ...c, mentions: (c.mentions || []).map(uid => user(uid)).filter(Boolean).map(u => ({ id: u.id, name: u.name })), author: user(c.userId)?.name || 'সদস্য', avatar: user(c.userId)?.avatar || '', badge: user(c.userId)?.verified || '',
         likes: c.likes || 0, reactions: c.rx || {}, myReaction: (c.rk || {})[meId] || '' }));
       list.sort((a, b) => sort === 'top' ? (b.likes - a.likes) || a.createdAt.localeCompare(b.createdAt) : sort === 'new' ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt));
       return wait(list);
@@ -979,6 +1053,7 @@ function demoApi() {
       if (parent) notify(parent.userId, meId, 'reply', p.id);
       if (!parent || parent.userId !== p.userId) notify(p.userId, meId, 'comment', p.id);
       save();
+      if (body.trim().length >= 3) earn('comment', p.id + ':' + c.id, p.userId);
       // ডেমো: নমুনা মানুষের মন্তব্যে উত্তর দিলে সে-ও কিছুক্ষণ পর উত্তর দেয়
       if (parent && parent.userId !== meId && person(parent.userId)) setTimeout(() => { if (!p.cm.includes(c)) return; p.cm.push({ id: Date.now(), userId: parent.userId, body: 'ধন্যবাদ 🙂', createdAt: new Date().toISOString(), parentId: parent.id }); notify(meId, parent.userId, 'reply', p.id); }, 4000);
     },

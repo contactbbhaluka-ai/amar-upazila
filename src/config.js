@@ -44,5 +44,8 @@ export const SETTING_KEYS = {
   announcement: ['announcement', ''],
   minVersion: ['min_app_version', 0],       // এর চেয়ে পুরনো অ্যাপ হলে আপডেট বাধ্যতামূলক
   latestVersion: ['latest_app_version', 0], // এর চেয়ে পুরনো অ্যাপ হলে "আপডেট করুন" বার্তা
+  // কয়েন ও ভেরিফাইড ব্যাজ
+  earnPost: ['earn_post', 5], earnComment: ['earn_comment', 2], earnLike: ['earn_like', 1], earnShare: ['earn_share', 3],
+  earnCap: ['earn_daily_cap', 50], badgePrice: ['badge_price', 500], badgeDays: ['badge_days', 30],
 };
 export const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.amarupazila.app';

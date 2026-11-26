@@ -1697,3 +1697,4 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .svc-ic .sic{width:44px;height:44px}.card.svc .ic.svc-ic{background:none;width:auto;height:auto}
 .svc-chip{display:inline-flex;align-items:center;gap:6px}.svc-chip .sic{width:22px;height:22px;border-radius:7px;background:none}.svc-chip.on .sic{color:#fff}
 @media (max-width:340px){.svc-grid{grid-template-columns:repeat(3,1fr)}}
+#dchips .chip-all{position:sticky;left:0;z-index:2;box-shadow:6px 0 8px -4px rgba(0,0,0,.18)}#dchips .chip-all:not(.on){background:var(--card)}

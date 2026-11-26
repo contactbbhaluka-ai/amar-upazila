@@ -1244,8 +1244,8 @@ function introCard(u, own) {
   const rows = detailRows(u, u.featured || FEATURED0);
   if (!rows.length && !own) return '';
   return `<div class="intro-card">${rows.join('')}
-    ${!rows.length ? '<p class="mut" style="margin:0;font-size:14px">প্রোফাইলে আপনার কাজ, শিক্ষা, ঠিকানা ইত্যাদি দেখাতে পারেন।</p>' : ''}
-    ${own ? `<button class="intro-edit" id="feat-edit">${ic('edit', 15)} প্রোফাইলে কী দেখাবে</button>` : ''}</div>`;
+    ${!rows.length ? '<p class="mut" style="margin:0;font-size:13px">কাজ, শিক্ষা, ঠিকানা ইত্যাদি এখানে দেখাতে পারেন</p>' : ''}
+    ${own ? `<button class="intro-edit" id="feat-edit">${ic('edit', 13)} কী দেখাবে বাছাই করুন</button>` : ''}</div>`;
 }
 const profileBase = u => ({ name: u.name, district: u.district, upazila: u.upazila, unionId: u.unionId, bio: u.bio, phone: u.phone, bloodGroup: u.bloodGroup, donorVisible: u.donorVisible, lastDonated: u.lastDonated });
 function featuredSheet() {

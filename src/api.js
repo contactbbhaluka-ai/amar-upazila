@@ -25,6 +25,8 @@ const toStats = r => ({ people: r.people || 0, views: r.views || 0, today: r.tod
   sources: r.sources || {}, areas: r.areas || [], genders: r.genders || null, ages: r.ages || null, daily: r.daily || [], clicks: r.clicks || { profile: 0, photo: 0, more: 0 } });
 const toInsights = r => ({ days: r.days || 7, people: r.people || 0, views: r.views || 0, close: r.close || 0, others: r.others || 0, newFollowers: r.new_followers || 0, posts: r.posts || 0,
   sources: r.sources || {}, daily: r.daily || [], hours: r.hours || Array(24).fill(0), top: (r.top || []).map(t => ({ id: t.id, body: t.body || '', image: t.image || '', createdAt: t.created_at, people: t.people || 0, views: t.views || 0 })) });
+const SELF_NT = ['milestone', 'follower_milestone', 'weekly'];
+const toGrowth = r => ({ visits: r.visits || 0, visitors: r.visitors || 0, visitsDaily: r.visits_daily || [], followers: r.followers || 0, gained: r.gained || 0, lost: r.lost || 0, followDaily: r.follow_daily || [] });
 const lastDays = n => Array.from({ length: n }, (_, i) => { const d = new Date(Date.now() + 6 * 3600e3 - (n - 1 - i) * 864e5); return d.toISOString().slice(0, 10); });
 const toReq = r => r && ({ id: r.id, userId: r.user_id, kind: r.kind, name: r.full_name, category: r.category || '', links: r.links || '', note: r.note || '', status: r.status, adminNote: r.admin_note || '', coinsHeld: r.coins_held || 0, createdAt: r.created_at, decidedAt: r.decided_at || null });
 const settingDefaults = () => Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d]));
@@ -185,7 +187,13 @@ async function supabaseApi() {
     // ---------- পোস্ট কতজন দেখেছেন
     async postSeen(items) { if (me && items.length) await sb.rpc('post_seen2', { p_ids: items.map(x => x.id), p_src: items.map(x => x.src) }); },
     async postClick(id, kind) { if (me) await sb.rpc('post_click', { p_post: id, p_kind: kind }); },
-    async postStats(id) { return toStats(ok(await sb.rpc('post_stats', { p_id: id })) || {}); },
+    async postStats(id) {
+      const [st, avg] = await Promise.all([sb.rpc('post_stats', { p_id: id }), sb.rpc('post_avg_people', { p_id: id })]);
+      return { ...toStats(ok(st) || {}), avgPeople: avg.data == null ? null : Number(avg.data) };
+    },
+    async profileVisit(uid) { if (me && uid !== me.id) await sb.rpc('profile_visit', { p_user: uid }); },
+    async myGrowth(days) { return toGrowth(ok(await sb.rpc('my_growth', { p_days: days })) || {}); },
+    async weeklyReport() { if (me) await sb.rpc('ensure_weekly_report'); },
     async myInsights(days) { return toInsights(ok(await sb.rpc('my_insights', { p_days: days })) || {}); },
     // ---------- পোস্ট বুস্ট
     async boostedPosts(n = 3) {
@@ -546,11 +554,11 @@ async function supabaseApi() {
 
     // ---------- নোটিফিকেশন
     async notifications() {
-      const rows = ok(await sb.from('notifications').select('id,type,post_id,group_id,read,created_at,actor_id, a:profiles!notifications_actor_id_fkey(id,name,avatar_url), p:posts!notifications_post_id_fkey(body), g:groups!notifications_group_id_fkey(name)')
+      const rows = ok(await sb.from('notifications').select('id,type,post_id,group_id,read,created_at,actor_id,meta, a:profiles!notifications_actor_id_fkey(id,name,avatar_url), p:posts!notifications_post_id_fkey(body), g:groups!notifications_group_id_fkey(name)')
         .eq('user_id', me.id).order('created_at', { ascending: false }).limit(60));
       return rows.filter(n => n.a && !blocked.has(n.actor_id)).map(n => ({
         id: n.id, type: n.type, postId: n.post_id, groupId: n.group_id, groupName: n.g?.name || '', read: n.read, createdAt: n.created_at,
-        actor: { id: n.a.id, name: n.a.name, avatar: n.a.avatar_url || '' }, snippet: n.p?.body || '',
+        actor: { id: n.a.id, name: n.a.name, avatar: n.a.avatar_url || '' }, snippet: n.p?.body || '', meta: n.meta || {},
       }));
     },
     async unreadNotifications() {
@@ -746,10 +754,10 @@ function demoApi() {
     clean.filter(uid => !old.includes(uid) && sees(uid)).forEach(uid => notify(uid, from, 'mention', p.id));
     return clean;
   }
-  function notify(to, from, type, postId = null, groupId = null) {
-    if (!to || to === from || db.blocks.includes(to + ':' + from)) return;
+  function notify(to, from, type, postId = null, groupId = null, meta = null) {
+    if (!to || (to === from && !SELF_NT.includes(type)) || db.blocks.includes(to + ':' + from)) return;
     if (type !== 'comment' && type !== 'reply') db.notifs = db.notifs.filter(n => !(n.to === to && n.from === from && n.type === type && n.postId === postId && n.groupId === groupId));
-    db.notifs.push({ id: nid(db.notifs), to, from, type, postId, groupId, createdAt: new Date().toISOString(), read: false });
+    db.notifs.push({ id: nid(db.notifs), to, from, type, postId, groupId, meta, createdAt: new Date().toISOString(), read: false });
     save(); if (to === meId) notifyListeners.forEach(cb => cb());
   }
 
@@ -896,7 +904,23 @@ function demoApi() {
     },
     async postStats(id) {
       const p = db.posts.find(x => x.id === Number(id)); if (!p) throw new Error('পোস্ট পাওয়া যায়নি');
-      return wait(demoViews(p));
+      const others = db.posts.filter(x => x.userId === p.userId && x.id !== p.id).slice(-20).map(x => demoViews(x).people);
+      return wait({ ...demoViews(p), avgPeople: others.length ? others.reduce((t, n) => t + n, 0) / others.length : null });
+    },
+    async profileVisit() { return true; },
+    async myGrowth(days) {
+      const d = days >= 30 ? 30 : 7, seed = n => (Math.sin(n * 7919 + 104729) + 1) / 2;
+      const vd = lastDays(d).map((day, i) => ({ day, n: Math.round(seed(i) * 6) })), fd = lastDays(d).map((day, i) => ({ day, plus: Math.round(seed(i + 3) * 3), minus: seed(i + 9) > 0.8 ? 1 : 0 }));
+      return wait(toGrowth({ visits: vd.reduce((t, x) => t + x.n, 0), visitors: Math.round(vd.reduce((t, x) => t + x.n, 0) * 0.8), visits_daily: vd,
+        followers: db.follows.filter(f => f.endsWith(':' + meId)).length, gained: fd.reduce((t, x) => t + x.plus, 0), lost: fd.reduce((t, x) => t + x.minus, 0), follow_daily: fd }));
+    },
+    async weeklyReport() {
+      const today = new Date(Date.now() + 6 * 3600e3), dow = today.getUTCDay(), wk = new Date(today.getTime() - ((dow - 5 + 7) % 7) * 864e5).toISOString().slice(0, 10);
+      if (db.notifs.some(n => n.to === meId && n.type === 'weekly' && n.meta?.week === wk)) return;
+      const mine = db.posts.filter(p => p.userId === meId), people = mine.reduce((t, p) => t + demoViews(p).people, 0);
+      notify(meId, meId, 'weekly', null, null, { week: wk, people, prev: Math.round(people * 0.75), visits: 9, followers: 2 });
+      const top = mine.sort((a, b) => demoViews(b).people - demoViews(a).people)[0];
+      if (top && !db.notifs.some(n => n.to === meId && n.type === 'milestone')) notify(meId, meId, 'milestone', top.id, null, { n: 10 });
     },
     async boostSeen(ids) { const seen = get('bseen', {}), day = new Date().toISOString().slice(0, 10); for (const id of ids) { const k = id + ':' + day; if (seen[k]) continue; seen[k] = 1; const b = db.boosts.find(x => x.id === id); if (b) b.reach++; } set('bseen', seen); save(); },
     async requestBoost(postId, days, unionId) {
@@ -1266,7 +1290,7 @@ function demoApi() {
 
     async notifications() {
       return wait(db.notifs.filter(n => n.to === meId && !isBlocked(n.from)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 60)
-        .map(n => ({ id: n.id, type: n.type, postId: n.postId, groupId: n.groupId || null, groupName: db.groups.find(g => g.id === n.groupId)?.name || '', read: n.read, createdAt: n.createdAt, actor: user(n.from) || { id: n.from, name: 'সদস্য', avatar: '' }, snippet: db.posts.find(p => p.id === n.postId)?.body || '' })));
+        .map(n => ({ id: n.id, type: n.type, postId: n.postId, groupId: n.groupId || null, groupName: db.groups.find(g => g.id === n.groupId)?.name || '', read: n.read, createdAt: n.createdAt, actor: user(n.from) || { id: n.from, name: 'সদস্য', avatar: '' }, snippet: db.posts.find(p => p.id === n.postId)?.body || '', meta: n.meta || {} })));
     },
     async unreadNotifications() { return db.notifs.filter(n => n.to === meId && !n.read && !isBlocked(n.from)).length; },
     async markNotificationsRead() { for (const n of db.notifs) if (n.to === meId) n.read = true; save(); },

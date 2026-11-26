@@ -417,6 +417,16 @@ function listBlock(title, rows) {
   if (!total) return '';
   return `<div class="ps-box"><b>${title}</b>${rows.map(([l, n]) => `<div class="pl-row"><span>${esc(l)}</span><span class="pl-bar"><i style="width:${(n / total) * 100}%"></i></span><b>${bn(n)}</b></div>`).join('')}</div>`;
 }
+// আপনার সাম্প্রতিক ২০টা পোস্টের গড়ের সাথে তুলনা
+function avgLine(n, avg) {
+  if (avg == null) return '<small class="ps-avg">তুলনার জন্য আরও পোস্ট দরকার</small>';
+  if (avg < 1) return n > 0 ? '<small class="ps-avg up">আপনার অন্য পোস্টগুলোর চেয়ে বেশি দেখা হয়েছে</small>' : '';
+  const r = n / avg;
+  if (r >= 1.5) return `<small class="ps-avg up">▲ আপনার সাধারণ পোস্টের চেয়ে ${bn(r >= 10 ? Math.round(r) : Math.round(r * 10) / 10)} গুণ বেশি</small>`;
+  if (r >= 1.1) return `<small class="ps-avg up">▲ আপনার সাধারণ পোস্টের চেয়ে ${bn(Math.round((r - 1) * 100))}% বেশি</small>`;
+  if (r > 0.9) return '<small class="ps-avg">আপনার সাধারণ পোস্টের মতোই</small>';
+  return `<small class="ps-avg down">▼ আপনার সাধারণ পোস্টের চেয়ে ${bn(Math.round((1 - r) * 100))}% কম</small>`;
+}
 async function postStatsSheet(p) {
   if (!p) return;
   openSheet('<div class="skel"></div>');
@@ -426,7 +436,7 @@ async function postStatsSheet(p) {
     const rx = Object.values(p.reactions || {}).reduce((t, n) => t + n, 0) || p.likes || 0;
     const cell = (icon, n, l) => `<div class="ps-cell"><span>${icon}</span><b>${bn(n)}</b><small>${l}</small></div>`;
     openSheet(`<h2>পোস্টের হিসাব</h2>
-      <div class="ps-big">${ic('users', 22)}<b>${bn(st.people)}</b><span>জন পোস্টটি দেখেছেন</span></div>
+      <div class="ps-big">${ic('users', 22)}<b>${bn(st.people)}</b><span>জন পোস্টটি দেখেছেন</span>${avgLine(st.people, st.avgPeople)}</div>
       <div class="ps-grid">
         ${cell('👁', st.views, 'মোট দেখা')}${cell('📅', st.today, 'আজ দেখেছেন')}${cell('👍', rx, 'রিয়্যাক্ট')}
         ${cell('💬', p.comments || 0, 'মন্তব্য')}${cell('↗', p.shares || 0, 'শেয়ার')}${cell('🔖', p.saves || 0, 'সেভ')}
@@ -461,18 +471,29 @@ function bestWindow(hours) {
   for (let h = 0; h < 24; h++) { const s2 = hours[h] + hours[(h + 1) % 24]; if (s2 > best) { best = s2; at = h; } }
   return best > 0 ? `${hourBn(at)} থেকে ${hourBn((at + 2) % 24)}` : '';
 }
+function followChart(daily) {
+  const max = Math.max(1, ...daily.map(d => Math.max(d.plus, d.minus))), many = daily.length > 10;
+  return `<div class="ps-chart fol${many ? ' many' : ''}">${daily.map((d, i) => {
+    const dt = new Date(d.day + 'T00:00:00'), lbl = many ? (i % 5 === 0 || i === daily.length - 1 ? bn(dt.getDate()) : '') : WD[dt.getDay()];
+    return `<div class="pc-col" title="${bn(dt.getDate())} তারিখ: +${bn(d.plus)} / −${bn(d.minus)}"><div class="fc-bars"><i class="p" style="height:${d.plus ? Math.max(4, (d.plus / max) * 100) : 0}%"></i><i class="m" style="height:${d.minus ? Math.max(4, (d.minus / max) * 100) : 0}%"></i></div><span>${lbl}</span></div>`;
+  }).join('')}</div><div class="ps-leg" style="margin-top:6px"><span><i class="c1"></i>ফলো</span><span><i class="c3"></i>আনফলো</span></div>`;
+}
 async function loadInsights(days) {
   const box = $('#insights');
   if (!me()) { box.innerHTML = '<div class="empty">ড্যাশবোর্ড দেখতে লগইন করুন।</div>'; return; }
   S.insDays = days || S.insDays || 7;
   box.innerHTML = '<div class="skel"></div><div class="skel"></div>';
   try {
-    const d = await S.api.myInsights(S.insDays), best = bestWindow(d.hours), hmax = Math.max(1, ...d.hours);
+    const [d, g] = await Promise.all([S.api.myInsights(S.insDays), S.api.myGrowth(S.insDays)]), best = bestWindow(d.hours), hmax = Math.max(1, ...d.hours);
     const tile = (icon, n, l) => `<div class="in-tile"><span>${icon}</span><b>${bn(n)}</b><small>${l}</small></div>`;
     box.innerHTML = `
       <div class="seg in-seg" role="tablist">${[7, 30].map(n => `<button role="tab" data-indays="${n}" class="${S.insDays === n ? 'on' : ''}" aria-selected="${S.insDays === n}">গত ${bn(n)} দিন</button>`).join('')}</div>
-      <div class="in-tiles">${tile('👥', d.people, 'জন দেখেছেন')}${tile('👁', d.views, 'মোট ভিউ')}${tile('➕', d.newFollowers, 'নতুন ফলোয়ার')}${tile('📝', d.posts, 'পোস্ট করেছেন')}</div>
-      <div class="card">${chartBlock('প্রতিদিনের ভিউ', d.daily)}</div>
+      <div class="in-tiles">${tile('👥', d.people, 'জন পোস্ট দেখেছেন')}${tile('👁', d.views, 'পোস্টের মোট ভিউ')}${tile('🏠', g.visits, 'প্রোফাইল ভিজিট')}${tile('📝', d.posts, 'পোস্ট করেছেন')}</div>
+      <div class="card">${chartBlock('প্রতিদিনের পোস্ট ভিউ', d.daily)}</div>
+      <div class="card"><b class="in-h">ফলোয়ার</b>
+        <div class="in-fol"><div><b>${bn(g.followers)}</b><small>এখন মোট</small></div><div class="up"><b>+${bn(g.gained)}</b><small>নতুন ফলো করেছেন</small></div><div class="down"><b>−${bn(g.lost)}</b><small>আনফলো করেছেন</small></div><div><b>${g.gained - g.lost >= 0 ? '+' : '−'}${bn(Math.abs(g.gained - g.lost))}</b><small>মোট বদল</small></div></div>
+        ${followChart(g.followDaily)}</div>
+      <div class="card">${chartBlock(`প্রোফাইল ভিজিট · ${bn(g.visitors)} জন`, g.visitsDaily)}<p class="mut" style="margin:6px 0 0;font-size:12.5px">একজন দিনে একবার গোনা হয়। কে ভিজিট করেছেন তা দেখানো হয় না।</p></div>
       <div class="card"><div class="ps-aud" style="margin:0;border:0;padding:0"><b>কারা দেখেছেন</b>
         <div class="ps-bar"><i style="width:${d.people ? (d.close / d.people) * 100 : 0}%"></i></div>
         <div class="ps-leg"><span><i class="c1"></i>বন্ধু / ফলোয়ার <b>${bn(d.close)}</b></span><span><i class="c2"></i>অন্যরা <b>${bn(d.others)}</b></span></div></div></div>
@@ -1500,6 +1521,7 @@ async function openUser(id, silent, keepState) {
   try {
     const p = await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
+    if (!silent) S.api.profileVisit?.(id).catch(() => {});
     $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}<div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       ${introCard(p, false)}
@@ -1852,6 +1874,7 @@ function renderComposer() {
 function afterAuth() {
   if (!me() && S.scope === 'friends') S.scope = 'area';
   renderComposer(); renderFilters(); listenMessages(); refreshBadges(); loadFeed('home'); renderDemoBar();
+  if (me()) S.api.weeklyReport?.().then(() => refreshBadges()).catch(() => {});
   if (S.view === 'me') renderMe(); if (S.view === 'friends') loadFriends(); if (S.view === 'msgs') loadConvs(); if (S.view === 'notif') loadNotifs(); if (S.view === 'menu') renderMenu();
 }
 
@@ -1962,6 +1985,21 @@ const NT = {
   boost_ok: ['🚀', 'আপনার পোস্টের বুস্ট অনুমোদন করেছেন, এখন চলছে'],
   boost_no: ['✖', 'আপনার পোস্টের বুস্ট গ্রহণ করেননি, কয়েন ফেরত গেছে'],
 };
+// নিজের অর্জনের নোটিফিকেশন (মাইলফলক, সাপ্তাহিক রিপোর্ট): কারো নাম নয়, শুধু খবরটা
+const SELF_TYPES = ['milestone', 'follower_milestone', 'weekly'];
+function selfNotif(n) {
+  const m = n.meta || {};
+  let icon = '🎉', text = '';
+  if (n.type === 'milestone') text = `অভিনন্দন! আপনার পোস্ট <b>${bn(m.n || 0)} জন</b> দেখেছেন${n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : ''}`;
+  else if (n.type === 'follower_milestone') text = `অভিনন্দন! আপনার ফলোয়ার এখন <b>${bn(m.n || 0)} জন</b>`;
+  else {
+    icon = '📊';
+    const ch = m.prev ? Math.round(((m.people - m.prev) / m.prev) * 100) : null;
+    text = `<b>সাপ্তাহিক রিপোর্ট:</b> গত সপ্তাহে আপনার পোস্ট ${bn(m.people || 0)} জন দেখেছেন${ch === null ? '' : ch >= 0 ? `, আগের সপ্তাহের চেয়ে <b class="up">${bn(ch)}% বেশি</b>` : `, আগের সপ্তাহের চেয়ে <b class="down">${bn(-ch)}% কম</b>`}। প্রোফাইল ভিজিট ${bn(m.visits || 0)}, নতুন ফলোয়ার ${bn(m.followers || 0)}।`;
+  }
+  return `<div class="notif self${n.read ? '' : ' new'}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="" data-n-user="" role="button" tabindex="0">
+    <span class="ico"><span class="self-ic">${icon}</span></span><span class="txt">${text}<span class="time">${esc(ago(n.createdAt))}</span></span></div>`;
+}
 async function loadNotifs(keep) {
   const box = $('#notifs');
   if (!me()) { box.innerHTML = `<div class="empty">নোটিফিকেশন দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
@@ -1970,6 +2008,7 @@ async function loadNotifs(keep) {
     const [list, reqs] = await Promise.all([S.api.notifications(), S.api.friendRequests()]);
     const pending = new Set(reqs.map(r => r.id));
     box.innerHTML = list.length ? list.map(n => {
+      if (SELF_TYPES.includes(n.type)) return selfNotif(n);
       const [ic, txt] = NT[n.type] || ['•', ''];
       const snip = n.groupName ? ` <span class="q">${esc(n.groupName)}</span>` : n.snippet ? ` <span class="q">"${esc(n.snippet.slice(0, 40))}${n.snippet.length > 40 ? '…' : ''}"</span>` : '';
       const reqBtns = n.type === 'friend_request' && pending.has(n.actor.id)
@@ -1987,6 +2026,8 @@ function openNotif(el) {
   if ((t === 'like' || t === 'comment' || t === 'reply' || t === 'mention' || t === 'share' || t === 'tag' || t === 'boost_ok' || t === 'boost_no') && el.dataset.nPost) openPost(el.dataset.nPost);
   else if (t === 'friend_request') go('friends');
   else if (t === 'verify_ok' || t === 'verify_no') { open('wallet'); loadWallet(); }
+  else if (t === 'milestone' && el.dataset.nPost) openPost(el.dataset.nPost);
+  else if (t === 'weekly' || t === 'follower_milestone' || t === 'milestone') { open('insights'); loadInsights(); }
   else if (t.startsWith('group_') && el.dataset.nGroup) openGroup(el.dataset.nGroup);
   else openUser(el.dataset.nUser);
 }

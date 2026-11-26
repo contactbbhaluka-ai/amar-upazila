@@ -548,8 +548,8 @@ async function loadWeather() {
     const u = `https://api.open-meteo.com/v1/forecast?latitude=${L.lat}&longitude=${L.lng}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=1`;
     const j = await (await fetch(u, { signal: AbortSignal.timeout?.(6000) })).json();
     const v = { temp: Math.round(j.current.temperature_2m), code: j.current.weather_code, max: Math.round(j.daily.temperature_2m_max[0]), min: Math.round(j.daily.temperature_2m_min[0]), rain: j.daily.precipitation_probability_max?.[0] ?? null };
-    local.set('wx', { t: Date.now(), k: key, v }); return v;
-  } catch { return c?.k === key ? c.v : null; }
+    local.set('wx', { t: Date.now(), k: key, v }); S.wxErr = false; return v;
+  } catch { S.wxErr = true; return c?.k === key ? c.v : null; }
 }
 function renderDaily() {
   const box = $('#daily'); if (!box) return;
@@ -564,9 +564,11 @@ function renderDaily() {
   const open = !!S.dailyOpen;
   box.innerHTML = `<div class="card daily${open ? ' open' : ''}"><button class="dl-top" id="dl-toggle" aria-expanded="${open}">
       <span class="dl-pr">🕌 <span><small>পরের নামাজ${tomorrow ? ' (কাল)' : ''} · 📍${esc(L.name)}</small><b>${next[1]} ${hm(pt[next[0]])}</b><small>${lh ? `${bn(lh)} ঘণ্টা ` : ''}${lm || !lh ? `${bn(lm)} মিনিট ` : ''}পর</small></span></span>
-      ${w ? `<span class="dl-wx"><span class="dl-wi">${w[0]}</span><span><b>${bn(wx.temp)}°</b><small>${w[1]}</small></span></span>` : ''}
+      ${w ? `<span class="dl-wx"><span class="dl-wi">${w[0]}</span><span><b>${bn(wx.temp)}°</b><small>${w[1]}</small></span></span>`
+        : `<span class="dl-wx"><span class="dl-wi">🌡️</span><span><small>${S.wxErr ? 'আবহাওয়া<br>আনা যায়নি' : 'আবহাওয়া<br>আসছে…'}</small></span></span>`}
       <span class="dl-chev">${open ? '▴' : '▾'}</span></button>
     ${open ? `<div class="dl-more"><div class="dl-grid">${PRAYERS.map(([k, n]) => `<span class="${next[0] === k && !tomorrow ? 'on' : ''}"><small>${n}</small><b>${hm(pt[k])}</b></span>`).join('')}</div>
+      ${!wx && S.wxErr ? `<p class="dl-wxl">আবহাওয়ার তথ্য আনা যায়নি। ইন্টারনেট সংযোগ দেখে <button class="link" id="dl-wxr">আবার চেষ্টা করুন</button></p>` : ''}
       ${wx ? `<p class="dl-wxl">${esc(L.name)}: আজ সর্বোচ্চ ${bn(wx.max)}°, সর্বনিম্ন ${bn(wx.min)}°${wx.rain != null ? ` · বৃষ্টির সম্ভাবনা ${bn(wx.rain)}%` : ''}</p>` : ''}
       <div class="dl-loc">${myLoc() ? `<span>📍 আপনার লোকেশন: <b>${esc(L.name)}</b></span><button class="link" id="dl-loc">আবার খুঁজুন</button><button class="link" id="dl-home">${esc(HOME_LOC.of)} সময় দেখান</button>`
         : `<button class="sbtn" id="dl-loc">📍 আমার লোকেশন অনুযায়ী দেখান</button><span class="mut">এখন ${esc(HOME_LOC.of)} সময় দেখাচ্ছে</span>`}</div>
@@ -576,6 +578,7 @@ function renderDaily() {
 $('#daily').addEventListener('click', e => {
   if (e.target.closest('#dl-toggle')) { S.dailyOpen = !S.dailyOpen; renderDaily(); }
   const lb = e.target.closest('#dl-loc'); if (lb) return useMyLocation(lb);
+  if (e.target.closest('#dl-wxr')) { S.wxErr = false; renderDaily(); return loadWeather().then(v => { S.wx = v; renderDaily(); }); }
   if (e.target.closest('#dl-home')) { local.set('myloc', null); local.set('wx', null); S.wx = null; renderDaily(); loadWeather().then(v => { if (v) { S.wx = v; renderDaily(); } }); return toast(`${HOME_LOC.of} সময় দেখাচ্ছে`); }
   if (e.target.closest('#dl-off')) { local.set('daily-off', 1); renderDaily(); toast('লুকানো হয়েছে। ☰ মেনু → সেটিংস থেকে আবার চালু করা যাবে'); }
 });
@@ -599,7 +602,7 @@ function renderTrend() {
 }
 async function loadHomeExtras() {
   renderDaily();
-  if (!local.get('daily-off')) loadWeather().then(v => { if (v) { S.wx = v; renderDaily(); } });
+  if (!local.get('daily-off')) loadWeather().then(v => { S.wx = v || S.wx; renderDaily(); });
   S.api.trendingTags().then(t => { S.trend = t; renderTrend(); }).catch(() => {});
   if (me() && !S.actAs) {
     S.api.birthdays().then(b => { S.bdays = b; renderBdays(); }).catch(() => {});

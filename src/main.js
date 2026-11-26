@@ -1561,7 +1561,7 @@ async function openUser(id, silent, keepState) {
     const p = await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
     if (!silent) S.api.profileVisit?.(id).catch(() => {});
-    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}<div class="mut">${esc(p.union)}</div>
+    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       ${introCard(p, false)}
       ${statsHtml(p)}
@@ -1845,7 +1845,7 @@ async function renderMe(mode = 'login') {
   const u = me();
   if (u) {
     $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
-      <h2 style="margin:6px 0 0">${esc(u.name)}${vb(u.verified, true)}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}<div class="mut">${ic('pin', 14)} ${esc(u.union)}${u.admin && S.api.mode !== 'demo' ? ' · অ্যাডমিন' : ''}</div>
+      <h2 style="margin:6px 0 0">${esc(u.name)}${vb(u.verified, true)}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>

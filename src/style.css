@@ -1541,3 +1541,5 @@ img.av{aspect-ratio:1/1}
 .pc-sw.on{border-color:var(--ink)!important;box-shadow:0 0 0 2px var(--card) inset}
 .pc-bgnote{margin:-2px 0 6px;font-size:12.5px}
 #pc-text.pc-bg{padding:72px 18px 40px;min-height:220px}
+.pc-bgs-below{margin:8px 0 4px}
+.pc-bgs-below{display:grid;grid-template-columns:repeat(9,minmax(0,40px));justify-content:space-between;gap:6px;overflow:visible}.pc-bgs-below .pc-sw{width:100%;height:auto;aspect-ratio:1/1}

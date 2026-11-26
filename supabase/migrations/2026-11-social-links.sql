@@ -22,3 +22,7 @@ alter table public.profiles add column if not exists social jsonb not null defau
 do $$ begin
   alter table public.profiles add constraint profiles_social_valid check (public.valid_social(social));
 exception when duplicate_object then null; end $$;
+
+-- ---------- এবাউট: কাজ ও শিক্ষা ----------
+alter table public.profiles add column if not exists work text check (char_length(work) <= 80);
+alter table public.profiles add column if not exists education text check (char_length(education) <= 80);

@@ -1246,6 +1246,10 @@ do $$ begin
   alter table public.profiles add constraint profiles_social_valid check (public.valid_social(social));
 exception when duplicate_object then null; end $$;
 
+-- ---------- এবাউট: কাজ ও শিক্ষা ----------
+alter table public.profiles add column if not exists work text check (char_length(work) <= 80);
+alter table public.profiles add column if not exists education text check (char_length(education) <= 80);
+
 -- =====================================================================
 --  নিজেকে অ্যাডমিন বানাতে: অ্যাপে প্রথমে সাইনআপ করুন, তারপর নিচের লাইনে
 --  নিজের ইমেইল বসিয়ে আলাদাভাবে চালান:

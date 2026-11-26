@@ -41,6 +41,10 @@ const ICONS = {
   s_tiktok: '<path d="M14 4v10.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 4c.4 2.3 2 3.8 4.5 4"/>',
   s_youtube: '<rect x="3" y="6" width="18" height="12" rx="3.5"/><path d="M10.5 9.5v5l4-2.5z"/>',
   s_instagram: '<rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="16.8" cy="7.2" r=".6"/>',
+  work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 12h18"/>',
+  school: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
+  chevD: '<path d="M6 9l6 6 6-6"/>',
   album: '<rect x="3" y="6" width="15" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/><path d="M3 16l4-4 4 4 3-3 4 4"/>',
   tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.6"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
@@ -793,7 +797,7 @@ const socialHtml = (p, own) => {
   if (!list.length) return own ? '<button class="soc-add" id="soc-add">+ সোশ্যাল লিংক যোগ করুন</button>' : '';
   return `<div class="soc-row">${list.map(([k, l]) => `<a class="soc-b soc-${k}" href="${esc(s[k])}" target="_blank" rel="noopener noreferrer" aria-label="${l}-এ ${esc(p.name)}"><span class="soc-ic">${ic('s_' + k, 17)}</span>${l}</a>`).join('')}</div>`;
 };
-document.addEventListener('click', e => { if (e.target.closest('#soc-add')) { document.getElementById('edit')?.click(); setTimeout(() => $('#soc-facebook')?.scrollIntoView({ block: 'center' }), 80); } });
+document.addEventListener('click', e => { if (e.target.closest('#soc-add')) openAbout('social'); });
 
 // ================================================================ বন্ধু / ফলোয়ার / ফলো করছেন তালিকা ও তার প্রাইভেসি
 const PLIST = { friends: 'বন্ধু', followers: 'ফলোয়ার', following: 'ফলো করছেন' };
@@ -859,7 +863,7 @@ function coverHtml(p, own) {
 }
 function profTabs(key) {
   const st = S.pstate[key];
-  return `<div class="ptabs" role="tablist">${[['posts', 'পোস্ট'], ['photos', 'ছবি']].map(([k, l]) => `<button role="tab" data-ptab="${key}|${k}" aria-selected="${st.tab === k}" class="${st.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  return `<div class="ptabs" role="tablist">${[['posts', 'পোস্ট'], ['about', 'এবাউট'], ['photos', 'ছবি']].map(([k, l]) => `<button role="tab" data-ptab="${key}|${k}" aria-selected="${st.tab === k}" class="${st.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div id="${key}-pane"></div>`;
 }
 function profComposer() {
@@ -875,6 +879,9 @@ function showProfPane(key) {
   if (st.tab === 'posts') {
     pane.innerHTML = own ? profComposer() + '<h2 class="sec-h">আমার পোস্ট</h2>' : '';
     feed.hidden = false; loadFeed(key);
+  } else if (st.tab === 'about') {
+    feed.hidden = true; if (more) more.hidden = true;
+    renderAbout(key);
   } else {
     feed.hidden = true; if (more) more.hidden = true;
     loadPhotosPane(key);
@@ -994,6 +1001,112 @@ document.addEventListener('click', async e => {
   }
 });
 
+// ================================================================ এবাউট (ফেসবুকের মতো): প্রতিটা অংশ চাপলে নিচে এডিট খোলে
+const joinedText = d => { if (!d) return ''; const t = new Date(d); return `${bn(t.getFullYear())} সালের ${['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'][t.getMonth()]} থেকে সদস্য`; };
+const ABOUT = [
+  { id: 'intro', ic: 'info', t: 'পরিচিতি',
+    sum: u => u.bio || '', empty: 'নিজের সম্পর্কে কিছু লিখুন',
+    form: u => `<label for="ab-name">নাম</label><input id="ab-name" required minlength="2" maxlength="40" value="${esc(u.name)}">
+      <label for="ab-bio">নিজের সম্পর্কে</label><textarea id="ab-bio" maxlength="160" rows="2" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">${esc(u.bio || '')}</textarea>`,
+    read: () => { const name = $('#ab-name').value.trim(); if (name.length < 2) return { err: 'নাম অন্তত ২ অক্ষরের দিন' }; return { name, bio: $('#ab-bio').value.trim() }; } },
+  { id: 'work', ic: 'work', t: 'কাজ ও শিক্ষা',
+    sum: u => [u.work && `${u.work}-এ কাজ করেন`, u.education && `${u.education}-এ পড়েছেন`].filter(Boolean).join(' · '), empty: 'কর্মস্থল ও শিক্ষাপ্রতিষ্ঠান যোগ করুন',
+    form: u => `<label for="ab-work">${ic('work', 16)} কর্মস্থল / পেশা</label><input id="ab-work" maxlength="80" value="${esc(u.work || '')}" placeholder="যেমন: ভালুকা সরকারি কলেজ, নিজস্ব ব্যবসা">
+      <label for="ab-edu">${ic('school', 16)} শিক্ষাপ্রতিষ্ঠান</label><input id="ab-edu" maxlength="80" value="${esc(u.education || '')}" placeholder="যেমন: ভালুকা পাইলট উচ্চ বিদ্যালয়">`,
+    read: () => ({ work: $('#ab-work').value.trim(), education: $('#ab-edu').value.trim() }) },
+  { id: 'addr', ic: 'pin', t: 'ঠিকানা',
+    sum: u => u.union || '', empty: 'ঠিকানা দিন',
+    form: u => addrHtml('ab', u), after: u => addrRefresh('ab', u),
+    read: () => { const a = readAddr('ab'); if (!a.upazila || (a.upazila === HOME_UPAZILA && !a.unionId)) return { err: 'ঠিকানা সম্পূর্ণ বাছাই করুন' }; return a; } },
+  { id: 'contact', ic: 'mobile', t: 'যোগাযোগ', own: true,
+    sum: u => (u.phone ? bn(u.phone) : ''), empty: 'মোবাইল নম্বর দিন',
+    form: u => `<label for="ab-ph">${ic('mobile', 16)} মোবাইল নম্বর</label><input id="ab-ph" required inputmode="tel" maxlength="17" value="${esc(u.phone ? bn(u.phone) : '')}" placeholder="০১XXXXXXXXX">
+      <p class="mut ab-note">${ic('lock', 13)} প্রোফাইলে কেউ দেখে না। ব্লাড ব্যাংকে ডোনার হলে শুধু লগইন করা ব্যবহারকারীরা দেখতে পান।</p>`,
+    read: () => { const phone = normPhone($('#ab-ph').value); return validPhone(phone) ? { phone } : { err: 'সঠিক মোবাইল নম্বর দিন (যেমন ০১৭১২৩৪৫৬৭৮)' }; } },
+  { id: 'blood', ic: 'drop', t: 'রক্তদান',
+    sum: u => (u.bloodGroup ? `${u.bloodGroup} · ${u.donorVisible ? 'ব্লাড ব্যাংকে ডোনার' : 'ব্লাড ব্যাংকে দেখানো বন্ধ'}${u.lastDonated ? ` · সর্বশেষ ${bnDate(u.lastDonated)}` : ''}` : ''), empty: 'ব্লাড গ্রুপ দিন',
+    pub: u => (u.bloodGroup && u.donorVisible ? `রক্তের গ্রুপ ${u.bloodGroup}` : ''),
+    form: u => bloodHtml('ab', u.bloodGroup || '', u.donorVisible, u.lastDonated || ''),
+    after: () => { if ($('#ab-never')?.checked) $('#ab-ld').disabled = true; },
+    read: () => { const b = readBlood('ab'); if (b.err) return b; return { ...b, donorVisible: !!$('#ab-donor')?.checked }; } },
+  { id: 'social', ic: 'link', t: 'সোশ্যাল লিংক',
+    sum: u => SOCIALS.filter(([k]) => u.social?.[k]).map(([, l]) => l).join(', '), empty: 'Facebook, WhatsApp, TikTok, YouTube, Instagram যোগ করুন',
+    form: u => `<div class="soc-edit flat">${SOCIALS.map(([k, l, ph]) => `<label for="soc-${k}" class="soc-l"><span class="soc-ic">${ic('s_' + k, 16)}</span>${l}</label><input id="soc-${k}" maxlength="200" inputmode="${k === 'whatsapp' ? 'tel' : 'url'}" autocomplete="off" value="${esc(k === 'whatsapp' && u.social?.[k] ? '+' + u.social[k].split('/').pop() : (u.social?.[k] || ''))}" placeholder="${esc(ph)}">`).join('')}</div>`,
+    read: () => {
+      const social = {};
+      for (const [k, l] of SOCIALS) {
+        const v = normSocial(k, $('#soc-' + k).value);
+        if (v === null) { $('#soc-' + k).focus(); return { err: k === 'whatsapp' ? 'WhatsApp নম্বর ঠিক নেই (যেমন ০১৭১২৩৪৫৬৭৮)' : `${l} লিংক ঠিক নেই। ${l}-এর নিজের লিংক বা ইউজারনেম দিন।` }; }
+        if (v) social[k] = v;
+      }
+      return { social };
+    } },
+  { id: 'lists', ic: 'lock', t: 'বন্ধু ও ফলো তালিকার প্রাইভেসি', own: true, action: () => listPrivacySheet(),
+    sum: u => Object.entries(PLIST).map(([k, l]) => `${l}: ${PRIVACY[u[k + 'Visibility'] || 'public'][1]}`).join(' · ') },
+];
+function renderAbout(key) {
+  const pane = $('#' + key + '-pane'); if (!pane) return;
+  const own = key === 'me', u = own ? me() : S.viewProfile, open = S.pstate[key].open;
+  if (!u) return;
+  if (!own) {
+    const blood = ABOUT.find(a => a.id === 'blood').pub(u);
+    const rows = [
+      u.work && [ic('work', 18), `<b>${esc(u.work)}</b>-এ কাজ করেন`],
+      u.education && [ic('school', 18), `<b>${esc(u.education)}</b>-এ পড়েছেন`],
+      u.union && [ic('pin', 18), `থাকেন <b>${esc(u.union)}</b>`],
+      blood && [ic('drop', 18), esc(blood)],
+      u.joinedAt && [ic('calendar', 18), joinedText(u.joinedAt)],
+    ].filter(Boolean);
+    pane.innerHTML = `<div class="card about-view">${u.bio ? `<p class="about-bio">${esc(u.bio)}</p>` : ''}
+      ${rows.map(([i, t]) => `<div class="av-row"><span class="av-i">${i}</span><span>${t}</span></div>`).join('')}
+      ${socialHtml(u, false)}
+      ${!rows.length && !u.bio && !Object.keys(u.social || {}).length ? '<p class="mut" style="margin:0">এখনো কোনো তথ্য দেওয়া নেই।</p>' : ''}</div>`;
+    return;
+  }
+  pane.innerHTML = `<div class="card about-edit">${ABOUT.map(a => {
+    const sum = a.sum(u), isOpen = open === a.id;
+    return `<div class="ab-sec${isOpen ? ' open' : ''}" data-absec="${a.id}">
+      <button class="ab-head" data-abopen="${a.id}" aria-expanded="${isOpen}">
+        <span class="ab-ic">${ic(a.ic, 18)}</span>
+        <span class="ab-tx"><b>${a.t}${a.own ? ` <span class="ab-only">${ic('lock', 11)} শুধু আপনি</span>` : ''}</b><small class="${sum ? '' : 'ab-empty'}">${esc(sum || (a.empty ? '+ ' + a.empty : ''))}</small></span>
+        <span class="ab-chev">${a.action ? ic('chevR', 18) : ic('chevD', 18)}</span>
+      </button>
+      ${isOpen ? `<form class="ab-form" data-abform="${a.id}">${a.form(u)}<div class="ab-btns"><button type="button" class="btn ghost sm" data-abcancel>বাতিল</button><button class="btn sm">সেভ করুন</button></div></form>` : ''}
+    </div>`;
+  }).join('')}
+  ${u.joinedAt ? `<div class="ab-joined">${ic('calendar', 15)} ${joinedText(u.joinedAt)}</div>` : ''}</div>`;
+  const a = ABOUT.find(x => x.id === open);
+  if (a?.after) a.after(u);
+  if (a) setTimeout(() => pane.querySelector('.ab-form input, .ab-form select, .ab-form textarea')?.focus({ preventScroll: true }), 30);
+}
+function openAbout(section) {
+  Object.assign(S.pstate.me, { tab: 'about', open: section || null, album: null });
+  if (S.view !== 'me') go('me'); else renderMe();
+  setTimeout(() => document.querySelector(`[data-absec="${section}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 120);
+}
+document.addEventListener('click', e => {
+  const h = e.target.closest('[data-abopen]');
+  if (h) {
+    const id = h.dataset.abopen, a = ABOUT.find(x => x.id === id);
+    if (a.action) return a.action();
+    S.pstate.me.open = S.pstate.me.open === id ? null : id; renderAbout('me');
+    document.querySelector(`[data-absec="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return;
+  }
+  if (e.target.closest('[data-abcancel]')) { S.pstate.me.open = null; renderAbout('me'); }
+});
+document.addEventListener('submit', e => {
+  const f = e.target.closest('[data-abform]'); if (!f) return;
+  e.preventDefault();
+  const a = ABOUT.find(x => x.id === f.dataset.abform), v = a.read(); if (v.err) return toast(v.err);
+  const u = me();
+  const base = { name: u.name, district: u.district, upazila: u.upazila, unionId: u.unionId, bio: u.bio, phone: u.phone, bloodGroup: u.bloodGroup, donorVisible: u.donorVisible, lastDonated: u.lastDonated };
+  busy(e.submitter, async () => {
+    await S.api.updateProfile({ ...base, ...v });
+    S.pstate.me.open = null; renderMe(); renderComposer(); toast(`${a.t} সেভ হয়েছে`);
+  });
+});
+
 async function openUser(id, silent, keepState) {
   if (me() && id === me().id) return go('me');
   if (!keepState && S.pstate.user.uid !== id) Object.assign(S.pstate.user, { tab: 'posts', seg: 'all', album: null });
@@ -1001,6 +1114,7 @@ async function openUser(id, silent, keepState) {
   if (!silent) { S.userId = id; open('user'); $('#user').innerHTML = '<div class="skel"></div>'; S.feeds.user.posts = []; $('#feed-user').innerHTML = ''; }
   try {
     const p = await S.api.profile(id), r = p.rel || {};
+    S.viewProfile = p;
     $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}</h2><div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       ${socialHtml(p, false)}
@@ -1272,7 +1386,7 @@ async function renderMe(mode = 'login') {
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${socialHtml(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
-      <div class="row"><button class="btn ghost" id="edit">প্রোফাইল এডিট</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
+      <div class="row"><button class="btn ghost" id="edit">${ic('edit', 15)} এবাউট এডিট</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
       ${profTabs('me')}`;
     S.api.profile(u.id).then(p => { if ($('#mystats')) $('#mystats').innerHTML = statsHtml(p); }).catch(() => {});
     showProfPane('me');
@@ -1335,33 +1449,7 @@ document.addEventListener('click', async e => {
     openSheet(`<h2>ব্লক করা মানুষ</h2>${list.length ? list.map(u => `<div class="person">${av(u)}<div class="info"><b>${esc(u.name)}</b></div><button class="sbtn ghost" data-unb="${esc(u.id)}">আনব্লক</button></div>`).join('') : '<p class="mut">কাউকে ব্লক করা নেই।</p>'}<button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
     $('#sheet').onclick = ev => { const b = ev.target.closest('[data-unb]'); if (b) busy(b, async () => { await S.api.unblock(b.dataset.unb); b.closest('.person').remove(); loadFeed('home'); }); };
   }
-  if (id === 'edit') {
-    const u = me();
-    openSheet(`<h2>প্রোফাইল এডিট</h2><form id="pform"><label for="pn">${ic('user', 16)} নাম</label><input id="pn" required minlength="2" maxlength="40" value="${esc(u.name)}">
-      ${addrHtml('pe', u)}
-      <label for="pe-ph">${ic('mobile', 16)} মোবাইল নম্বর</label><input id="pe-ph" required inputmode="tel" maxlength="17" value="${esc(u.phone ? bn(u.phone) : '')}" placeholder="০১XXXXXXXXX">
-      ${bloodHtml('pe', u.bloodGroup || '', u.donorVisible, u.lastDonated || '')}
-      <label for="pb">${ic('note', 16)} নিজের সম্পর্কে (ঐচ্ছিক)</label><input id="pb" maxlength="160" value="${esc(u.bio || '')}" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">
-      <div class="soc-edit"><b>সোশ্যাল লিংক <span class="mut" style="font-weight:400">(ঐচ্ছিক)</span></b>
-        ${SOCIALS.map(([k, l, ph]) => `<label for="soc-${k}" class="soc-l"><span class="soc-ic">${ic('s_' + k, 16)}</span>${l}</label><input id="soc-${k}" maxlength="200" inputmode="${k === 'whatsapp' ? 'tel' : 'url'}" autocomplete="off" value="${esc(k === 'whatsapp' && u.social?.[k] ? '+' + u.social[k].split('/').pop() : (u.social?.[k] || ''))}" placeholder="${esc(ph)}">`).join('')}</div>
-      <div class="row" style="margin-top:16px"><button class="btn" style="flex:1">সেভ করুন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div></form>`);
-    addrRefresh('pe', u);
-    if ($('#pe-never')?.checked) $('#pe-ld').disabled = true;
-    $('#pform').onsubmit = ev => {
-      ev.preventDefault();
-      const addr = readAddr('pe'), phone = normPhone($('#pe-ph').value), blood = readBlood('pe');
-      if (!addr.upazila || (addr.upazila === HOME_UPAZILA && !addr.unionId)) return toast('ঠিকানা সম্পূর্ণ বাছাই করুন');
-      if (!validPhone(phone)) return toast('সঠিক মোবাইল নম্বর দিন (যেমন ০১৭১২৩৪৫৬৭৮)');
-      if (blood.err) return toast(blood.err);
-      const social = {};
-      for (const [k, l] of SOCIALS) {
-        const v = normSocial(k, $('#soc-' + k).value);
-        if (v === null) { $('#soc-' + k).focus(); return toast(k === 'whatsapp' ? 'WhatsApp নম্বর ঠিক নেই (যেমন ০১৭১২৩৪৫৬৭৮)' : `${l} লিংক ঠিক নেই। ${l}-এর নিজের লিংক বা ইউজারনেম দিন।`); }
-        if (v) social[k] = v;
-      }
-      busy(ev.submitter, async () => { await S.api.updateProfile({ name: $('#pn').value.trim(), ...addr, phone, ...blood, donorVisible: !!$('#pe-donor')?.checked, bio: $('#pb').value.trim(), social }); closeSheet(); renderMe(); renderComposer(); renderMenu(); toast('সেভ হয়েছে'); });
-    };
-  }
+  if (id === 'edit') return openAbout(null);
   if (id === 'delacc') {
     if (!(await confirmSheet('অ্যাকাউন্ট, আপনার সব পোস্ট, ছবি, মন্তব্য ও মেসেজ স্থায়ীভাবে মুছে যাবে। নিশ্চিত?', 'হ্যাঁ, মুছে ফেলুন', true))) return;
     await busy(null, async () => { await S.api.deleteAccount(); afterAuth(); toast('অ্যাকাউন্ট মুছে ফেলা হয়েছে'); });

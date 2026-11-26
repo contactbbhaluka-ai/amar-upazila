@@ -1576,3 +1576,6 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 /* শেয়ার করা পোস্টে প্রোফাইল ছবি ঠিক মাপে, নাম ছবির উপর উঠবে না */
 .se-top .av{flex:none;width:36px;height:36px;min-width:36px;margin:0;max-height:none}
 .se-top>span:last-child{min-width:0;flex:1}
+/* প্রোফাইলের নাম ঠিক মাঝখানে; শেয়ার ও চোখ বাটন নামের ডানে বসে কিন্তু নামকে সরায় না */
+.prof h2.ph-h2{padding:0 78px;position:relative}
+.prof h2 .ph-acts{position:absolute;margin-left:12px;white-space:nowrap}

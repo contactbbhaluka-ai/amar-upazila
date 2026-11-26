@@ -3909,6 +3909,8 @@ async function loadDir() {
   const q = $('#q').value.trim(), landing = !S.dcat && !q;
   // প্রথম পাতায় আইকনের গ্রিড; কোনো ধরনের ভেতরে বা খোঁজার সময় উপরে দ্রুত বদলানোর চিপ
   $('#dchips').hidden = landing;
+  document.body.classList.toggle('dir-sub', !landing);
+  if (landing) S.dirSub = false;
   if (!landing) $('#dchips').innerHTML = [['', 'সব সেবা', '🗂️'], ['sos', 'জরুরি নম্বর', '🚨'], ...svcCats()].map(c => `<button class="chip svc-chip${c[0] === S.dcat ? ' on' : ''}" data-d="${c[0]}">${svcIc(c[0] || 'all', 16)}${esc(c[1])}</button>`).join('');
   if (!landing) setTimeout(() => $('#dchips .chip.on')?.scrollIntoView({ inline: 'center', block: 'nearest' }), 0);
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }
@@ -3934,6 +3936,8 @@ async function loadDir() {
 function openSvcCat(k) {
   const sp = SVC_SPECIAL[k];
   if (sp && sp !== 'blood') { S.fcat = sp; go('home'); renderFilters(); loadFeed('home'); return; }   // ক্রয়বিক্রয় ও চাকরি: ফিডের সেই ধরনের পোস্ট
+  // গ্রিড থেকে কোনো ধরনে ঢুকলে Back চাপলে আবার গ্রিডে ফেরে (অ্যাপ থেকে বেরিয়ে যায় না)
+  if (S.view === 'dir' && !S.dcat && !S.dirSub && k) { S.dirSub = true; pushNav(); }
   S.dcat = k; loadDir(); window.scrollTo(0, 0);
 }
 $('#q').addEventListener('input', () => { clearTimeout(svcTimer); svcTimer = setTimeout(loadDir, 300); });
@@ -5860,6 +5864,7 @@ function back() { try { history.back(); } catch { onPop(); } }
 function onPop() {
   if (S.viewerOpen) return closeViewer();
   if ($('#modal').classList.contains('on')) return closeSheet();
+  if (S.view === 'dir' && S.dirSub) { S.dirSub = false; S.dcat = ''; if ($('#q')) $('#q').value = ''; loadDir(); window.scrollTo(0, 0); return; }
   if (!S.stack.length) return;
   const prev = S.stack.pop(); show(prev); RELOAD[prev]?.();
 }

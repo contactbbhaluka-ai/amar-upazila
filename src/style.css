@@ -1681,7 +1681,7 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .act-row:disabled{cursor:default;opacity:.7}.act-ic{font-size:20px;width:30px;text-align:center;flex:none}.act-b{display:flex;flex-direction:column;gap:2px;min-width:0}
 .act-q{font-size:14px}.act-p{color:var(--mut,#6b7280);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--line);padding-left:6px}.act-note{font-size:12.5px;text-align:center;margin:10px}
 .faq-i{border-bottom:1px solid var(--line);padding:10px 2px}.faq-i summary{font-weight:700;cursor:pointer}.faq-i p{margin:8px 0 2px;line-height:1.55}
-.upz-root #v-dir .back{display:none}
+.upz-root:not(.dir-sub) #v-dir .back{display:none}
 
 .sic{--c:#0f8a5f;display:inline-grid;place-items:center;flex:none;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);border-radius:12px}
 .svc-hero{display:flex;align-items:center;gap:10px;margin:12px 0 4px;padding:14px;border-radius:16px;background:linear-gradient(135deg,#0b7a55,#0f9a6c);color:#fff}

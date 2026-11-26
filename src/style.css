@@ -785,13 +785,15 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .ab-sub>input,.ab-sub>textarea,.ab-sub>select,.ab-sub>.un-wrap,.ab-sub>.date3{margin-top:2px}
 .ab-sub summary small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 
-/* ===== v25: নামের নিচে পরিচিতি (আলাদা বক্স নয়, সিম্পল আইকন লাইন) ===== */
-.intro-card{display:flex;flex-direction:column;align-items:flex-start;gap:5px;text-align:left;width:fit-content;max-width:100%;margin:8px auto 2px;padding:0;border:0;background:none}
-.intro-card .av-row{font-size:14px;gap:8px;align-items:flex-start;line-height:1.45}
-.intro-card .av-i{width:auto;height:auto;background:none;color:var(--mut);border-radius:0;padding-top:1px}
-.intro-card .av-i svg{width:17px;height:17px}
-.intro-card .soc-row{justify-content:flex-start;margin:2px 0 0}
-.intro-edit{display:inline-flex;align-items:center;gap:4px;border:0;background:none;color:var(--gt);font:inherit;font-size:13px;font-weight:700;padding:2px 0;cursor:pointer;min-height:0}
+/* ===== v25: নামের নিচে পরিচিতি — পাশাপাশি, সিম্পল আইকন ===== */
+.intro-card{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px 14px;margin:8px 0 2px;padding:0 6px;border:0;background:none}
+.intro-card .av-row{display:inline-flex;align-items:center;gap:5px;font-size:13.5px;line-height:1.4;color:var(--ink,inherit)}
+.intro-card .av-i{width:auto;height:auto;background:none;color:var(--mut);border-radius:0}
+.intro-card .av-i svg{width:15px;height:15px}
+.intro-card .soc-row{margin:0;gap:6px}
+.intro-card .soc-row a{transform:scale(.85)}
+.intro-card>p{flex-basis:100%;text-align:center}
+.intro-edit{flex-basis:100%;display:inline-flex;align-items:center;justify-content:center;gap:4px;border:0;background:none;color:var(--gt);font:inherit;font-size:13px;font-weight:700;padding:2px 0;cursor:pointer;min-height:0}
 .feat-list{display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow:auto}
 .feat-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:9px 12px;cursor:pointer;font-weight:400;margin:0}
 .feat-row:has(input:checked){border-color:var(--g);background:color-mix(in srgb,var(--g2) 60%,var(--card))}

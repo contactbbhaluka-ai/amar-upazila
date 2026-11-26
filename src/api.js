@@ -6,7 +6,7 @@
 //   User     { id, name, unionId, union, avatar, bio }
 //   Relation { friend: 'none'|'sent'|'received'|'friends', following, blocked }
 //   Post     { id, body, image, category, createdAt, likes, comments, userId, author, avatar, union, liked }
-import { SUPABASE_URL, SUPABASE_ANON_KEY, UPAZILA_ID, DEMO, SETTING_KEYS } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, UPAZILA_ID, DEMO, SETTING_KEYS, PUBLIC_URL } from './config.js';
 // অ্যালবামের ছবি: পোস্টের তালিকা থেকে একেকটা ছবি আলাদা করে [{ url, postId, i, createdAt }]
 const flattenPhotos = rows => rows.flatMap(r => (r.images || []).map((url, i) => ({ url, postId: r.id, i, createdAt: r.createdAt })));
 // নিজে থেকে তৈরি অ্যালবাম: প্রোফাইল ছবি, কভার ছবি, আর বাকি সব ছবি "মোবাইল আপলোড"-এ (ফেসবুকের মতো)
@@ -45,6 +45,7 @@ async function supabaseApi() {
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
+  let recoveryPending = false, recoveryCb = null;
   const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,friend_req_from,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
     id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
@@ -131,11 +132,14 @@ async function supabaseApi() {
 
   return {
     mode: 'supabase',
+    // ইমেইলের "পাসওয়ার্ড ভুলে গেছেন" লিংক থেকে ফিরলে নতুন পাসওয়ার্ড চাওয়া
+    onPasswordRecovery(cb) { recoveryCb = cb; if (recoveryPending) setTimeout(cb, 0); },
     async init(onAuth) {
       const { data } = await sb.auth.getSession();
       await loadMe(data.session);
       sb.auth.onAuthStateChange((event, session) => {
         if (event === 'TOKEN_REFRESHED') return;
+        if (event === 'PASSWORD_RECOVERY') { recoveryPending = true; setTimeout(() => recoveryCb?.(), 0); }
         setTimeout(async () => { try { await loadMe(session); } catch { me = null; } onAuth?.(me); }, 0);
       });
       return me;
@@ -430,7 +434,17 @@ async function supabaseApi() {
     },
     async savePost(id) { ok(await sb.from('saved_posts').insert({ user_id: me.id, post_id: id })); },
     async unsavePost(id) { ok(await sb.from('saved_posts').delete().eq('user_id', me.id).eq('post_id', id)); },
-    async changePassword(password) { ok(await sb.auth.updateUser({ password })); },
+    async changePassword(password, oldPassword) {
+      if (oldPassword != null) { const r = await sb.auth.signInWithPassword({ email: me.email, password: oldPassword }); if (r.error) throw new Error('wrong password'); }
+      ok(await sb.auth.updateUser({ password })); recoveryPending = false;
+    },
+    async sendPasswordReset(email) { ok(await sb.auth.resetPasswordForEmail(email, { redirectTo: (PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '') })); },
+    async changeName(name) { ok(await sb.from('profiles').update({ name: name.trim() }).eq('id', me.id)); me.name = name.trim(); },
+    async changePhone(phone) { ok(await sb.from('profile_private').upsert({ user_id: me.id, phone: phone || null })); me.phone = phone || ''; },
+    async changeEmail(email, password) {
+      const r = await sb.auth.signInWithPassword({ email: me.email, password }); if (r.error) throw new Error('wrong password');
+      ok(await sb.auth.updateUser({ email: email.trim() }, { emailRedirectTo: (PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '') }));
+    },
 
     // ---------- পেইজ
     async myPages() {
@@ -1458,7 +1472,12 @@ function demoApi() {
       save();
     },
     async unsavePost(id) { db.saved = db.saved.filter(x => x !== meId + ':' + id); save(); },
-    async changePassword(pw) { person(meId).password = pw; save(); },
+    async changePassword(pw, oldPw) { const p = person(meId); if (oldPw != null && p.password !== oldPw) throw new Error('wrong password'); p.password = pw; save(); },
+    async sendPasswordReset() { return wait(); },
+    onPasswordRecovery() {},
+    async changeName(name) { person(meId).name = name.trim(); save(); return wait(); },
+    async changePhone(phone) { person(meId).phone = phone || ''; save(); return wait(); },
+    async changeEmail(email, password) { const p = person(meId); if (p.password !== password) throw new Error('wrong password'); p.email = email.trim(); save(); return wait(); },
 
     async myPages() { return wait([...db.pages.filter(x => x.ownerId === meId).map(pageOut), ...db.pages.filter(x => db.pageAdmins.includes(x.id + ':' + meId)).map(x => ({ ...pageOut(x), isAdmin: true }))]); },
     async followedPages() { return wait(db.pageFollows.filter(f => f.startsWith(meId + ':')).map(f => pageOf(f.split(':')[1])).filter(Boolean).map(pageOut)); },

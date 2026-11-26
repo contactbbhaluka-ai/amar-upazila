@@ -150,6 +150,9 @@ function errText(e) {
   if (/lists max 20/.test(m)) return 'সর্বোচ্চ ২০টি তালিকা বানানো যায়';
   if (/friend_lists_user_id_name_key|duplicate key/.test(m)) return 'এই নামে আগে থেকেই একটা তালিকা আছে';
   if (/union only/.test(m)) return 'আপনি শুধু নিজের ইউনিয়নে ঘোষণা পাঠাতে পারবেন';
+  if (/wrong password/.test(m)) return 'পাসওয়ার্ড ঠিক হয়নি';
+  if (/email.*(already|registered|exists)/i.test(m)) return 'এই ইমেইল দিয়ে আগে থেকেই একটি অ্যাকাউন্ট আছে';
+  if (/rate limit|too many/i.test(m)) return 'অনেকবার চেষ্টা হয়েছে, কিছুক্ষণ পর আবার চেষ্টা করুন';
   if (/announce limit/.test(m)) return 'দিনে সর্বোচ্চ ৫টি জরুরি ঘোষণা পাঠানো যায়';
   if (/admins only/.test(m)) return 'এই গ্রুপে শুধু অ্যাডমিনরা মেসেজ পাঠাতে পারেন';
   if (/last admin/.test(m)) return 'গ্রুপে অন্তত একজন অ্যাডমিন থাকতে হবে';
@@ -3679,11 +3682,13 @@ async function renderMe(mode = 'login') {
       <label for="ae">${ic('mail', 16)} ইমেইল</label><input id="ae" type="email" required autocomplete="email" inputmode="email">
       <label for="ap">${ic('lock', 16)} পাসওয়ার্ড</label><input id="ap" type="password" required minlength="6" autocomplete="${signup ? 'new-password' : 'current-password'}">
       ${signup ? `<label class="chk"><input type="checkbox" id="agree" required> <span>আমার বয়স ১৩ বছরের বেশি, এবং আমি <a href="./privacy.html">ব্যবহারের নিয়ম</a> মেনে চলব: মিথ্যা খবর, গালিগালাজ বা আপত্তিকর কিছু পোস্ট করব না।</span></label>` : ''}
+      ${signup ? '' : '<button type="button" class="link pw-forgot" id="login-forgot">পাসওয়ার্ড ভুলে গেছেন?</button>'}
       <button class="btn wide" style="margin-top:14px">${signup ? 'অ্যাকাউন্ট খুলুন' : 'লগইন'}</button>
     </form>
     <p style="text-align:center;margin:10px 0 0">${signup ? 'আগে থেকে অ্যাকাউন্ট আছে?' : 'নতুন ব্যবহারকারী?'} <button class="link" id="swap">${signup ? 'লগইন করুন' : 'অ্যাকাউন্ট খুলুন'}</button></p></div>
     <p class="note"><a class="link" href="./privacy.html">গোপনীয়তা নীতি</a></p>`;
   $('#swap').onclick = () => renderMe(signup ? 'login' : 'signup');
+  $('#login-forgot')?.addEventListener('click', () => forgotPassword(''));
   if (signup) addrRefresh('su');
   $('#aform').onsubmit = e => {
     e.preventDefault();
@@ -4630,25 +4635,28 @@ function renderMenu() {
     </div>` : ''}
     <h3 class="mn-h">⚙️ সেটিংস</h3>
     <details class="card"${u ? '' : ' hidden'}><summary>👤 অ্যাকাউন্ট</summary><div class="setlist">
-      <button id="edit">প্রোফাইল এডিট</button>
-      <button id="chpw">পাসওয়ার্ড পরিবর্তন</button>
-      <button id="delacc" style="color:var(--r)">অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলুন</button></div></details>
+      <button id="acc-name"><span class="set-ic">✏️</span>নাম পরিবর্তন<span class="val">${esc(u?.name || '')}</span></button>
+      <button id="acc-email"><span class="set-ic">📧</span>ইমেইল পরিবর্তন<span class="val">${esc(u?.email || '')}</span></button>
+      <button id="acc-phone"><span class="set-ic">📱</span>মোবাইল নম্বর পরিবর্তন<span class="val">${u?.phone ? esc(fmtPhone(u.phone)) : 'দেওয়া নেই'}</span></button>
+      <button id="chpw"><span class="set-ic">🔑</span>পাসওয়ার্ড পরিবর্তন</button>
+      <button id="edit"><span class="set-ic">📝</span>প্রোফাইলের বাকি তথ্য<span class="val">ঠিকানা, রক্তের গ্রুপ…</span></button>
+      <button id="delacc" style="color:var(--r)"><span class="set-ic">🗑️</span>অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলুন</button></div></details>
     <details class="card"${u ? '' : ' hidden'}><summary>🔒 প্রাইভেসি</summary><div class="setlist">
-      <button id="plock">🔒 প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
-      <button id="listpriv">বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
-      <button id="showact">🟢 সক্রিয় অবস্থা দেখান (মেসেজে)</button>
-      <button id="blocked">ব্লক করা মানুষ</button></div></details>
+      <button id="plock"><span class="set-ic">🔒</span>প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
+      <button id="listpriv"><span class="set-ic">👁️</span>বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
+      <button id="showact"><span class="set-ic">🟢</span>সক্রিয় অবস্থা দেখান (মেসেজে)</button>
+      <button id="blocked"><span class="set-ic">🚫</span>ব্লক করা মানুষ</button></div></details>
     <details class="card"${u ? '' : ' hidden'}><summary>🔔 নোটিফিকেশন ও শব্দ</summary><div class="setlist">
-      <button id="ntset2">🔔 নোটিফিকেশন সেটিং</button>
-      <button id="msgsnd">🔊 শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
+      <button id="ntset2"><span class="set-ic">🔔</span>নোটিফিকেশন সেটিং</button>
+      <button id="msgsnd"><span class="set-ic">🔊</span>শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
     <details class="card"><summary>🎨 দেখতে কেমন</summary><div class="setlist">
-      <button id="theme">থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
-      <button id="fontsz">🔠 লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button></div></details>
+      <button id="theme"><span class="set-ic">🌓</span>থিম<span class="val">${esc((THEMES.find(t => t[0] === local.get('theme', '')) || THEMES[0])[1])}</span></button>
+      <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button></div></details>
     <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
-      ${S.api.demoLogin ? '<button id="demo-guide">🧪 ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset">🔄 ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
-      <button id="help">কোনো সমস্যা জানান</button>
-      <a href="./privacy.html">গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>
-      <button id="about">অ্যাপ সম্পর্কে<span class="val">${esc(versionLabel())}</span></button></div></details>
+      ${S.api.demoLogin ? '<button id="demo-guide"><span class="set-ic">🧪</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">🔄</span>ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
+      <button id="help"><span class="set-ic">🐞</span>কোনো সমস্যা জানান</button>
+      <a href="./privacy.html"><span class="set-ic">📜</span>গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>
+      <button id="about"><span class="set-ic">ℹ️</span>অ্যাপ সম্পর্কে<span class="val">${esc(versionLabel())}</span></button></div></details>
     ${u ? '<button class="btn ghost wide" id="logout" style="margin-top:4px">লগআউট</button>' : ''}
     </div>`;
   document.querySelectorAll('#menu details').forEach((d, i) => { d.open = !!wasOpen[i]; });
@@ -5102,12 +5110,10 @@ $('#admin').addEventListener('click', e => {
 });
 document.addEventListener('click', e => {
   const id = e.target.closest('button')?.id;
-  if (id === 'chpw') {
-    openSheet(`<h2>পাসওয়ার্ড পরিবর্তন</h2><form id="pwform"><label for="pw1">নতুন পাসওয়ার্ড</label><input id="pw1" type="password" minlength="6" required autocomplete="new-password">
-      <label for="pw2">আবার লিখুন</label><input id="pw2" type="password" minlength="6" required autocomplete="new-password">
-      <div class="row" style="margin-top:16px"><button class="btn" style="flex:1">পরিবর্তন করুন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div></form>`);
-    $('#pwform').onsubmit = ev => { ev.preventDefault(); if ($('#pw1').value !== $('#pw2').value) return toast('দুটো পাসওয়ার্ড মেলেনি'); busy(ev.submitter, async () => { await S.api.changePassword($('#pw1').value); closeSheet(); toast('পাসওয়ার্ড পরিবর্তন হয়েছে'); }); };
-  }
+  if (id === 'chpw') return passwordSheet();
+  if (id === 'acc-name') return nameSheet();
+  if (id === 'acc-email') return emailSheet();
+  if (id === 'acc-phone') return phoneSheet();
   if (id === 'theme') {
     const cur = local.get('theme', '');
     openSheet(`<h2>থিম</h2><div class="seg3">${THEMES.map(([v, l]) => `<label><input type="radio" name="th" value="${v}" ${v === cur ? 'checked' : ''}>${esc(l)}</label>`).join('')}</div><button class="btn ghost wide" data-close style="margin-top:14px">ঠিক আছে</button>`);
@@ -5117,6 +5123,77 @@ document.addEventListener('click', e => {
   if (id === 'about') openSheet(`<h2>আমার উপজেলা</h2><p>ভার্সন ১.০</p><p class="mut">উপজেলার মানুষকে যুক্ত রাখা আর সব সেবার তথ্য এক জায়গায় আনার জন্য তৈরি।</p><a class="link" href="./privacy.html">গোপনীয়তা নীতি</a><button class="btn ghost wide" data-close style="margin-top:10px">বন্ধ করুন</button>`);
 });
 
+// ================================================================ অ্যাকাউন্ট: নাম, ইমেইল, নম্বর, পাসওয়ার্ড (প্রোফাইলে না গিয়েই)
+const pwField = (id, label, ac) => `<label for="${id}">${label}</label><div class="pw-wrap"><input id="${id}" type="password" minlength="6" required autocomplete="${ac}"><button type="button" class="pw-eye" data-pweye="${id}" aria-label="পাসওয়ার্ড দেখুন">👁️</button></div>`;
+document.addEventListener('click', e => { const b = e.target.closest('[data-pweye]'); if (!b) return; const i = document.getElementById(b.dataset.pweye); if (i) { i.type = i.type === 'password' ? 'text' : 'password'; b.textContent = i.type === 'password' ? '👁️' : '🙈'; } });
+function passwordSheet() {
+  const u = me(); if (!u) return;
+  openSheet(`<h2>🔑 পাসওয়ার্ড পরিবর্তন</h2><form id="pwform">
+    ${pwField('pw0', 'বর্তমান পাসওয়ার্ড', 'current-password')}
+    <button type="button" class="link pw-forgot" id="pw-forgot">পাসওয়ার্ড ভুলে গেছেন?</button>
+    ${pwField('pw1', 'নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)', 'new-password')}
+    ${pwField('pw2', 'নতুন পাসওয়ার্ড আবার লিখুন', 'new-password')}
+    <div class="row" style="margin-top:16px"><button class="btn" style="flex:1">পরিবর্তন করুন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div></form>`);
+  $('#pw-forgot').onclick = () => forgotPassword(u.email);
+  $('#pwform').onsubmit = ev => {
+    ev.preventDefault();
+    if ($('#pw1').value !== $('#pw2').value) return toast('নতুন পাসওয়ার্ড দুটো মেলেনি');
+    if ($('#pw1').value === $('#pw0').value) return toast('নতুন পাসওয়ার্ড পুরোনোটার মতো হতে পারবে না');
+    busy(ev.submitter, async () => { await S.api.changePassword($('#pw1').value, $('#pw0').value); closeSheet(); toast('পাসওয়ার্ড পরিবর্তন হয়েছে'); });
+  };
+}
+async function forgotPassword(email) {
+  if (!email) {
+    openSheet(`<h2>পাসওয়ার্ড ভুলে গেছেন?</h2><p class="mut">অ্যাকাউন্টের ইমেইল দিন। সেখানে নতুন পাসওয়ার্ড দেওয়ার লিংক যাবে।</p><input class="f" id="fp-em" type="email" inputmode="email" autocomplete="email" placeholder="আপনার ইমেইল"><button class="btn wide" id="fp-go" style="margin-top:10px">লিংক পাঠান</button>`);
+    $('#fp-go').onclick = e => { const v = $('#fp-em').value.trim(); if (!/^\S+@\S+\.\S+$/.test(v)) return toast('সঠিক ইমেইল দিন'); busy(e.currentTarget, async () => { await S.api.sendPasswordReset(v); fpSent(v); }); };
+    return;
+  }
+  if (!(await confirmSheet(`${email} ঠিকানায় নতুন পাসওয়ার্ড দেওয়ার লিংক পাঠাব?`, 'লিংক পাঠান'))) return passwordSheet();
+  busy(null, async () => { await S.api.sendPasswordReset(email); fpSent(email); });
+}
+const fpSent = email => openSheet(`<div class="lock-sheet"><div class="lock-ic">📧</div><h2>লিংক পাঠানো হয়েছে</h2><p class="mut"><b>${esc(email)}</b> ঠিকানায় একটি ইমেইল গেছে। সেই ইমেইলের লিংকে চাপলে অ্যাপ খুলবে, তখন নতুন পাসওয়ার্ড দিতে পারবেন। ইমেইল না পেলে স্প্যাম ফোল্ডার দেখুন।</p><button class="btn wide" data-close>ঠিক আছে</button></div>`);
+// ইমেইলের লিংক থেকে ফিরলে: নতুন পাসওয়ার্ড
+function recoverySheet() {
+  openSheet(`<h2>🔑 নতুন পাসওয়ার্ড দিন</h2><form id="rcform">${pwField('rc1', 'নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)', 'new-password')}${pwField('rc2', 'আবার লিখুন', 'new-password')}<button class="btn wide" style="margin-top:14px">সংরক্ষণ</button></form>`);
+  $('#rcform').onsubmit = ev => { ev.preventDefault(); if ($('#rc1').value !== $('#rc2').value) return toast('দুটো পাসওয়ার্ড মেলেনি'); busy(ev.submitter, async () => { await S.api.changePassword($('#rc1').value); closeSheet(); toast('নতুন পাসওয়ার্ড সংরক্ষণ হয়েছে'); }); };
+}
+function nameSheet() {
+  const u = me(); if (!u) return;
+  openSheet(`<h2>✏️ নাম পরিবর্তন</h2><label for="nm-v">আপনার নাম</label><input class="f" id="nm-v" maxlength="40" value="${esc(u.name)}" autocomplete="name">
+    <p class="mut" style="font-size:13px">আসল নাম দিন, যাতে বন্ধুরা আপনাকে চিনতে পারেন। নাম ২ থেকে ৪০ অক্ষরের মধ্যে।</p><button class="btn wide" id="nm-go">সংরক্ষণ</button>`);
+  $('#nm-go').onclick = e => {
+    const v = $('#nm-v').value.trim().replace(/\s+/g, ' ');
+    if (v.length < 2) return toast('নাম কমপক্ষে ২ অক্ষরের হতে হবে'); if (v === u.name) return closeSheet();
+    busy(e.currentTarget, async () => { await S.api.changeName(v); u.name = v; closeSheet(); toast('নাম পরিবর্তন হয়েছে'); renderMenu(); renderComposer(); });
+  };
+}
+function emailSheet() {
+  const u = me(); if (!u) return;
+  openSheet(`<h2>📧 ইমেইল পরিবর্তন</h2><p class="mut">বর্তমান ইমেইল: <b>${esc(u.email || '')}</b></p>
+    <label for="em-v">নতুন ইমেইল</label><input class="f" id="em-v" type="email" inputmode="email" autocomplete="email">
+    ${pwField('em-pw', 'নিরাপত্তার জন্য আপনার পাসওয়ার্ড', 'current-password')}
+    <p class="mut" style="font-size:13px">নতুন ইমেইলে একটি নিশ্চিতকরণ লিংক যাবে। সেটায় চাপার পর থেকে নতুন ইমেইল দিয়ে লগইন করবেন।</p><button class="btn wide" id="em-go">পরিবর্তন করুন</button>`);
+  $('#em-go').onclick = e => {
+    const v = $('#em-v').value.trim().toLowerCase(), pw = $('#em-pw').value;
+    if (!/^\S+@\S+\.\S+$/.test(v)) return toast('সঠিক ইমেইল দিন'); if (v === (u.email || '').toLowerCase()) return toast('এটাই আপনার বর্তমান ইমেইল'); if (!pw) return toast('পাসওয়ার্ড দিন');
+    busy(e.currentTarget, async () => {
+      await S.api.changeEmail(v, pw);
+      if (S.api.demoLogin) { u.email = v; closeSheet(); toast('ইমেইল পরিবর্তন হয়েছে'); renderMenu(); return; }
+      openSheet(`<div class="lock-sheet"><div class="lock-ic">📧</div><h2>নিশ্চিত করুন</h2><p class="mut"><b>${esc(v)}</b> ঠিকানায় একটি লিংক পাঠানো হয়েছে (পুরোনো ইমেইলেও একটি যেতে পারে)। লিংকে চাপলে ইমেইল বদলে যাবে। তার আগ পর্যন্ত পুরোনো ইমেইলেই লগইন হবে।</p><button class="btn wide" data-close>ঠিক আছে</button></div>`);
+    });
+  };
+}
+function phoneSheet() {
+  const u = me(); if (!u) return;
+  openSheet(`<h2>📱 মোবাইল নম্বর পরিবর্তন</h2><label for="ph-v">মোবাইল নম্বর <span class="mut" style="font-weight:400">(WhatsApp থাকলে এই নম্বরেই)</span></label>
+    <input class="f" id="ph-v" inputmode="tel" autocomplete="tel" placeholder="০১XXXXXXXXX" value="${esc(u.phone ? fmtPhone(u.phone) : '')}">
+    <p class="mut" style="font-size:13px">নম্বর কারা দেখবেন তা প্রোফাইলের "কী কী দেখাবে" থেকে ঠিক করতে পারবেন। রক্তদাতা হলে রক্ত চাইলে মানুষ এই নম্বরে যোগাযোগ করবেন।</p><button class="btn wide" id="ph-go">সংরক্ষণ</button>`);
+  $('#ph-go').onclick = e => {
+    const raw = $('#ph-v').value.trim(), v = raw ? normPhone(raw) : '';
+    if (v && !validPhone(v)) return toast('সঠিক মোবাইল নম্বর দিন, যেমন ০১৭১২৩৪৫৬৭৮');
+    busy(e.currentTarget, async () => { await S.api.changePhone(v); u.phone = v; closeSheet(); toast(v ? 'নম্বর সংরক্ষণ হয়েছে' : 'নম্বর মুছে ফেলা হয়েছে'); renderMenu(); });
+  };
+}
 // ================================================================ ছবি বেছে নেওয়ার সাধারণ ফর্ম অংশ
 const photoField = (label, cur) => `<label>${esc(label)}</label><div class="row"><span class="pf-prev">${cur ? `<img loading="lazy" decoding="async" class="av" src="${esc(cur)}" alt="">` : ''}</span><label class="photo-btn" style="margin:0">ছবি বাছুন<input type="file" class="pf-file" accept="image/*"></label></div>`;
 function watchPhoto(store, max = 600) {
@@ -5595,6 +5672,7 @@ function restoreNav() {
     S.api = await createApi();
     renderDemoBar();
     await S.api.init(() => afterAuth());
+    S.api.onPasswordRecovery?.(() => recoverySheet());
     renderNetBar(); renderNotices(); checkForceUpdate();
     const [up, unions] = await Promise.all([cachedCall('upazila', () => S.api.upazila()), cachedCall('unions', () => S.api.unions())]);
     S.unions = unions;

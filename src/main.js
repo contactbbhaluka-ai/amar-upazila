@@ -851,7 +851,8 @@ async function loadFeed(key, append) {
     const call = () => S.api.posts({ ...q, before: append ? f.posts.at(-1)?.createdAt : undefined });
     const adsP = key === 'home' && !append && !q.category && feat('featBoost') ? S.api.boostedPosts(3).catch(() => []) : null;
     const urgP = key === 'home' && !append && S.scope === 'area' && (!q.category || q.category === 'সাহায্য চাই') ? S.api.posts({ urgent: true, unionId: q.unionId }).catch(() => []) : null;
-    const pinP = key === 'page' && !append && S.curPage?.pinnedPostId ? S.api.posts({ postId: S.curPage.pinnedPostId }).catch(() => []) : null;
+    const pinId = append ? null : key === 'page' ? S.curPage?.pinnedPostId : key === 'me' ? me()?.pinnedPostId : key === 'user' ? (S.viewProfile?.id === S.userId ? S.viewProfile?.pinnedPostId : null) : null;
+    const pinP = pinId ? S.api.posts({ postId: pinId }).catch(() => []) : null;
     const rows = plainHome ? await cachedCall('feed', async () => (await call()).slice(0, PAGE)) : await call();
     if (adsP) f.ads = await adsP;
     if (key === 'home' && !append) loadStories();
@@ -991,6 +992,7 @@ function postMenu(key, p) {
   openSheet(`<div class="menu">
     ${u && (p.tags || []).some(t => t.id === u.id) ? '<button data-act="untag">আমার ট্যাগ সরিয়ে দিন</button>' : ''}
     ${u && p.userId === u.id && (p.privacy || 'public') === 'public' && !p.groupId && feat('featBoost') ? `<button data-act="boost">${ic('send', 16)} পোস্ট বুস্ট করুন</button>` : ''}
+    ${u && p.userId === u.id && !p.pageId && !p.groupId && p.kind === 'normal' && !S.actAs ? `<button data-act="pinme">📌 ${u.pinnedPostId === p.id ? 'প্রোফাইল থেকে পিন সরান' : 'প্রোফাইলের উপরে পিন করুন'}</button>` : ''}
     ${p.pageId && S.curPage?.id === p.pageId && S.curPage.canManage ? `<button data-act="pinpg">📌 ${S.curPage.pinnedPostId === p.id ? 'পিন সরান' : 'পেইজের উপরে পিন করুন'}</button>` : ''}
     ${u && p.userId === u.id && RESOLVE[p.category] ? `<button data-act="resolve">${p.resolvedAt ? 'চিহ্নটি তুলে নিন' : '✅ ' + RESOLVE[p.category][1]}</button>` : ''}
     ${u && p.userId === u.id ? '<button data-act="edit">পোস্ট এডিট করুন</button>' : ''}
@@ -1021,6 +1023,14 @@ function postMenu(key, p) {
       });
     }
     if (a === 'boost') boostSheet(p);
+    if (a === 'pinme') {
+      closeSheet(); const un = me().pinnedPostId === p.id;
+      return busy(null, async () => {
+        await S.api.pinProfilePost(un ? null : p.id); me().pinnedPostId = un ? null : p.id;
+        toast(un ? 'পিন সরানো হয়েছে' : '📌 পোস্টটি আপনার প্রোফাইলের উপরে পিন হয়েছে');
+        if (S.view === 'me') loadFeed('me');
+      });
+    }
     if (a === 'pinpg') { closeSheet(); const pg = S.curPage, un = pg.pinnedPostId === p.id; return busy(null, async () => { await S.api.pinPagePost(pg.id, un ? null : p.id); pg.pinnedPostId = un ? null : p.id; await openPage(pg.id, true); toast(un ? 'পিন সরানো হয়েছে' : 'পোস্টটি পেইজের উপরে পিন হয়েছে'); }); }
     if (a === 'untag') { closeSheet(); await busy(null, async () => { await S.api.untagMe(p.id); p.tags = p.tags.filter(t => t.id !== me().id); renderFeed(key); toast('ট্যাগ সরানো হয়েছে'); }); }
     if (a === 'block') { closeSheet(); blockUser(p.userId, p.author); }

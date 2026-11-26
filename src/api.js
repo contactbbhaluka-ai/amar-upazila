@@ -45,14 +45,14 @@ async function supabaseApi() {
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
-  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,unions!profiles_union_id_fkey(name)';
+  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
     id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
     union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
     bloodGroup: p.blood_group || '', donorVisible: p.donor_visible !== false, lastDonated: p.last_donated || '',
     avatar: p.avatar_url || '', cover: p.cover_url || '', bio: p.bio || '', admin: p.role === 'admin',
     friendsVisibility: p.friends_visibility || 'public', followersVisibility: p.followers_visibility || 'public', followingVisibility: p.following_visibility || 'public', joinedAt: p.created_at || '',
-    gender: p.gender || '', username: p.username || '', verified: badgeOf(p), verifiedUntil: p.verified_until || null, locked: !!p.locked,
+    gender: p.gender || '', username: p.username || '', verified: badgeOf(p), verifiedUntil: p.verified_until || null, locked: !!p.locked, pinnedPostId: p.pinned_post_id || null,
     social: {}, works: [], educations: [],
   });
   const toPost = (r, mine, saved) => ({
@@ -424,6 +424,7 @@ async function supabaseApi() {
     async addPageAdmin(pageId, uid) { ok(await sb.rpc('add_page_admin', { p_page: pageId, p_user: uid })); },
     async removePageAdmin(pageId, uid) { ok(await sb.rpc('remove_page_admin', { p_page: pageId, p_user: uid })); },
     async pinPagePost(pageId, postId) { ok(await sb.rpc('pin_page_post', { p_page: pageId, p_post: postId || null })); },
+    async pinProfilePost(postId) { ok(await sb.rpc('pin_profile_post', { p_post: postId || null })); me.pinnedPostId = postId || null; },
     async setFaqs(pageId, faqs) { ok(await sb.from('pages').update({ faqs }).eq('id', pageId)); },
     async askFaq(pageId, idx) { ok(await sb.rpc('ask_page_faq', { p_page: pageId, p_idx: idx })); },
     async followedPages() { return ok(await sb.from('page_follows').select('p:pages(*)').eq('user_id', me.id).order('created_at', { ascending: false })).map(r => toPage(r.p)).filter(Boolean); },
@@ -761,7 +762,7 @@ function demoApi() {
   let meId = get('me', null);
   const save = () => { for (const k of ['votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
-  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked }; };
+  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
   const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true, aboutVis: { ...ABOUT_VIS0, ...(person(meId).aboutVis || {}) } } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
@@ -1237,6 +1238,11 @@ function demoApi() {
     },
     async removePageAdmin(pageId, uid) { db.pageAdmins = db.pageAdmins.filter(k => k !== pageId + ':' + uid); save(); },
     async pinPagePost(pageId, postId) { const pg = pageOf(pageId); if (pg) pg.pinnedPostId = postId || null; save(); },
+    async pinProfilePost(postId) {
+      const p = postId && db.posts.find(x => x.id === Number(postId));
+      if (postId && (!p || p.userId !== meId || p.pageId || p.groupId)) throw new Error('not allowed');
+      person(meId).pinnedPostId = postId ? Number(postId) : null; save(); return wait();
+    },
     async setFaqs(pageId, faqs) { const pg = pageOf(pageId); if (pg) pg.faqs = faqs; save(); },
     async askFaq(pageId, idx) {
       const pg = pageOf(pageId), it = pg?.faqs?.[idx]; if (!it) throw new Error('প্রশ্ন পাওয়া যায়নি');

@@ -1253,3 +1253,4 @@ body{overscroll-behavior-y:contain}
 .pymk-c .sbtn{width:100%}
 .pymk-x{position:absolute;top:4px;right:4px;border:0;background:none;color:var(--mut);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
 .sh-ic.ms{background:linear-gradient(135deg,#0866ff,#a033ff);color:#fff}
+.dl-loc{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:8px 0 2px;font-size:13.5px}

@@ -63,6 +63,12 @@ jobs:
           [ -d android ] || npx cap add android
           npx cap sync android
 
+      - name: Location permission (নামাজের সময় ও আবহাওয়ার জন্য আনুমানিক লোকেশন)
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q ACCESS_COARSE_LOCATION "$M" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-feature android:name="android.hardware.location" android:required="false" />\n</manifest>#' "$M"
+          grep -n "LOCATION\|hardware.location" "$M"
+
       - name: Generate app icon and splash
         continue-on-error: true
         run: npx @capacitor/assets generate --android --iconBackgroundColor '#006a4e' --iconBackgroundColorDark '#006a4e' --splashBackgroundColor '#006a4e' --splashBackgroundColorDark '#006a4e'

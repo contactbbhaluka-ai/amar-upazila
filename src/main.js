@@ -1574,26 +1574,34 @@ async function loadConvs() {
   if (!me()) { box.innerHTML = `<div class="empty">মেসেজ দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
   try {
     const list = await S.api.conversations();
-    box.innerHTML = list.length ? list.map(c => `<button class="conv${c.unread ? ' unread' : ''}" data-thread="${esc(c.userId)}">${av(c)}<div class="info"><b>${esc(c.name)}</b><div class="last">${c.lastMine ? 'আপনি: ' : ''}${esc(c.last)}</div></div><div style="text-align:right"><div class="time">${esc(ago(c.lastAt))}</div>${c.unread ? `<span class="badge">${bn(c.unread)}</span>` : ''}</div></button>`).join('')
-      : '<div class="empty">এখনো কোনো মেসেজ নেই।<br>কারও প্রোফাইলে গিয়ে "মেসেজ" চাপুন।</div>';
+    const f = S.convPage, rows = f ? list.filter(c => c.asPage && c.pageId === f.id) : list;
+    const head = f ? `<div class="card conv-filter">${entAv(f)}<div class="info"><b>${esc(f.name)}</b><small>পেইজের মেসেজ · আপনি পেইজের নামে উত্তর দেবেন</small></div><button class="sbtn ghost" id="auto-reply">⚡ অটো মেসেজ${f.autoReplyOn ? ' ✓' : ''}</button><button class="link" id="conv-all">সব মেসেজ</button></div>` : '';
+    box.innerHTML = head + (rows.length ? rows.map(c => `<button class="conv${c.unread ? ' unread' : ''}" data-thread="${esc(c.userId)}" data-tpage="${esc(c.pageId || '')}">${c.pageId && !c.asPage ? entAv({ name: c.name, avatar: c.avatar }) : av(c)}<div class="info"><b>${esc(c.name)}</b>${c.pageId ? `<span class="conv-tag">${c.asPage ? `📄 ${esc(c.pageName)} পেইজে` : '📄 পেইজ'}</span>` : ''}<div class="last">${c.lastMine ? (c.asPage ? 'পেইজ: ' : 'আপনি: ') : ''}${esc(c.last)}</div></div><div style="text-align:right"><div class="time">${esc(ago(c.lastAt))}</div>${c.unread ? `<span class="badge">${bn(c.unread)}</span>` : ''}</div></button>`).join('')
+      : `<div class="empty">${f ? 'এই পেইজে এখনো কেউ মেসেজ পাঠাননি।' : 'এখনো কোনো মেসেজ নেই।<br>কারও প্রোফাইলে গিয়ে "মেসেজ" চাপুন।'}</div>`);
+    $('#conv-all')?.addEventListener('click', () => { S.convPage = null; loadConvs(); });
+    $('#auto-reply')?.addEventListener('click', () => autoReplySheet(f));
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
-$('#convs').addEventListener('click', e => { const b = e.target.closest('[data-thread]'); if (b) openThread(b.dataset.thread); });
-async function openThread(id, silent) {
-  if (!silent) { S.threadId = id; open('thread'); $('#thread').innerHTML = '<div class="mut">লোড হচ্ছে…</div>'; }
+$('#convs').addEventListener('click', e => { const b = e.target.closest('[data-thread]'); if (b) openThread(b.dataset.thread, false, b.dataset.tpage ? Number(b.dataset.tpage) : null); });
+// pageId থাকলে পেইজের কথোপকথন: সাধারণ মানুষ পেইজের সাথে কথা বলেন, মালিক পেইজের নামে উত্তর দেন
+async function openThread(id, silent, pageId = null) {
+  if (!silent) { S.threadId = id; S.threadPage = pageId || null; open('thread'); $('#thread').innerHTML = '<div class="mut">লোড হচ্ছে…</div>'; }
+  const pid = S.threadPage;
   try {
-    const [p, msgs] = await Promise.all([silent ? null : S.api.profile(id), S.api.messages(id)]);
-    if (p) $('#t-head').innerHTML = `${userLink(p.id, av(p, 'sm'))}${userLink(p.id, esc(p.name), 'who-btn')}`;
+    const [p, msgs, pg] = await Promise.all([silent ? null : S.api.profile(id), S.api.messages(id, pid), !silent && pid ? S.api.page(pid) : null]);
+    const asPage = pg && pg.isOwner;
+    if (p && pg && !asPage) $('#t-head').innerHTML = `<button class="ent-btn" data-page="${esc(pg.id)}">${entAv(pg)}</button><button class="who-btn" data-page="${esc(pg.id)}">${esc(pg.name)}${vb(pg.verified)}</button>`;
+    else if (p) $('#t-head').innerHTML = `${userLink(p.id, av(p, 'sm'))}<span class="t-who">${userLink(p.id, esc(p.name), 'who-btn')}${asPage ? `<small>📄 ${esc(pg.name)}-এর পক্ষে উত্তর দিচ্ছেন</small>` : ''}</span>`;
     if (p?.rel?.blocked) { $('#thread').innerHTML = '<div class="empty">আপনি এই ব্যক্তিকে ব্লক করেছেন।</div>'; return; }
-    $('#thread').innerHTML = msgs.length ? msgs.map(m => `<div class="bub${m.mine ? ' mine' : ''}">${linkify(m.body)}<small>${esc(clock(m.createdAt))}</small></div>`).join('')
-      : '<div class="empty">কথোপকথন শুরু করুন 👋</div>';
+    $('#thread').innerHTML = msgs.length ? msgs.map(m => `<div class="bub${m.mine ? ' mine' : ''}">${linkify(m.body)}<small>${m.auto ? '⚡ অটো মেসেজ · ' : ''}${esc(clock(m.createdAt))}</small></div>`).join('')
+      : `<div class="empty">${pid && !asPage ? 'পেইজকে মেসেজ পাঠান 👋<br><small>পেইজের মালিক উত্তর দেবেন।</small>' : 'কথোপকথন শুরু করুন 👋'}</div>`;
     window.scrollTo(0, document.body.scrollHeight);
-    if (msgs.some(m => !m.mine && !m.read)) { await S.api.markRead(id); refreshBadges(); }
+    if (msgs.some(m => !m.mine && !m.read)) { await S.api.markRead(id, pid); refreshBadges(); }
   } catch (e) { $('#thread').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 $('#tform').addEventListener('submit', e => {
   e.preventDefault(); const body = $('#tmsg').value.trim(); if (!body) return;
-  busy(e.submitter, async () => { await S.api.sendMessage(S.threadId, body); $('#tmsg').value = ''; await openThread(S.threadId, true); $('#tmsg').focus(); });
+  busy(e.submitter, async () => { await S.api.sendMessage(S.threadId, body, S.threadPage); $('#tmsg').value = ''; await openThread(S.threadId, true); $('#tmsg').focus(); });
 });
 async function refreshBadges() {
   if (!me()) { $('#b-msgs').hidden = $('#b-friends').hidden = $('#b-notif').hidden = true; return; }
@@ -1608,7 +1616,7 @@ function listenMessages() {
   if (!me()) return;
   S.stopNotif = S.api.onNotify(() => { if (S.view === 'notif') loadNotifs(); else refreshBadges(); });
   S.stopMsg = S.api.onMessage(m => {
-    if (S.view === 'thread' && S.threadId === m.from) openThread(m.from, true);
+    if (S.view === 'thread' && S.threadId === m.from && (S.threadPage || null) === (m.pageId || null)) openThread(m.from, true);
     else { toast('নতুন মেসেজ এসেছে'); if (S.view === 'msgs') loadConvs(); }
     refreshBadges();
   });
@@ -2819,10 +2827,12 @@ async function openPage(id, silent) {
     $('#page').innerHTML = `<div class="card ent-head prof-fb pg-head">${pageCoverHtml(pg)}<h2 style="margin:8px 0 0">${esc(pg.name)}${vb(pg.verified, true)}</h2><div class="meta">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div>
       ${pg.about ? `<p class="about">${esc(pg.about)}</p>` : ''}${pg.phone ? `<p class="meta" style="margin:6px 0 0">📞 ${esc(bn(pg.phone))}</p>` : ''}
       <div class="row">${pg.isOwner
-        ? `<button class="sbtn" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button><button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button><button class="sbtn ghost" id="pg-edit">এডিট</button><button class="sbtn ghost" id="pg-del" style="color:var(--r)">মুছুন</button>`
-        : `<button class="sbtn ${pg.following ? 'ghost' : ''}" data-pf="${esc(pg.id)}" data-on="${pg.following ? 1 : 0}">${pg.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button>${tel ? `<a class="sbtn ghost" style="text-decoration:none;display:inline-grid;place-items:center" href="tel:${esc(tel)}">কল করুন</a>` : ''}<button class="more" id="pg-more" aria-label="আরও">⋯</button>`}</div></div>${profTabs('page')}`;
+        ? `<button class="sbtn" id="pg-inbox">💬 মেসেজ</button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button><button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button><button class="sbtn ghost" id="pg-edit">এডিট</button><button class="sbtn ghost" id="pg-del" style="color:var(--r)">মুছুন</button>`
+        : `<button class="sbtn ${pg.following ? 'ghost' : ''}" data-pf="${esc(pg.id)}" data-on="${pg.following ? 1 : 0}">${pg.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" id="pg-msg">💬 মেসেজ</button>${tel ? `<a class="sbtn ghost" style="text-decoration:none;display:inline-grid;place-items:center" href="tel:${esc(tel)}">কল করুন</a>` : ''}<button class="more" id="pg-more" aria-label="আরও">⋯</button>`}</div></div>${profTabs('page')}`;
     if (!pg.isOwner && !silent) S.api.entVisit?.('page', pg.id).catch(() => {});
     $('#pg-badge')?.addEventListener('click', () => pageBadgeSheet(pg));
+    $('#pg-msg')?.addEventListener('click', () => { if (needUser()) openThread(pg.ownerId, false, pg.id); });
+    $('#pg-inbox')?.addEventListener('click', () => { S.convPage = pg; open('msgs'); loadConvs(); });
     $('#pg-post')?.addEventListener('click', () => openPostComposer({ pageId: pg.id, title: `${pg.name}-এর পক্ষে পোস্ট`, authorName: pg.name }));
     $('#pavfile')?.addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) picSheet('avatar', f, pg); });
     $('#pcoverfile')?.addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) picSheet('cover', f, pg); });
@@ -2832,6 +2842,22 @@ async function openPage(id, silent) {
     $('#pg-more')?.addEventListener('click', () => { if (!needUser()) return; openSheet(`<div class="menu">${me()?.admin ? `<button data-act="ab">${ic('shield', 16)} অ্যাডমিন: পেইজের ব্যাজ</button>` : ''}<button data-act="r">পেইজ রিপোর্ট করুন</button><button data-close>বন্ধ করুন</button></div>`); $('#sheet').onclick = ev => { if (ev.target.closest('[data-act=r]')) reportSheet('user', 'page:' + pg.id); if (ev.target.closest('[data-act=ab]')) adminPageBadgeSheet(pg); }; });
     showProfPane('page');
   } catch (e) { $('#page').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+}
+// পেইজের অটো মেসেজ: কেউ মেসেজ পাঠালেই সাথে সাথে এই উত্তর যায় (একই মানুষকে ২৪ ঘণ্টায় একবার)
+const AUTO_SAMPLES = ['আসসালামু আলাইকুম! মেসেজ করার জন্য ধন্যবাদ। আমরা শীঘ্রই উত্তর দেব।', 'ধন্যবাদ! আমাদের দোকান প্রতিদিন সকাল ৯টা থেকে রাত ১০টা পর্যন্ত খোলা। জরুরি হলে কল করুন।', 'মেসেজের জন্য ধন্যবাদ। দাম ও বিস্তারিত জানতে পণ্যের নাম লিখে পাঠান।'];
+function autoReplySheet(pg) {
+  if (!pg) return;
+  openSheet(`<h2>⚡ অটো মেসেজ</h2><p class="mut" style="margin-top:0">${esc(pg.name)} পেইজে কেউ মেসেজ পাঠালে সাথে সাথে এই উত্তরটা চলে যাবে। একই মানুষকে ২৪ ঘণ্টায় একবারই যায়, আর আপনি নিজে উত্তর দিয়ে থাকলে যায় না।</p>
+    <label class="switch-row" for="ar-on"><span class="sw-text"><b>অটো মেসেজ চালু</b></span><input type="checkbox" id="ar-on" class="switch" role="switch" ${pg.autoReplyOn ? 'checked' : ''}></label>
+    <label for="ar-text">অটো মেসেজ</label><textarea id="ar-text" rows="4" maxlength="1000" placeholder="যেমন: আসসালামু আলাইকুম! মেসেজ করার জন্য ধন্যবাদ। শীঘ্রই উত্তর দেব।">${esc(pg.autoReply || '')}</textarea>
+    <div class="ar-samples"><small class="mut">নমুনা থেকে বেছে নিন:</small>${AUTO_SAMPLES.map((t, i) => `<button type="button" class="ar-s" data-ars="${i}">${esc(t)}</button>`).join('')}</div>
+    <button class="btn wide" id="ar-save" style="margin-top:12px">সংরক্ষণ</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
+  $('#sheet').onclick = ev => { const b = ev.target.closest('[data-ars]'); if (b) { $('#ar-text').value = AUTO_SAMPLES[Number(b.dataset.ars)]; $('#ar-on').checked = true; } };
+  $('#ar-save').onclick = ev => {
+    const on = $('#ar-on').checked, text = $('#ar-text').value.trim();
+    if (on && !text) return toast('অটো মেসেজ লিখুন');
+    busy(ev.currentTarget, async () => { await S.api.setAutoReply(pg.id, { on, text }); Object.assign(pg, { autoReplyOn: on, autoReply: text }); closeSheet(); toast(on ? 'অটো মেসেজ চালু হয়েছে' : 'অটো মেসেজ বন্ধ হয়েছে'); if (S.view === 'msgs') loadConvs(); });
+  };
 }
 function pageCoverHtml(pg) {
   const own = pg.isOwner;
@@ -2986,6 +3012,7 @@ const RELOAD = {
 };
 function pushNav() { try { history.pushState({ au: 1 }, ''); } catch { /* sandbox */ } }
 function show(v) {
+  if (v !== 'msgs' && v !== 'thread') S.convPage = null;   // পেইজের মেসেজ-ফিল্টার শুধু ওই পাতায়
   S.view = v;
   if (TABS.includes(v)) S.tab = v;
   document.body.classList.toggle('searching', v === 'search');

@@ -68,7 +68,7 @@ async function supabaseApi() {
       author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '', badge: r.sp.page_id ? badgeOf(r.sp.pages) : badgeOf(r.sp.profiles) } : null,
   });
   const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url,verified,verified_until),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until)),kind,album_id,al:albums!posts_album_id_fkey(id,name),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila,verified,verified_until),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url,verified,verified_until),groups!posts_group_id_fkey(name)';
-  const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count, verified: badgeOf(r), verifiedUntil: r.verified_until || null, cover: r.cover_url || '' });
+  const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count, verified: badgeOf(r), verifiedUntil: r.verified_until || null, cover: r.cover_url || '', autoReply: r.auto_reply || '', autoReplyOn: !!r.auto_reply_on });
   const toGroup = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, about: r.about || '', privacy: r.privacy, avatar: r.avatar_url || '', members: r.member_count });
   const inList = ids => `(${ids.join(',')})`;
 
@@ -545,16 +545,19 @@ async function supabaseApi() {
     // ---------- মেসেজ
     async conversations() {
       return ok(await sb.rpc('my_conversations')).filter(c => !blocked.has(c.partner_id))
-        .map(c => ({ userId: c.partner_id, name: c.name, avatar: c.avatar_url || '', last: c.last_body, lastAt: c.last_at, lastMine: c.last_mine, unread: Number(c.unread) }));
+        .map(c => ({ userId: c.partner_id, pageId: c.page_id || null, asPage: !!c.as_page, pageName: c.page_name || '', name: c.name, avatar: c.avatar_url || '', last: c.last_body, lastAt: c.last_at, lastMine: c.last_mine, unread: Number(c.unread) }));
     },
-    async messages(id) {
-      const rows = ok(await sb.from('messages').select('id,sender_id,body,created_at,read_at')
-        .or(`and(sender_id.eq.${me.id},recipient_id.eq.${id}),and(sender_id.eq.${id},recipient_id.eq.${me.id})`)
-        .order('created_at', { ascending: false }).limit(200));
-      return rows.reverse().map(m => ({ id: m.id, mine: m.sender_id === me.id, body: m.body, createdAt: m.created_at, read: !!m.read_at }));
+    // pageId থাকলে শুধু ওই পেইজের কথোপকথন; না থাকলে সাধারণ (পেইজ ছাড়া) মেসেজ
+    async messages(id, pageId) {
+      let q = sb.from('messages').select('id,sender_id,body,created_at,read_at,is_auto')
+        .or(`and(sender_id.eq.${me.id},recipient_id.eq.${id}),and(sender_id.eq.${id},recipient_id.eq.${me.id})`);
+      q = pageId ? q.eq('page_id', pageId) : q.is('page_id', null);
+      const rows = ok(await q.order('created_at', { ascending: false }).limit(200));
+      return rows.reverse().map(m => ({ id: m.id, mine: m.sender_id === me.id, body: m.body, createdAt: m.created_at, read: !!m.read_at, auto: !!m.is_auto }));
     },
-    async sendMessage(id, body) { ok(await sb.from('messages').insert({ sender_id: me.id, recipient_id: id, body })); },
-    async markRead(id) { ok(await sb.rpc('mark_read', { partner: id })); },
+    async sendMessage(id, body, pageId) { ok(await sb.from('messages').insert({ sender_id: me.id, recipient_id: id, body, page_id: pageId || null })); },
+    async markRead(id, pageId) { ok(await sb.rpc('mark_read2', { partner: id, p_page: pageId || null })); },
+    async setAutoReply(pageId, { on, text }) { ok(await sb.from('pages').update({ auto_reply_on: !!on, auto_reply: (text || '').trim() || null }).eq('id', pageId)); },
     async unreadCount() {
       if (!me) return 0;
       return ok(await sb.from('messages').select('id', { count: 'exact', head: true }).eq('recipient_id', me.id).is('read_at', null)) || 0;
@@ -563,7 +566,7 @@ async function supabaseApi() {
       if (!me) return () => {};
       const ch = sb.channel('dm-' + me.id)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `recipient_id=eq.${me.id}` },
-          p => { if (!blocked.has(p.new.sender_id)) cb({ from: p.new.sender_id, body: p.new.body }); })
+          p => { if (!blocked.has(p.new.sender_id)) cb({ from: p.new.sender_id, body: p.new.body, pageId: p.new.page_id || null }); })
         .subscribe();
       return () => sb.removeChannel(ch);
     },
@@ -670,7 +673,7 @@ function demoApi() {
       { id: 1, createdBy: 'd3', name: 'আব্দুল করিম', district: 'ময়মনসিংহ', upazila: 'ভালুকা', unionId: 7, phone: '01700000140', bloodGroup: 'O-', lastDonated: '' },
     ]),
     pages: get('pages', [
-      { id: 1, ownerId: 'd1', verified: 'authentic', name: 'জননী ডায়াগনস্টিক সেন্টার', category: 'স্বাস্থ্য', about: 'সব ধরনের পরীক্ষা ও বিশেষজ্ঞ ডাক্তার। শুক্রবার খোলা।', phone: '01700-000020', avatar: '' },
+      { id: 1, ownerId: 'd1', verified: 'authentic', autoReplyOn: true, autoReply: 'আসসালামু আলাইকুম! জননী ডায়াগনস্টিকে মেসেজ করার জন্য ধন্যবাদ। আমরা সকাল ৯টা থেকে রাত ১০টা পর্যন্ত খোলা। শীঘ্রই উত্তর দেব।', name: 'জননী ডায়াগনস্টিক সেন্টার', category: 'স্বাস্থ্য', about: 'সব ধরনের পরীক্ষা ও বিশেষজ্ঞ ডাক্তার। শুক্রবার খোলা।', phone: '01700-000020', avatar: '' },
       { id: 2, ownerId: 'd6', name: 'উপজেলা চাকরির খবর', category: 'চাকরি ও প্রশিক্ষণ', about: 'উপজেলার সরকারি-বেসরকারি চাকরি ও প্রশিক্ষণের খবর।', phone: '', avatar: '' },
     ]),
     pageFollows: get('pageFollows', ['d2:1', 'd3:1', 'd4:2']),
@@ -827,6 +830,7 @@ function demoApi() {
     // নিজের পেইজ
     const pg = { id: nid(db.pages), ownerId: id, name: 'ডেমো ফার্মেসী', category: 'স্বাস্থ্য', about: 'সব ধরনের ওষুধ পাওয়া যায়। প্রতিদিন সকাল ৮টা থেকে রাত ১১টা।', phone: '01700-000099', avatar: '' };
     db.pages.push(pg); db.pageFollows.push(`d1:${pg.id}`, `d3:${pg.id}`, `d4:${pg.id}`, `${id}:1`);
+    db.messages.push({ id: nid(db.messages), from: 'd2', to: id, pageId: pg.id, body: 'আজ কি নাপা এক্সট্রা পাওয়া যাবে? কত টাকা পাতা?', createdAt: ago(0.4), read: false });
     db.posts.push({ id: nid(db.posts), userId: id, pageId: pg.id, unionId: 2, category: 'খবর', createdAt: t(6), body: 'শীতের ওষুধ ও ভিটামিন এখন ১০% ছাড়ে পাওয়া যাচ্ছে।', image: '', likes: 0, cm: [] });
     // নিজের প্রাইভেট গ্রুপ (একজনের যোগদানের অনুরোধসহ) + একটি পাবলিক গ্রুপের সদস্য
     const g = { id: nid(db.groups), ownerId: id, name: 'ডেমো যুব সংঘ', about: 'সদর ইউনিয়নের তরুণদের খেলাধুলা ও সামাজিক কাজের গ্রুপ।', privacy: 'private', avatar: '' };
@@ -1300,28 +1304,43 @@ function demoApi() {
       const map = new Map();
       for (const m of db.messages) {
         if (m.from !== meId && m.to !== meId) continue;
-        const other = m.from === meId ? m.to : m.from;
+        const other = m.from === meId ? m.to : m.from, key = other + ':' + (m.pageId || 0);
         if (isBlocked(other)) continue;
-        const c = map.get(other) || { userId: other, unread: 0 };
+        const c = map.get(key) || { userId: other, pageId: m.pageId || null, unread: 0 };
         if (!c.lastAt || m.createdAt >= c.lastAt) Object.assign(c, { last: m.body, lastAt: m.createdAt, lastMine: m.from === meId });
         if (m.to === meId && !m.read) c.unread++;
-        map.set(other, c);
+        map.set(key, c);
       }
-      return wait([...map.values()].map(c => ({ ...c, name: user(c.userId)?.name || 'সদস্য', avatar: user(c.userId)?.avatar || '' })).sort((a, b) => b.lastAt.localeCompare(a.lastAt)));
+      return wait([...map.values()].map(c => {
+        const pg = c.pageId && pageOf(c.pageId), asPage = !!pg && pg.ownerId === meId;
+        return { ...c, asPage, pageName: pg?.name || '', name: pg && !asPage ? pg.name : user(c.userId)?.name || 'সদস্য', avatar: pg && !asPage ? pg.avatar || '' : user(c.userId)?.avatar || '' };
+      }).sort((a, b) => b.lastAt.localeCompare(a.lastAt)));
     },
-    async messages(id) {
-      return wait(db.messages.filter(m => (m.from === meId && m.to === id) || (m.from === id && m.to === meId)).map(m => ({ id: m.id, mine: m.from === meId, body: m.body, createdAt: m.createdAt, read: m.read })));
+    async messages(id, pageId) {
+      return wait(db.messages.filter(m => ((m.from === meId && m.to === id) || (m.from === id && m.to === meId)) && (m.pageId || null) === (pageId ? Number(pageId) : null))
+        .map(m => ({ id: m.id, mine: m.from === meId, body: m.body, createdAt: m.createdAt, read: m.read, auto: !!m.auto })));
     },
-    async sendMessage(id, body) {
+    async setAutoReply(pageId, { on, text }) { const pg = pageOf(pageId); if (pg) Object.assign(pg, { autoReplyOn: !!on, autoReply: (text || '').trim() }); save(); },
+    async sendMessage(id, body, pageId) {
       if (isBlocked(id)) throw new Error('blocked');
-      db.messages.push({ id: nid(db.messages), from: meId, to: id, body, createdAt: new Date().toISOString(), read: false }); save();
+      const pid = pageId ? Number(pageId) : null, pg = pid && pageOf(pid);
+      db.messages.push({ id: nid(db.messages), from: meId, to: id, body, pageId: pid, createdAt: new Date().toISOString(), read: false }); save();
+      if (pg && pg.ownerId === id) {   // পেইজকে মেসেজ: অটো মেসেজ চালু থাকলে সাথে সাথে উত্তর (২৪ ঘণ্টায় একবার)
+        const recent = db.messages.some(m => m.pageId === pid && m.from === id && m.to === meId && Date.now() - new Date(m.createdAt) < 864e5);
+        if (pg.autoReplyOn && (pg.autoReply || '').trim() && !recent) setTimeout(() => {
+          db.messages.push({ id: nid(db.messages), from: id, to: meId, body: pg.autoReply, pageId: pid, auto: true, createdAt: new Date().toISOString(), read: false }); save();
+          listeners.forEach(cb => cb({ from: id, body: pg.autoReply, pageId: pid }));
+        }, 600);
+        return;
+      }
+      if (pid) return;
       if (id.startsWith('d')) setTimeout(() => { // ডেমো: নমুনা মানুষ উত্তর দেয়
         const reply = 'ধন্যবাদ! (এটি ডেমো উত্তর — আসল অ্যাপে মানুষটি নিজে উত্তর দেবেন)';
         db.messages.push({ id: nid(db.messages), from: id, to: meId, body: reply, createdAt: new Date().toISOString(), read: false }); save();
         listeners.forEach(cb => cb({ from: id, body: reply }));
       }, 1500);
     },
-    async markRead(id) { for (const m of db.messages) if (m.from === id && m.to === meId) m.read = true; save(); },
+    async markRead(id, pageId) { for (const m of db.messages) if (m.from === id && m.to === meId && (m.pageId || null) === (pageId ? Number(pageId) : null)) m.read = true; save(); },
     async unreadCount() { return db.messages.filter(m => m.to === meId && !m.read && !isBlocked(m.from)).length; },
     onMessage(cb) { listeners.add(cb); return () => listeners.delete(cb); },
 

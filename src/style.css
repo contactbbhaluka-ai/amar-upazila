@@ -962,3 +962,17 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .pg-av .ent-av{width:104px;height:104px;border-radius:24px;font-size:40px;border:4px solid var(--card);box-shadow:0 2px 10px rgba(0,0,0,.12)}
 .pg-av .av-edit{position:relative;display:inline-block;cursor:pointer}
 .prof-comp .cm-top .ent-av{width:40px;height:40px;min-width:40px;font-size:16px;border-radius:10px}
+
+/* ===== v34: পেইজের মেসেজ ও অটো মেসেজ ===== */
+.conv .ent-av{width:48px;height:48px;min-width:48px;font-size:18px;border-radius:12px}
+.conv-tag{display:inline-block;font-size:11.5px;color:var(--gt);background:var(--g2);border-radius:99px;padding:1px 8px;margin:1px 0}
+.conv-filter{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.conv-filter .ent-av{width:40px;height:40px;font-size:16px;border-radius:10px}
+.conv-filter .info{flex:1;display:flex;flex-direction:column;min-width:140px}
+.conv-filter small{color:var(--mut);font-size:12px}
+#t-head .ent-av{width:34px;height:34px;font-size:14px;border-radius:9px}
+.t-who{display:flex;flex-direction:column;line-height:1.2}
+.t-who small{font-size:11.5px;color:var(--gt)}
+.ar-samples{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.ar-s{text-align:left;border:1px dashed var(--line);background:none;border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;color:inherit;cursor:pointer;min-height:0}
+.ar-s:hover{border-color:var(--g)}

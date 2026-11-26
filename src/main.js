@@ -4588,8 +4588,8 @@ function bindMenuSearch() {
   q.oninput = () => {
     const t = q.value.trim().toLowerCase(), res = $('#mn-res'), main = $('#mn-main');
     if (!t) { res.hidden = true; main.hidden = false; return; }
-    const items = [...main.querySelectorAll('.sc[data-mgo], .setlist button, .setlist a, #logout')].map(el => {
-      const label = (el.querySelector('.sc-t b') || el).textContent.replace(/\s+/g, ' ').trim();
+    const items = [...$('#menu').querySelectorAll('#mn-main .sc[data-mgo], .mn-quick .sc[data-mgo], .setlist button, .setlist a, .lang-row, #logout')].map(el => {
+      const label = (el.querySelector('.sc-t b') || el.querySelector('.lang-t')?.firstChild || el).textContent.replace(/\s+/g, ' ').trim();
       const key = el.dataset.mgo ? MN_SC_KEYS[el.dataset.mgo] || '' : MN_KEYS[el.id] || '';
       return { el, label, hay: (el.textContent + ' ' + key).toLowerCase() };
     }).filter(x => x.hay.includes(t));
@@ -4638,6 +4638,10 @@ function renderMenu() {
   $('#menu').innerHTML = `
     ${u ? `<div class="me-wrap"><button class="me-row" data-v="me">${S.actAs ? entAv(S.actAs) : av(u)}<div class="info"><b>${esc(S.actAs ? S.actAs.name : u.name)}</b><div class="sub">${S.actAs ? 'পেইজ দেখুন' : 'আপনার প্রোফাইল দেখুন'}</div></div></button><button class="sw-toggle" id="sw-toggle" aria-label="প্রোফাইল বা পেইজ বদলান" aria-expanded="false" hidden>${ic('users', 16)}<span class="chev">▾</span></button><div id="switcher" class="sw-drop" hidden></div></div>`
       : `${demoCard()}<div class="card"><b>আপনি লগইন করেননি</b><p class="mut" style="margin:4px 0 10px">পোস্ট, বন্ধু, গ্রুপ ও পেইজ ব্যবহার করতে লগইন করুন।</p><button class="btn wide" data-v="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`}
+    ${u ? `<div class="sc-grid mn-quick">
+      ${sc('wallet', '🪙', 'কয়েন ও ব্যাজ', 'ভেরিফাইড ব্যাজ নিন')}
+      ${sc('insights', '📊', 'ড্যাশবোর্ড', 'পোস্ট কতজন দেখছেন')}
+    </div>` : ''}
     ${!u?.admin && S.announcer ? `<button class="me-row admin-row" data-mgo="announce"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:20px">📢</span><div class="info"><b>জরুরি ঘোষণা পাঠান</b><div class="sub">${esc(S.announcer.title)} হিসেবে</div></div></button>` : ''}
     ${u?.admin ? `<button class="me-row admin-row" data-mgo="admin"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('shield', 22)}</span><div class="info"><b>অ্যাডমিন ড্যাশবোর্ড</b><div class="sub">অ্যাপের সংখ্যা ও সেটিংস</div></div></button>` : ''}
     <div class="mn-top"><input type="search" id="mn-q" placeholder="মেনুতে খুঁজুন… (যেমন: পাসওয়ার্ড, ব্লক, রক্ত)" aria-label="মেনুতে খুঁজুন" autocomplete="off"><button class="mn-dark" id="mn-dark" aria-label="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}" title="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}">${isDark() ? '☀️' : '🌙'}</button><button class="mn-dark mn-lang" id="mn-lang" translate="no" aria-label="${EN ? 'বাংলা' : 'English'}" title="${EN ? 'বাংলা' : 'English'}">${EN ? 'বাং' : 'EN'}</button></div>
@@ -4659,8 +4663,6 @@ function renderMenu() {
     <div class="sc-grid">
       ${sc('saved', '🔖', 'সেভ করা পোস্ট', '')}
       ${sc('bday', '🎂', 'জন্মদিন', 'বন্ধুদের জন্মদিন')}
-      ${sc('wallet', '🪙', 'কয়েন ও ব্যাজ', 'ভেরিফাইড ব্যাজ নিন')}
-      ${sc('insights', '📊', 'ড্যাশবোর্ড', 'পোস্ট কতজন দেখছেন')}
     </div>` : ''}
     <h3 class="mn-h">⚙️ সেটিংস</h3>
     <details class="card"${u ? '' : ' hidden'}><summary>👤 অ্যাকাউন্ট</summary><div class="setlist">

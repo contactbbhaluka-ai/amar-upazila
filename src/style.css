@@ -1185,3 +1185,14 @@ body{overscroll-behavior-y:contain}
 .ptr.ready{color:var(--gt,#006a4e)}
 .ptr.spin svg{animation:ptrspin .8s linear infinite}
 @keyframes ptrspin{to{transform:rotate(360deg)}}
+
+/* v46 পোল: ভোট দেওয়া যায় তা স্পষ্ট */
+.poll{border:1px solid var(--line);border-radius:14px;padding:10px;background:var(--bg)}
+.po-head{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:var(--gt,#006a4e)}
+.poll.voted .po-head{color:var(--mut)}
+.po{border-color:light-dark(#9fd3c0,#2b5a4b);box-shadow:0 1px 0 rgba(0,0,0,.04)}
+.po:not(.res):active{transform:scale(.99);background:var(--g2)}
+.po-r{position:relative;flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--g);display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff;background:var(--card)}
+.po-r.on{background:var(--g)}
+.po.res:not(.mine) .po-r{border-color:var(--line)}
+.po-cta{position:relative;flex:none;font-size:12.5px;font-weight:700;color:var(--gt,#006a4e);border:1px solid currentColor;border-radius:999px;padding:2px 10px}

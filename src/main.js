@@ -455,11 +455,13 @@ document.addEventListener('submit', e => {
 function pollHtml(p) {
   const votes = p.poll.map((_, i) => Number(p.votes?.[i]) || 0), total = votes.reduce((a, b) => a + b, 0);
   const voted = p.myVote != null, show = voted || p.userId === me()?.id;
-  return `<div class="poll">${p.poll.map((o, i) => {
-    const pct = total ? Math.round(votes[i] * 100 / total) : 0;
-    return show ? `<button class="po res${p.myVote === i ? ' mine' : ''}" data-vote="${esc(p.id)}|${i}" aria-label="${esc(o)}: ${bn(pct)}%${p.myVote === i ? ', আপনার ভোট' : ''}"><span class="po-bar" style="width:${pct}%"></span><span class="po-t">${p.myVote === i ? '✓ ' : ''}${esc(o)}</span><span class="po-p">${bn(pct)}%</span></button>`
-      : `<button class="po" data-vote="${esc(p.id)}|${i}"><span class="po-t">${esc(o)}</span></button>`;
-  }).join('')}<div class="po-foot mut">${bn(total)} ভোট${voted ? ' · বদলাতে অন্য অপশনে, তুলে নিতে নিজের ভোটে চাপুন' : show ? '' : ' · ভোট দিলে ফলাফল দেখবেন'}</div></div>`;
+  const head = voted ? `${ic('poll', 16)} আপনি ভোট দিয়েছেন` : `${ic('poll', 16)} ভোট দিন: নিচের যেকোনো একটিতে চাপুন`;
+  return `<div class="poll${voted ? ' voted' : ''}"><div class="po-head">${head}</div>${p.poll.map((o, i) => {
+    const pct = total ? Math.round(votes[i] * 100 / total) : 0, mine = p.myVote === i;
+    const radio = `<span class="po-r${mine ? ' on' : ''}" aria-hidden="true">${mine ? '✓' : ''}</span>`;
+    return show ? `<button class="po res${mine ? ' mine' : ''}" data-vote="${esc(p.id)}|${i}" aria-label="${esc(o)}: ${bn(pct)}%${mine ? ', আপনার ভোট' : ', এখানে ভোট দিন'}"><span class="po-bar" style="width:${pct}%"></span>${radio}<span class="po-t">${esc(o)}</span><span class="po-p">${bn(pct)}%</span></button>`
+      : `<button class="po" data-vote="${esc(p.id)}|${i}" aria-label="${esc(o)}, এখানে ভোট দিন">${radio}<span class="po-t">${esc(o)}</span><span class="po-cta">ভোট দিন</span></button>`;
+  }).join('')}<div class="po-foot mut">${bn(total)} জন ভোট দিয়েছেন${voted ? ' · মত বদলাতে অন্যটিতে চাপুন, ভোট তুলে নিতে নিজের ভোটে আবার চাপুন' : show ? '' : ' · ভোট দিলে ফলাফল দেখতে পাবেন'}</div></div>`;
 }
 const DHAKA = { timeZone: 'Asia/Dhaka' };
 // বাংলায় তারিখ-সময় (ঢাকার সময়): "শুক্রবার, ২৭ নভেম্বর · বিকাল ৫:০০"

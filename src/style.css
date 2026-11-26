@@ -1556,3 +1556,12 @@ img.av{aspect-ratio:1/1}
 .sw-ic.ready{background:var(--g);color:#fff;transform:scale(1.1)}
 #thread{overflow-x:clip}
 .mrow.mine .mcol{position:relative}.mrow.mine .sw-ic{left:auto;right:-40px}
+/* নিজস্ব ভয়েস প্লেয়ার */
+.m-voice{display:flex;align-items:center;gap:8px;min-width:190px;padding:2px 0}
+.vp-btn{flex:none;width:34px;height:34px;border-radius:50%;border:0;cursor:pointer;display:grid;place-items:center;font-size:13px;padding:0;background:var(--g);color:#fff}
+.bub.mine .vp-btn{background:#fff;color:var(--tc,var(--g))}
+.vp-bar{flex:1;height:22px;display:flex;align-items:center;cursor:pointer;position:relative}
+.vp-bar::before{content:'';position:absolute;left:0;right:0;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:currentColor;opacity:.25}
+.vp-bar i{position:relative;display:block;height:4px;border-radius:2px;background:currentColor;width:0;transition:width .2s linear}
+.vp-t{flex:none;font-size:12px!important;opacity:.85;margin:0!important;min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+.m-voice.playing .vp-btn{box-shadow:0 0 0 3px rgba(0,106,78,.2)}

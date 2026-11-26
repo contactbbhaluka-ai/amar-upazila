@@ -2613,7 +2613,7 @@ function openThread(id, silent, pageId = null) { return openConv({ kind: pageId 
 function openChatGroup(chatId, silent) { return openConv({ kind: 'group', id: Number(chatId) || chatId }, silent); }
 async function openConv(t, silent) {
   if (!silent) {
-    $('#tform').hidden = false; $('#t-ro').hidden = true;
+    $('#tform').hidden = false; $('#t-ro').hidden = true; VP.a.pause(); VP.id = null; VP.pct = 0;
     S.th = { ...t }; S.threadId = t.kind === 'group' ? null : t.id; S.threadPage = t.pageId || null; S.reply = null; S.edit = null; S.tq = ''; $('#t-search').hidden = true; $('#t-mention').hidden = true; $('#t-top').innerHTML = ''; $('#v-thread').dataset.theme = '';
     open('thread'); $('#thread').innerHTML = '<div class="mut">লোড হচ্ছে…</div>'; $('#t-req').innerHTML = ''; setReplyBar(); $('#t-typing').hidden = true; $('#t-emoji').hidden = true;
     S.typingCh?.stop(); S.typingCh = null;
@@ -2675,7 +2675,9 @@ function msgBody(m) {
   const r = m.reply;
   const quote = r ? `<span class="rq"><b>${r.mine ? 'আপনি' : 'উত্তর'}</b>${esc(r.deleted ? 'মুছে ফেলা মেসেজ' : r.voice ? '🎤 ভয়েস মেসেজ' : r.image && !r.body ? '📷 ছবি' : (r.body || '').slice(0, 80))}</span>` : '';
   const img = m.image ? `<button class="m-img" data-mimg="${esc(m.image)}" aria-label="ছবি বড় করে দেখুন"><img alt="" data-path="${esc(m.image)}"></button>` : '';
-  const voice = m.voice ? `<span class="m-voice">🎤 <audio controls preload="none" data-path="${esc(m.voice)}"></audio><small>${fmtSecs(m.voiceSecs || 0)}</small></span>` : '';
+  // নিজস্ব হালকা ভয়েস প্লেয়ার (ব্রাউজারের নিজের প্লেয়ার কিছু ফোনে উপরের অংশের উপর উঠে যায়, আর সোয়াইপও আটকায়)
+  const playing = VP.id === m.id && !VP.a.paused;
+  const voice = m.voice ? `<span class="m-voice${playing ? ' playing' : ''}" data-vmid="${esc(m.id)}" data-vpath="${esc(m.voice)}" data-secs="${m.voiceSecs || 0}"><button type="button" class="vp-btn" data-vplay aria-label="${playing ? 'থামান' : 'ভয়েস মেসেজ শুনুন'}">${playing ? '❚❚' : '▶'}</button><span class="vp-bar" data-vseek><i style="width:${VP.id === m.id ? VP.pct : 0}%"></i></span><small class="vp-t">${fmtSecs(VP.id === m.id && VP.a.currentTime ? VP.a.currentTime : m.voiceSecs || 0)}</small></span>` : '';
   const fwd = m.forwarded ? '<span class="m-fwd">↪ ফরওয়ার্ড করা</span>' : '';
   const stk = m.sticker && STICKERS[m.sticker] ? stickerHtml(m.sticker) : '';
   const loc = m.loc ? `<a class="m-loc" href="https://www.google.com/maps?q=${Number(m.loc.lat)},${Number(m.loc.lng)}" target="_blank" rel="noopener"><span class="ml-pin">📍</span><span><b>লোকেশন</b><small>ম্যাপে দেখতে চাপুন ↗</small></span></a>` : '';
@@ -2726,7 +2728,41 @@ function renderMsgs() {
   if (paths.length) S.api.fileUrls(paths).then(map => {
     document.querySelectorAll('#thread [data-path]').forEach(el => { const u = map.get(el.dataset.path); if (u) el.src = u; });
     document.querySelectorAll('#thread [data-mimg]').forEach(el => { const u = map.get(el.dataset.mimg); if (u) el.dataset.url = u; });
+    document.querySelectorAll('#thread [data-vpath]').forEach(el => { const u = map.get(el.dataset.vpath); if (u) el.dataset.url = u; });
   }).catch(() => {});
+}
+// ভয়েস প্লেয়ার: একটাই অডিও, যেটা চাপবেন সেটা বাজবে
+const VP = { a: new Audio(), id: null, pct: 0 };
+VP.a.preload = 'none';
+const vpEl = () => VP.id != null && document.querySelector(`#thread .m-voice[data-vmid="${CSS.escape(String(VP.id))}"]`);
+function vpPaint() {
+  const el = vpEl(); if (!el) return;
+  const d = VP.a.duration && isFinite(VP.a.duration) ? VP.a.duration : Number(el.dataset.secs) || 1;
+  VP.pct = Math.min(100, (VP.a.currentTime / d) * 100);
+  el.querySelector('.vp-bar i').style.width = VP.pct + '%';
+  el.querySelector('.vp-t').textContent = fmtSecs(VP.a.paused && !VP.a.currentTime ? Number(el.dataset.secs) || 0 : VP.a.currentTime);
+  const on = !VP.a.paused; el.classList.toggle('playing', on);
+  const b = el.querySelector('.vp-btn'); b.textContent = on ? '❚❚' : '▶'; b.setAttribute('aria-label', on ? 'থামান' : 'ভয়েস মেসেজ শুনুন');
+}
+['timeupdate', 'play', 'pause'].forEach(ev => VP.a.addEventListener(ev, vpPaint));
+VP.a.addEventListener('ended', () => { VP.a.currentTime = 0; VP.pct = 0; vpPaint(); });
+VP.a.addEventListener('error', () => { if (VP.id != null) toast('ভয়েস মেসেজটি চালানো যায়নি'); });
+async function vpToggle(el, seekPct) {
+  const id = el.dataset.vmid;
+  if (String(VP.id) !== id) {
+    let url = el.dataset.url;
+    if (!url) { try { url = (await S.api.fileUrls([el.dataset.vpath])).get(el.dataset.vpath); } catch { /* নিচে বার্তা */ } }
+    if (!url) return toast('ভয়েস মেসেজটি লোড হচ্ছে, আবার চাপুন');
+    const old = vpEl(); VP.a.pause(); VP.id = id; VP.pct = 0; VP.a.src = url;
+    if (old) { old.classList.remove('playing'); old.querySelector('.vp-btn').textContent = '▶'; old.querySelector('.vp-bar i').style.width = '0%'; old.querySelector('.vp-t').textContent = fmtSecs(Number(old.dataset.secs) || 0); }
+  }
+  if (seekPct != null) {
+    const go = () => { const d = VP.a.duration && isFinite(VP.a.duration) ? VP.a.duration : Number(el.dataset.secs) || 0; VP.a.currentTime = d * seekPct; };
+    if (VP.a.readyState >= 1) go(); else VP.a.addEventListener('loadedmetadata', go, { once: true });
+    if (VP.a.paused) VP.a.play().catch(() => toast('ভয়েস মেসেজটি চালানো যায়নি'));
+    return;
+  }
+  if (VP.a.paused) VP.a.play().catch(() => toast('ভয়েস মেসেজটি চালানো যায়নি')); else VP.a.pause();
 }
 // মেসেজে চাপলে: রিয়্যাক্ট, উত্তর, কপি, মুছা
 $('#thread').addEventListener('click', e => {
@@ -2737,6 +2773,9 @@ $('#thread').addEventListener('click', e => {
     else if (im.dataset.url) openViewer({ images: [im.dataset.url] });
     return;
   }
+  const vb0 = e.target.closest('.m-voice');
+  if (vb0 && e.target.closest('[data-vplay]')) { vpToggle(vb0); return; }
+  if (vb0 && e.target.closest('[data-vseek]')) { const r = e.target.closest('[data-vseek]').getBoundingClientRect(); vpToggle(vb0, Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))); return; }
   if (e.target.closest('a, audio, .who-btn, .avbtn')) return;
   const pv = e.target.closest('[data-pvote]');
   if (pv) { const m = (S.th?.msgs || []).find(x => String(x.id) === pv.dataset.pvote); if (m) busy(null, async () => { const o = Number(pv.dataset.opt); await S.api.voteChatPoll(m.id, m.poll.my === o ? null : o); openConv(S.th, true); }); return; }
@@ -2754,7 +2793,7 @@ let tapT = null, tapId = null;
   let sw = null, swiped = false;
   const thread = $('#thread');
   thread.addEventListener('touchstart', e => {
-    const row = e.target.closest('.mrow'); if (!row || e.touches.length !== 1 || e.target.closest('audio, .mp-opt')) { sw = null; return; }
+    const row = e.target.closest('.mrow'); if (!row || e.touches.length !== 1 || e.target.closest('.mp-opt')) { sw = null; return; }
     const b = row.querySelector('[data-mid]'); const m = b && (S.th?.msgs || []).find(x => String(x.id) === b.dataset.mid);
     if (!m || m.deleted || S.th?.partner?.rel?.blocked || !$('#t-ro').hidden) { sw = null; return; }
     sw = { row, m, x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, dir: 0, done: false, sign: row.classList.contains('mine') ? -1 : 1 };   // নিজের মেসেজ বাঁয়ে, অন্যের মেসেজ ডানে
@@ -5046,6 +5085,7 @@ const RELOAD = {
 };
 function pushNav() { try { history.pushState({ au: 1 }, ''); } catch { /* sandbox */ } }
 function show(v) {
+  if (v !== 'thread') { try { VP.a.pause(); } catch { /* প্লেয়ার এখনো তৈরি হয়নি */ } }
   if (v !== 'msgs' && v !== 'thread') S.convPage = null;   // পেইজের মেসেজ-ফিল্টার শুধু ওই পাতায়
   S.view = v;
   if (TABS.includes(v)) S.tab = v;

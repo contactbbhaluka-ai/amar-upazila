@@ -34,6 +34,8 @@ const ICONS = {
   dots: '<circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/>',
   send: '<path d="M4 12l16-8-6 16-2.5-6.5z"/>',
   photo: '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  album: '<rect x="3" y="6" width="15" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/><path d="M3 16l4-4 4 4 3-3 4 4"/>',
   tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.6"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
@@ -239,6 +241,8 @@ document.addEventListener('click', e => {
 S.viewer = null;
 function openViewer(p, start = 0) {
   const im = p.images || [p.image]; S.viewer = { p, im, i: start };
+  let vp = $('#v-gopost'); if (!vp) { $('#v-save').insertAdjacentHTML('beforebegin', '<button id="v-gopost" class="v-post">পোস্ট দেখুন</button>'); vp = $('#v-gopost'); vp.onclick = () => { const id = S.viewer?.p.postIds?.[S.viewer.i]; if (id) { back(); setTimeout(() => openPost(id), 60); } }; }
+  vp.hidden = !p.postIds;
   $('#v-track').innerHTML = im.map((src, i) => `<div class="v-item"><img src="${esc(src)}" alt="ছবি ${bn(i + 1)}"></div>`).join('');
   $('#v-save').innerHTML = ic('download', 22); $('#viewer').hidden = false; document.body.style.overflow = 'hidden';
   $('#v-prev').hidden = $('#v-next').hidden = im.length < 2;
@@ -276,13 +280,20 @@ $('#v-save').addEventListener('click', async () => {
 });
 
 // ================================================================ পোস্ট (হোম, আমার, অন্যের প্রোফাইল — সব জায়গায় একই)
+// প্রোফাইল/কভার ছবি বদল বা অ্যালবামে ছবি যোগের লাইন (ফেসবুকের মতো)
+function actLine(p) {
+  if (p.kind === 'avatar') return ' <span class="act-line">প্রোফাইল ছবি পরিবর্তন করেছেন</span>';
+  if (p.kind === 'cover') return ' <span class="act-line">কভার ছবি পরিবর্তন করেছেন</span>';
+  if (p.albumId && p.albumName) return ` <span class="act-line"><button class="link-b" data-openalbum="${esc(p.userId)}|${esc(p.albumId)}">${esc(p.albumName)}</button> অ্যালবামে ছবি যোগ করেছেন</span>`;
+  return '';
+}
 function postHtml(p) {
   const u = me();
   const link = (inner, cls) => p.pageId ? `<button class="${cls}" data-page="${esc(p.pageId)}">${inner}</button>` : userLink(p.userId, inner, cls);
   const via = p.groupId && S.view !== 'group' ? ` <span class="via">▸ <button data-group="${esc(p.groupId)}">${esc(p.groupName)}</button></span>` : '';
   return `<article class="card post">
     <div class="top">${link(av(p), 'avbtn')}
-      <div>${link(esc(p.author), 'who-btn')}${tagsLine(p)}${via}<div class="mut">${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
+      <div>${link(esc(p.author), 'who-btn')}${actLine(p)}${tagsLine(p)}${via}<div class="mut">${p.pageId ? 'পেইজ' : esc(p.union)} · ${esc(ago(p.createdAt))}${p.editedAt ? ` · <span class="edited" title="সম্পাদিত ${esc(ago(p.editedAt))}">সম্পাদিত</span>` : ''} · <span class="pv-mini" title="${PRIVACY[p.privacy || 'public'][1]}" aria-label="${PRIVACY[p.privacy || 'public'][1]}">${ic(PRIVACY[p.privacy || 'public'][0], 13)}</span></div></div>
       <button class="more" data-menu="${esc(p.id)}" aria-label="আরও অপশন">⋯</button></div>
     <span class="tag${p.category === 'সাহায্য চাই' ? ' help' : ''}" style="margin-top:8px">${esc(p.category)}</span>
     ${p.body ? `<p>${moreText(p.body, 'p' + p.id, { full: S.view === 'post' && S.feeds.post.posts[0]?.id === p.id, mentions: p.mentions })}</p>` : '<div style="height:8px"></div>'}
@@ -556,7 +567,7 @@ S.draft = null;
 function newDraft(opts = {}) { return { body: '', category: POST_CATS[0], photos: [], tags: [], mentions: new Map(), privacy: local.get('privacy', 'public'), ...opts }; }
 function openPostComposer(opts = {}, then) {
   if (!needUser()) return;
-  if (!S.draft || S.draft.editId || S.draft.pageId !== opts.pageId || S.draft.groupId !== opts.groupId) S.draft = newDraft(opts);
+  if (!S.draft || S.draft.editId || S.draft.albumId !== opts.albumId || S.draft.pageId !== opts.pageId || S.draft.groupId !== opts.groupId) S.draft = newDraft(opts);
   renderComposerSheet();
   if (then === 'photo') setTimeout(() => $('#pc-file')?.click(), 50);
   if (then === 'tag') tagPicker();
@@ -579,7 +590,8 @@ function renderComposerSheet() {
   openSheet(`<div class="pc">
     <div class="pc-head"><b>${esc(d.title || 'পোস্ট তৈরি করুন')}</b><button class="pc-x" data-close aria-label="বন্ধ করুন">${ic('close', 20)}</button></div>
     <div class="pc-author">${av(u)}<div><div class="pc-name"><b>${esc(d.authorName || u.name)}</b>${tagLine}</div>
-      ${own ? `<button class="pc-priv" id="pc-priv" aria-label="কারা দেখবে: ${pv[1]}">${ic(pv[0], 14)} ${pv[1]} ▾</button>` : `<span class="pc-priv static">${ic('globe', 14)} পাবলিক</span>`}</div></div>
+      ${d.albumId ? `<span class="pc-priv static" title="অ্যালবামের প্রাইভেসি">${ic(pv[0], 14)} ${pv[1]}</span>` : own ? `<button class="pc-priv" id="pc-priv" aria-label="কারা দেখবে: ${pv[1]}">${ic(pv[0], 14)} ${pv[1]} ▾</button>` : `<span class="pc-priv static">${ic('globe', 14)} পাবলিক</span>`}</div></div>
+    ${d.albumId ? `<div class="pc-album">${ic('album', 16)} অ্যালবাম: <b>${esc(d.albumName)}</b></div>` : ''}
     <textarea id="pc-text" maxlength="1000" placeholder="আপনার মনে কী আছে, ${esc(u.name.split(' ')[0])}? (কাউকে উল্লেখ করতে @ লিখুন)">${esc(d.body)}</textarea>
     ${d.photos.length ? `<div class="pc-photos">${d.photos.map((ph, i) => `<div class="pc-ph"><img src="${esc(ph.url)}" alt="ছবি ${bn(i + 1)}"><button type="button" data-rmph="${i}" aria-label="ছবি বাদ দিন">${ic('close', 14)}</button></div>`).join('')}
       ${d.photos.length < MAX_PHOTOS && photosOk ? `<label class="pc-ph add" aria-label="আরও ছবি">${ic('plus', 24)}<span>${bn(d.photos.length)}/${bn(MAX_PHOTOS)}</span><input type="file" accept="image/*" multiple class="pc-more" hidden></label>` : ''}</div>` : ''}
@@ -613,12 +625,14 @@ function renderComposerSheet() {
     if (!d.body.trim() && !d.photos.length && !d.shared) return toast('কিছু লিখুন বা ছবি দিন');
     if (d.editId) return saveEdit(e.currentTarget);
     busy(e.currentTarget, async () => {
-      await S.api.createPost({ body: d.body.trim(), category: d.category, images: d.photos.map(p => p.blob), pageId: d.pageId, groupId: d.groupId, privacy: d.privacy, tags: d.tags.map(t => t.id), mentions: mentionIds(d.body, d.mentions) });
+      if (d.albumId && !d.photos.length) return toast('অ্যালবামে যোগ করতে অন্তত একটা ছবি দিন');
+      await S.api.createPost({ body: d.body.trim(), category: d.category, images: d.photos.map(p => p.blob), pageId: d.pageId, groupId: d.groupId, privacy: d.privacy, tags: d.tags.map(t => t.id), mentions: mentionIds(d.body, d.mentions), albumId: d.albumId || null });
       d.photos.forEach(p => URL.revokeObjectURL(p.url));
       const where = d.pageId ? 'page' : d.groupId ? 'group' : 'home';
       S.draft = null; $('#sheet').classList.remove('tall'); closeSheet(); toast('পোস্ট হয়েছে');
       if (where === 'home') { S.fcat = ''; if (S.union && Number(S.union) !== me().unionId) { S.union = ''; $('#loc').value = ''; } renderFilters(); }
       loadFeed(where);
+      if (S.view === 'me') { if (S.pstate.me.tab === 'photos') loadPhotosPane('me'); else loadFeed('me'); }
     });
   };
 }
@@ -734,23 +748,173 @@ document.addEventListener('click', async e => {
 });
 
 // ================================================================ অন্যের প্রোফাইল
-async function openUser(id, silent) {
+// ================================================================ প্রোফাইল: কভার ছবি, পোস্ট/ছবি ট্যাব, অ্যালবাম
+S.pstate = { me: { tab: 'posts', seg: 'all', album: null }, user: { tab: 'posts', seg: 'all', album: null, uid: null } };
+function coverHtml(p, own) {
+  return `<div class="cover${p.cover ? '' : ' empty'}">
+    ${p.cover ? `<button class="cover-img" data-viewpic="${esc(p.cover)}" aria-label="কভার ছবি দেখুন"><img src="${esc(p.cover)}" alt=""></button>` : ''}
+    ${own ? `<button class="cover-btn" id="cover-btn">${ic('camera', 16)} ${p.cover ? 'কভার বদলান' : 'কভার ছবি যোগ করুন'}</button>` : ''}
+  </div>
+  <div class="prof-av">${own
+    ? `<label class="av-edit" title="প্রোফাইল ছবি বদলান">${av(p, 'lg')}<span class="av-cam">${ic('camera', 16)}</span><input type="file" id="avfile" accept="image/*" hidden></label>`
+    : p.avatar ? `<button class="avbtn" data-viewpic="${esc(p.avatar)}" aria-label="প্রোফাইল ছবি দেখুন">${av(p, 'lg')}</button>` : av(p, 'lg')}</div>`;
+}
+function profTabs(key) {
+  const st = S.pstate[key];
+  return `<div class="ptabs" role="tablist">${[['posts', 'পোস্ট'], ['photos', 'ছবি']].map(([k, l]) => `<button role="tab" data-ptab="${key}|${k}" aria-selected="${st.tab === k}" class="${st.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div id="${key}-pane"></div>`;
+}
+function profComposer() {
+  const u = me();
+  return `<div class="card composer-mini prof-comp"><div class="cm-top">${av(u)}<button class="cm-open" data-pcompose="">আপনার মনে কী আছে, ${esc(u.name.split(' ')[0])}?</button></div>
+    <div class="cm-quick"><button data-pcompose="photo"><span class="qi">${ic('photo', 20)}</span>ছবি</button><button data-pcompose="tag"><span class="qi">${ic('tag', 20)}</span>ট্যাগ</button><button data-pcompose="privacy"><span class="qi">${ic('globe', 20)}</span>প্রাইভেসি</button></div></div>`;
+}
+// কোন ট্যাব খোলা সেই অনুযায়ী নিচের অংশ দেখানো
+function showProfPane(key) {
+  const st = S.pstate[key], pane = $('#' + key + '-pane'), feed = $('#feed-' + key), more = $('#more-' + key);
+  if (!pane) return;
+  const own = key === 'me';
+  if (st.tab === 'posts') {
+    pane.innerHTML = own ? profComposer() + '<h2 class="sec-h">আমার পোস্ট</h2>' : '';
+    feed.hidden = false; loadFeed(key);
+  } else {
+    feed.hidden = true; if (more) more.hidden = true;
+    loadPhotosPane(key);
+  }
+}
+const profUid = key => (key === 'me' ? me()?.id : S.userId);
+async function loadPhotosPane(key) {
+  const st = S.pstate[key], pane = $('#' + key + '-pane'), uid = profUid(key), own = key === 'me';
+  if (!pane || !uid) return;
+  const seg = `<div class="seg pseg">${[['all', 'সব ছবি'], ['albums', 'অ্যালবাম']].map(([k, l]) => `<button data-pseg="${key}|${k}" class="${st.seg === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  pane.innerHTML = (st.album ? '' : seg) + '<div class="ph-grid"><div class="skel"></div></div>';
+  try {
+    if (st.album) {
+      const albums = await S.api.albums(uid), a = albums.find(x => String(x.id) === String(st.album));
+      if (!a) { st.album = null; return loadPhotosPane(key); }
+      const list = await S.api.photos(uid, VIRTUAL_KINDS.includes(a.id) ? { kind: a.id } : { albumId: a.id });
+      S.phList = list;
+      pane.innerHTML = `<div class="album-head"><button class="back" data-albumback="${key}" aria-label="সব অ্যালবাম">←</button>
+          <div class="ah-t"><b>${esc(a.name)}</b><span class="mut">${bn(a.count)}টি ছবি · ${ic(PRIVACY[a.privacy][0], 13)} ${PRIVACY[a.privacy][1]}</span></div>
+          ${own && !a.virtual ? `<button class="sbtn" data-albumadd="${esc(a.id)}">${ic('plus', 16)} ছবি যোগ করুন</button><button class="more" data-albummenu="${esc(a.id)}" aria-label="অ্যালবামের অপশন">⋯</button>` : ''}</div>
+        ${photoGrid(list, own && !a.virtual ? 'এখনো কোনো ছবি নেই। "ছবি যোগ করুন" চেপে শুরু করুন।' : 'এখনো কোনো ছবি নেই।')}`;
+      S.curAlbum = a;
+      return;
+    }
+    if (st.seg === 'all') {
+      const list = await S.api.photos(uid); S.phList = list;
+      pane.innerHTML = seg + photoGrid(list, own ? 'এখনো কোনো ছবি নেই। ছবিসহ পোস্ট করলে এখানে দেখাবে।' : 'এখনো কোনো ছবি নেই।');
+    } else {
+      const albums = await S.api.albums(uid);
+      pane.innerHTML = seg + `<div class="al-grid">
+        ${own ? `<button class="al-card new" data-albumnew>${ic('plus', 30)}<b>নতুন অ্যালবাম</b></button>` : ''}
+        ${albums.map(a => `<button class="al-card" data-album="${key}|${esc(a.id)}">${a.cover ? `<img src="${esc(a.cover)}" alt="" loading="lazy">` : `<span class="al-empty">${ic('album', 30)}</span>`}
+          <b>${esc(a.name)}</b><span class="mut">${bn(a.count)}টি ছবি${own && !a.virtual ? ` · ${ic(PRIVACY[a.privacy][0], 12)}` : ''}</span></button>`).join('')}
+      </div>${!albums.length && !own ? '<div class="empty">কোনো অ্যালবাম নেই।</div>' : ''}`;
+    }
+  } catch (e) { pane.innerHTML = seg + `<div class="empty">${esc(errText(e))}</div>`; }
+}
+const VIRTUAL_KINDS = ['avatar', 'cover'];
+const photoGrid = (list, emptyText) => list.length
+  ? `<div class="ph-grid">${list.map((ph, i) => `<button class="ph-cell" data-phi="${i}" aria-label="ছবি ${bn(i + 1)}"><img src="${esc(ph.url)}" alt="" loading="lazy"></button>`).join('')}</div>`
+  : `<div class="empty">${emptyText}</div>`;
+
+function albumSheet(a, then) {
+  const pv = a?.privacy || 'public';
+  openSheet(`<h2>${a ? 'অ্যালবাম এডিট' : 'নতুন অ্যালবাম'}</h2>
+    <label for="al-name">অ্যালবামের নাম</label><input id="al-name" maxlength="60" value="${esc(a?.name || '')}" placeholder="যেমন: ঈদ ২০২৬, ভ্রমণ, পরিবার">
+    <label>কারা দেখবে</label><div class="pv-pick">${Object.entries(PRIVACY).map(([k, [icn, l, sub]]) => `<label class="pv-opt"><input type="radio" name="al-pv" value="${k}" ${k === pv ? 'checked' : ''}><span>${ic(icn, 18)}</span><span><b>${l}</b><small>${sub}</small></span></label>`).join('')}</div>
+    ${a ? '<p class="mut" style="font-size:13px">প্রাইভেসি বদলালে অ্যালবামের সব ছবিতেও একই প্রাইভেসি হবে।</p>' : ''}
+    <button class="btn wide" id="al-save" style="margin-top:12px">${a ? 'সংরক্ষণ' : 'অ্যালবাম তৈরি করুন'}</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
+  $('#al-save').onclick = e => {
+    const name = $('#al-name').value.trim(), privacy = document.querySelector('[name=al-pv]:checked')?.value || 'public';
+    if (!name) return toast('অ্যালবামের নাম দিন');
+    busy(e.currentTarget, async () => {
+      if (a) await S.api.updateAlbum(a.id, { name, privacy }); else { const id = await S.api.createAlbum({ name, privacy }); S.pstate.me.album = id; }
+      closeSheet(); toast(a ? 'অ্যালবাম আপডেট হয়েছে' : 'অ্যালবাম তৈরি হয়েছে'); loadPhotosPane('me'); then?.();
+    });
+  };
+}
+function openAlbum(uid, albumId) {
+  const key = me() && uid === me().id ? 'me' : 'user';
+  Object.assign(S.pstate[key], { tab: 'photos', seg: 'albums', album: albumId, uid });
+  if (key === 'me') { go('me'); renderMe(); } else openUser(uid, false, true);
+}
+// নতুন প্রোফাইল বা কভার ছবি: আগে দেখে নিয়ে, নিউজফিডে জানাবেন কিনা বেছে সেভ
+function picSheet(kind, blob) {
+  const url = URL.createObjectURL(blob), cover = kind === 'cover';
+  openSheet(`<h2>${cover ? 'নতুন কভার ছবি' : 'নতুন প্রোফাইল ছবি'}</h2>
+    <div class="pic-prev${cover ? ' cover' : ''}"><img src="${url}" alt=""></div>
+    <label class="chk"><input type="checkbox" id="pic-share" checked> <span>নিউজফিডে শেয়ার করুন <small class="mut">(বন্ধ রাখলে শুধু আপনার "${cover ? 'কভার ছবি' : 'প্রোফাইল ছবি'}" অ্যালবামে থাকবে, অন্যরা দেখবে না)</small></span></label>
+    <button class="btn wide" id="pic-save" style="margin-top:12px">সংরক্ষণ করুন</button><button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button>`);
+  $('#pic-save').onclick = e => busy(e.currentTarget, async () => {
+    const share = $('#pic-share').checked;
+    if (cover) await S.api.setCover(blob, share); else await S.api.setAvatar(blob, share);
+    URL.revokeObjectURL(url); closeSheet(); renderMe(); renderComposer(); loadFeed('home');
+    toast(cover ? 'কভার ছবি বদলানো হয়েছে' : 'প্রোফাইল ছবি বদলানো হয়েছে');
+  });
+}
+function coverMenu() {
+  const u = me();
+  if (!u.cover) return $('#coverfile').click();
+  openSheet(`<div class="menu"><button data-act="up">${ic('camera', 18)} নতুন ছবি আপলোড করুন</button><button data-act="view">${ic('photo', 18)} কভার ছবি দেখুন</button><button data-act="rm" class="danger">কভার ছবি সরান</button><button data-close>বন্ধ করুন</button></div>`);
+  $('#sheet').onclick = async ev => {
+    const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    closeSheet();
+    if (a === 'up') $('#coverfile').click();
+    if (a === 'view') openViewer({ images: [u.cover] });
+    if (a === 'rm' && await confirmSheet('কভার ছবি সরাবেন? ছবিটা আপনার "কভার ছবি" অ্যালবামে থেকে যাবে।', 'সরান', true)) await busy(null, async () => { await S.api.removeCover(); renderMe(); toast('কভার ছবি সরানো হয়েছে'); });
+  };
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-ptab],[data-pseg],[data-phi],[data-album],[data-albumnew],[data-albumback],[data-albumadd],[data-albummenu],[data-openalbum],[data-viewpic],[data-pcompose],#cover-btn');
+  if (!b) return;
+  if (b.id === 'cover-btn') return coverMenu();
+  if (b.dataset.viewpic) return openViewer({ images: [b.dataset.viewpic] });
+  if (b.dataset.pcompose !== undefined) return openPostComposer({}, b.dataset.pcompose || undefined);
+  if (b.dataset.openalbum) { const [uid, aid] = b.dataset.openalbum.split('|'); return openAlbum(uid, aid); }
+  if (b.dataset.ptab) { const [key, tab] = b.dataset.ptab.split('|'); S.pstate[key].tab = tab; S.pstate[key].album = null; document.querySelectorAll(`[data-ptab^="${key}|"]`).forEach(x => { const on = x.dataset.ptab === b.dataset.ptab; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); }); return showProfPane(key); }
+  if (b.dataset.pseg) { const [key, seg] = b.dataset.pseg.split('|'); S.pstate[key].seg = seg; return loadPhotosPane(key); }
+  if (b.dataset.album) { const [key, id] = b.dataset.album.split('|'); S.pstate[key].album = id; return loadPhotosPane(key); }
+  if (b.dataset.albumback) { S.pstate[b.dataset.albumback].album = null; return loadPhotosPane(b.dataset.albumback); }
+  if (b.dataset.albumnew !== undefined) return albumSheet(null);
+  if (b.dataset.phi) {
+    const list = S.phList || [], i = Number(b.dataset.phi);
+    return openViewer({ images: list.map(x => x.url), postIds: list.map(x => x.postId) }, i);
+  }
+  if (b.dataset.albumadd) { const a = S.curAlbum; return openPostComposer({ albumId: a.id, albumName: a.name, privacy: a.privacy, title: 'অ্যালবামে ছবি যোগ করুন' }, 'photo'); }
+  if (b.dataset.albummenu) {
+    const a = S.curAlbum;
+    openSheet(`<div class="menu"><button data-act="edit">${ic('edit', 18)} নাম ও প্রাইভেসি বদলান</button><button data-act="del" class="danger">অ্যালবাম মুছুন</button><button data-close>বন্ধ করুন</button></div>`);
+    $('#sheet').onclick = async ev => {
+      const act = ev.target.closest('[data-act]')?.dataset.act; if (!act) return;
+      if (act === 'edit') return albumSheet(a);
+      closeSheet();
+      if (act === 'del' && await confirmSheet(`"${a.name}" অ্যালবাম মুছবেন? ভেতরের ছবির পোস্টগুলো মুছবে না, শুধু অ্যালবাম থেকে বেরিয়ে যাবে।`, 'মুছুন', true))
+        await busy(null, async () => { await S.api.deleteAlbum(a.id); S.pstate.me.album = null; S.pstate.me.seg = 'albums'; loadPhotosPane('me'); toast('অ্যালবাম মুছে ফেলা হয়েছে'); });
+    };
+  }
+});
+
+async function openUser(id, silent, keepState) {
   if (me() && id === me().id) return go('me');
+  if (!keepState && S.pstate.user.uid !== id) Object.assign(S.pstate.user, { tab: 'posts', seg: 'all', album: null });
+  S.pstate.user.uid = id;
   if (!silent) { S.userId = id; open('user'); $('#user').innerHTML = '<div class="skel"></div>'; S.feeds.user.posts = []; $('#feed-user').innerHTML = ''; }
   try {
     const p = await S.api.profile(id), r = p.rel || {};
-    $('#user').innerHTML = `<div class="card prof">${av(p, 'lg')}<h2 style="margin:8px 0 0">${esc(p.name)}</h2><div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
+    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}</h2><div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       <div class="stats"><div><b>${bn(p.friends)}</b><span>বন্ধু</span></div><div><b>${bn(p.followers)}</b><span>ফলোয়ার</span></div><div><b>${bn(p.following)}</b><span>ফলো করছেন</span></div></div>
       ${r.blocked ? `<p class="mut">আপনি এই ব্যক্তিকে ব্লক করেছেন।</p><button class="btn ghost" id="unblock">আনব্লক করুন</button>`
-      : `<div class="row">${relBtns(p)}<button class="sbtn ${r.following ? 'ghost' : ''}" data-fo="${esc(p.id)}" data-on="${r.following ? 1 : 0}">${r.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" data-dm="${esc(p.id)}">মেসেজ</button><button class="more" id="umore" aria-label="আরও">⋯</button></div>`}</div>`;
+      : `<div class="row">${relBtns(p)}<button class="sbtn ${r.following ? 'ghost' : ''}" data-fo="${esc(p.id)}" data-on="${r.following ? 1 : 0}">${r.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" data-dm="${esc(p.id)}">মেসেজ</button><button class="more" id="umore" aria-label="আরও">⋯</button></div>`}</div>${r.blocked ? '' : profTabs('user')}`;
     $('#unblock')?.addEventListener('click', e => busy(e.currentTarget, async () => { await S.api.unblock(p.id); openUser(p.id, true); loadFeed('user'); }));
     $('#umore')?.addEventListener('click', () => {
       if (!needUser()) return;
       openSheet(`<div class="menu"><button data-act="report">প্রোফাইল রিপোর্ট করুন</button><button data-act="block" class="danger">ব্লক করুন</button><button data-close>বন্ধ করুন</button></div>`);
       $('#sheet').onclick = ev => { const a = ev.target.closest('[data-act]')?.dataset.act; if (a === 'report') reportSheet('user', p.id); if (a === 'block') { closeSheet(); blockUser(p.id, p.name); } };
     });
-    if (!silent) loadFeed('user');
+    if (r.blocked) $('#feed-user').hidden = true; else showProfPane('user');
   } catch (e) { $('#user').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 
@@ -1001,8 +1165,7 @@ const unionOptions = sel => S.unions.map(u => `<option value="${esc(u.id)}" ${St
 async function renderMe(mode = 'login') {
   const u = me();
   if (u) {
-    $('#me').innerHTML = `<div class="card prof"><label class="avbtn" style="cursor:pointer;display:inline-block" title="প্রোফাইল ছবি বদলান">${av(u, 'lg')}<input type="file" id="avfile" accept="image/*" hidden></label>
-      <div class="mut" style="font-size:13px">ছবিতে চাপ দিয়ে বদলান</div>
+    $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
       <h2 style="margin:6px 0 0">${esc(u.name)}</h2><div class="mut">${ic('pin', 14)} ${esc(u.union)}${u.admin && S.api.mode !== 'demo' ? ' · অ্যাডমিন' : ''}</div>
       <div style="margin-top:6px">${u.bloodGroup ? `${bgBadge(u.bloodGroup)} <span class="mut" style="font-size:13px">${u.donorVisible ? 'ব্লাড ব্যাংকে ডোনার হিসেবে আছেন' : 'ব্লাড ব্যাংকে দেখানো বন্ধ'}</span>
         <div class="mut" style="font-size:14px;margin-top:4px">${ic('calendar', 14)} সর্বশেষ রক্তদান: ${u.lastDonated ? esc(bnDate(u.lastDonated)) : 'দেওয়া নেই'} · ${donateStatus(u.lastDonated)}</div>
@@ -1010,12 +1173,12 @@ async function renderMe(mode = 'login') {
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       <div class="stats" id="mystats"><div><b>…</b><span>বন্ধু</span></div><div><b>…</b><span>ফলোয়ার</span></div><div><b>…</b><span>ফলো করছেন</span></div></div>
       <div class="row"><button class="btn ghost" id="edit">প্রোফাইল এডিট</button><button class="btn ghost" data-v="menu">⚙️ সেটিং</button></div></div>
-      <h2>আমার পোস্ট</h2>`;
+      ${profTabs('me')}`;
     S.api.profile(u.id).then(p => { $('#mystats') && ($('#mystats').innerHTML = `<div><b>${bn(p.friends)}</b><span>বন্ধু</span></div><div><b>${bn(p.followers)}</b><span>ফলোয়ার</span></div><div><b>${bn(p.following)}</b><span>ফলো করছেন</span></div>`); }).catch(() => {});
-    loadFeed('me');
+    showProfPane('me');
     return;
   }
-  $('#feed-me').innerHTML = '';
+  $('#feed-me').innerHTML = ''; $('#feed-me').hidden = false;
   const signup = mode === 'signup';
   $('#me').innerHTML = `${demoCard()}<div class="card"><h2>${signup ? 'নতুন অ্যাকাউন্ট খুলুন' : 'লগইন করুন'}</h2>
     <p class="mut">পোস্ট, বন্ধু, মেসেজের জন্য অ্যাকাউন্ট লাগবে। ☰ মেনুর সেবা ডিরেক্টরি লগইন ছাড়াই দেখা যায়।</p>
@@ -1055,9 +1218,10 @@ async function renderMe(mode = 'login') {
   };
 }
 $('#me').addEventListener('change', async e => {
-  if (e.target.id !== 'avfile') return;
-  const file = e.target.files[0]; if (!file) return;
-  await busy(null, async () => { const blob = await compress(file, 512, 0.85); await S.api.setAvatar(blob); renderMe(); renderComposer(); toast('প্রোফাইল ছবি বদলানো হয়েছে'); });
+  if (e.target.id !== 'avfile' && e.target.id !== 'coverfile') return;
+  const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+  const cover = e.target.id === 'coverfile';
+  try { picSheet(cover ? 'cover' : 'avatar', await compress(file, cover ? 1600 : 640, 0.85)); } catch { toast('ছবিটা পড়া গেল না, অন্য ছবি দিন'); }
 });
 document.addEventListener('click', async e => {
   const id = e.target.closest('button')?.id; if (!id) return;

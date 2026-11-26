@@ -7,6 +7,9 @@
 //   Relation { friend: 'none'|'sent'|'received'|'friends', following, blocked }
 //   Post     { id, body, image, category, createdAt, likes, comments, userId, author, avatar, union, liked }
 import { SUPABASE_URL, SUPABASE_ANON_KEY, UPAZILA_ID, DEMO, SETTING_KEYS } from './config.js';
+// অ্যালবামের ছবি: পোস্টের তালিকা থেকে একেকটা ছবি আলাদা করে [{ url, postId, i, createdAt }]
+const flattenPhotos = rows => rows.flatMap(r => (r.images || []).map((url, i) => ({ url, postId: r.id, i, createdAt: r.createdAt })));
+const VIRTUAL_ALBUMS = { avatar: 'প্রোফাইল ছবি', cover: 'কভার ছবি' };
 const settingDefaults = () => Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d]));
 
 export const PAGE = 20;
@@ -19,12 +22,12 @@ async function supabaseApi() {
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
-  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,bio,role,unions!profiles_union_id_fkey(name)';
+  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
     id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
     union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
     bloodGroup: p.blood_group || '', donorVisible: p.donor_visible !== false, lastDonated: p.last_donated || '',
-    avatar: p.avatar_url || '', bio: p.bio || '', admin: p.role === 'admin',
+    avatar: p.avatar_url || '', cover: p.cover_url || '', bio: p.bio || '', admin: p.role === 'admin',
   });
   const toPost = (r, mine, saved) => ({
     id: r.id, body: r.body, image: r.image_url || '', images: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []),
@@ -37,10 +40,11 @@ async function supabaseApi() {
     pageId: r.page_id || null, groupId: r.group_id || null, groupName: r.groups?.name || '', poster: r.profiles?.name || '',
     shares: r.share_count || 0, saves: r.save_count || 0, pinnedCommentId: r.pinned_comment_id || null,
     sharedPostId: r.shared_post_id || null, sharedMissing: !!r.shared_post_id && !r.sp,
+    kind: r.kind || 'normal', albumId: r.album_id || null, albumName: r.al?.name || '',
     shared: r.sp ? { id: r.sp.id, body: r.sp.body, image: r.sp.image_urls?.[0] || r.sp.image_url || '', createdAt: r.sp.created_at, userId: r.sp.user_id, pageId: r.sp.page_id || null,
       author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '' } : null,
   });
-  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url),pages!posts_page_id_fkey(name,avatar_url)),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url),groups!posts_group_id_fkey(name)';
+  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:shared_post_id(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url),pages!posts_page_id_fkey(name,avatar_url)),kind,album_id,al:albums!posts_album_id_fkey(id,name),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url),groups!posts_group_id_fkey(name)';
   const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count });
   const toGroup = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, about: r.about || '', privacy: r.privacy, avatar: r.avatar_url || '', members: r.member_count });
   const inList = ids => `(${ids.join(',')})`;
@@ -154,11 +158,43 @@ async function supabaseApi() {
       ok(await sb.from('manual_donors').update({ name: v.name, district: v.district, upazila: v.upazila, union_id: v.unionId || null, phone: v.phone, blood_group: v.bloodGroup, last_donated: v.lastDonated || null }).eq('id', id));
     },
     async deleteManualDonor(id) { ok(await sb.from('manual_donors').delete().eq('id', id)); },
-    async setAvatar(blob) {
+    // share: নিউজফিডে জানানো হবে কিনা (না চাইলে শুধু নিজের অ্যালবামে থাকে)
+    async setAvatar(blob, share = true) {
       const url = await upload(blob, 'avatar');
       ok(await sb.from('profiles').update({ avatar_url: url }).eq('id', me.id));
-      me.avatar = url; return url;
+      me.avatar = url;
+      await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'avatar', privacy: share ? 'public' : 'only_me' });
+      return url;
     },
+    async setCover(blob, share = true) {
+      const url = await upload(blob, 'cover');
+      ok(await sb.from('profiles').update({ cover_url: url }).eq('id', me.id));
+      me.cover = url;
+      await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', privacy: share ? 'public' : 'only_me' });
+      return url;
+    },
+    async removeCover() { ok(await sb.from('profiles').update({ cover_url: null }).eq('id', me.id)); me.cover = ''; },
+    // ছবি: কারও সব ছবি, বা একটা অ্যালবামের (albumId), বা প্রোফাইল/কভার ছবির (kind)
+    async photos(userId, { albumId, kind } = {}) {
+      let q = sb.from('posts').select('id,image_url,image_urls,created_at').eq('user_id', userId).is('page_id', null).is('group_id', null)
+        .order('created_at', { ascending: false }).limit(300);
+      if (albumId) q = q.eq('album_id', albumId); if (kind) q = q.eq('kind', kind);
+      return flattenPhotos(ok(await q).map(r => ({ id: r.id, createdAt: r.created_at, images: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []) })));
+    },
+    async albums(userId) {
+      const [al, ps] = await Promise.all([
+        sb.from('albums').select('id,name,privacy,created_at').eq('user_id', userId).order('created_at', { ascending: false }),
+        sb.from('posts').select('id,image_url,image_urls,album_id,kind,created_at').eq('user_id', userId).is('page_id', null).is('group_id', null)
+          .or('album_id.not.is.null,kind.neq.normal').order('created_at', { ascending: false }).limit(500),
+      ]);
+      const posts = ok(ps).map(r => ({ id: r.id, albumId: r.album_id, kind: r.kind, createdAt: r.created_at, images: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []) }));
+      const pack = (id, name, privacy, rows, own) => { const ph = flattenPhotos(rows); return { id, name, privacy, count: ph.length, cover: ph[0]?.url || '', virtual: !own }; };
+      const out = Object.entries(VIRTUAL_ALBUMS).map(([k, name]) => pack(k, name, 'public', posts.filter(p => p.kind === k), false)).filter(a => a.count);
+      return [...out, ...ok(al).map(a => pack(a.id, a.name, a.privacy, posts.filter(p => p.albumId === a.id), true))];
+    },
+    async createAlbum({ name, privacy }) { return ok(await sb.from('albums').insert({ user_id: me.id, name, privacy: privacy || 'public' }).select('id').single()).id; },
+    async updateAlbum(id, { name, privacy }) { ok(await sb.from('albums').update({ name, privacy }).eq('id', id)); },
+    async deleteAlbum(id) { ok(await sb.from('albums').delete().eq('id', id)); },
     async deleteAccount() {
       // আগে নিজের সব ছবি মুছে ফেলি, তারপর অ্যাকাউন্ট
       for (;;) {
@@ -203,13 +239,14 @@ async function supabaseApi() {
       }
       return rows.map(r => toPost(r, mine, sv));
     },
-    async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions }) {
+    async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions, albumId, kind = 'normal', imageUrls }) {
       const files = images?.length ? images.slice(0, 10) : image ? [image] : [];
-      const urls = [];
+      const urls = [...(imageUrls || [])];
       for (const f of files) urls.push(await upload(f, 'post'));   // একটার পর একটা আপলোড
       const row = ok(await sb.from('posts').insert({
         user_id: me.id, union_id: me.unionId, body: body || '', category, image_url: urls[0] || null, image_urls: urls,
         privacy: pageId || groupId ? 'public' : (privacy || 'public'), page_id: pageId || null, group_id: groupId || null, shared_post_id: sharedPostId || null,
+        album_id: albumId || null, kind,
       }).select('id').single());
       if (tags?.length) ok(await sb.from('post_tags').insert(tags.map(uid => ({ post_id: row.id, user_id: uid }))));
       await setMentions('post', row.id, mentions);
@@ -492,6 +529,7 @@ function demoApi() {
     notifs: get('notifs', []),           // { id, to, from, type, postId, groupId, createdAt, read }
     saved: get('saved', []),             // "userId:postId"
     settings: get('settings', { publicDonorPhone: false }),
+    albums: get('albums', []),           // { id, userId, name, privacy, createdAt }
     manual: get('manual', [            // হাতে যোগ করা ডোনার
       { id: 1, createdBy: 'd3', name: 'আব্দুল করিম', district: 'ময়মনসিংহ', upazila: 'ভালুকা', unionId: 7, phone: '01700000140', bloodGroup: 'O-', lastDonated: '' },
     ]),
@@ -526,11 +564,12 @@ function demoApi() {
     ]),
   };
   let meId = get('me', null);
-  const save = () => { for (const k of ['users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
-  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', bio: p.bio || '' }; };
+  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '' }; };
   const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
+  const albumVisible = a => a.privacy === 'public' || a.userId === meId || (a.privacy === 'friends' && meId && friendIds(meId).includes(a.userId));
   const friendRow = (a, b) => db.friendships.find(f => (f.requester === a && f.addressee === b) || (f.requester === b && f.addressee === a));
   const friendIds = of => db.friendships.filter(f => f.status === 'accepted' && (f.requester === of || f.addressee === of)).map(f => (f.requester === of ? f.addressee : f.requester));
   const rel = id => {
@@ -698,7 +737,32 @@ function demoApi() {
     async updateManualDonor(id, v) { const m = db.manual.find(x => x.id === Number(id) && x.createdBy === meId); if (!m) throw new Error('row-level security'); Object.assign(m, v, { unionId: v.unionId || null }); save(); },
     async deleteManualDonor(id) { db.manual = db.manual.filter(x => !(x.id === Number(id) && x.createdBy === meId)); save(); },
     async setLastDonated(date) { person(meId).lastDonated = date || ''; save(); },
-    async setAvatar(blob) { const url = await toBlobUrl(blob); person(meId).avatar = url; save(); return url; },
+    async setAvatar(blob, share = true) { const url = await toBlobUrl(blob); person(meId).avatar = url; save(); await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'avatar', privacy: share ? 'public' : 'only_me' }); return url; },
+    async setCover(blob, share = true) { const url = await toBlobUrl(blob); person(meId).cover = url; save(); await this.createPost({ body: '', category: 'খবর', imageUrls: [url], kind: 'cover', privacy: share ? 'public' : 'only_me' }); return url; },
+    async removeCover() { person(meId).cover = ''; save(); },
+    async photos(userId, { albumId, kind } = {}) {
+      const mine = this.__visiblePosts().filter(p => p.userId === userId && !p.pageId && !p.groupId && (!albumId || p.albumId === Number(albumId)) && (!kind || (p.kind || 'normal') === kind));
+      return wait(flattenPhotos(mine.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(p => ({ id: p.id, createdAt: p.createdAt, images: (p.images?.length ? p.images : (p.image ? [p.image] : [])).map(demoPic) }))));
+    },
+    async albums(userId) {
+      const posts = this.__visiblePosts().filter(p => p.userId === userId && !p.pageId && !p.groupId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(p => ({ id: p.id, kind: p.kind || 'normal', albumId: p.albumId || null, createdAt: p.createdAt, images: (p.images?.length ? p.images : (p.image ? [p.image] : [])).map(demoPic) }));
+      const pack = (id, name, privacy, rows, own) => { const ph = flattenPhotos(rows); return { id, name, privacy, count: ph.length, cover: ph[0]?.url || '', virtual: !own }; };
+      const out = Object.entries(VIRTUAL_ALBUMS).map(([k, name]) => pack(k, name, 'public', posts.filter(p => p.kind === k), false)).filter(a => a.count);
+      const own = db.albums.filter(a => a.userId === userId && albumVisible(a)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return wait([...out, ...own.map(a => pack(a.id, a.name, a.privacy, posts.filter(p => p.albumId === a.id), true))]);
+    },
+    async createAlbum({ name, privacy }) { const a = { id: nid(db.albums), userId: meId, name, privacy: privacy || 'public', createdAt: new Date().toISOString() }; db.albums.push(a); save(); return a.id; },
+    async updateAlbum(id, { name, privacy }) {
+      const a = db.albums.find(x => x.id === Number(id) && x.userId === meId); if (!a) throw new Error('row-level security');
+      if (privacy && privacy !== a.privacy) db.posts.filter(p => p.albumId === a.id).forEach(p => { p.privacy = privacy; });
+      Object.assign(a, { name, privacy }); save();
+    },
+    async deleteAlbum(id) { db.albums = db.albums.filter(a => !(a.id === Number(id) && a.userId === meId)); db.posts.forEach(p => { if (p.albumId === Number(id)) p.albumId = null; }); save(); },
+    __visiblePosts() {
+      const myFriends = meId ? new Set(friendIds(meId)) : new Set();
+      return db.posts.filter(p => !isBlocked(p.userId) && (!p.privacy || p.privacy === 'public' || p.userId === meId || (p.privacy === 'friends' && myFriends.has(p.userId))));
+    },
     async deleteAccount() {
       const id = meId;
       db.users = db.users.filter(u => u.id !== id); db.posts = db.posts.filter(p => p.userId !== id);
@@ -744,7 +808,8 @@ function demoApi() {
           shared: sp ? { id: sp.id, body: sp.body, image: demoPic(sp.images?.[0] || sp.image || ''), createdAt: sp.createdAt, userId: sp.userId, pageId: sp.pageId || null, author: spPg ? spPg.name : spU?.name || 'সদস্য', avatar: spPg ? spPg.avatar : spU?.avatar || '' } : null,
           author: pg ? pg.name : u.name, avatar: pg ? pg.avatar : u.avatar, poster: u.name, union: uname(p.unionId), liked: db.likes.includes(meId + ':' + p.id),
           reactions: p.rx || { like: p.likes }, myReaction: db.reacts[meId + ':' + p.id] || (db.likes.includes(meId + ':' + p.id) ? 'like' : ''),
-          saved: db.saved.includes(meId + ':' + p.id), pageId: p.pageId || null, groupId: p.groupId || null, groupName: g ? g.name : '' };
+          saved: db.saved.includes(meId + ':' + p.id), pageId: p.pageId || null, groupId: p.groupId || null, groupName: g ? g.name : '',
+          kind: p.kind || 'normal', albumId: p.albumId || null, albumName: p.albumId ? (db.albums.find(a => a.id === p.albumId && albumVisible(a))?.name || '') : '' };
       }));
     },
     async savePost(id) { if (!db.saved.includes(meId + ':' + id)) db.saved.push(meId + ':' + id); save(); },
@@ -800,14 +865,16 @@ function demoApi() {
     async groupMembers(id, status = 'active') { return wait(db.members.filter(m => m.groupId === Number(id) && m.status === status).map(m => ({ ...user(m.userId), role: m.role })).filter(u => u.id)); },
     async approveMember(gid, uid) { const m = member(gid, uid); if (!m) throw new Error('no pending request'); m.status = 'active'; db.notifs = db.notifs.filter(n => !(n.groupId === Number(gid) && n.from === uid && n.type === 'group_request')); save(); },
     async removeMember(gid, uid) { db.members = db.members.filter(m => !(m.groupId === Number(gid) && m.userId === uid)); save(); },
-    async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions }) {
+    async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions, albumId, kind = 'normal', imageUrls }) {
       const files = images?.length ? images.slice(0, 10) : image ? [image] : [];
-      const imgs = []; for (const f of files) imgs.push(await toBlobUrl(f));
+      const imgs = [...(imageUrls || [])]; for (const f of files) imgs.push(await toBlobUrl(f));
+      if (albumId && !db.albums.some(a => a.id === Number(albumId) && a.userId === meId)) throw new Error('row-level security');
       const img = imgs[0] || '';
       if (sharedPostId) { const o = db.posts.find(x => x.id === Number(sharedPostId)), g = o?.groupId && db.groups.find(x => x.id === o.groupId); if (!o || (g && g.privacy === 'private')) throw new Error('row-level security'); }
       const fr = new Set(friendIds(meId));
       const post = { id: nid(db.posts), userId: meId, pageId: pageId ? Number(pageId) : null, groupId: groupId ? Number(groupId) : null, sharedPostId: sharedPostId ? Number(sharedPostId) : null, unionId: person(meId).unionId, category, body: body || '', image: img, images: imgs,
-        privacy: pageId || groupId ? 'public' : (privacy || 'public'), tags: (tags || []).filter(uid => fr.has(uid)), createdAt: new Date().toISOString(), likes: 0, cm: [] };
+        privacy: pageId || groupId ? 'public' : (privacy || 'public'), tags: (tags || []).filter(uid => fr.has(uid)), createdAt: new Date().toISOString(), likes: 0, cm: [],
+        albumId: albumId ? Number(albumId) : null, kind };
       post.tags.forEach(uid => notify(uid, meId, 'tag', post.id));
       post.mentions = mentionNotify(post, mentions, meId);
       if (post.sharedPostId) { const o = db.posts.find(x => x.id === post.sharedPostId); db.posts.push(post); save(); notify(o.userId, meId, 'share', o.id); return; }

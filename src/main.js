@@ -3916,11 +3916,10 @@ async function loadDir() {
   if (S.dcat === 'blood' && !feat('featBlood')) S.dcat = '';
   const q = $('#q').value.trim(), landing = !S.dcat && !q;
   // প্রথম পাতায় আইকনের গ্রিড; কোনো ধরনের ভেতরে বা খোঁজার সময় উপরে দ্রুত বদলানোর চিপ
-  $('#dchips').hidden = landing;
   document.body.classList.toggle('dir-sub', !landing);
   if (landing) S.dirSub = false;
-  if (!landing) $('#dchips').innerHTML = [['', 'সব সেবা', '🗂️'], ['sos', 'জরুরি নম্বর', '🚨'], ...svcCats()].map(c => `<button class="chip svc-chip${c[0] === S.dcat ? ' on' : ''}" data-d="${c[0]}">${svcIc(c[0] || 'all', 16)}${esc(c[1])}</button>`).join('');
-  if (!landing) setTimeout(() => $('#dchips .chip.on')?.scrollIntoView({ inline: 'center', block: 'nearest' }), 0);
+  $('#dchips').innerHTML = [['', 'সব সেবা', '🗂️'], ['sos', 'জরুরি নম্বর', '🚨'], ...svcCats()].map(c => `<button class="chip svc-chip${c[0] === S.dcat ? ' on' : ''}" data-d="${c[0]}">${svcIc(c[0] || 'all', 16)}${esc(c[1])}</button>`).join('');
+  setTimeout(() => { const c = $('#dchips'), on = c?.querySelector('.chip.on'); if (c && on) c.scrollLeft = on.offsetLeft - (c.clientWidth - on.offsetWidth) / 2; }, 0);
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }
   if (S.dcat === 'blood') return loadBlood();
   if (landing && S.svcAll) { renderSvcGrid(S.svcAll); if (S.dirY != null) window.scrollTo(0, S.dirY); }   // আগের তালিকা সাথে সাথে দেখাই, পরে হালনাগাদ

@@ -1427,9 +1427,9 @@ const FEATURED0 = ['works', 'educations', 'addr', 'social', 'joined'];
 const DETAIL_ITEMS = [   // [key, নাম, প্রাইভেসির key (না থাকলে সবসময় দেখা যায়)]
   ['works', 'কাজ', 'works'], ['educations', 'শিক্ষা', 'educations'], ['addr', 'কোথায় থাকেন', null], ['gender', 'লিঙ্গ', null],
   ['birth', 'জন্মতারিখ', 'birth'], ['relationship', 'সম্পর্কের অবস্থা', 'relationship'], ['religion', 'ধর্ম', 'religion'],
-  ['orgs', 'সংগঠন ও ক্লাব', 'orgs'], ['phone', 'মোবাইল নম্বর', 'contact'], ['social', 'সোশ্যাল লিংক', 'social'], ['joined', 'কবে থেকে সদস্য', null],
+  ['orgs', 'সংগঠন ও ক্লাব', 'orgs'], ['phone', 'মোবাইল নম্বর', 'contact'], ['social', 'সোশ্যাল লিংক', 'social'], ['joined', 'কবে থেকে সদস্য', null], ['blood', 'রক্তের গ্রুপ ও রক্তদান', null],
 ];
-const ALL_DETAIL_KEYS = DETAIL_ITEMS.map(x => x[0]);
+const ALL_DETAIL_KEYS = DETAIL_ITEMS.map(x => x[0]).filter(k => k !== 'blood');   // রক্তদানের তথ্য শুধু মালিক বেছে নিলে
 const row = (i, t) => `<div class="av-row"><span class="av-i">${ic(i, 18)}</span><span>${t}</span></div>`;
 // একেকটা বিষয়ের লাইন (যা দেখার অনুমতি নেই তা আগেই সার্ভার থেকে বাদ পড়ে আসে)
 function detailRows(u, keys) {
@@ -1448,6 +1448,7 @@ function detailRows(u, keys) {
     if (k === 'phone' && u.phone) out.push(row('mobile', `<a href="tel:${esc(u.phone)}" class="link">${bn(u.phone)}</a>`));
     if (k === 'social' && SOCIALS.some(([sk]) => u.social?.[sk])) out.push(socialHtml(u, false));
     if (k === 'joined' && u.joinedAt) out.push(row('calendar', joinedText(u.joinedAt)));
+    if (k === 'blood' && u.bloodGroup) out.push(bloodRow(u));
   }
   return out;
 }
@@ -1466,9 +1467,12 @@ function introRows(u, keys) {
     if (k === 'phone' && u.phone) out.push(row('mobile', `<a href="tel:${esc(u.phone)}" class="link">${bn(u.phone)}</a>`));
     if (k === 'social' && SOCIALS.some(([sk]) => u.social?.[sk])) out.push(socialHtml(u, false));
     if (k === 'joined' && u.joinedAt) { const t = new Date(u.joinedAt); out.push(row('clock', `${MONTHS_BN[t.getMonth()]} ${bn(t.getFullYear())}`)); }
+    if (k === 'blood' && u.bloodGroup) out.push(bloodRow(u, true));
   }
   return out;
 }
+// রক্তের গ্রুপ ও সর্বশেষ রক্তদান (মালিক "প্রোফাইলে কী দেখাবে"-তে বেছে নিলে তবেই দেখায়)
+const bloodRow = (u, short) => row('drop', `<b>${esc(u.bloodGroup)}</b>${u.lastDonated ? `${short ? ' · ' : ' · সর্বশেষ রক্তদান '}${esc(bnDate(u.lastDonated))}` : ''}${u.donorVisible ? ` · ${donateStatus(u.lastDonated)}` : ''}`);
 function introCard(u, own) {
   const rows = introRows(u, u.featured || FEATURED0);
   if (!rows.length && !own) return '';
@@ -1498,7 +1502,7 @@ function renderAbout(key) {
   const own = key === 'me', u = own ? me() : S.viewProfile, open = S.pstate[key].open;
   if (!u) return;
   if (!own) {
-    const rows = detailRows(u, ALL_DETAIL_KEYS);
+    const rows = detailRows(u, (u.featured || FEATURED0).includes('blood') ? [...ALL_DETAIL_KEYS, 'blood'] : ALL_DETAIL_KEYS);
     pane.innerHTML = `<div class="card about-view">${u.bio ? `<p class="about-bio">${esc(u.bio)}</p>` : ''}
       ${rows.join('')}
       ${!rows.length && !u.bio ? '<p class="mut" style="margin:0">এখনো কোনো তথ্য দেওয়া নেই।</p>' : ''}</div>`;
@@ -1557,7 +1561,7 @@ async function openUser(id, silent, keepState) {
     const p = await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
     if (!silent) S.api.profileVisit?.(id).catch(() => {});
-    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}<div class="mut">${esc(p.union)}</div>${p.bloodGroup ? `<div style="margin-top:6px">${bgBadge(p.bloodGroup)} ${p.donorVisible ? donateStatus(p.lastDonated) : ''}</div>` : ''}
+    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}<div class="mut">${esc(p.union)}</div>
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       ${introCard(p, false)}
       ${statsHtml(p)}
@@ -1842,9 +1846,6 @@ async function renderMe(mode = 'login') {
   if (u) {
     $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
       <h2 style="margin:6px 0 0">${esc(u.name)}${vb(u.verified, true)}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}<div class="mut">${ic('pin', 14)} ${esc(u.union)}${u.admin && S.api.mode !== 'demo' ? ' · অ্যাডমিন' : ''}</div>
-      <div style="margin-top:6px">${u.bloodGroup ? `${bgBadge(u.bloodGroup)} <span class="mut" style="font-size:13px">${u.donorVisible ? 'ব্লাড ব্যাংকে ডোনার হিসেবে আছেন' : 'ব্লাড ব্যাংকে দেখানো বন্ধ'}</span>
-        <div class="mut" style="font-size:14px;margin-top:4px">${ic('calendar', 14)} সর্বশেষ রক্তদান: ${u.lastDonated ? esc(bnDate(u.lastDonated)) : 'দেওয়া নেই'} · ${donateStatus(u.lastDonated)}</div>
-        <div class="row" style="margin-top:8px;justify-content:center"><button class="sbtn ghost" data-donor-edit>${ic('edit', 15)} ডোনার তথ্য আপডেট</button><button class="sbtn ghost" id="donated-today">${ic('drop', 15)} আজ রক্ত দিয়েছি</button></div>` : `<span class="mut" style="font-size:13px">ব্লাড গ্রুপ দেওয়া নেই</span> <button class="sbtn ghost" data-add-donor>${ic('drop', 15)} নিজের ডোনার প্রোফাইল যোগ করুন</button>`}</div>
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>

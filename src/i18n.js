@@ -144,6 +144,8 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'ভালুকার সব সেবা এক জায়গায়': 'All Bhaluka services in one place', '{x}টি ধরন · মোট {x}টি সেবা যুক্ত': '{x} categories · {x} services listed', 'জরুরি সেবা': 'Emergency', 'সরকারি ও প্রশাসন': 'Government & administration',
+  'শিক্ষা ও পেশাজীবী': 'Education & professionals', 'গুণী মানুষ ও বিয়ে': 'Notable people & marriage', 'ভ্রমণ, যাতায়াত ও থাকা': 'Travel, transport & stay', 'খাবার, বাজার ও কাজ': 'Food, market & jobs', 'দৈনন্দিন সেবা': 'Everyday services',
   'উপজেলা': 'Upazila', 'পৌরসভা': 'Pourashava', 'ইউনিয়ন': 'Union', 'ফায়ার সার্ভিস': 'Fire service', 'থানা পুলিশ': 'Police station', 'প্রশাসন': 'Administration', 'এ্যাম্বুলেন্স': 'Ambulance',
   'হাসপাতাল': 'Hospital', 'সাংবাদিক': 'Journalists', 'আইনজীবী': 'Lawyers', 'প্রসিদ্ধ ব্যক্তি': 'Notable people', 'মুক্তিযোদ্ধা': 'Freedom fighters', 'ভোটার তালিকা': 'Voter list', 'স্কুল কলেজ': 'Schools & colleges',
   'দর্শনীয় স্থান': 'Places to visit', 'রেস্টুরেন্ট': 'Restaurants', 'আবাসিক হোটেল': 'Hotels', 'কুরিয়ার': 'Courier', 'ব্যাংক': 'Banks', 'গাড়ি ভাড়া': 'Car rental', 'ব্রডব্যান্ড': 'Broadband',

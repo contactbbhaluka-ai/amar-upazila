@@ -3832,20 +3832,84 @@ function afterAuth() {
 
 // ================================================================ ☰ সেবা ডিরেক্টরি
 const svcCard = s => `<div class="card svc">
-  <div class="ic svc-emo" aria-hidden="true">${SERVICE_CATS.find(c => c[0] === s.category)?.[2] || '📍'}</div>
+  <div class="ic svc-ic">${svcIc(s.category, 24)}</div>
   <div style="flex:1"><h3>${esc(s.name)}</h3><div class="meta">${esc(s.address)}</div>${s.hours ? `<div class="meta">🕘 ${esc(s.hours)}</div>` : ''}
     ${s.verified ? '<span class="ver">✔ যাচাইকৃত</span>' : `<span class="mut">যাচাই বাকি</span>${me()?.admin ? ` <button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button>` : ''}`}</div>
   <a class="call" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a></div>`;
 const emergencyHtml = () => `<a class="big" href="tel:999"><span class="n">৯৯৯</span><span><b>জাতীয় জরুরি সেবা</b><br>পুলিশ, ফায়ার সার্ভিস, অ্যাম্বুলেন্স: টোল ফ্রি</span></a>
   <div class="em">${EMERGENCY.map(e => `<a class="emc" href="tel:${e[2]}"><div class="n">${e[0]}</div><div class="t">${esc(e[1])}</div></a>`).join('')}</div>`;
 let svcTimer;
+// সেবা ডিরেক্টরির রেখার আইকন (অ্যাপের বাকি আইকনের মতো) ও রঙের ভাগ
+const SVC_IC = {
+  sos: '<path d="M12 3v2M5 6.5l1.4 1.4M19 6.5l-1.4 1.4M7 16a5 5 0 0 1 10 0v2H7zM4 21h16"/>',
+  fire: '<path d="M2 17V8h11v9M13 11h4.5L21 15v2h-8M2 17h2.2M8.8 17h6.4M19.3 17H21M3 5.5l9 1.5"/><circle cx="6.5" cy="17.5" r="1.9"/><circle cx="17" cy="17.5" r="1.9"/>',
+  police: '<path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/><path d="M12 8.3l1.1 2.2 2.4.3-1.8 1.7.5 2.4L12 13.8l-2.2 1.1.5-2.4-1.8-1.7 2.4-.3z"/>',
+  amb: '<path d="M2 17V7h12v10M14 10.5h4l3 3.5v3h-7M2 17h2.2M8.8 17h6.4M19.3 17H21M8 9.5v5M5.5 12h5"/><circle cx="6.5" cy="17.5" r="1.9"/><circle cx="17" cy="17.5" r="1.9"/>',
+  blood: '<path d="M12 3s-6 7-6 11.2a6 6 0 0 0 12 0C18 10 12 3 12 3z"/><path d="M12 11.5v5M9.5 14h5"/>',
+  upz: '<path d="M3 10l9-6 9 6M5 10v8M19 10v8M9.5 10v8M14.5 10v8M3 21h18M3 18h18"/>',
+  pouro: '<path d="M6 21V4h9v17M15 9h4v12M3 21h18M9 8h3M9 12h3M9 16h3"/>',
+  union: '<path d="M3 21v-9l5-4 5 4v9M13 21v-7l4-3 4 3v7M2 21h20M6.8 21v-4h2.4v4"/>',
+  gov: '<path d="M12 4v16M8 20h8M5 7h14M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/>',
+  voter: '<path d="M3.5 12h17v9h-17zM8 12V4h8v8M10 7.5l1.5 1.5L14 6.5M3.5 16h17"/>',
+  office: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 12.5h18"/>',
+  kazi: '<circle cx="12" cy="15" r="5.5"/><path d="M9.5 5l2.5 3.5L14.5 5 13 3h-2z"/>',
+  health: '<path d="M4 21V7h16v14M2 21h20M12 10v5M9.5 12.5h5M10 21v-3h4v3"/>',
+  doc: '<path d="M6 3v5a4 4 0 0 0 8 0V3M10 12v3a5 5 0 0 0 10 0v-2"/><circle cx="20" cy="11" r="2"/>',
+  gym: '<path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11"/>',
+  edu: '<path d="M2 9l10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5M22 9v6"/>',
+  tutor: '<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 21l4-5 4 5M7 8.5h6M7 11.5h4"/>',
+  lawyer: '<path d="M13.5 3.5l7 7M10.5 6.5l7 7M12 5l-3 3 7 7 3-3M10 12l-7 7M3 21h9"/>',
+  press: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>',
+  it: '<rect x="4" y="5" width="16" height="10" rx="1.5"/><path d="M2 19h20M10 8.5L8 10l2 1.5M14 8.5l2 1.5-2 1.5"/>',
+  graphics: '<path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.6 0-1.1-.9-1.4-.9-2.4s.8-1.8 1.9-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>',
+  video: '<rect x="3" y="9" width="18" height="11" rx="1.5"/><path d="M3 9l1.8-5 15.7 3-1 2M8.5 4.8l2 3.8M14 5.9l2 3.4"/>',
+  famous: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  ff: '<path d="M8 3h8l-2.5 6.5h-3z"/><circle cx="12" cy="15.5" r="5"/><path d="M12 13v5M10 14.5h4"/>',
+  pride: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>',
+  bride: '<circle cx="9" cy="14" r="5"/><circle cx="15" cy="14" r="5"/><path d="M12 3.5l1.5 2.5L12 8.5 10.5 6z"/>',
+  ghotok: '<path d="M2.5 11l4-4 3.5 2 3-2 4.5 4M2.5 11L8 16.5l1.5-1 2 2 1.5-1 1.5 1.5L21.5 11M10 9l-2 3.2a1.5 1.5 0 0 0 2.5 1.5L13 11"/>',
+  tour: '<path d="M12 21v-6M12 3a6 6 0 0 0-6 6c0 3.3 2.7 6 6 6s6-2.7 6-6a6 6 0 0 0-6-6zM8.5 21h7"/>',
+  hotel: '<path d="M3 6v14M3 13h18v7M21 20v-4.5a3 3 0 0 0-3-3h-7V13"/><circle cx="7" cy="10" r="2"/>',
+  rentcar: '<path d="M3 13l2-5.5h14l2 5.5v5H3zM3 13h18M5 18v2M19 18v2"/><circle cx="7" cy="15.5" r=".6"/><circle cx="17" cy="15.5" r=".6"/>',
+  air: '<path d="M21 3L3 10.5l7 2.5 2.5 7z"/><path d="M10 13l11-10"/>',
+  bus: '<rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3M7 7h10"/><circle cx="8" cy="14.5" r=".6"/><circle cx="16" cy="14.5" r=".6"/>',
+  tolet: '<path d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-5h4v5"/>',
+  food: '<path d="M7 3v8a2 2 0 0 0 4 0V3M9 11v10M16 21V3c2 1 3.5 4 3.5 7.5H16"/>',
+  cook: '<path d="M7 14v6h10v-6M7 14a4 4 0 0 1-1-7.9 4.5 4.5 0 0 1 8.6-1.5A4 4 0 0 1 17 14M7 17h10"/>',
+  shop: '<path d="M3 4h2l2.5 11h11L21 7.5H6.3"/><circle cx="9.5" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/>',
+  sale: '<path d="M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2"/>',
+  job: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M9 13.5l2 2 4-4"/>',
+  bank: '<path d="M3 9l9-5 9 5M4 9h16M5.5 9v9M9.8 9v9M14.2 9v9M18.5 9v9M3 21h18M3 18h18"/>',
+  courier: '<path d="M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10M7.5 5l9 4"/>',
+  net: '<path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',
+  power: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  clean: '<path d="M19.5 3l-7 7M9 11l4 4M3.5 20.5c0-4 2-8.5 5.5-9.5l4 4c-1 3.5-5.5 5.5-9.5 5.5zM7 17.5l2-2"/>',
+  fix: '<path d="M15 4a5 5 0 0 0-4.6 7L3 18.4V21h2.6l7.4-7.4A5 5 0 0 0 20 9l-3 1-2-2 1-3z"/>',
+  ladies: '<path d="M9 21h6M10 21V12h4v9M10 12l.8-6.5 3.2 2V12"/>',
+  gents: '<circle cx="6" cy="6.5" r="2.5"/><circle cx="6" cy="17.5" r="2.5"/><path d="M8.2 7.8L20 17M8.2 16.2L20 7"/>',
+  band: '<ellipse cx="12" cy="8" rx="8" ry="3"/><path d="M4 8v8c0 1.7 3.6 3 8 3s8-1.3 8-3V8M8 3l3 4M16 3l-3 4"/>',
+  all: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><path d="M17 13.5v7M13.5 17h7"/>',
+};
+// [শিরোনাম, রং, কী-গুলো]
+const SVC_GROUPS = [
+  ['জরুরি সেবা', '#d92d3a', ['sos', 'fire', 'police', 'amb', 'blood']],
+  ['সরকারি ও প্রশাসন', '#0f8a5f', ['upz', 'pouro', 'union', 'gov', 'voter', 'office', 'kazi']],
+  ['স্বাস্থ্য', '#d6336c', ['health', 'doc', 'gym']],
+  ['শিক্ষা ও পেশাজীবী', '#2f6fe0', ['edu', 'tutor', 'lawyer', 'press', 'it', 'graphics', 'video']],
+  ['গুণী মানুষ ও বিয়ে', '#7a4fd6', ['famous', 'ff', 'pride', 'bride', 'ghotok']],
+  ['ভ্রমণ, যাতায়াত ও থাকা', '#0e9aa7', ['tour', 'hotel', 'rentcar', 'air', 'bus', 'tolet']],
+  ['খাবার, বাজার ও কাজ', '#e8710a', ['food', 'cook', 'shop', 'sale', 'job']],
+  ['দৈনন্দিন সেবা', '#b7791f', ['bank', 'courier', 'net', 'power', 'clean', 'fix', 'ladies', 'gents', 'band']],
+];
+const svcColor = k => (SVC_GROUPS.find(g => g[2].includes(k)) || [, '#0f8a5f'])[1];
+const svcIc = (k, size = 24) => `<span class="sic" style="--c:${svcColor(k)}"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SVC_IC[k] || SVC_IC.all}</svg></span>`;
 const svcCats = () => SERVICE_CATS.filter(c => c[0] !== 'blood' || feat('featBlood'));
 async function loadDir() {
   if (S.dcat === 'blood' && !feat('featBlood')) S.dcat = '';
   const q = $('#q').value.trim(), landing = !S.dcat && !q;
   // প্রথম পাতায় আইকনের গ্রিড; কোনো ধরনের ভেতরে বা খোঁজার সময় উপরে দ্রুত বদলানোর চিপ
   $('#dchips').hidden = landing;
-  if (!landing) $('#dchips').innerHTML = [['', 'সব সেবা', '🗂️'], ['sos', 'জরুরি নম্বর', '🚨'], ...svcCats()].map(c => `<button class="chip${c[0] === S.dcat ? ' on' : ''}" data-d="${c[0]}">${c[2]} ${esc(c[1])}</button>`).join('');
+  if (!landing) $('#dchips').innerHTML = [['', 'সব সেবা', '🗂️'], ['sos', 'জরুরি নম্বর', '🚨'], ...svcCats()].map(c => `<button class="chip svc-chip${c[0] === S.dcat ? ' on' : ''}" data-d="${c[0]}">${svcIc(c[0] || 'all', 16)}${esc(c[1])}</button>`).join('');
   if (!landing) setTimeout(() => $('#dchips .chip.on')?.scrollIntoView({ inline: 'center', block: 'nearest' }), 0);
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }
   if (S.dcat === 'blood') return loadBlood();
@@ -3854,14 +3918,15 @@ async function loadDir() {
     const list = await S.api.services({ category: landing ? null : S.dcat || null, q });
     if (landing) {
       const n = k => list.filter(x => x.category === k).length;
-      $('#dir').innerHTML = `<div class="svc-grid">
-        <button class="svc-tile sos" data-svc="sos"><span class="st-e">🚨</span><span class="st-n">জরুরি নম্বর</span></button>
-        ${svcCats().map(([k, name, e]) => { const c = SVC_SPECIAL[k] ? 0 : n(k); return `<button class="svc-tile" data-svc="${k}"><span class="st-e">${e}</span><span class="st-n">${esc(name)}</span>${c ? `<span class="st-c">${bn(c)}</span>` : ''}</button>`; }).join('')}
-      </div>`;
+      const total = list.length, cats = svcCats(), has = k => k === 'sos' || cats.some(c => c[0] === k);
+      const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : c[1], cnt = k === 'sos' || SVC_SPECIAL[k] ? 0 : n(k);
+        return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
+      $('#dir').innerHTML = `<div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div>`
+        + SVC_GROUPS.map(([t, col, keys]) => { const ks = keys.filter(has); return ks.length ? `<h3 class="svc-sec" style="--c:${col}"><i></i>${esc(t)}</h3><div class="svc-grid">${ks.map(tile).join('')}</div>` : ''; }).join('');
       return;
     }
     const cat = SERVICE_CATS.find(c => c[0] === S.dcat);
-    const head = cat ? `<div class="svc-head"><span class="st-e">${cat[2]}</span><b>${esc(cat[1])}</b><span class="mut">${bn(list.length)}টি</span></div>` : '';
+    const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(list.length)}টি</span></div>` : '';
     if (!list.length) { $('#dir').innerHTML = head + `<div class="empty">${cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।'}</div>`; return; }
     $('#dir').innerHTML = head + list.map(svcCard).join('');
   } catch (e) { $('#dir').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }

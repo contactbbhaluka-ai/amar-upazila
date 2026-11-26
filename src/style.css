@@ -1683,12 +1683,17 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .faq-i{border-bottom:1px solid var(--line);padding:10px 2px}.faq-i summary{font-weight:700;cursor:pointer}.faq-i p{margin:8px 0 2px;line-height:1.55}
 .upz-root #v-dir .back{display:none}
 
-.svc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
-.svc-tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 4px 10px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:inherit;font:inherit;cursor:pointer;min-height:86px}
-.svc-tile:active{transform:scale(.97)}.svc-tile .st-e{font-size:28px;line-height:1}.svc-tile .st-n{font-size:12.5px;line-height:1.25;text-align:center;font-weight:600}
-.svc-tile .st-c{position:absolute;top:5px;right:6px;font-size:11px;background:var(--chip,#e8f3ee);color:var(--g);border-radius:999px;padding:0 6px;font-weight:700}
-.svc-tile.sos{border-color:#f3b4bd;background:#fff1f3}.svc-tile.sos .st-n{color:#c8102e}
-[data-theme=dark] .svc-tile.sos{background:#3a1d22;border-color:#6b2b35}[data-theme=dark] .svc-tile.sos .st-n{color:#ff8a9a}
-.svc-head{display:flex;align-items:center;gap:10px;margin:12px 2px 8px;font-size:17px}.svc-head .st-e{font-size:26px}.svc-head .mut{margin-left:auto;font-size:13px}
-.svc-emo{font-size:24px;display:grid;place-items:center}
+.sic{--c:#0f8a5f;display:inline-grid;place-items:center;flex:none;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);border-radius:12px}
+.svc-hero{display:flex;align-items:center;gap:10px;margin:12px 0 4px;padding:14px;border-radius:16px;background:linear-gradient(135deg,#0b7a55,#0f9a6c);color:#fff}
+.svc-hero div{flex:1;display:flex;flex-direction:column;gap:2px}.svc-hero b{font-size:16px}.svc-hero small{opacity:.9;font-size:12.5px}
+.svc-999{flex:none;background:#fff;color:#c8102e;font-weight:800;border-radius:999px;padding:8px 14px;text-decoration:none;font-size:15px}
+.svc-sec{display:flex;align-items:center;gap:8px;font-size:14.5px;margin:18px 2px 8px}.svc-sec i{width:4px;height:16px;border-radius:2px;background:var(--c)}
+.svc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.svc-tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 4px 10px;border:1px solid var(--line);border-radius:16px;background:var(--card);color:inherit;font:inherit;cursor:pointer;min-height:92px;transition:transform .12s,border-color .12s}
+.svc-tile .sic{width:46px;height:46px;border-radius:14px}.svc-tile:active{transform:scale(.96)}.svc-tile:hover{border-color:color-mix(in srgb,var(--g) 40%,var(--line))}
+.svc-tile .st-n{font-size:12px;line-height:1.25;text-align:center;font-weight:600}
+.svc-tile .st-c{position:absolute;top:6px;right:6px;min-width:18px;height:18px;font-size:11px;line-height:18px;text-align:center;background:var(--g);color:#fff;border-radius:999px;padding:0 5px;font-weight:700}
+.svc-head{display:flex;align-items:center;gap:10px;margin:12px 2px 8px;font-size:17px}.svc-head .sic{width:42px;height:42px}.svc-head .mut{margin-left:auto;font-size:13px}
+.svc-ic .sic{width:44px;height:44px}.card.svc .ic.svc-ic{background:none;width:auto;height:auto}
+.svc-chip{display:inline-flex;align-items:center;gap:6px}.svc-chip .sic{width:22px;height:22px;border-radius:7px;background:none}.svc-chip.on .sic{color:#fff}
 @media (max-width:340px){.svc-grid{grid-template-columns:repeat(3,1fr)}}

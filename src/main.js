@@ -917,6 +917,8 @@ async function tagPicker() {
 }
 document.querySelector('[data-compose="photo"] .qi').innerHTML = ic('photo', 24);
 $('#cm-open').addEventListener('click', () => openPostComposer(actAsOpts()));
+// পোস্ট বক্সের পাশের ছবিতে চাপলে নিজের প্রোফাইল (পেইজ হিসেবে থাকলে পেইজ)
+$('#comp-av').addEventListener('click', () => { if (me()) go('me'); else $('#cm-open').click(); });
 $('#composer').addEventListener('click', e => { const b = e.target.closest('[data-compose]'); if (b) openPostComposer(actAsOpts(), S.actAs && b.dataset.compose !== 'photo' ? undefined : b.dataset.compose); });
 
 function renderFilters() {
@@ -1950,7 +1952,7 @@ document.addEventListener('click', async e => {
 const TAB_ME_ICON = $('#tab-av').innerHTML;
 function renderComposer() {
   const u = me(), pg = u && S.actAs;
-  $('#comp-av').innerHTML = pg ? entAv(pg) : u ? av(u) : `<div class="av" aria-hidden="true">?</div>`; $('#tab-av').innerHTML = pg ? entAv(pg) : u ? av(u) : TAB_ME_ICON;
+  $('#comp-av').innerHTML = pg ? entAv(pg) : u ? av(u) : `<div class="av" aria-hidden="true">?</div>`; $('#comp-av').setAttribute('aria-label', pg ? `${pg.name} পেইজ দেখুন` : 'নিজের প্রোফাইল দেখুন'); $('#tab-av').innerHTML = pg ? entAv(pg) : u ? av(u) : TAB_ME_ICON;
   $('#cm-open').textContent = pg ? `${pg.name}-এর পক্ষে কিছু লিখুন…` : u ? `আপনার মনে কী আছে, ${u.name.split(' ')[0]}?` : 'আপনার মনে কী আছে? পোস্ট করতে লগইন করুন';
   swapFriendsTab(!!pg);   // পেইজের পোস্ট সবসময় পাবলিক
   renderActAsBar();

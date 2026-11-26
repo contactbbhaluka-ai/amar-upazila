@@ -1044,3 +1044,4 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .cm-photo{flex:none;display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:none;cursor:pointer;color:#2e9d5b}
 .cm-photo:hover,.cm-photo:active{background:var(--g2)}
 .cm-top .cm-open{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#comp-av{cursor:pointer;display:grid}

@@ -1,0 +1,14 @@
+{
+  "appId": "com.amarupazila.app",
+  "appName": "আমার উপজেলা",
+  "webDir": "dist",
+  "android": {
+    "adjustMarginsForEdgeToEdge": "auto"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "backgroundColor": "#006a4e"
+    }
+  }
+}

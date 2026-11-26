@@ -1,0 +1,16 @@
+{
+  "name": "আমার উপজেলা",
+  "short_name": "আমার উপজেলা",
+  "description": "উপজেলার খবর, সাহায্য ও সেবা ডিরেক্টরি",
+  "lang": "bn",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f6f4",
+  "theme_color": "#006a4e",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ইন্টারনেট নেই · আমার উপজেলা</title>
+<style>
+  body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,"Noto Sans Bengali",sans-serif;background:#f3f6f4;color:#1c2b24;text-align:center;padding:24px;box-sizing:border-box}
+  .box{max-width:340px} .ic{width:72px;height:72px;border-radius:50%;background:#e2efe9;display:grid;place-items:center;margin:0 auto 16px}
+  h1{font-size:20px;margin:0 0 8px} p{color:#5b6b63;line-height:1.6;margin:0 0 20px}
+  button{background:#006a4e;color:#fff;border:0;border-radius:12px;padding:12px 28px;font:inherit;font-weight:700;font-size:16px}
+  @media (prefers-color-scheme: dark){body{background:#101815;color:#e6efe9}.ic{background:#1d2a24}p{color:#9fb0a7}}
+</style></head>
+<body><div class="box">
+  <div class="ic"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#006a4e" stroke-width="2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/><path d="M3 3l18 18"/></svg></div>
+  <h1>ইন্টারনেট সংযোগ নেই</h1>
+  <p>অ্যাপটি প্রথমবার খুলতে ইন্টারনেট লাগে। ওয়াই-ফাই বা মোবাইল ডেটা চালু করে আবার চেষ্টা করুন। একবার খোলার পর ইন্টারনেট ছাড়াও আগের পোস্ট দেখা যাবে।</p>
+  <button id="retry">আবার চেষ্টা করুন</button>
+  <script>
+    // বিল্ডের সময় __LIVE_URL__ জায়গায় ওয়েবসাইটের ঠিকানা বসে (Android অ্যাপে লাইভ আপডেট চালু থাকলে)
+    var LIVE = '__LIVE_URL__';
+    document.getElementById('retry').onclick = function () { location.href = LIVE.indexOf('http') === 0 ? LIVE : './'; };
+  </script>
+</div></body></html>

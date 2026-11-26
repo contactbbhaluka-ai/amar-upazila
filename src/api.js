@@ -1,0 +1,963 @@
+// ডেটা লেয়ার: একই ফাংশনগুলো দুইভাবে কাজ করে —
+//   Supabase মোড (আসল সার্ভার) এবং ডেমো মোড (ব্রাউজারের localStorage)।
+// UI কোড শুধু এই ফাইলের ফাংশন ডাকে, তাই ব্যাকএন্ড বদলালেও UI বদলাতে হয় না।
+//
+// সাধারণ আকার:
+//   User     { id, name, unionId, union, avatar, bio }
+//   Relation { friend: 'none'|'sent'|'received'|'friends', following, blocked }
+//   Post     { id, body, image, category, createdAt, likes, comments, userId, author, avatar, union, liked }
+import { SUPABASE_URL, SUPABASE_ANON_KEY, UPAZILA_ID, DEMO, SETTING_KEYS } from './config.js';
+const settingDefaults = () => Object.fromEntries(Object.entries(SETTING_KEYS).map(([k, [, d]]) => [k, d]));
+
+export const PAGE = 20;
+
+// ================================================================ Supabase
+async function supabaseApi() {
+  const { createClient } = await import('@supabase/supabase-js');
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+  });
+  const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
+  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,bio,role,unions(name)';
+  const toUser = p => p && ({
+    id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
+    union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
+    bloodGroup: p.blood_group || '', donorVisible: p.donor_visible !== false, lastDonated: p.last_donated || '',
+    avatar: p.avatar_url || '', bio: p.bio || '', admin: p.role === 'admin',
+  });
+  const toPost = (r, mine, saved) => ({
+    id: r.id, body: r.body, image: r.image_url || '', images: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []),
+    privacy: r.privacy || 'public', tags: (r.post_tags || []).map(t => t.profiles).filter(Boolean).map(t => ({ id: t.id, name: t.name })),
+    mentions: (r.post_mentions || []).map(t => t.profiles).filter(Boolean).map(t => ({ id: t.id, name: t.name })),
+    category: r.category, createdAt: r.created_at, editedAt: r.edited_at || null, rawImages: r.image_urls?.length ? r.image_urls : (r.image_url ? [r.image_url] : []),
+    likes: r.like_count, reactions: r.reactions || {}, myReaction: mine.get(r.id) || '', comments: r.comment_count, userId: r.user_id,
+    author: r.pages?.name || r.profiles?.name || 'সদস্য', avatar: (r.page_id ? r.pages?.avatar_url : r.profiles?.avatar_url) || '',
+    union: r.unions?.name || r.profiles?.upazila || '', liked: mine.has(r.id), saved: saved.has(r.id),
+    pageId: r.page_id || null, groupId: r.group_id || null, groupName: r.groups?.name || '', poster: r.profiles?.name || '',
+    shares: r.share_count || 0, saves: r.save_count || 0, pinnedCommentId: r.pinned_comment_id || null,
+    sharedPostId: r.shared_post_id || null, sharedMissing: !!r.shared_post_id && !r.sp,
+    shared: r.sp ? { id: r.sp.id, body: r.sp.body, image: r.sp.image_urls?.[0] || r.sp.image_url || '', createdAt: r.sp.created_at, userId: r.sp.user_id, pageId: r.sp.page_id || null,
+      author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '' } : null,
+  });
+  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:posts!posts_shared_post_id_fkey(id,body,image_url,image_urls,created_at,user_id,page_id,profiles(name,avatar_url),pages(name,avatar_url)),user_id,union_id,page_id,group_id,profiles(name,avatar_url,upazila),unions(name),pages(name,avatar_url),groups(name)';
+  const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count });
+  const toGroup = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, about: r.about || '', privacy: r.privacy, avatar: r.avatar_url || '', members: r.member_count });
+  const inList = ids => `(${ids.join(',')})`;
+
+  let me = null, unionIds = [], blocked = new Set();
+
+  async function loadMe(session) {
+    if (!session) { me = null; blocked = new Set(); return null; }
+    const p = ok(await sb.from('profiles').select(PROFILE).eq('id', session.user.id).maybeSingle());
+    me = p ? { ...toUser(p), email: session.user.email } : null;
+    if (me) me.phone = ok(await sb.from('profile_private').select('phone').eq('user_id', me.id).maybeSingle())?.phone || '';
+    if (me) blocked = new Set(ok(await sb.from('blocks').select('blocked_id').eq('blocker_id', me.id)).map(b => b.blocked_id));
+    return me;
+  }
+  async function friendIds(of) {
+    const rows = ok(await sb.from('friendships').select('requester,addressee').eq('status', 'accepted').or(`requester.eq.${of},addressee.eq.${of}`));
+    return rows.map(r => (r.requester === of ? r.addressee : r.requester));
+  }
+  async function relations(ids) {
+    const map = new Map(ids.map(id => [id, { friend: 'none', following: false, blocked: blocked.has(id) }]));
+    if (!me || !ids.length) return map;
+    const [fr, fo] = await Promise.all([
+      sb.from('friendships').select('requester,addressee,status')
+        .or(`and(requester.eq.${me.id},addressee.in.${inList(ids)}),and(addressee.eq.${me.id},requester.in.${inList(ids)})`),
+      sb.from('follows').select('followee_id').eq('follower_id', me.id).in('followee_id', ids),
+    ]);
+    for (const f of ok(fr)) {
+      const other = f.requester === me.id ? f.addressee : f.requester;
+      map.get(other).friend = f.status === 'accepted' ? 'friends' : (f.requester === me.id ? 'sent' : 'received');
+    }
+    for (const f of ok(fo)) map.get(f.followee_id).following = true;
+    return map;
+  }
+  // মেনশনের তালিকা নতুন করে বসানো: বাদ পড়াগুলো মুছে, নতুনগুলো যোগ (নতুনরাই শুধু নোটিফিকেশন পান)
+  async function setMentions(kind, id, ids = [], replace = false) {
+    const t = kind === 'post' ? 'post_mentions' : 'comment_mentions', col = kind === 'post' ? 'post_id' : 'comment_id';
+    ids = [...new Set(ids || [])].filter(x => x && x !== me.id && !blocked.has(x)).slice(0, 20);
+    if (replace) { let d = sb.from(t).delete().eq(col, id); if (ids.length) d = d.not('user_id', 'in', `(${ids.join(',')})`); ok(await d); }
+    if (ids.length) ok(await sb.from(t).upsert(ids.map(uid => ({ [col]: id, user_id: uid })), { onConflict: `${col},user_id`, ignoreDuplicates: true }));
+  }
+  async function upload(blob, kind) {
+    const path = `${me.id}/${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
+    ok(await sb.storage.from('media').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' }));
+    return sb.storage.from('media').getPublicUrl(path).data.publicUrl;
+  }
+
+  return {
+    mode: 'supabase',
+    async init(onAuth) {
+      const { data } = await sb.auth.getSession();
+      await loadMe(data.session);
+      sb.auth.onAuthStateChange((event, session) => {
+        if (event === 'TOKEN_REFRESHED') return;
+        setTimeout(async () => { try { await loadMe(session); } catch { me = null; } onAuth?.(me); }, 0);
+      });
+      return me;
+    },
+    me: () => me,
+    async upazila() { return ok(await sb.from('upazilas').select('id,name,district').eq('id', UPAZILA_ID).single()); },
+    async unions() {
+      const rows = ok(await sb.from('unions').select('id,name').eq('upazila_id', UPAZILA_ID).order('sort'));
+      unionIds = rows.map(r => r.id); return rows;
+    },
+
+    // ---------- অ্যাকাউন্ট
+    async signUp({ email, password, name, district, upazila, unionId, phone, bloodGroup, lastDonated }) {
+      const data = ok(await sb.auth.signUp({ email, password, options: { data: { name, district, upazila, union_id: unionId ? String(unionId) : '', phone, blood_group: bloodGroup || '', last_donated: lastDonated || '' } } }));
+      if (!data.session) return { needsConfirm: true };
+      await loadMe(data.session); return { user: me };
+    },
+    async signIn({ email, password }) { return loadMe(ok(await sb.auth.signInWithPassword({ email, password })).session); },
+    async signOut() { await sb.auth.signOut(); me = null; },
+    async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated }) {
+      ok(await sb.from('profiles').update({ name, district, upazila, union_id: unionId || null, bio: bio || null, blood_group: bloodGroup || null, donor_visible: donorVisible !== false, last_donated: (bloodGroup && lastDonated) || null }).eq('id', me.id));
+      ok(await sb.from('profile_private').upsert({ user_id: me.id, phone: phone || null }));
+      return loadMe((await sb.auth.getSession()).data.session);
+    },
+    async setLastDonated(date) { ok(await sb.from('profiles').update({ last_donated: date || null }).eq('id', me.id)); me.lastDonated = date || ''; },
+    async donors({ group, upazila } = {}) {
+      return ok(await sb.rpc('blood_donors', { p_group: group || null, p_upazila: upazila || null }))
+        .map(d => ({
+          id: d.id || 'm' + d.manual_id, manual: !!d.manual_id, manualId: d.manual_id, addedBy: d.added_by, addedByName: d.added_by_name || '',
+          name: d.name, avatar: d.avatar_url || '', bloodGroup: d.blood_group,
+          area: (d.union_name ? [d.union_name, d.upazila] : [d.upazila, d.district]).filter(Boolean).join(', '), phone: d.phone || '', lastDonated: d.last_donated || '',
+        }));
+    },
+    // অ্যাপ সেটিংস ও অ্যাডমিন ড্যাশবোর্ড
+    async settings() {
+      const rows = ok(await sb.from('app_settings').select('key,value'));
+      const out = settingDefaults();
+      for (const [name, [key]] of Object.entries(SETTING_KEYS)) { const r = rows.find(x => x.key === key); if (r && r.value !== null) out[name] = r.value; }
+      return out;
+    },
+    async setSetting(name, value) {
+      const key = SETTING_KEYS[name]?.[0]; if (!key) throw new Error('unknown setting');
+      ok(await sb.from('app_settings').upsert({ key, value, updated_by: me.id, updated_at: new Date().toISOString() }));
+    },
+    async adminStats() {
+      const r = ok(await sb.rpc('admin_stats'));
+      return { users: r.users, donors: r.donors, manualDonors: r.manual_donors, posts: r.posts, pendingServices: r.pending_services, openReports: r.open_reports };
+    },
+    // হাতে যোগ করা ডোনার (শুধু যোগকারী এডিট/মুছতে পারেন)
+    async manualDonor(id) {
+      const r = ok(await sb.from('manual_donors').select('*').eq('id', id).single());
+      return { id: r.id, name: r.name, district: r.district || '', upazila: r.upazila || '', unionId: r.union_id, phone: r.phone, bloodGroup: r.blood_group, lastDonated: r.last_donated || '' };
+    },
+    async addManualDonor(v) {
+      ok(await sb.from('manual_donors').insert({ created_by: me.id, name: v.name, district: v.district, upazila: v.upazila, union_id: v.unionId || null, phone: v.phone, blood_group: v.bloodGroup, last_donated: v.lastDonated || null }));
+    },
+    async updateManualDonor(id, v) {
+      ok(await sb.from('manual_donors').update({ name: v.name, district: v.district, upazila: v.upazila, union_id: v.unionId || null, phone: v.phone, blood_group: v.bloodGroup, last_donated: v.lastDonated || null }).eq('id', id));
+    },
+    async deleteManualDonor(id) { ok(await sb.from('manual_donors').delete().eq('id', id)); },
+    async setAvatar(blob) {
+      const url = await upload(blob, 'avatar');
+      ok(await sb.from('profiles').update({ avatar_url: url }).eq('id', me.id));
+      me.avatar = url; return url;
+    },
+    async deleteAccount() {
+      // আগে নিজের সব ছবি মুছে ফেলি, তারপর অ্যাকাউন্ট
+      for (;;) {
+        const files = ok(await sb.storage.from('media').list(me.id, { limit: 100 }));
+        if (!files.length) break;
+        ok(await sb.storage.from('media').remove(files.map(f => `${me.id}/${f.name}`)));
+        if (files.length < 100) break;
+      }
+      ok(await sb.rpc('delete_my_account')); await sb.auth.signOut(); me = null;
+    },
+
+    // ---------- পোস্ট
+    async posts({ scope = 'area', unionId, category, before, userId, postId, q: text, groupId, pageId, saved }) {
+      let q = sb.from('posts').select(POST_COLS).order('created_at', { ascending: false }).limit(PAGE);
+      if (postId) q = q.eq('id', postId);
+      else if (saved) {
+        const ids = ok(await sb.from('saved_posts').select('post_id').eq('user_id', me.id).order('created_at', { ascending: false }).limit(100)).map(r => r.post_id);
+        if (!ids.length) return [];
+        q = q.in('id', ids).limit(100);
+      }
+      else if (text) q = q.ilike('body', `%${text.replace(/[,%()*\\]/g, ' ').trim()}%`);
+      else if (groupId) q = q.eq('group_id', groupId);
+      else if (pageId) q = q.eq('page_id', pageId);
+      else if (userId) q = q.eq('user_id', userId).is('page_id', null).is('group_id', null);
+      else if (scope === 'friends' && me) {
+        const [fr, fo, pf] = await Promise.all([friendIds(me.id), sb.from('follows').select('followee_id').eq('follower_id', me.id), sb.from('page_follows').select('page_id').eq('user_id', me.id)]);
+        const users = [...new Set([me.id, ...fr, ...ok(fo).map(f => f.followee_id)])], pages = ok(pf).map(f => f.page_id);
+        q = q.is('group_id', null).or(`and(user_id.in.${inList(users)},page_id.is.null)${pages.length ? `,page_id.in.${inList(pages)}` : ''}`);
+      } else {
+        q = q.is('group_id', null);
+        if (unionId) q = q.eq('union_id', unionId);
+      }
+      if (blocked.size && !userId) q = q.not('user_id', 'in', inList([...blocked]));
+      if (category) q = q.eq('category', category);
+      if (before) q = q.lt('created_at', before);
+      const rows = ok(await q);
+      let mine = new Map(), sv = new Set();
+      if (me && rows.length) {
+        const ids = rows.map(r => r.id);
+        const [l, s2] = await Promise.all([sb.from('likes').select('post_id,reaction').eq('user_id', me.id).in('post_id', ids), sb.from('saved_posts').select('post_id').eq('user_id', me.id).in('post_id', ids)]);
+        mine = new Map(ok(l).map(x => [x.post_id, x.reaction])); sv = new Set(ok(s2).map(x => x.post_id));
+      }
+      return rows.map(r => toPost(r, mine, sv));
+    },
+    async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions }) {
+      const files = images?.length ? images.slice(0, 10) : image ? [image] : [];
+      const urls = [];
+      for (const f of files) urls.push(await upload(f, 'post'));   // একটার পর একটা আপলোড
+      const row = ok(await sb.from('posts').insert({
+        user_id: me.id, union_id: me.unionId, body: body || '', category, image_url: urls[0] || null, image_urls: urls,
+        privacy: pageId || groupId ? 'public' : (privacy || 'public'), page_id: pageId || null, group_id: groupId || null, shared_post_id: sharedPostId || null,
+      }).select('id').single());
+      if (tags?.length) ok(await sb.from('post_tags').insert(tags.map(uid => ({ post_id: row.id, user_id: uid }))));
+      await setMentions('post', row.id, mentions);
+      return row.id;
+    },
+    async untagMe(postId) { ok(await sb.from('post_tags').delete().eq('post_id', postId).eq('user_id', me.id)); },
+    // images: আগের ছবির URL (string) বা নতুন ছবি (Blob), যে ক্রমে দেখাবে সেই ক্রমে
+    async updatePost(id, { body, category, images = [], privacy, tags = [], mentions = [] }, removed = []) {
+      const urls = [];
+      for (const x of images.slice(0, 10)) urls.push(typeof x === 'string' ? x : await upload(x, 'post'));
+      ok(await sb.rpc('edit_post', { p_id: id, p_body: body || '', p_category: category, p_images: urls, p_privacy: privacy || 'public', p_tags: tags }));
+      await setMentions('post', id, mentions, true);
+      // বাদ দেওয়া নিজের ছবি স্টোরেজ থেকেও মুছে ফেলা (ব্যর্থ হলে সমস্যা নেই)
+      const paths = removed.map(u => decodeURIComponent(u.split('/object/public/media/')[1] || '')).filter(x => x.startsWith(me.id + '/'));
+      if (paths.length) await sb.storage.from('media').remove(paths).catch(() => {});
+    },
+    async savePost(id) { ok(await sb.from('saved_posts').insert({ user_id: me.id, post_id: id })); },
+    async unsavePost(id) { ok(await sb.from('saved_posts').delete().eq('user_id', me.id).eq('post_id', id)); },
+    async changePassword(password) { ok(await sb.auth.updateUser({ password })); },
+
+    // ---------- পেইজ
+    async myPages() { return ok(await sb.from('pages').select('*').eq('owner_id', me.id).order('created_at')).map(toPage); },
+    async followedPages() { return ok(await sb.from('page_follows').select('p:pages(*)').eq('user_id', me.id).order('created_at', { ascending: false })).map(r => toPage(r.p)).filter(Boolean); },
+    async discoverPages({ q } = {}) {
+      let s = sb.from('pages').select('*').order('follower_count', { ascending: false }).limit(40);
+      const term = (q || '').replace(/[,%()*\\]/g, ' ').trim(); if (term) s = s.ilike('name', `%${term}%`);
+      return ok(await s).map(toPage);
+    },
+    async page(id) {
+      const p = toPage(ok(await sb.from('pages').select('*').eq('id', id).single()));
+      const f = me ? ok(await sb.from('page_follows').select('page_id').eq('page_id', id).eq('user_id', me.id)) : [];
+      return { ...p, following: f.length > 0, isOwner: !!me && p.ownerId === me.id };
+    },
+    async createPage({ name, category, about, phone, avatar }) {
+      const avatar_url = avatar ? await upload(avatar, 'page') : null;
+      return toPage(ok(await sb.from('pages').insert({ owner_id: me.id, name, category, about: about || null, phone: phone || null, avatar_url }).select().single()));
+    },
+    async updatePage(id, { name, category, about, phone, avatar }) {
+      const v = { name, category, about: about || null, phone: phone || null };
+      if (avatar) v.avatar_url = await upload(avatar, 'page');
+      ok(await sb.from('pages').update(v).eq('id', id));
+    },
+    async deletePage(id) { ok(await sb.from('pages').delete().eq('id', id)); },
+    async followPage(id) { ok(await sb.from('page_follows').upsert({ page_id: id, user_id: me.id }, { ignoreDuplicates: true })); },
+    async unfollowPage(id) { ok(await sb.from('page_follows').delete().eq('page_id', id).eq('user_id', me.id)); },
+
+    // ---------- গ্রুপ
+    async myGroups() {
+      return ok(await sb.from('group_members').select('role,status,g:groups(*)').eq('user_id', me.id).order('created_at', { ascending: false }))
+        .filter(r => r.g).map(r => ({ ...toGroup(r.g), role: r.role, status: r.status }));
+    },
+    async discoverGroups({ q } = {}) {
+      let s = sb.from('groups').select('*').order('member_count', { ascending: false }).limit(40);
+      const term = (q || '').replace(/[,%()*\\]/g, ' ').trim(); if (term) s = s.ilike('name', `%${term}%`);
+      return ok(await s).map(toGroup);
+    },
+    async group(id) {
+      const g = toGroup(ok(await sb.from('groups').select('*').eq('id', id).single()));
+      const m = me ? ok(await sb.from('group_members').select('role,status').eq('group_id', id).eq('user_id', me.id).maybeSingle()) : null;
+      return { ...g, role: m?.role || null, status: m?.status || null, isOwner: !!me && g.ownerId === me.id };
+    },
+    async createGroup({ name, about, privacy, avatar }) {
+      const avatar_url = avatar ? await upload(avatar, 'group') : null;
+      return toGroup(ok(await sb.from('groups').insert({ owner_id: me.id, name, about: about || null, privacy, avatar_url }).select().single()));
+    },
+    async updateGroup(id, { name, about, privacy, avatar }) {
+      const v = { name, about: about || null, privacy };
+      if (avatar) v.avatar_url = await upload(avatar, 'group');
+      ok(await sb.from('groups').update(v).eq('id', id));
+    },
+    async deleteGroup(id) { ok(await sb.from('groups').delete().eq('id', id)); },
+    async joinGroup(id) { return ok(await sb.rpc('join_group', { gid: id })); },
+    async leaveGroup(id) { ok(await sb.from('group_members').delete().eq('group_id', id).eq('user_id', me.id)); },
+    async groupMembers(id, status = 'active') {
+      return ok(await sb.from('group_members').select('role,status,p:profiles(' + PROFILE + ')').eq('group_id', id).eq('status', status).order('created_at'))
+        .filter(r => r.p).map(r => ({ ...toUser(r.p), role: r.role }));
+    },
+    async approveMember(gid, uid) { ok(await sb.rpc('approve_member', { gid, uid })); },
+    async removeMember(gid, uid) { ok(await sb.from('group_members').delete().eq('group_id', gid).eq('user_id', uid)); },
+    async deletePost(id) { ok(await sb.from('posts').delete().eq('id', id)); },
+    // রিয়্যাক্ট দেওয়া/বদলানো/তুলে নেওয়া (reaction খালি = তুলে নেওয়া)
+    async react(id, reaction, prev) {
+      if (!reaction) ok(await sb.from('likes').delete().eq('post_id', id).eq('user_id', me.id));
+      else if (prev) ok(await sb.from('likes').update({ reaction }).eq('post_id', id).eq('user_id', me.id));
+      else ok(await sb.from('likes').insert({ post_id: id, user_id: me.id, reaction }));
+    },
+    // sort: 'top' (বেশি রিয়্যাক্ট), 'new' (নতুন), 'old' (পুরাতন)
+    async comments(postId, sort = 'old') {
+      let q = sb.from('comments').select('id,body,created_at,edited_at,parent_id,user_id,like_count,reactions,profiles(name,avatar_url),comment_mentions(profiles(id,name))').eq('post_id', postId).limit(300);
+      q = sort === 'top' ? q.order('like_count', { ascending: false }).order('created_at') : q.order('created_at', { ascending: sort === 'old' });
+      const rows = ok(await q).filter(r => !blocked.has(r.user_id));
+      let mine = new Map();
+      if (me && rows.length) mine = new Map(ok(await sb.from('comment_likes').select('comment_id,reaction').eq('user_id', me.id).in('comment_id', rows.map(r => r.id))).map(x => [x.comment_id, x.reaction]));
+      return rows.map(r => ({ id: r.id, body: r.body, createdAt: r.created_at, editedAt: r.edited_at || null, parentId: r.parent_id || null, userId: r.user_id,
+        mentions: (r.comment_mentions || []).map(t => t.profiles).filter(Boolean).map(t => ({ id: t.id, name: t.name })), author: r.profiles?.name || 'সদস্য', avatar: r.profiles?.avatar_url || '',
+        likes: r.like_count, reactions: r.reactions || {}, myReaction: mine.get(r.id) || '' }));
+    },
+    async reactComment(id, reaction, prev) {
+      if (!reaction) ok(await sb.from('comment_likes').delete().eq('comment_id', id).eq('user_id', me.id));
+      else if (prev) ok(await sb.from('comment_likes').update({ reaction }).eq('comment_id', id).eq('user_id', me.id));
+      else ok(await sb.from('comment_likes').insert({ comment_id: id, user_id: me.id, reaction }));
+    },
+    async pinComment(postId, commentId) { ok(await sb.rpc('pin_comment', { p_post: postId, p_comment: commentId || null })); },
+    // কে কে রিয়্যাক্ট দিয়েছেন
+    async reactors(kind, id) {
+      const t = kind === 'comment' ? 'comment_likes' : 'likes', col = kind === 'comment' ? 'comment_id' : 'post_id';
+      const rows = ok(await sb.from(t).select('reaction, p:profiles(' + PROFILE + ')').eq(col, id).limit(500));
+      return { list: rows.filter(r => r.p && !blocked.has(r.p.id)).map(r => ({ ...toUser(r.p), reaction: r.reaction })), unnamed: 0 };
+    },
+    async addComment(postId, body, parentId = null, mentions = []) {
+      const row = ok(await sb.from('comments').insert({ post_id: postId, user_id: me.id, body, parent_id: parentId }).select('id').single());
+      await setMentions('comment', row.id, mentions);
+    },
+    async editComment(id, body, mentions = []) { ok(await sb.rpc('edit_comment', { p_id: id, p_body: body })); await setMentions('comment', id, mentions, true); },
+    async deleteComment(id) { ok(await sb.from('comments').delete().eq('id', id)); },
+
+    // ---------- মানুষ, বন্ধু, ফলো, ব্লক
+    async profile(id) {
+      const p = toUser(ok(await sb.from('profiles').select(PROFILE).eq('id', id).single()));
+      const [friends, followers, following, rel] = await Promise.all([
+        sb.from('friendships').select('requester', { count: 'exact', head: true }).eq('status', 'accepted').or(`requester.eq.${id},addressee.eq.${id}`),
+        sb.from('follows').select('follower_id', { count: 'exact', head: true }).eq('followee_id', id),
+        sb.from('follows').select('follower_id', { count: 'exact', head: true }).eq('follower_id', id),
+        relations([id]),
+      ]);
+      return { ...p, friends: ok(friends) || 0, followers: ok(followers) || 0, following: ok(following) || 0, rel: rel.get(id) };
+    },
+    async people({ q }) {
+      let s = sb.from('profiles').select(PROFILE).limit(30);
+      const term = (q || '').replace(/[,%()*\\]/g, ' ').trim();
+      if (term) s = s.ilike('name', `%${term}%`);
+      else if (me?.unionId) s = s.eq('union_id', me.unionId).order('created_at', { ascending: false });
+      else if (me?.upazila) s = s.eq('upazila', me.upazila).order('created_at', { ascending: false });
+      else s = s.order('created_at', { ascending: false });
+      const rows = ok(await s).map(toUser).filter(u => u.id !== me?.id && !blocked.has(u.id));
+      const rel = await relations(rows.map(u => u.id));
+      return rows.map(u => ({ ...u, rel: rel.get(u.id) }));
+    },
+    async friendRequests() {
+      const rows = ok(await sb.from('friendships').select('created_at, p:profiles!friendships_requester_fkey(' + PROFILE + ')').eq('addressee', me.id).eq('status', 'pending').order('created_at', { ascending: false }));
+      return rows.map(r => toUser(r.p)).filter(u => u && !blocked.has(u.id));
+    },
+    async friends(of) {
+      const id = of || me.id;
+      const rows = ok(await sb.from('friendships').select(`requester,addressee, r:profiles!friendships_requester_fkey(${PROFILE}), a:profiles!friendships_addressee_fkey(${PROFILE})`).eq('status', 'accepted').or(`requester.eq.${id},addressee.eq.${id}`));
+      return rows.map(r => toUser(r.requester === id ? r.a : r.r)).filter(Boolean);
+    },
+    async sendFriendRequest(id) {
+      ok(await sb.from('friendships').insert({ requester: me.id, addressee: id }));
+      ok(await sb.from('follows').upsert({ follower_id: me.id, followee_id: id }, { ignoreDuplicates: true }));
+    },
+    async acceptFriend(id) { ok(await sb.rpc('accept_friend', { from_user: id })); },
+    async removeFriend(id) { ok(await sb.from('friendships').delete().or(`and(requester.eq.${me.id},addressee.eq.${id}),and(requester.eq.${id},addressee.eq.${me.id})`)); },
+    async follow(id) { ok(await sb.from('follows').upsert({ follower_id: me.id, followee_id: id }, { ignoreDuplicates: true })); },
+    async unfollow(id) { ok(await sb.from('follows').delete().eq('follower_id', me.id).eq('followee_id', id)); },
+    async block(id) { ok(await sb.from('blocks').insert({ blocker_id: me.id, blocked_id: id })); blocked.add(id); },
+    async unblock(id) { ok(await sb.from('blocks').delete().eq('blocker_id', me.id).eq('blocked_id', id)); blocked.delete(id); },
+    async blockedList() {
+      const rows = ok(await sb.from('blocks').select('p:profiles!blocks_blocked_id_fkey(' + PROFILE + ')').eq('blocker_id', me.id));
+      return rows.map(r => toUser(r.p)).filter(Boolean);
+    },
+
+    // ---------- মেসেজ
+    async conversations() {
+      return ok(await sb.rpc('my_conversations')).filter(c => !blocked.has(c.partner_id))
+        .map(c => ({ userId: c.partner_id, name: c.name, avatar: c.avatar_url || '', last: c.last_body, lastAt: c.last_at, lastMine: c.last_mine, unread: Number(c.unread) }));
+    },
+    async messages(id) {
+      const rows = ok(await sb.from('messages').select('id,sender_id,body,created_at,read_at')
+        .or(`and(sender_id.eq.${me.id},recipient_id.eq.${id}),and(sender_id.eq.${id},recipient_id.eq.${me.id})`)
+        .order('created_at', { ascending: false }).limit(200));
+      return rows.reverse().map(m => ({ id: m.id, mine: m.sender_id === me.id, body: m.body, createdAt: m.created_at, read: !!m.read_at }));
+    },
+    async sendMessage(id, body) { ok(await sb.from('messages').insert({ sender_id: me.id, recipient_id: id, body })); },
+    async markRead(id) { ok(await sb.rpc('mark_read', { partner: id })); },
+    async unreadCount() {
+      if (!me) return 0;
+      return ok(await sb.from('messages').select('id', { count: 'exact', head: true }).eq('recipient_id', me.id).is('read_at', null)) || 0;
+    },
+    onMessage(cb) {
+      if (!me) return () => {};
+      const ch = sb.channel('dm-' + me.id)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `recipient_id=eq.${me.id}` },
+          p => { if (!blocked.has(p.new.sender_id)) cb({ from: p.new.sender_id, body: p.new.body }); })
+        .subscribe();
+      return () => sb.removeChannel(ch);
+    },
+
+    // ---------- নোটিফিকেশন
+    async notifications() {
+      const rows = ok(await sb.from('notifications').select('id,type,post_id,group_id,read,created_at,actor_id, a:profiles!notifications_actor_id_fkey(id,name,avatar_url), p:posts(body), g:groups(name)')
+        .eq('user_id', me.id).order('created_at', { ascending: false }).limit(60));
+      return rows.filter(n => n.a && !blocked.has(n.actor_id)).map(n => ({
+        id: n.id, type: n.type, postId: n.post_id, groupId: n.group_id, groupName: n.g?.name || '', read: n.read, createdAt: n.created_at,
+        actor: { id: n.a.id, name: n.a.name, avatar: n.a.avatar_url || '' }, snippet: n.p?.body || '',
+      }));
+    },
+    async unreadNotifications() {
+      if (!me) return 0;
+      return ok(await sb.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', me.id).eq('read', false)) || 0;
+    },
+    async markNotificationsRead() { ok(await sb.rpc('mark_notifications_read')); },
+    onNotify(cb) {
+      if (!me) return () => {};
+      const ch = sb.channel('nt-' + me.id)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${me.id}` }, () => cb())
+        .subscribe();
+      return () => sb.removeChannel(ch);
+    },
+
+    // ---------- সার্চ (মানুষ, পোস্ট, সেবা একসঙ্গে)
+    async search(q) {
+      const [people, posts, services] = await Promise.all([this.people({ q }), this.posts({ q }), this.services({ q })]);
+      return { people, posts, services };
+    },
+
+    // ---------- সেবা ডিরেক্টরি ও রিপোর্ট
+    async services({ category, q }) {
+      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id')
+        .eq('upazila_id', UPAZILA_ID).order('verified', { ascending: false }).order('name').limit(500);
+      if (category) s = s.eq('category', category);
+      const term = (q || '').replace(/[,%()*\\]/g, ' ').trim();
+      if (term) s = s.or(`name.ilike.%${term}%,address.ilike.%${term}%`);
+      return ok(await s);
+    },
+    async addService(v) { ok(await sb.from('services').insert({ ...v, upazila_id: UPAZILA_ID, created_by: me.id, verified: false })); },
+    async verifyService(id) { ok(await sb.from('services').update({ verified: true }).eq('id', id)); },
+    async report(targetType, targetId, reason) {
+      ok(await sb.from('reports').insert({ reporter_id: me.id, target_type: targetType, target_id: String(targetId), reason }));
+    },
+  };
+}
+
+// ================================================================ ডেমো মোড
+function demoApi() {
+  const K = 'au_demo7_';
+  const get = (k, d) => { try { const v = localStorage.getItem(K + k); return v ? JSON.parse(v) : d; } catch { return d; } };
+  const set = (k, v) => { try { localStorage.setItem(K + k, JSON.stringify(v)); } catch { /* জায়গা না থাকলে শুধু মেমরিতে */ } };
+  const ago = h => new Date(Date.now() - h * 3600e3).toISOString();
+  const wait = v => new Promise(r => setTimeout(() => r(v), 100));
+  const nid = arr => arr.reduce((m, x) => Math.max(m, Number(x.id) || 0), 0) + 1;
+  const toBlobUrl = blob => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+
+  const UNIONS = ['ভালুকা পৌরসভা', 'উথুরা ইউনিয়ন', 'কাচিনা ইউনিয়ন', 'ডাকাতিয়া ইউনিয়ন', 'ধীতপুর ইউনিয়ন', 'বিরুনিয়া ইউনিয়ন', 'ভরাডোবা ইউনিয়ন', 'ভালুকা ইউনিয়ন', 'মল্লিকবাড়ী ইউনিয়ন', 'মেদুয়ারী ইউনিয়ন', 'রাজৈ ইউনিয়ন', 'হবিরবাড়ী ইউনিয়ন'].map((name, i) => ({ id: i + 1, name }));
+  const uname = id => UNIONS.find(u => u.id === Number(id))?.name || '';
+  const BH = { district: 'ময়মনসিংহ', upazila: 'ভালুকা' };
+  const daysAgo = n => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+  const PEOPLE = [
+    { id: 'd1', name: 'রাশেদুল হক', ...BH, unionId: 2, bio: 'শিক্ষক, উথুরা উচ্চ বিদ্যালয়', bloodGroup: 'A+', phone: '01700000101', lastDonated: daysAgo(150) },
+    { id: 'd2', name: 'সুমি আক্তার', ...BH, unionId: 2, bio: '', bloodGroup: 'O+', phone: '01700000102', lastDonated: '' },
+    { id: 'd3', name: 'নাসরিন সুলতানা', ...BH, unionId: 3, bio: 'স্বেচ্ছাসেবী, রক্তদান ক্লাব', bloodGroup: 'B+', phone: '01700000103', lastDonated: daysAgo(40) },
+    { id: 'd4', name: 'তানভীর আহমেদ', ...BH, unionId: 3, bio: 'নিয়মিত রক্তদাতা', bloodGroup: 'B+', phone: '01700000104', lastDonated: daysAgo(120) },
+    { id: 'd5', name: 'মিজানুর রহমান', ...BH, unionId: 4, bio: 'ব্যবসায়ী, ডাকাতিয়া বাজার', bloodGroup: 'AB+', phone: '01700000105', lastDonated: daysAgo(200) },
+    { id: 'd6', name: 'উপজেলা যুব উন্নয়ন', ...BH, unionId: 1, bio: 'প্রশিক্ষণ ও চাকরির খবর', bloodGroup: '', phone: '' },
+    { id: 'd7', name: 'রুমানা আক্তার', ...BH, unionId: 12, bio: '', bloodGroup: 'A-', phone: '01700000107', lastDonated: daysAgo(20) },
+    { id: 'd8', name: 'জাহিদ হাসান', district: 'ময়মনসিংহ', upazila: 'ত্রিশাল', unionId: null, bio: '', bloodGroup: 'O-', phone: '01700000108', lastDonated: daysAgo(95) },
+    { id: 'd9', name: 'শফিকুল ইসলাম', district: 'ঢাকা', upazila: 'সাভার', unionId: null, bio: 'ভালুকার কারখানায় কাজ করি', bloodGroup: 'AB-', phone: '01700000109', lastDonated: '' },
+  ];
+
+  const db = {
+    users: get('users', []),
+    posts: get('posts', [
+      { id: 1, userId: 'd1', sv: 3, unionId: 2, category: 'খবর', createdAt: ago(2), body: 'আগামীকাল সকাল ৯টা থেকে বিকাল ৩টা পর্যন্ত সদর ও বাজার এলাকায় বিদ্যুৎ বন্ধ থাকবে। লাইন মেরামতের কাজ চলবে।', image: '', likes: 24, rx: { like: 18, love: 4, wow: 2 }, cm: [{ id: 1, userId: 'd2', body: 'জানানোর জন্য ধন্যবাদ ভাই।', createdAt: ago(1) }] },
+      { id: 10, userId: 'd2', sv: 3, unionId: 2, category: 'অনুষ্ঠান', createdAt: ago(0.2), body: 'আজ বিকেলে উথুরা স্কুল মাঠে ফুটবল টুর্নামেন্টের ফাইনাল হলো। দারুণ খেলা হয়েছে!', images: ['demo:1', 'demo:2', 'demo:3', 'demo:4'], tags: ['d1', 'd4'], likes: 22, rx: { like: 15, love: 7 }, cm: [] },
+      { id: 9, userId: 'd1', sv: 6, unionId: 2, category: 'খবর', createdAt: ago(0.5), body: 'উথুরা ইউনিয়নের সবার জন্য একটি গুরুত্বপূর্ণ ঘোষণা।\n\nআগামী শনিবার সকাল ১০টা থেকে ইউনিয়ন পরিষদ চত্বরে বিনামূল্যে স্বাস্থ্য ক্যাম্প হবে। এখানে চোখ, দাঁত, ডায়াবেটিস ও রক্তচাপ পরীক্ষা করা হবে। শিশুদের জন্য আলাদা ডাক্তার থাকবেন এবং প্রয়োজনীয় ওষুধও বিনামূল্যে দেওয়া হবে।\n\nযারা আসবেন, জাতীয় পরিচয়পত্র বা জন্ম নিবন্ধনের ফটোকপি সঙ্গে আনবেন। বয়স্ক ও প্রতিবন্ধী ভাই-বোনদের জন্য আলাদা লাইনের ব্যবস্থা থাকবে। সকাল সকাল এলে ভিড় কম পাবেন।\n\nদয়া করে পোস্টটি শেয়ার করে সবাইকে জানিয়ে দিন, যাতে কেউ বাদ না পড়েন।', image: '', likes: 16, rx: { like: 12, love: 4 }, cm: [{ id: 5, userId: 'd2', sv: 4, body: 'অনেক ভালো উদ্যোগ। আমার বাবা-মাকে নিয়ে আসব ইনশাআল্লাহ। আগের বারও এমন ক্যাম্প হয়েছিল, তখন অনেক ভিড় ছিল কিন্তু ডাক্তাররা খুব যত্ন নিয়ে সবাইকে দেখেছিলেন। এবারও আশা করি ভালো ব্যবস্থা থাকবে, আর ওষুধের পরিমাণ যেন যথেষ্ট থাকে সেটা খেয়াল রাখবেন। ধন্যবাদ সবাইকে যারা এর আয়োজন করছেন।', createdAt: ago(0.3) }] },
+      { id: 8, userId: 'd5', unionId: 4, category: 'খবর', createdAt: ago(1.5), body: 'সবাই শেয়ার করুন, রক্ত দরকার।', image: '', likes: 3, rx: { like: 3 }, sharedPostId: 2, cm: [] },
+      { id: 2, userId: 'd3', sv: 14, unionId: 3, category: 'সাহায্য চাই', createdAt: ago(4), body: 'জরুরি ভিত্তিতে B+ রক্ত দরকার। রোগী উপজেলা স্বাস্থ্য কমপ্লেক্সে ভর্তি। কেউ দিতে পারলে কমেন্ট বা মেসেজ করুন।', image: '', likes: 41, rx: { like: 22, love: 9, sad: 10 }, cm: [{ id: 2, userId: 'd4', body: 'আমি B+, এক ঘণ্টার মধ্যে আসছি।', createdAt: ago(3), likes: 12, rx: { like: 8, love: 4 }, rk: { d1: 'like', d2: 'love', d3: 'like', d5: 'love', d7: 'like' } }, { id: 3, userId: 'd1', body: 'কোন ওয়ার্ডে ভর্তি আছেন জানাবেন।', createdAt: ago(3.5), likes: 2, rx: { like: 2 }, rk: { d2: 'like', d5: 'like' } }, { id: 4, userId: 'd7', sv: 9, body: 'আমার পরিচিত একজন B+ আছেন, যোগাযোগ করছি।', createdAt: ago(2), likes: 5, rx: { like: 3, love: 2 }, rk: { d1: 'like', d3: 'love', d4: 'like', d6: 'love', d9: 'like' } }], pinned: 2 },
+      { id: 3, userId: 'd5', unionId: 4, category: 'হারানো-প্রাপ্তি', createdAt: ago(26), body: 'নদীপাড় মোড়ে একটি কালো মানিব্যাগ পাওয়া গেছে, ভেতরে জাতীয় পরিচয়পত্র আছে। পরিচয় দিয়ে নিয়ে যান।', image: '', likes: 18, rx: { like: 15, wow: 3 }, cm: [] },
+      { id: 4, userId: 'd6', pageId: 2, unionId: 1, category: 'অনুষ্ঠান', createdAt: ago(50), body: 'ফ্রিল্যান্সিং ও কম্পিউটার প্রশিক্ষণে ভর্তি চলছে। বয়স ১৮–৩৫। আবেদনের শেষ তারিখ ৩০ নভেম্বর।', image: '', likes: 57, rx: { like: 40, love: 12, haha: 5 }, cm: [] },
+      { id: 5, userId: 'd1', pageId: 1, unionId: 2, category: 'খবর', createdAt: ago(8), body: 'এই শুক্রবার বিনামূল্যে ডায়াবেটিস ও রক্তচাপ পরীক্ষা, সকাল ১০টা থেকে দুপুর ২টা।', image: '', likes: 33, rx: { like: 28, love: 5 }, cm: [] },
+      { id: 6, userId: 'd4', groupId: 1, unionId: 3, category: 'সাহায্য চাই', createdAt: ago(6), body: 'O- রক্তের দাতা খুঁজছি, আগামী সোমবার অপারেশন। কেউ থাকলে জানাবেন।', image: '', likes: 9, rx: { like: 6, sad: 3 }, cm: [] },
+      { id: 7, userId: 'd5', groupId: 2, unionId: 4, category: 'খবর', createdAt: ago(10), body: 'এ সপ্তাহে ইউরিয়া সারের দাম বস্তাপ্রতি ৫০ টাকা কমেছে।', image: '', likes: 4, rx: { like: 4 }, cm: [] },
+    ]),
+    likes: get('likes', []),            // "userId:postId"
+    reacts: get('reacts', {}),          // "userId:postId" -> রিয়্যাক্টের ধরন
+    friendships: get('friendships', []), // { requester, addressee, status }
+    follows: get('follows', []),         // "follower:followee"
+    blocks: get('blocks', []),           // "blocker:blocked"
+    messages: get('messages', []),       // { id, from, to, body, createdAt, read }
+    notifs: get('notifs', []),           // { id, to, from, type, postId, groupId, createdAt, read }
+    saved: get('saved', []),             // "userId:postId"
+    settings: get('settings', { publicDonorPhone: false }),
+    manual: get('manual', [            // হাতে যোগ করা ডোনার
+      { id: 1, createdBy: 'd3', name: 'আব্দুল করিম', district: 'ময়মনসিংহ', upazila: 'ভালুকা', unionId: 7, phone: '01700000140', bloodGroup: 'O-', lastDonated: '' },
+    ]),
+    pages: get('pages', [
+      { id: 1, ownerId: 'd1', name: 'জননী ডায়াগনস্টিক সেন্টার', category: 'স্বাস্থ্য', about: 'সব ধরনের পরীক্ষা ও বিশেষজ্ঞ ডাক্তার। শুক্রবার খোলা।', phone: '01700-000020', avatar: '' },
+      { id: 2, ownerId: 'd6', name: 'উপজেলা চাকরির খবর', category: 'চাকরি ও প্রশিক্ষণ', about: 'উপজেলার সরকারি-বেসরকারি চাকরি ও প্রশিক্ষণের খবর।', phone: '', avatar: '' },
+    ]),
+    pageFollows: get('pageFollows', ['d2:1', 'd3:1', 'd4:2']),
+    groups: get('groups', [
+      { id: 1, ownerId: 'd3', name: 'উপজেলা রক্তদান ক্লাব', about: 'জরুরি রক্তের প্রয়োজনে একে অপরের পাশে।', privacy: 'public', avatar: '' },
+      { id: 2, ownerId: 'd5', name: 'চরপাড়া কৃষক সমিতি', about: 'চাষাবাদ, বীজ, সার ও বাজারদর নিয়ে আলোচনা। শুধু সদস্যদের জন্য।', privacy: 'private', avatar: '' },
+    ]),
+    members: get('members', [
+      { groupId: 1, userId: 'd3', role: 'admin', status: 'active' }, { groupId: 1, userId: 'd4', role: 'member', status: 'active' },
+      { groupId: 2, userId: 'd5', role: 'admin', status: 'active' },
+    ]),
+    services: get('services', [
+      { id: 1, name: 'উপজেলা স্বাস্থ্য কমপ্লেক্স', category: 'health', address: 'হাসপাতাল রোড, সদর', phone: '01700-000001', hours: 'জরুরি বিভাগ ২৪ ঘণ্টা', verified: true },
+      { id: 2, name: 'উপজেলা নির্বাহী অফিসারের কার্যালয়', category: 'gov', address: 'উপজেলা পরিষদ চত্বর', phone: '01700-000002', hours: 'রবি–বৃহস্পতি, সকাল ৯টা–বিকাল ৫টা', verified: true },
+      { id: 3, name: 'সহকারী কমিশনার (ভূমি) অফিস', category: 'gov', address: 'উপজেলা পরিষদ চত্বর', phone: '01700-000003', hours: 'রবি–বৃহস্পতি, সকাল ৯টা–বিকাল ৫টা', verified: true },
+      { id: 12, name: 'উপজেলা কৃষি অফিস', category: 'gov', address: 'উপজেলা পরিষদ চত্বর', phone: '01700-000013', hours: 'রবি–বৃহস্পতি, সকাল ৯টা–বিকাল ৫টা', verified: true },
+      { id: 4, name: 'থানা', category: 'police', address: 'থানা মোড়, সদর', phone: '01700-000004', hours: '২৪ ঘণ্টা', verified: true },
+      { id: 5, name: 'ফায়ার সার্ভিস ও সিভিল ডিফেন্স স্টেশন', category: 'police', address: 'বাসস্ট্যান্ডের পাশে', phone: '01700-000005', hours: '২৪ ঘণ্টা', verified: true },
+      { id: 6, name: 'সরকারি পাইলট উচ্চ বিদ্যালয়', category: 'edu', address: 'স্কুল রোড, সদর', phone: '01700-000006', hours: 'শনি–বৃহস্পতি', verified: true },
+      { id: 13, name: 'উপজেলা সরকারি কলেজ', category: 'edu', address: 'কলেজ রোড', phone: '01700-000014', hours: 'শনি–বৃহস্পতি', verified: true },
+      { id: 7, name: 'ডা. ফারহানা ইসলাম (শিশু বিশেষজ্ঞ)', category: 'doc', address: 'জননী ডায়াগনস্টিক, বাজার রোড', phone: '01700-000007', hours: 'বিকাল ৪টা–রাত ৯টা', verified: true },
+      { id: 8, name: 'রফিক ইলেকট্রিক', category: 'fix', address: 'চরপাড়া বাজার', phone: '01700-000008', hours: 'সকাল ৮টা–রাত ৮টা', verified: true },
+      { id: 14, name: 'কামাল প্লাম্বিং ও স্যানিটারি', category: 'fix', address: 'নদীপাড় মোড়', phone: '01700-000009', hours: 'যেকোনো সময় কল করুন', verified: true },
+      { id: 9, name: 'উপজেলা–জেলা সদর বাস কাউন্টার', category: 'bus', address: 'কেন্দ্রীয় বাসস্ট্যান্ড', phone: '01700-000010', hours: 'ভোর ৬টা থেকে প্রতি ৩০ মিনিটে', verified: true },
+      { id: 10, name: 'কৃষি ব্যাংক শাখা', category: 'bank', address: 'কলেজ রোড, সদর', phone: '01700-000011', hours: 'রবি–বৃহস্পতি, সকাল ১০টা–বিকাল ৪টা', verified: true },
+      { id: 11, name: 'বটতলা সাপ্তাহিক হাট', category: 'shop', address: 'বটতলা ইউনিয়ন', phone: '01700-000012', hours: 'প্রতি মঙ্গলবার', verified: true },
+    ]),
+  };
+  let meId = get('me', null);
+  const save = () => { for (const k of ['users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services']) set(k, db[k]); set('me', meId); };
+  const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
+  const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', bio: p.bio || '' }; };
+  const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true } : null);
+  const isBlocked = id => db.blocks.includes(meId + ':' + id);
+  const friendRow = (a, b) => db.friendships.find(f => (f.requester === a && f.addressee === b) || (f.requester === b && f.addressee === a));
+  const friendIds = of => db.friendships.filter(f => f.status === 'accepted' && (f.requester === of || f.addressee === of)).map(f => (f.requester === of ? f.addressee : f.requester));
+  const rel = id => {
+    const f = meId && friendRow(meId, id);
+    return { friend: !f ? 'none' : f.status === 'accepted' ? 'friends' : f.requester === meId ? 'sent' : 'received', following: db.follows.includes(meId + ':' + id), blocked: isBlocked(id) };
+  };
+  const listeners = new Set(), notifyListeners = new Set();
+  // ডেমোর নমুনা ছবি (মাঠ, আকাশ, খেলোয়াড়)
+  const PICS = [['#7fc8f8', '#5cb85c', '#f5b700'], ['#ffb37a', '#4caf50', '#e5303f'], ['#9ad0ff', '#3f9b4f', '#1d6fd8'], ['#c6b8ff', '#66bb6a', '#ff7043']];
+  function demoPic(src) {
+    const m = /^demo:(\d+)$/.exec(src || ''); if (!m) return src;
+    const [sky, field, shirt] = PICS[(Number(m[1]) - 1) % PICS.length], n = Number(m[1]);
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600"><rect width="800" height="600" fill="${sky}"/><circle cx="${150 + n * 120}" cy="110" r="55" fill="#fff6c2"/><rect y="330" width="800" height="270" fill="${field}"/><path d="M0 330h800" stroke="#fff" stroke-width="6"/><circle cx="400" cy="465" r="70" stroke="#fff" stroke-width="5" fill="none"/><rect x="${200 + n * 60}" y="250" width="40" height="90" rx="12" fill="${shirt}"/><circle cx="${220 + n * 60}" cy="232" r="20" fill="#8d5524"/><circle cx="${300 + n * 70}" cy="520" r="18" fill="#fff" stroke="#333" stroke-width="3"/><text x="30" y="570" font-family="sans-serif" font-size="30" fill="#fff">${n}/4</text></svg>`);
+  }
+  function reactAs(uid, postId, reaction, prev) {
+    const k = uid + ':' + postId, p = db.posts.find(x => x.id === postId); if (!p) return;
+    p.rx = p.rx || { like: p.likes };
+    if (prev) { p.rx[prev] = Math.max((p.rx[prev] || 0) - 1, 0); }
+    if (reaction) { p.rx[reaction] = (p.rx[reaction] || 0) + 1; db.reacts[k] = reaction; if (!db.likes.includes(k)) db.likes.push(k); }
+    else { delete db.reacts[k]; db.likes = db.likes.filter(x => x !== k); }
+    p.likes += (reaction ? 1 : 0) - (prev ? 1 : 0);
+    save();
+  }
+  const ready = d => !d.lastDonated || (Date.now() - new Date(d.lastDonated).getTime()) / 864e5 >= 90;
+  const member = (gid, uid) => db.members.find(m => m.groupId === Number(gid) && m.userId === uid);
+  const canSeeGroup = gid => { const g = db.groups.find(x => x.id === gid); return !g || g.privacy === 'public' || member(gid, meId)?.status === 'active'; };
+  const pageOf = id => db.pages.find(x => x.id === Number(id));
+  const groupOut = g => ({ ...g, members: db.members.filter(m => m.groupId === g.id && m.status === 'active').length });
+  const pageOut = pg => ({ ...pg, followers: db.pageFollows.filter(f => f.endsWith(':' + pg.id)).length });
+  // ডেমো: মেনশন — শুধু যাঁরা পোস্ট দেখতে পারেন তাঁদের নোটিফিকেশন
+  function mentionNotify(p, ids, from, old = []) {
+    const fr = new Set(friendIds(p.userId)), g = p.groupId && db.groups.find(x => x.id === p.groupId);
+    const pair = (a, b) => db.blocks.includes(a + ':' + b) || db.blocks.includes(b + ':' + a);
+    const sees = uid => !pair(uid, p.userId) && (!g || g.privacy === 'public' || member(g.id, uid)?.status === 'active') && (p.privacy === 'public' || !p.privacy || uid === p.userId || (p.privacy === 'friends' && fr.has(uid)));
+    const clean = [...new Set(ids || [])].filter(uid => uid && uid !== from && person(uid) && !pair(uid, from)).slice(0, 20);
+    clean.filter(uid => !old.includes(uid) && sees(uid)).forEach(uid => notify(uid, from, 'mention', p.id));
+    return clean;
+  }
+  function notify(to, from, type, postId = null, groupId = null) {
+    if (!to || to === from || db.blocks.includes(to + ':' + from)) return;
+    if (type !== 'comment' && type !== 'reply') db.notifs = db.notifs.filter(n => !(n.to === to && n.from === from && n.type === type && n.postId === postId && n.groupId === groupId));
+    db.notifs.push({ id: nid(db.notifs), to, from, type, postId, groupId, createdAt: new Date().toISOString(), read: false });
+    save(); if (to === meId) notifyListeners.forEach(cb => cb());
+  }
+
+  function seedFor(id) { // নতুন ডেমো ইউজারের জন্য কিছু নমুনা সম্পর্ক
+    db.friendships.push({ requester: 'd3', addressee: id, status: 'pending' });
+    db.friendships.push({ requester: 'd1', addressee: id, status: 'accepted' });
+    db.follows.push(id + ':d1', 'd1:' + id, id + ':d6');
+    db.messages.push({ id: nid(db.messages), from: 'd1', to: id, body: 'আসসালামু আলাইকুম! আমার উপজেলা অ্যাপে স্বাগতম 🙂', createdAt: new Date().toISOString(), read: false });
+    db.notifs.push({ id: nid(db.notifs), to: id, from: 'd1', type: 'follow', postId: null, createdAt: ago(0.1), read: false });
+    db.notifs.push({ id: nid(db.notifs), to: id, from: 'd3', type: 'friend_request', postId: null, createdAt: new Date().toISOString(), read: false });
+  }
+
+  // ---------- ডেমো প্রোফাইল: সব ফিচার চেক করার জন্য আগে থেকে সাজানো অ্যাকাউন্ট
+  const DEMO_ID = 'demo', DEMO_EMAIL = 'demo@amarupazila.app', DEMO_PASS = 'demo1234';
+  const demoImg = (sky, field, label) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"><rect width="800" height="500" fill="${sky}"/><circle cx="640" cy="110" r="60" fill="#ffd54a"/>` +
+    `<path d="M0 330 Q200 260 400 320 T800 300 V500 H0z" fill="${field}"/><path d="M0 400 Q250 350 500 400 T800 390 V500 H0z" fill="#2f7d4f"/>` +
+    `<rect x="150" y="250" width="120" height="90" fill="#c0563b"/><path d="M140 255 L210 200 L280 255z" fill="#7a2e1d"/><rect x="195" y="295" width="30" height="45" fill="#4a2a1a"/>` +
+    `<text x="30" y="470" font-family="sans-serif" font-size="26" fill="#fff">${label}</text></svg>`);
+  function seedDemo() {
+    const id = DEMO_ID, t = h => ago(h);
+    // আগের ডেমো ডেটা মুছে নতুন করে সাজাই
+    const oldPages = db.pages.filter(x => x.ownerId === id).map(x => x.id), oldGroups = db.groups.filter(g => g.ownerId === id).map(g => g.id);
+    db.users = db.users.filter(u => u.id !== id);
+    db.posts = db.posts.filter(p => p.userId !== id && !oldPages.includes(p.pageId) && !oldGroups.includes(p.groupId));
+    for (const p of db.posts) p.cm = p.cm.filter(c => c.userId !== id);
+    db.pages = db.pages.filter(x => x.ownerId !== id); db.groups = db.groups.filter(g => g.ownerId !== id);
+    db.members = db.members.filter(m => m.userId !== id && !oldGroups.includes(m.groupId));
+    const mine = x => x.startsWith(id + ':') || x.endsWith(':' + id);
+    db.likes = db.likes.filter(x => !x.startsWith(id + ':')); db.saved = db.saved.filter(x => !x.startsWith(id + ':'));
+    db.follows = db.follows.filter(x => !mine(x)); db.blocks = db.blocks.filter(x => !mine(x)); db.pageFollows = db.pageFollows.filter(x => !x.startsWith(id + ':'));
+    db.friendships = db.friendships.filter(f => f.requester !== id && f.addressee !== id);
+    db.messages = db.messages.filter(m => m.from !== id && m.to !== id); db.notifs = db.notifs.filter(n => n.to !== id && n.from !== id);
+    db.services = db.services.filter(x => x.demo !== true);
+    db.manual = db.manual.filter(m => m.createdBy !== id);
+    db.manual.push({ id: nid(db.manual), createdBy: id, name: 'মোঃ সেলিম মিয়া', district: 'ময়মনসিংহ', upazila: 'ভালুকা', unionId: 12, phone: '01700000150', bloodGroup: 'A+', lastDonated: daysAgo(60) });
+
+    db.users.push({ id, email: DEMO_EMAIL, password: DEMO_PASS, name: 'ডেমো ব্যবহারকারী', district: 'ময়মনসিংহ', upazila: 'ভালুকা', unionId: 12, phone: '01700000100', bloodGroup: 'B+', lastDonated: daysAgo(100), donorVisible: true, avatar: '', bio: 'অ্যাপের সব ফিচার চেক করার প্রোফাইল' });
+    // বন্ধু, রিকোয়েস্ট, ফলো
+    db.friendships.push({ requester: 'd1', addressee: id, status: 'accepted' }, { requester: id, addressee: 'd2', status: 'accepted' },
+      { requester: 'd3', addressee: id, status: 'pending' }, { requester: 'd4', addressee: id, status: 'pending' }, { requester: id, addressee: 'd5', status: 'pending' });
+    db.follows.push(`${id}:d1`, `d1:${id}`, `${id}:d2`, `d2:${id}`, `d6:${id}`, `${id}:d5`);
+    // নিজের পোস্ট (একটিতে ছবি)
+    const p1 = { id: nid(db.posts), userId: id, unionId: 2, category: 'খবর', createdAt: t(3), body: 'আমাদের সদর ইউনিয়নের নতুন রাস্তার কাজ শেষ হয়েছে। সবাইকে ধন্যবাদ যারা সহযোগিতা করেছেন।', image: demoImg('#8fd0f0', '#7cc36b', 'সদর ইউনিয়ন'), likes: 2, cm: [] };
+    p1.cm.push({ id: Date.now() + 1, userId: 'd1', body: 'অনেক ভালো খবর 👏', createdAt: t(2.5) }, { id: Date.now() + 2, userId: 'd2', body: 'রাস্তাটা এখন অনেক সুন্দর।', createdAt: t(2) });
+    db.posts.push(p1);
+    const p2 = { id: nid(db.posts), userId: id, unionId: 2, category: 'প্রশ্ন', createdAt: t(30), body: 'উপজেলায় ভালো কম্পিউটার প্রশিক্ষণ কেন্দ্র কোথায় আছে? কেউ জানলে জানাবেন।', image: '', likes: 1, cm: [{ id: Date.now() + 3, userId: 'd6', body: 'যুব উন্নয়ন অফিসে কোর্স চলছে, পেইজে দেখুন।', createdAt: t(29) }] };
+    db.posts.push(p2);
+    db.likes.push(`d1:${p1.id}`, `d2:${p1.id}`, `d1:${p2.id}`, `${id}:2`, `${id}:5`);
+    db.saved.push(`${id}:2`, `${id}:4`);
+    // নিজের পেইজ
+    const pg = { id: nid(db.pages), ownerId: id, name: 'ডেমো ফার্মেসী', category: 'স্বাস্থ্য', about: 'সব ধরনের ওষুধ পাওয়া যায়। প্রতিদিন সকাল ৮টা থেকে রাত ১১টা।', phone: '01700-000099', avatar: '' };
+    db.pages.push(pg); db.pageFollows.push(`d1:${pg.id}`, `d3:${pg.id}`, `d4:${pg.id}`, `${id}:1`);
+    db.posts.push({ id: nid(db.posts), userId: id, pageId: pg.id, unionId: 2, category: 'খবর', createdAt: t(6), body: 'শীতের ওষুধ ও ভিটামিন এখন ১০% ছাড়ে পাওয়া যাচ্ছে।', image: '', likes: 0, cm: [] });
+    // নিজের প্রাইভেট গ্রুপ (একজনের যোগদানের অনুরোধসহ) + একটি পাবলিক গ্রুপের সদস্য
+    const g = { id: nid(db.groups), ownerId: id, name: 'ডেমো যুব সংঘ', about: 'সদর ইউনিয়নের তরুণদের খেলাধুলা ও সামাজিক কাজের গ্রুপ।', privacy: 'private', avatar: '' };
+    db.groups.push(g);
+    db.members.push({ groupId: g.id, userId: id, role: 'admin', status: 'active' }, { groupId: g.id, userId: 'd1', role: 'member', status: 'active' },
+      { groupId: g.id, userId: 'd2', role: 'member', status: 'active' }, { groupId: g.id, userId: 'd4', role: 'member', status: 'pending' },
+      { groupId: 1, userId: id, role: 'member', status: 'active' });
+    db.posts.push({ id: nid(db.posts), userId: 'd2', groupId: g.id, unionId: 2, category: 'অনুষ্ঠান', createdAt: t(5), body: 'শুক্রবার বিকেল ৪টায় স্কুল মাঠে ফুটবল ম্যাচ। সবাই চলে আসবেন!', image: '', likes: 3, cm: [] });
+    // মেসেজ
+    const msg = (from, to, body, h, read) => db.messages.push({ id: nid(db.messages), from, to, body, createdAt: t(h), read });
+    msg('d1', id, 'আসসালামু আলাইকুম, কেমন আছেন?', 5, true); msg(id, 'd1', 'ওয়ালাইকুম আসসালাম, ভালো আছি। আপনি?', 4.9, true);
+    msg('d1', id, 'আলহামদুলিল্লাহ। কাল ইউনিয়ন পরিষদে মিটিং আছে, আসবেন?', 1, false); msg('d1', id, 'সকাল ১০টায় শুরু।', 0.9, false);
+    msg('d2', id, 'ফুটবল ম্যাচের জার্সি রেডি হয়েছে 👕', 7, false); msg(id, 'd6', 'প্রশিক্ষণের আবেদন ফর্ম কোথায় পাব?', 26, true);
+    // নোটিফিকেশন (সব ধরনের)
+    const nt = (from, type, h, postId = null, groupId = null, read = false) => db.notifs.push({ id: nid(db.notifs), to: id, from, type, postId, groupId, createdAt: t(h), read });
+    nt('d2', 'like', 2.6, p1.id); nt('d1', 'comment', 2.5, p1.id); nt('d2', 'comment', 2, p1.id);
+    nt('d4', 'friend_request', 1.5); nt('d3', 'friend_request', 1.2); nt('d4', 'group_request', 1, null, g.id);
+    nt('d6', 'follow', 20, null, null, true); nt('d2', 'friend_accept', 40, null, null, true); nt('d3', 'group_approved', 45, null, 1, true);
+    // যাচাই বাকি একটি সেবা (অ্যাডমিন হিসেবে যাচাই করে দেখার জন্য)
+    db.services.push({ id: nid(db.services), name: 'সুমন মোবাইল সার্ভিসিং', category: 'fix', address: 'সদর বাজার', phone: '01700-000077', hours: 'সকাল ৯টা–রাত ৯টা', verified: false, demo: true });
+    meId = id; save();
+  }
+
+  return {
+    mode: 'demo',
+    async init() { return meUser(); },
+    me: meUser,
+    async upazila() { return { id: 1, name: 'ভালুকা', district: 'ময়মনসিংহ' }; },
+    async unions() { return UNIONS; },
+
+    async signUp({ email, password, name, district, upazila, unionId, phone, bloodGroup, lastDonated }) {
+      if (db.users.some(u => u.email === email)) throw new Error('User already registered');
+      const u = { id: 'u' + Date.now(), email, password, name, district, upazila, unionId: unionId ? Number(unionId) : null, phone: phone || '', bloodGroup: bloodGroup || '', lastDonated: (bloodGroup && lastDonated) || '', donorVisible: true, avatar: '', bio: '' };
+      db.users.push(u); meId = u.id; seedFor(u.id); save(); return { user: meUser() };
+    },
+    async signIn({ email, password }) {
+      const u = db.users.find(x => x.email === email && x.password === password);
+      if (!u) throw new Error('Invalid login credentials');
+      meId = u.id; save(); return meUser();
+    },
+    async signOut() { meId = null; save(); },
+    demoInfo: { email: DEMO_EMAIL, password: DEMO_PASS },
+    async demoLogin({ reset } = {}) { if (reset || !db.users.some(u => u.id === DEMO_ID)) seedDemo(); else { meId = DEMO_ID; save(); } return meUser(); },
+    async updateProfile({ name, district, upazila, unionId, bio, phone, bloodGroup, donorVisible, lastDonated }) {
+      Object.assign(person(meId), { name, district, upazila, unionId: unionId ? Number(unionId) : null, bio: bio || '', phone: phone || '', bloodGroup: bloodGroup || '', lastDonated: (bloodGroup && lastDonated) || '', donorVisible: donorVisible !== false });
+      save(); return meUser();
+    },
+    async donors({ group, upazila } = {}) {
+      const ok2 = p => (!group || p.bloodGroup === group) && (!upazila || p.upazila === upazila);
+      const showPhone = !!meId || db.settings.publicDonorPhone;
+      const users = [...PEOPLE, ...db.users].filter(p => p.bloodGroup && p.donorVisible !== false && ok2(p) && !isBlocked(p.id))
+        .map(p => { const u = user(p.id); return { id: p.id, manual: false, name: p.name, avatar: p.avatar || '', bloodGroup: p.bloodGroup, area: u.union, phone: showPhone ? (p.phone || '') : '', lastDonated: p.lastDonated || '' }; });
+      const manual = db.manual.filter(m => ok2(m) && !isBlocked(m.createdBy) && person(m.createdBy))
+        .map(m => ({ id: 'm' + m.id, manual: true, manualId: m.id, addedBy: m.createdBy, addedByName: person(m.createdBy)?.name || '', name: m.name, avatar: '', bloodGroup: m.bloodGroup,
+          area: (uname(m.unionId) ? [uname(m.unionId), m.upazila] : [m.upazila, m.district]).filter(Boolean).join(', '), phone: showPhone ? m.phone : '', lastDonated: m.lastDonated || '' }));
+      return wait([...users, ...manual].sort((a, b) => (ready(b) - ready(a)) || a.bloodGroup.localeCompare(b.bloodGroup) || a.name.localeCompare(b.name, 'bn')));
+    },
+    async settings() { return { ...settingDefaults(), ...db.settings }; },
+    async setSetting(name, value) { db.settings[name] = value; save(); },
+    async adminStats() {
+      const all = [...PEOPLE, ...db.users];
+      return wait({ users: all.length, donors: all.filter(p => p.bloodGroup && p.donorVisible !== false).length, manualDonors: db.manual.length,
+        posts: db.posts.length, pendingServices: db.services.filter(x => !x.verified).length, openReports: 0 });
+    },
+    async manualDonor(id) { const m = db.manual.find(x => x.id === Number(id) && x.createdBy === meId); if (!m) throw new Error('not found'); return wait({ ...m }); },
+    async addManualDonor(v) {
+      if (db.manual.some(m => m.createdBy === meId && m.phone === v.phone)) throw new Error('duplicate key');
+      db.manual.push({ id: nid(db.manual), createdBy: meId, ...v, unionId: v.unionId || null }); save();
+    },
+    async updateManualDonor(id, v) { const m = db.manual.find(x => x.id === Number(id) && x.createdBy === meId); if (!m) throw new Error('row-level security'); Object.assign(m, v, { unionId: v.unionId || null }); save(); },
+    async deleteManualDonor(id) { db.manual = db.manual.filter(x => !(x.id === Number(id) && x.createdBy === meId)); save(); },
+    async setLastDonated(date) { person(meId).lastDonated = date || ''; save(); },
+    async setAvatar(blob) { const url = await toBlobUrl(blob); person(meId).avatar = url; save(); return url; },
+    async deleteAccount() {
+      const id = meId;
+      db.users = db.users.filter(u => u.id !== id); db.posts = db.posts.filter(p => p.userId !== id);
+      db.friendships = db.friendships.filter(f => f.requester !== id && f.addressee !== id);
+      db.messages = db.messages.filter(m => m.from !== id && m.to !== id);
+      const myGroups = db.groups.filter(g => g.ownerId === id).map(g => g.id), myPages = db.pages.filter(x => x.ownerId === id).map(x => x.id);
+      db.groups = db.groups.filter(g => g.ownerId !== id); db.pages = db.pages.filter(x => x.ownerId !== id); db.manual = db.manual.filter(m => m.createdBy !== id);
+      db.members = db.members.filter(m => m.userId !== id && !myGroups.includes(m.groupId));
+      db.posts = db.posts.filter(p => !myGroups.includes(p.groupId) && !myPages.includes(p.pageId));
+      meId = null; save();
+    },
+
+    async posts({ scope = 'area', unionId, category, before, userId, postId, q, groupId, pageId, saved }) {
+      const myFriends = meId ? new Set(friendIds(meId)) : new Set();
+      const visible = db.posts.filter(p => (!p.groupId || canSeeGroup(p.groupId))
+        && (!p.privacy || p.privacy === 'public' || p.userId === meId || (p.privacy === 'friends' && myFriends.has(p.userId))));
+      if (postId || q || saved) {
+        const t = (q || '').trim().toLowerCase();
+        const savedIds = db.saved.filter(x => x.startsWith(meId + ':')).map(x => Number(x.split(':')[1]));
+        const hits = visible.filter(p => (postId ? p.id === Number(postId) : saved ? savedIds.includes(p.id) : p.body.toLowerCase().includes(t)) && !isBlocked(p.userId));
+        if (saved) hits.sort((a, b) => savedIds.indexOf(b.id) - savedIds.indexOf(a.id)); else hits.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        return this.__map(hits.slice(0, saved ? 100 : PAGE));
+      }
+      const circle = scope === 'friends' && meId ? new Set([meId, ...friendIds(meId), ...db.follows.filter(f => f.startsWith(meId + ':')).map(f => f.split(':')[1])]) : null;
+      const myPages = new Set(db.pageFollows.filter(f => f.startsWith(meId + ':')).map(f => Number(f.split(':')[1])));
+      const rows = visible.filter(p => (groupId ? p.groupId === Number(groupId)
+          : pageId ? p.pageId === Number(pageId)
+          : userId ? p.userId === userId && !p.pageId && !p.groupId
+          : !p.groupId && (circle ? (p.pageId ? myPages.has(p.pageId) : circle.has(p.userId)) : (!unionId || p.unionId === unionId)) && !isBlocked(p.userId))
+        && (!category || p.category === category) && (!before || p.createdAt < before))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, PAGE);
+      return this.__map(rows);
+    },
+    __map(rows) {
+      return wait(rows.map(p => {
+        const u = user(p.userId) || { name: 'সদস্য', avatar: '' }, pg = p.pageId && pageOf(p.pageId), g = p.groupId && db.groups.find(x => x.id === p.groupId);
+        const sp = p.sharedPostId ? db.posts.find(x => x.id === p.sharedPostId) : null, spPg = sp?.pageId && pageOf(sp.pageId), spU = sp && user(sp.userId);
+        const imgs = (p.images?.length ? p.images : (p.image ? [p.image] : [])).map(demoPic);
+        return { id: p.id, body: p.body, image: imgs[0] || '', images: imgs, privacy: p.privacy || 'public', tags: (p.tags || []).map(uid => user(uid)).filter(Boolean).map(u => ({ id: u.id, name: u.name })),
+          mentions: (p.mentions || []).map(uid => user(uid)).filter(Boolean).map(u => ({ id: u.id, name: u.name })),
+          category: p.category, createdAt: p.createdAt, editedAt: p.editedAt || null, rawImages: p.images?.length ? p.images : (p.image ? [p.image] : []), likes: p.likes, comments: p.cm.length, userId: p.userId,
+          shares: db.posts.filter(x => x.sharedPostId === p.id).length, saves: (p.sv || 0) + db.saved.filter(k => k.endsWith(':' + p.id)).length, pinnedCommentId: p.pinned || null, sharedPostId: p.sharedPostId || null, sharedMissing: !!p.sharedPostId && !sp,
+          shared: sp ? { id: sp.id, body: sp.body, image: demoPic(sp.images?.[0] || sp.image || ''), createdAt: sp.createdAt, userId: sp.userId, pageId: sp.pageId || null, author: spPg ? spPg.name : spU?.name || 'সদস্য', avatar: spPg ? spPg.avatar : spU?.avatar || '' } : null,
+          author: pg ? pg.name : u.name, avatar: pg ? pg.avatar : u.avatar, poster: u.name, union: uname(p.unionId), liked: db.likes.includes(meId + ':' + p.id),
+          reactions: p.rx || { like: p.likes }, myReaction: db.reacts[meId + ':' + p.id] || (db.likes.includes(meId + ':' + p.id) ? 'like' : ''),
+          saved: db.saved.includes(meId + ':' + p.id), pageId: p.pageId || null, groupId: p.groupId || null, groupName: g ? g.name : '' };
+      }));
+    },
+    async savePost(id) { if (!db.saved.includes(meId + ':' + id)) db.saved.push(meId + ':' + id); save(); },
+    async untagMe(postId) { const p = db.posts.find(x => x.id === Number(postId)); if (p) p.tags = (p.tags || []).filter(u => u !== meId); save(); },
+    async updatePost(id, { body, category, images = [], privacy, tags = [], mentions = [] }) {
+      const p = db.posts.find(x => x.id === Number(id)); if (!p || p.userId !== meId) throw new Error('row-level security');
+      const imgs = []; for (const x of images.slice(0, 10)) imgs.push(typeof x === 'string' ? x : await toBlobUrl(x));
+      if (!(body || '').trim() && !imgs.length && !p.sharedPostId) throw new Error('check constraint');
+      const fr = new Set(friendIds(meId)), old = new Set(p.tags || []);
+      Object.assign(p, { body: body || '', category, images: imgs, image: imgs[0] || '', privacy: p.pageId || p.groupId ? 'public' : (privacy || 'public'), editedAt: new Date().toISOString() });
+      if (!p.pageId && !p.groupId) { p.tags = tags.filter(uid => fr.has(uid)); p.tags.filter(uid => !old.has(uid)).forEach(uid => notify(uid, meId, 'tag', p.id)); }
+      p.mentions = mentionNotify(p, mentions, meId, p.mentions || []);
+      save();
+    },
+    async unsavePost(id) { db.saved = db.saved.filter(x => x !== meId + ':' + id); save(); },
+    async changePassword(pw) { person(meId).password = pw; save(); },
+
+    async myPages() { return wait(db.pages.filter(x => x.ownerId === meId).map(pageOut)); },
+    async followedPages() { return wait(db.pageFollows.filter(f => f.startsWith(meId + ':')).map(f => pageOf(f.split(':')[1])).filter(Boolean).map(pageOut)); },
+    async discoverPages({ q } = {}) { const t = (q || '').toLowerCase(); return wait(db.pages.filter(x => !t || x.name.toLowerCase().includes(t)).map(pageOut).sort((a, b) => b.followers - a.followers)); },
+    async page(id) { const pg = pageOf(id); if (!pg) throw new Error('not found'); return wait({ ...pageOut(pg), following: db.pageFollows.includes(meId + ':' + pg.id), isOwner: pg.ownerId === meId }); },
+    async createPage({ name, category, about, phone, avatar }) {
+      const pg = { id: nid(db.pages), ownerId: meId, name, category, about: about || '', phone: phone || '', avatar: avatar ? await toBlobUrl(avatar) : '' };
+      db.pages.push(pg); save(); return pageOut(pg);
+    },
+    async updatePage(id, v) { const pg = pageOf(id); Object.assign(pg, { name: v.name, category: v.category, about: v.about || '', phone: v.phone || '' }); if (v.avatar) pg.avatar = await toBlobUrl(v.avatar); save(); },
+    async deletePage(id) { db.pages = db.pages.filter(x => x.id !== Number(id)); db.posts = db.posts.filter(p => p.pageId !== Number(id)); save(); },
+    async followPage(id) { if (!db.pageFollows.includes(meId + ':' + id)) db.pageFollows.push(meId + ':' + id); save(); },
+    async unfollowPage(id) { db.pageFollows = db.pageFollows.filter(f => f !== meId + ':' + id); save(); },
+
+    async myGroups() { return wait(db.members.filter(m => m.userId === meId).map(m => ({ ...groupOut(db.groups.find(g => g.id === m.groupId)), role: m.role, status: m.status }))); },
+    async discoverGroups({ q } = {}) { const t = (q || '').toLowerCase(); return wait(db.groups.filter(g => !t || g.name.toLowerCase().includes(t)).map(groupOut).sort((a, b) => b.members - a.members)); },
+    async group(id) {
+      const g = db.groups.find(x => x.id === Number(id)); if (!g) throw new Error('not found');
+      const m = member(g.id, meId); return wait({ ...groupOut(g), role: m?.role || null, status: m?.status || null, isOwner: g.ownerId === meId });
+    },
+    async createGroup({ name, about, privacy, avatar }) {
+      const g = { id: nid(db.groups), ownerId: meId, name, about: about || '', privacy, avatar: avatar ? await toBlobUrl(avatar) : '' };
+      db.groups.push(g); db.members.push({ groupId: g.id, userId: meId, role: 'admin', status: 'active' }); save();
+      if (privacy === 'private') { const uid = meId; setTimeout(() => { db.members.push({ groupId: g.id, userId: 'd2', role: 'member', status: 'pending' }); notify(uid, 'd2', 'group_request', null, g.id); }, 4000); }
+      return groupOut(g);
+    },
+    async updateGroup(id, v) { const g = db.groups.find(x => x.id === Number(id)); Object.assign(g, { name: v.name, about: v.about || '', privacy: v.privacy }); if (v.avatar) g.avatar = await toBlobUrl(v.avatar); save(); },
+    async deleteGroup(id) { id = Number(id); db.groups = db.groups.filter(g => g.id !== id); db.members = db.members.filter(m => m.groupId !== id); db.posts = db.posts.filter(p => p.groupId !== id); save(); },
+    async joinGroup(id) {
+      const g = db.groups.find(x => x.id === Number(id)); if (member(g.id, meId)) return member(g.id, meId).status;
+      const status = g.privacy === 'public' ? 'active' : 'pending';
+      db.members.push({ groupId: g.id, userId: meId, role: 'member', status }); save();
+      if (status === 'pending' && g.ownerId.startsWith('d')) { const uid = meId; setTimeout(() => { const m = member(g.id, uid); if (m && m.status === 'pending') { m.status = 'active'; notify(uid, g.ownerId, 'group_approved', null, g.id); } }, 3000); }
+      return status;
+    },
+    async leaveGroup(id) { db.members = db.members.filter(m => !(m.groupId === Number(id) && m.userId === meId)); save(); },
+    async groupMembers(id, status = 'active') { return wait(db.members.filter(m => m.groupId === Number(id) && m.status === status).map(m => ({ ...user(m.userId), role: m.role })).filter(u => u.id)); },
+    async approveMember(gid, uid) { const m = member(gid, uid); if (!m) throw new Error('no pending request'); m.status = 'active'; db.notifs = db.notifs.filter(n => !(n.groupId === Number(gid) && n.from === uid && n.type === 'group_request')); save(); },
+    async removeMember(gid, uid) { db.members = db.members.filter(m => !(m.groupId === Number(gid) && m.userId === uid)); save(); },
+    async createPost({ body, category, image, images, pageId, groupId, sharedPostId, privacy, tags, mentions }) {
+      const files = images?.length ? images.slice(0, 10) : image ? [image] : [];
+      const imgs = []; for (const f of files) imgs.push(await toBlobUrl(f));
+      const img = imgs[0] || '';
+      if (sharedPostId) { const o = db.posts.find(x => x.id === Number(sharedPostId)), g = o?.groupId && db.groups.find(x => x.id === o.groupId); if (!o || (g && g.privacy === 'private')) throw new Error('row-level security'); }
+      const fr = new Set(friendIds(meId));
+      const post = { id: nid(db.posts), userId: meId, pageId: pageId ? Number(pageId) : null, groupId: groupId ? Number(groupId) : null, sharedPostId: sharedPostId ? Number(sharedPostId) : null, unionId: person(meId).unionId, category, body: body || '', image: img, images: imgs,
+        privacy: pageId || groupId ? 'public' : (privacy || 'public'), tags: (tags || []).filter(uid => fr.has(uid)), createdAt: new Date().toISOString(), likes: 0, cm: [] };
+      post.tags.forEach(uid => notify(uid, meId, 'tag', post.id));
+      post.mentions = mentionNotify(post, mentions, meId);
+      if (post.sharedPostId) { const o = db.posts.find(x => x.id === post.sharedPostId); db.posts.push(post); save(); notify(o.userId, meId, 'share', o.id); return; }
+      db.posts.push(post); save();
+      // ডেমো: কিছুক্ষণ পর নমুনা মানুষেরা লাইক ও মন্তব্য করে, যাতে নোটিফিকেশন দেখা যায়
+      const uid = meId;
+      setTimeout(() => { if (!db.posts.includes(post)) return; reactAs('d2', post.id, 'love', ''); notify(uid, 'd2', 'like', post.id); }, 3000);
+      setTimeout(() => { if (!db.posts.includes(post)) return; post.cm.push({ id: Date.now(), userId: 'd4', body: 'খুব ভালো লাগলো 👍', createdAt: new Date().toISOString() }); notify(uid, 'd4', 'comment', post.id); }, 5000);
+    },
+    async deletePost(id) { db.posts = db.posts.filter(p => p.id !== id); save(); },
+    async react(id, reaction, prev) { reactAs(meId, id, reaction, prev); },
+    async comments(postId, sort = 'old') {
+      const list = (db.posts.find(p => p.id === Number(postId))?.cm || []).filter(c => !isBlocked(c.userId)).map(c => ({ ...c, mentions: (c.mentions || []).map(uid => user(uid)).filter(Boolean).map(u => ({ id: u.id, name: u.name })), author: user(c.userId)?.name || 'সদস্য', avatar: user(c.userId)?.avatar || '',
+        likes: c.likes || 0, reactions: c.rx || {}, myReaction: (c.rk || {})[meId] || '' }));
+      list.sort((a, b) => sort === 'top' ? (b.likes - a.likes) || a.createdAt.localeCompare(b.createdAt) : sort === 'new' ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt));
+      return wait(list);
+    },
+    async reactComment(id, reaction, prev) {
+      for (const p of db.posts) for (const c of p.cm) if (c.id === id) {
+        c.rx = c.rx || {}; c.rk = c.rk || {}; c.likes = c.likes || 0;
+        if (prev) c.rx[prev] = Math.max((c.rx[prev] || 0) - 1, 0);
+        if (reaction) { c.rx[reaction] = (c.rx[reaction] || 0) + 1; c.rk[meId] = reaction; } else delete c.rk[meId];
+        c.likes += (reaction ? 1 : 0) - (prev ? 1 : 0);
+      }
+      save();
+    },
+    async reactors(kind, id) {
+      let named = [], total = 0;
+      if (kind === 'comment') {
+        for (const p of db.posts) for (const c of p.cm) if (c.id === Number(id)) { named = Object.entries(c.rk || {}); total = c.likes || 0; }
+      } else {
+        const p = db.posts.find(x => x.id === Number(id)); total = p?.likes || 0;
+        named = db.likes.filter(k => k.endsWith(':' + id)).map(k => { const uid = k.slice(0, k.lastIndexOf(':')); return [uid, db.reacts[k] || 'like']; });
+      }
+      const list = named.filter(([uid]) => person(uid) && !isBlocked(uid)).map(([uid, reaction]) => ({ ...user(uid), reaction }));
+      return wait({ list, unnamed: Math.max(total - list.length, 0) });   // ডেমোর নমুনা সংখ্যার সবার নাম নেই
+    },
+    async pinComment(postId, commentId) {
+      const p = db.posts.find(x => x.id === Number(postId)); if (!p) throw new Error('post not found');
+      // ডেমোতে সবাই অ্যাডমিন, তাই যেকোনো পোস্টে পিন করা যায় (আসল সার্ভারে: পোস্টের মালিক, গ্রুপ অ্যাডমিন বা অ্যাপ অ্যাডমিন)
+      p.pinned = commentId || null; save();
+    },
+    async addComment(postId, body, parentId = null, mentions = []) {
+      const p = db.posts.find(x => x.id === postId), parent = parentId && p.cm.find(c => c.id === parentId);
+      if (parentId && (!parent || parent.parentId)) throw new Error('row-level security');
+      const c = { id: Date.now(), userId: meId, body, createdAt: new Date().toISOString(), parentId: parentId || null }; p.cm.push(c);
+      c.mentions = mentionNotify(p, mentions, meId);
+      if (parent) notify(parent.userId, meId, 'reply', p.id);
+      if (!parent || parent.userId !== p.userId) notify(p.userId, meId, 'comment', p.id);
+      save();
+      // ডেমো: নমুনা মানুষের মন্তব্যে উত্তর দিলে সে-ও কিছুক্ষণ পর উত্তর দেয়
+      if (parent && parent.userId !== meId && person(parent.userId)) setTimeout(() => { if (!p.cm.includes(c)) return; p.cm.push({ id: Date.now(), userId: parent.userId, body: 'ধন্যবাদ 🙂', createdAt: new Date().toISOString(), parentId: parent.id }); notify(meId, parent.userId, 'reply', p.id); }, 4000);
+    },
+    async editComment(id, body, mentions = []) {
+      for (const p of db.posts) for (const c of p.cm) if (c.id === id) { if (c.userId !== meId) throw new Error('not allowed'); c.body = body.trim(); c.editedAt = new Date().toISOString(); c.mentions = mentionNotify(p, mentions, meId, c.mentions || []); }
+      save();
+    },
+    async deleteComment(id) { for (const p of db.posts) { p.cm = p.cm.filter(c => c.id !== id && c.parentId !== id); if (p.pinned === id) p.pinned = null; } save(); },
+
+    async profile(id) {
+      const u = user(id);
+      if (!u) throw new Error('not found');
+      return wait({ ...u, friends: friendIds(id).length, followers: db.follows.filter(f => f.endsWith(':' + id)).length, following: db.follows.filter(f => f.startsWith(id + ':')).length, rel: rel(id) });
+    },
+    async people({ q }) {
+      const t = (q || '').trim().toLowerCase();
+      const all = [...PEOPLE, ...db.users].map(p => user(p.id)).filter(u => u.id !== meId && !isBlocked(u.id));
+      const me = meUser();
+      const near = u => (me?.unionId && u.unionId === me.unionId ? 2 : 0) + (u.upazila === me?.upazila ? 1 : 0);
+      const rows = t ? all.filter(u => u.name.toLowerCase().includes(t)) : all.sort((a, b) => near(b) - near(a));
+      return wait(rows.slice(0, 30).map(u => ({ ...u, rel: rel(u.id) })));
+    },
+    async friendRequests() { return wait(db.friendships.filter(f => f.addressee === meId && f.status === 'pending' && !isBlocked(f.requester)).map(f => user(f.requester))); },
+    async friends(of) { return wait(friendIds(of || meId).map(user).filter(Boolean)); },
+    async sendFriendRequest(id) {
+      if (friendRow(meId, id)) throw new Error('already');
+      db.friendships.push({ requester: meId, addressee: id, status: 'pending' });
+      if (!db.follows.includes(meId + ':' + id)) db.follows.push(meId + ':' + id); save();
+      // ডেমোতে নমুনা মানুষেরা কিছুক্ষণ পর রিকোয়েস্ট গ্রহণ করে
+      const uid = meId;
+      if (id.startsWith('d')) setTimeout(() => { const f = friendRow(uid, id); if (f && f.status === 'pending') { f.status = 'accepted'; notify(uid, id, 'friend_accept'); } }, 4000);
+    },
+    async acceptFriend(id) {
+      const f = db.friendships.find(x => x.requester === id && x.addressee === meId && x.status === 'pending');
+      if (!f) throw new Error('no pending request');
+      f.status = 'accepted'; if (!db.follows.includes(meId + ':' + id)) db.follows.push(meId + ':' + id);
+      db.notifs = db.notifs.filter(n => !(n.to === meId && n.from === id && n.type === 'friend_request')); save();
+    },
+    async removeFriend(id) { const f = friendRow(meId, id); db.friendships = db.friendships.filter(x => x !== f); save(); },
+    async follow(id) { if (!db.follows.includes(meId + ':' + id)) db.follows.push(meId + ':' + id); save(); },
+    async unfollow(id) { db.follows = db.follows.filter(f => f !== meId + ':' + id); save(); },
+    async block(id) {
+      db.blocks.push(meId + ':' + id);
+      db.friendships = db.friendships.filter(f => f !== friendRow(meId, id));
+      db.follows = db.follows.filter(f => f !== meId + ':' + id && f !== id + ':' + meId); save();
+    },
+    async unblock(id) { db.blocks = db.blocks.filter(b => b !== meId + ':' + id); save(); },
+    async blockedList() { return wait(db.blocks.filter(b => b.startsWith(meId + ':')).map(b => user(b.split(':')[1])).filter(Boolean)); },
+
+    async conversations() {
+      const map = new Map();
+      for (const m of db.messages) {
+        if (m.from !== meId && m.to !== meId) continue;
+        const other = m.from === meId ? m.to : m.from;
+        if (isBlocked(other)) continue;
+        const c = map.get(other) || { userId: other, unread: 0 };
+        if (!c.lastAt || m.createdAt >= c.lastAt) Object.assign(c, { last: m.body, lastAt: m.createdAt, lastMine: m.from === meId });
+        if (m.to === meId && !m.read) c.unread++;
+        map.set(other, c);
+      }
+      return wait([...map.values()].map(c => ({ ...c, name: user(c.userId)?.name || 'সদস্য', avatar: user(c.userId)?.avatar || '' })).sort((a, b) => b.lastAt.localeCompare(a.lastAt)));
+    },
+    async messages(id) {
+      return wait(db.messages.filter(m => (m.from === meId && m.to === id) || (m.from === id && m.to === meId)).map(m => ({ id: m.id, mine: m.from === meId, body: m.body, createdAt: m.createdAt, read: m.read })));
+    },
+    async sendMessage(id, body) {
+      if (isBlocked(id)) throw new Error('blocked');
+      db.messages.push({ id: nid(db.messages), from: meId, to: id, body, createdAt: new Date().toISOString(), read: false }); save();
+      if (id.startsWith('d')) setTimeout(() => { // ডেমো: নমুনা মানুষ উত্তর দেয়
+        const reply = 'ধন্যবাদ! (এটি ডেমো উত্তর — আসল অ্যাপে মানুষটি নিজে উত্তর দেবেন)';
+        db.messages.push({ id: nid(db.messages), from: id, to: meId, body: reply, createdAt: new Date().toISOString(), read: false }); save();
+        listeners.forEach(cb => cb({ from: id, body: reply }));
+      }, 1500);
+    },
+    async markRead(id) { for (const m of db.messages) if (m.from === id && m.to === meId) m.read = true; save(); },
+    async unreadCount() { return db.messages.filter(m => m.to === meId && !m.read && !isBlocked(m.from)).length; },
+    onMessage(cb) { listeners.add(cb); return () => listeners.delete(cb); },
+
+    async notifications() {
+      return wait(db.notifs.filter(n => n.to === meId && !isBlocked(n.from)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 60)
+        .map(n => ({ id: n.id, type: n.type, postId: n.postId, groupId: n.groupId || null, groupName: db.groups.find(g => g.id === n.groupId)?.name || '', read: n.read, createdAt: n.createdAt, actor: user(n.from) || { id: n.from, name: 'সদস্য', avatar: '' }, snippet: db.posts.find(p => p.id === n.postId)?.body || '' })));
+    },
+    async unreadNotifications() { return db.notifs.filter(n => n.to === meId && !n.read && !isBlocked(n.from)).length; },
+    async markNotificationsRead() { for (const n of db.notifs) if (n.to === meId) n.read = true; save(); },
+    onNotify(cb) { notifyListeners.add(cb); return () => notifyListeners.delete(cb); },
+    async search(q) {
+      const [people, posts, services] = await Promise.all([this.people({ q }), this.posts({ q }), this.services({ q })]);
+      return { people, posts, services };
+    },
+
+    async services({ category, q }) {
+      const t = (q || '').trim().toLowerCase();
+      return wait(db.services.filter(s => (!category || s.category === category) && (!t || (s.name + ' ' + s.address).toLowerCase().includes(t)))
+        .sort((a, b) => (b.verified - a.verified) || a.name.localeCompare(b.name, 'bn')));
+    },
+    async addService(v) { db.services.push({ ...v, id: nid(db.services), verified: false }); save(); },
+    async verifyService(id) { const s = db.services.find(x => x.id === id); if (s) s.verified = true; save(); },
+    async report() { return wait(true); },
+  };
+}
+
+export async function createApi() {
+  return DEMO ? demoApi() : supabaseApi();
+}

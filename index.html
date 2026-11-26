@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#006a4e">
+<meta name="description" content="আপনার উপজেলার মানুষের সঙ্গে যুক্ত থাকুন: পোস্ট, ছবি, বন্ধু, মেসেজ, আর উপজেলার সব সেবার ফোন নম্বর এক জায়গায়।">
+<title>আমার উপজেলা</title>
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+<div class="app">
+<header id="top">
+  <div class="topbar">
+    <div class="title"><h1>আমার উপজেলা</h1><small id="upname">&nbsp;</small></div>
+    <button class="circle" id="open-search" aria-label="সার্চ"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
+    <button class="circle" data-v="menu" aria-label="মেনু: সেটিং, পেইজ, গ্রুপ, সেবা ডিরেক্টরি"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  </div>
+  <nav class="tabs" aria-label="প্রধান মেনু">
+    <button class="on" data-v="home" aria-label="হোম"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></button>
+    <button data-v="friends" aria-label="বন্ধু: রিকোয়েস্ট ও সাজেশন"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.3-5.5 6.5-5.5s5.7 2 6.5 5.5"/><circle cx="17" cy="9" r="2.8"/><path d="M17 14.5c2.5 0 4.2 1.6 4.8 4.5"/></svg><span class="badge" id="b-friends" hidden></span></button>
+    <button data-v="msgs" aria-label="মেসেজ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3c5 0 9 3.6 9 8s-4 8-9 8c-1 0-2-.1-2.9-.4L4 20l1.3-3.9C3.9 14.7 3 13 3 11c0-4.4 4-8 9-8z"/><path d="M7.5 13l3-3 2.5 2 3.5-3"/></svg><span class="badge" id="b-msgs" hidden></span></button>
+    <button data-v="notif" aria-label="নোটিফিকেশন"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg><span class="badge" id="b-notif" hidden></span></button>
+    <button data-v="me" aria-label="প্রোফাইল"><span id="tab-av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></span></button>
+  </nav>
+</header>
+<div class="demo" id="demo" hidden>ডেমো মোড: ডেটা শুধু এই ডিভাইসে সেভ হচ্ছে</div>
+
+<main>
+  <!-- হোম ফিড -->
+  <section class="view on" id="v-home">
+    <div id="notices"></div>
+    <div class="card composer-mini" id="composer">
+      <div class="cm-top"><span id="comp-av"></span><button class="cm-open" id="cm-open">আপনার মনে কী আছে?</button></div>
+      <div class="cm-quick"><button data-compose="photo"><span class="qi qi-photo"></span>ছবি</button><button data-compose="tag"><span class="qi qi-tag"></span>ট্যাগ</button><button data-compose="privacy"><span class="qi qi-globe"></span>প্রাইভেসি</button></div>
+    </div>
+    <div class="seg" id="scope"><button data-s="area" class="on">এলাকার সবাই</button><button data-s="friends">বন্ধু ও ফলো</button></div>
+    <div class="row" id="locrow" style="margin-bottom:8px"><label for="loc" class="mut" style="margin:0;font-weight:500">এলাকা:</label><select class="f" id="loc" style="flex:1;width:auto"><option value="">সব ইউনিয়ন</option></select></div>
+    <div class="chips" id="fchips"></div>
+    <div data-feed="home" id="feed-home"></div>
+    <button class="btn ghost wide" id="more-home" hidden>আরও পোস্ট দেখুন</button>
+  </section>
+
+  <!-- বন্ধু: রিকোয়েস্ট, সাজেশন, বন্ধু তালিকা -->
+  <section class="view" id="v-friends"><div id="friends"></div></section>
+
+  <!-- নোটিফিকেশন -->
+  <section class="view" id="v-notif">
+    <div class="sec-h" style="margin:4px 4px 10px"><h2 style="margin:0">নোটিফিকেশন</h2><button class="link" id="notif-read">সব পড়া হয়েছে</button></div>
+    <div class="card" id="notifs" style="padding:4px 12px"></div>
+  </section>
+
+  <!-- মেসেজ তালিকা -->
+  <section class="view" id="v-msgs">
+    <h2>মেসেজ</h2>
+    <div class="card" id="convs" style="padding:4px 12px"></div>
+  </section>
+
+  <!-- একজনের সঙ্গে চ্যাট -->
+  <section class="view" id="v-thread">
+    <div class="bar"><button class="back" data-back aria-label="ফিরে যান">←</button><span id="t-head" class="row" style="flex:1"></span></div>
+    <div class="thread" id="thread"></div>
+    <div class="tcomp"><form id="tform"><input id="tmsg" placeholder="মেসেজ লিখুন…" maxlength="2000" autocomplete="off" aria-label="মেসেজ"><button class="btn">পাঠান</button></form></div>
+  </section>
+
+  <!-- সার্চ -->
+  <section class="view" id="v-search">
+    <div class="sbar"><button class="back" data-back aria-label="ফিরে যান">←</button><input type="search" id="sq" placeholder="মানুষ, পোস্ট বা সেবা খুঁজুন…" aria-label="সার্চ" autocomplete="off"></div>
+    <div id="sres"></div>
+  </section>
+
+  <!-- একটি পোস্ট (নোটিফিকেশন থেকে) -->
+  <section class="view" id="v-post">
+    <div class="bar"><button class="back" data-back aria-label="ফিরে যান">←</button><b>পোস্ট ও মন্তব্য</b></div>
+    <div data-feed="post" id="feed-post"></div>
+    <div class="card cm-card" id="cm-wrap" hidden>
+      <div class="cm-head"><b id="cm-title">মন্তব্য</b>
+        <div class="cm-sort" id="cm-sort" role="tablist" aria-label="মন্তব্য সাজান">
+          <button data-csort="top" role="tab">সবচেয়ে বেশি রিয়্যাক্ট</button><button data-csort="new" role="tab">নতুন</button><button data-csort="old" role="tab">পুরাতন</button>
+        </div></div>
+      <div id="cm-list"></div>
+    </div>
+    <div class="tcomp" id="cm-comp" hidden><div id="cm-replying" hidden><span></span><button type="button" aria-label="উত্তর বাতিল">✕</button></div><form id="cm-form"><span id="cm-av"></span><input id="cm-input" placeholder="মন্তব্য লিখুন…" maxlength="300" autocomplete="off" aria-label="মন্তব্য"><button class="btn" aria-label="পাঠান">পাঠান</button></form></div>
+  </section>
+
+  <!-- অন্যের প্রোফাইল -->
+  <section class="view" id="v-user">
+    <div class="bar"><button class="back" data-back aria-label="ফিরে যান">←</button><b>প্রোফাইল</b></div>
+    <div id="user"></div>
+    <div data-feed="user" id="feed-user"></div>
+  </section>
+
+  <!-- আমার প্রোফাইল / লগইন -->
+  <section class="view" id="v-me">
+    <div id="me"></div>
+    <div data-feed="me" id="feed-me"></div>
+  </section>
+
+  <!-- ☰ মেনু (ফেসবুকের মতো) -->
+  <section class="view" id="v-menu"><div id="menu"></div></section>
+
+  <!-- সেভ করা পোস্ট -->
+  <section class="view" id="v-saved">
+    <div class="bar"><button class="back" data-back aria-label="ফিরে যান">←</button><b>সেভ করা পোস্ট</b></div>
+    <div data-feed="saved" id="feed-saved"></div>
+  </section>
+
+  <!-- পেইজের তালিকা ও একটি পেইজ -->
+  <section class="view" id="v-pages">
+    <div class="bar"><button class="back" data-back aria-label="ফিরে যান">←</button><b>পেইজ</b></div>
+    <button class="btn wide" id="new-page" style="margin-bottom:12px">+ নতুন পেইজ তৈরি করুন</button>
+    <div id="pages"></div>
+  </section>
+  <section class="view" id="v-page">
+    <div class="bar"><button class="back" data-back aria-label="ফিরে যান">←</button><b>পেইজ</b></div>
+    <div id="page"></div>
+    <div data-feed="page" id="feed-page"></div>
+  </section>
+
+  <!-- গ্রুপের তালিকা ও একটি গ্রুপ -->
+  <section class="view" id="v-groups">
+    <div class="bar"><button class="back" data-back aria-label="ফিরে যান">←</button><b>গ্রুপ</b></div>
+    <button class="btn wide" id="new-group" style="margin-bottom:12px">+ নতুন গ্রুপ তৈরি করুন</button>
+    <div id="groups"></div>
+  </section>
+  <section class="view" id="v-group">
+    <div class="bar"><button class="back" data-back aria-label="ফিরে যান">←</button><b>গ্রুপ</b></div>
+    <div id="group"></div>
+    <div data-feed="group" id="feed-group"></div>
+  </section>
+
+  <!-- অ্যাডমিন ড্যাশবোর্ড -->
+  <section class="view" id="v-admin">
+    <div class="bar"><button class="back" data-back aria-label="ফিরে যান">←</button><b>অ্যাডমিন ড্যাশবোর্ড</b></div>
+    <div id="admin"></div>
+  </section>
+
+  <!-- উপজেলা সেবা ডিরেক্টরি (মেনু থেকে) -->
+  <section class="view" id="v-dir">
+    <div class="bar"><button class="back" data-back aria-label="ফিরে যান">←</button><b>উপজেলা সেবা ডিরেক্টরি</b></div>
+    <input type="search" id="q" placeholder="খুঁজুন: হাসপাতাল, ইলেকট্রিশিয়ান, ভূমি অফিস…" aria-label="সেবা খুঁজুন">
+    <div class="chips" id="dchips" style="margin-top:10px"></div>
+    <div id="dir"></div>
+    <button class="btn ghost wide" id="addsvc" style="margin-top:8px">+ নতুন সেবা/প্রতিষ্ঠান যোগ করুন</button>
+    <p class="note">নতুন যোগ করা তথ্য অ্যাডমিন যাচাই করার পর সবাই দেখতে পাবে।</p>
+  </section>
+</main>
+</div>
+
+<div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="ছবি দেখা">
+  <div class="v-bar"><span id="v-count"></span><button id="v-save" aria-label="ছবি সেভ করুন" title="ছবি সেভ করুন"></button><button id="v-close" aria-label="বন্ধ করুন" title="বন্ধ করুন">✕</button></div>
+  <div class="v-track" id="v-track"></div>
+  <button class="v-nav prev" id="v-prev" aria-label="আগের ছবি">‹</button><button class="v-nav next" id="v-next" aria-label="পরের ছবি">›</button>
+</div>
+<div class="modal" id="modal"><div class="sheet" role="dialog" aria-modal="true" id="sheet"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

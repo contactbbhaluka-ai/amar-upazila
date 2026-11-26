@@ -1003,6 +1003,43 @@ document.addEventListener('click', async e => {
 
 // ================================================================ এবাউট (ফেসবুকের মতো): প্রতিটা অংশ চাপলে নিচে এডিট খোলে
 const joinedText = d => { if (!d) return ''; const t = new Date(d); return `${bn(t.getFullYear())} সালের ${['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'][t.getMonth()]} থেকে সদস্য`; };
+// কাজ ও শিক্ষা: একাধিক কর্মস্থল ও শিক্ষাপ্রতিষ্ঠান
+const MAX_WORK = 3, MAX_EDU = 5;
+const SUBJECT_HINTS = ['বিজ্ঞান', 'মানবিক', 'ব্যবসায় শিক্ষা', 'কারিগরি', 'দাখিল', 'আলিম', 'ফাজিল', 'বাংলা', 'ইংরেজি', 'গণিত', 'পদার্থবিজ্ঞান', 'রসায়ন', 'প্রাণিবিজ্ঞান', 'উদ্ভিদবিজ্ঞান', 'হিসাববিজ্ঞান', 'ব্যবস্থাপনা', 'অর্থনীতি', 'রাষ্ট্রবিজ্ঞান', 'ইতিহাস', 'কম্পিউটার সায়েন্স', 'ইলেকট্রিক্যাল ইঞ্জিনিয়ারিং', 'সিভিল ইঞ্জিনিয়ারিং', 'আইন', 'এমবিবিএস', 'নার্সিং', 'কৃষি'];
+const workText = w => (w.title ? `${w.title}, ${w.place}` : w.place);
+const eduText = e => `${e.school}${e.subject ? ` (${e.subject})` : ''}${e.status === 'running' ? ' · পড়ছেন' : e.year ? ` · পাশ ${bn(e.year)}` : ''}`;
+const yearOpts = sel => { const now = new Date().getFullYear(); let o = '<option value="">সন বাছুন</option>'; for (let y = now + 6; y >= 1960; y--) o += `<option value="${y}" ${y === Number(sel) ? 'selected' : ''}>${bn(y)}</option>`; return o; };
+const workRow = (w, i) => `<div class="we-card"><div class="we-h"><b>কর্মস্থল ${bn(i + 1)}</b><button type="button" class="we-x" data-werm="work|${i}" aria-label="এই কর্মস্থল বাদ দিন">${ic('close', 14)}</button></div>
+  <label>কর্মস্থলের নাম</label><input class="we-place" maxlength="80" value="${esc(w.place || '')}" placeholder="যেমন: ভালুকা সরকারি কলেজ, নিজস্ব দোকান">
+  <label>পদবি</label><input class="we-title" maxlength="60" value="${esc(w.title || '')}" placeholder="যেমন: প্রভাষক, ম্যানেজার, মালিক"></div>`;
+const eduRow = (e, i) => `<div class="we-card"><div class="we-h"><b>শিক্ষাপ্রতিষ্ঠান ${bn(i + 1)}</b><button type="button" class="we-x" data-werm="edu|${i}" aria-label="এই শিক্ষাপ্রতিষ্ঠান বাদ দিন">${ic('close', 14)}</button></div>
+  <label>প্রতিষ্ঠানের নাম</label><input class="ed-school" maxlength="80" value="${esc(e.school || '')}" placeholder="যেমন: ভালুকা পাইলট উচ্চ বিদ্যালয়">
+  <div class="we-2"><div><label>অবস্থা</label><select class="f ed-status"><option value="passed" ${e.status !== 'running' ? 'selected' : ''}>পাশ করেছি</option><option value="running" ${e.status === 'running' ? 'selected' : ''}>এখন পড়ছি</option></select></div>
+    <div class="ed-yearw" ${e.status === 'running' ? 'hidden' : ''}><label>পাশের সন</label><select class="f ed-year">${yearOpts(e.year)}</select></div></div>
+  <label>বিষয় / গ্রুপ</label><input class="ed-subject" maxlength="60" list="subj-hints" value="${esc(e.subject || '')}" placeholder="যেমন: বিজ্ঞান, মানবিক, হিসাববিজ্ঞান"></div>`;
+const weList = (kind, list) => { const l = list?.length ? list : [{}]; return l.map(kind === 'work' ? workRow : eduRow).join(''); };
+const readWorksDom = () => [...document.querySelectorAll('#we-works .we-card')].map(c => ({ place: c.querySelector('.we-place').value.trim(), title: c.querySelector('.we-title').value.trim() }));
+const readEdusDom = () => [...document.querySelectorAll('#we-edus .we-card')].map(c => ({ school: c.querySelector('.ed-school').value.trim(), status: c.querySelector('.ed-status').value, year: Number(c.querySelector('.ed-year').value) || 0, subject: c.querySelector('.ed-subject').value.trim() }));
+function weSyncAdd() {
+  const w = document.querySelectorAll('#we-works .we-card').length, e = document.querySelectorAll('#we-edus .we-card').length;
+  const aw = document.querySelector('[data-weadd=work]'), ae = document.querySelector('[data-weadd=edu]');
+  if (aw) aw.hidden = w >= MAX_WORK; if (ae) ae.hidden = e >= MAX_EDU;
+}
+document.addEventListener('click', e => {
+  const add = e.target.closest('[data-weadd]'), rm = e.target.closest('[data-werm]');
+  if (!add && !rm) return;
+  const kind = add ? add.dataset.weadd : rm.dataset.werm.split('|')[0];
+  const list = kind === 'work' ? readWorksDom() : readEdusDom();
+  if (add) list.push(kind === 'work' ? {} : { status: 'passed' });
+  else list.splice(Number(rm.dataset.werm.split('|')[1]), 1);
+  $(kind === 'work' ? '#we-works' : '#we-edus').innerHTML = weList(kind, list);
+  weSyncAdd();
+  if (add) $(kind === 'work' ? '#we-works' : '#we-edus').lastElementChild?.querySelector('input')?.focus();
+});
+document.addEventListener('change', e => {
+  if (!e.target.classList?.contains('ed-status')) return;
+  const w = e.target.closest('.we-card').querySelector('.ed-yearw'); w.hidden = e.target.value === 'running';
+});
 const ABOUT = [
   { id: 'intro', ic: 'info', t: 'পরিচিতি',
     sum: u => u.bio || '', empty: 'নিজের সম্পর্কে কিছু লিখুন',
@@ -1010,10 +1047,30 @@ const ABOUT = [
       <label for="ab-bio">নিজের সম্পর্কে</label><textarea id="ab-bio" maxlength="160" rows="2" placeholder="যেমন: শিক্ষক, রক্তদাতা, ব্যবসায়ী…">${esc(u.bio || '')}</textarea>`,
     read: () => { const name = $('#ab-name').value.trim(); if (name.length < 2) return { err: 'নাম অন্তত ২ অক্ষরের দিন' }; return { name, bio: $('#ab-bio').value.trim() }; } },
   { id: 'work', ic: 'work', t: 'কাজ ও শিক্ষা',
-    sum: u => [u.work && `${u.work}-এ কাজ করেন`, u.education && `${u.education}-এ পড়েছেন`].filter(Boolean).join(' · '), empty: 'কর্মস্থল ও শিক্ষাপ্রতিষ্ঠান যোগ করুন',
-    form: u => `<label for="ab-work">${ic('work', 16)} কর্মস্থল / পেশা</label><input id="ab-work" maxlength="80" value="${esc(u.work || '')}" placeholder="যেমন: ভালুকা সরকারি কলেজ, নিজস্ব ব্যবসা">
-      <label for="ab-edu">${ic('school', 16)} শিক্ষাপ্রতিষ্ঠান</label><input id="ab-edu" maxlength="80" value="${esc(u.education || '')}" placeholder="যেমন: ভালুকা পাইলট উচ্চ বিদ্যালয়">`,
-    read: () => ({ work: $('#ab-work').value.trim(), education: $('#ab-edu').value.trim() }) },
+    sum: u => [...(u.works || []).map(workText), ...(u.educations || []).map(eduText)].join(' · '), empty: 'কর্মস্থল ও শিক্ষাপ্রতিষ্ঠান যোগ করুন',
+    form: u => `<details class="ab-sub" open><summary>${ic('work', 16)} কাজ <small class="mut">(সর্বোচ্চ ${bn(MAX_WORK)}টি)</small></summary>
+        <div id="we-works">${weList('work', u.works)}</div><button type="button" class="we-add" data-weadd="work">${ic('plus', 15)} আরেকটি কর্মস্থল যোগ করুন</button></details>
+      <details class="ab-sub" open><summary>${ic('school', 16)} শিক্ষা <small class="mut">(সর্বোচ্চ ${bn(MAX_EDU)}টি)</small></summary>
+        <div id="we-edus">${weList('edu', u.educations)}</div><button type="button" class="we-add" data-weadd="edu">${ic('plus', 15)} আরেকটি শিক্ষাপ্রতিষ্ঠান যোগ করুন</button></details>
+      <datalist id="subj-hints">${SUBJECT_HINTS.map(x => `<option value="${x}">`).join('')}</datalist>`,
+    after: () => weSyncAdd(),
+    read: () => {
+      const works = [], educations = [];
+      for (const w of readWorksDom()) {
+        if (!w.place && !w.title) continue;
+        if (!w.place) return { err: 'পদবির সাথে কর্মস্থলের নামও দিন' };
+        works.push(w.title ? { place: w.place, title: w.title } : { place: w.place });
+      }
+      for (const e of readEdusDom()) {
+        if (!e.school && !e.subject && !e.year) continue;
+        if (!e.school) return { err: 'শিক্ষাপ্রতিষ্ঠানের নাম দিন' };
+        const o = { school: e.school, status: e.status };
+        if (e.status === 'passed' && e.year) o.year = e.year;
+        if (e.subject) o.subject = e.subject;
+        educations.push(o);
+      }
+      return { works, educations };
+    } },
   { id: 'addr', ic: 'pin', t: 'ঠিকানা',
     sum: u => u.union || '', empty: 'ঠিকানা দিন',
     form: u => addrHtml('ab', u), after: u => addrRefresh('ab', u),
@@ -1051,8 +1108,10 @@ function renderAbout(key) {
   if (!own) {
     const blood = ABOUT.find(a => a.id === 'blood').pub(u);
     const rows = [
-      u.work && [ic('work', 18), `<b>${esc(u.work)}</b>-এ কাজ করেন`],
-      u.education && [ic('school', 18), `<b>${esc(u.education)}</b>-এ পড়েছেন`],
+      ...(u.works || []).map(w => [ic('work', 18), w.title ? `<b>${esc(w.place)}</b>-এ <b>${esc(w.title)}</b> হিসেবে কাজ করেন` : `<b>${esc(w.place)}</b>-এ কাজ করেন`]),
+      ...(u.educations || []).map(e => [ic('school', 18), e.status === 'running'
+        ? `<b>${esc(e.school)}</b>-এ ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পড়ছেন`
+        : `<b>${esc(e.school)}</b> থেকে ${e.subject ? `<b>${esc(e.subject)}</b> নিয়ে ` : ''}পাশ করেছেন${e.year ? ` (${bn(e.year)})` : ''}`]),
       u.union && [ic('pin', 18), `থাকেন <b>${esc(u.union)}</b>`],
       blood && [ic('drop', 18), esc(blood)],
       u.joinedAt && [ic('calendar', 18), joinedText(u.joinedAt)],

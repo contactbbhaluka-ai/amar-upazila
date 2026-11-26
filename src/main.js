@@ -1579,8 +1579,8 @@ async function loadConvs() {
   if (!me()) { box.innerHTML = `<div class="empty">মেসেজ দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
   try {
     const list = await S.api.conversations();
-    const f = S.convPage, rows = f ? list.filter(c => c.asPage && c.pageId === f.id) : list;
-    const head = f ? `<div class="card conv-filter">${entAv(f)}<div class="info"><b>${esc(f.name)}</b><small>পেইজের মেসেজ · আপনি পেইজের নামে উত্তর দেবেন</small></div>${f.isOwner ? `<button class="sbtn ghost" id="auto-reply">⚡ অটো মেসেজ${f.autoReplyOn ? ' ✓' : ''}</button><button class="sbtn ghost" id="faq-btn">❓ প্রশ্ন-উত্তর${f.faqs?.length ? ' ✓' : ''}</button>` : ''}<button class="link" id="conv-all">সব মেসেজ</button></div>` : '';
+    const f = S.convPage, rows = f ? list.filter(c => c.asPage && c.pageId === f.id) : list.filter(c => !c.asPage);   // নিজের পেইজের মেসেজ শুধু পেইজের মেসেজ পাতায়
+    const head = f ? `<div class="card conv-filter">${entAv(f)}<div class="info"><b>${esc(f.name)}</b><small>পেইজের মেসেজ · আপনি পেইজের নামে উত্তর দেবেন</small></div>${f.isOwner ? `<button class="sbtn ghost" id="auto-reply">⚡ অটো মেসেজ${f.autoReplyOn ? ' ✓' : ''}</button><button class="sbtn ghost" id="faq-btn">❓ প্রশ্ন-উত্তর${f.faqs?.length ? ' ✓' : ''}</button>` : ''}<button class="link" id="conv-all">← আমার মেসেজ</button></div>` : '';
     box.innerHTML = head + (rows.length ? rows.map(c => `<button class="conv${c.unread ? ' unread' : ''}" data-thread="${esc(c.userId)}" data-tpage="${esc(c.pageId || '')}">${c.pageId && !c.asPage ? entAv({ name: c.name, avatar: c.avatar }) : av(c)}<div class="info"><b>${esc(c.name)}</b>${c.pageId ? `<span class="conv-tag">${c.asPage ? `📄 ${esc(c.pageName)} পেইজে` : '📄 পেইজ'}</span>` : ''}<div class="last">${c.lastMine ? (c.asPage ? 'পেইজ: ' : 'আপনি: ') : ''}${esc(c.last)}</div></div><div style="text-align:right"><div class="time">${esc(ago(c.lastAt))}</div>${c.unread ? `<span class="badge">${bn(c.unread)}</span>` : ''}</div></button>`).join('')
       : `<div class="empty">${f ? 'এই পেইজে এখনো কেউ মেসেজ পাঠাননি।' : 'এখনো কোনো মেসেজ নেই।<br>কারও প্রোফাইলে গিয়ে "মেসেজ" চাপুন।'}</div>`);
     $('#conv-all')?.addEventListener('click', () => { S.convPage = null; loadConvs(); });
@@ -1630,7 +1630,10 @@ function listenMessages() {
   S.stopNotif = S.api.onNotify(() => { if (S.view === 'notif') loadNotifs(); else refreshBadges(); });
   S.stopMsg = S.api.onMessage(m => {
     if (S.view === 'thread' && S.threadId === m.from && (S.threadPage || null) === (m.pageId || null)) openThread(m.from, true);
-    else { toast('নতুন মেসেজ এসেছে'); if (S.view === 'msgs') loadConvs(); }
+    else {
+      toast('নতুন মেসেজ এসেছে'); if (S.view === 'msgs') loadConvs();
+      if (S.view === 'page' && m.pageId && m.pageId === S.curPage?.id && S.curPage.canManage) S.api.pageUnread().then(u => { const n = u.get(m.pageId) || 0, b = $('#pg-unread'); if (b) { b.hidden = !n; b.textContent = bn(n); } }).catch(() => {});
+    }
     refreshBadges();
   });
 }
@@ -2824,10 +2827,10 @@ const pageRow = (pg, btn) => `<div class="ent-row"><button class="ent-btn" data-
 async function loadPages() {
   const box = $('#pages'); box.innerHTML = '<div class="skel"></div>';
   try {
-    const [mine, followed, all] = await Promise.all([S.api.myPages(), S.api.followedPages(), S.api.discoverPages()]);
+    const [mine, followed, all, pun] = await Promise.all([S.api.myPages(), S.api.followedPages(), S.api.discoverPages(), S.api.pageUnread().catch(() => new Map())]);
     const known = new Set([...mine, ...followed].map(x => x.id)), more = all.filter(x => !known.has(x.id));
     box.innerHTML = `
-      ${mine.length ? `<div class="card"><div class="sec-h"><h3>আমার পেইজ</h3></div>${mine.map(pg => pageRow(pg, '<span class="tag">অ্যাডমিন</span>')).join('')}</div>` : ''}
+      ${mine.length ? `<div class="card"><div class="sec-h"><h3>আমার পেইজ</h3></div>${mine.map(pg => pageRow(pg, `${pun.get(pg.id) ? `<span class="badge pg-ub" title="না-পড়া মেসেজ">💬 ${bn(pun.get(pg.id))}</span>` : ''}<span class="tag">${pg.isAdmin ? 'অ্যাডমিন' : 'মালিক'}</span>`)).join('')}</div>` : ''}
       <div class="card"><div class="sec-h"><h3>ফলো করা পেইজ</h3></div>${followed.length ? followed.map(pg => pageRow(pg, `<button class="sbtn ghost" data-pf="${esc(pg.id)}" data-on="1">ফলো করছেন ✓</button>`)).join('') : '<div class="mut">কোনো পেইজ ফলো করছেন না</div>'}</div>
       <div class="card"><div class="sec-h"><h3>আরও পেইজ</h3></div>${more.length ? more.map(pg => pageRow(pg, `<button class="sbtn" data-pf="${esc(pg.id)}" data-on="0">ফলো করুন</button>`)).join('') : '<div class="mut">আর কোনো পেইজ নেই</div>'}</div>`;
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
@@ -2843,7 +2846,7 @@ async function openPage(id, silent) {
       ${pg.about ? `<p class="about">${esc(pg.about)}</p>` : ''}${pg.phone ? `<p class="meta" style="margin:6px 0 0">📞 ${esc(bn(pg.phone))}</p>` : ''}
       ${pageAddrHtml(pg)}
       <div class="row">${pg.canManage
-        ? `<button class="sbtn" id="pg-inbox">💬 মেসেজ</button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button>${pg.isOwner ? `<button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button>` : ''}<button class="sbtn ghost" id="pg-share">🔗 শেয়ার</button><button class="more" id="pg-set" aria-label="পেইজের সেটিং">⚙️</button>`
+        ? `<button class="sbtn" id="pg-inbox">💬 মেসেজ<span class="badge" id="pg-unread" hidden></span></button><button class="sbtn ghost" data-insights="page" data-entid="${esc(pg.id)}" data-entname="${esc(pg.name)}">📊 ড্যাশবোর্ড</button>${pg.isOwner ? `<button class="sbtn ghost" id="pg-badge">${pg.verified ? '✔ ব্যাজ' : '✔ ব্যাজ নিন'}</button>` : ''}<button class="sbtn ghost" id="pg-share">🔗 শেয়ার</button><button class="more" id="pg-set" aria-label="পেইজের সেটিং">⚙️</button>`
         : `<button class="sbtn ${pg.following ? 'ghost' : ''}" data-pf="${esc(pg.id)}" data-on="${pg.following ? 1 : 0}">${pg.following ? 'ফলো করছেন ✓' : 'ফলো করুন'}</button><button class="sbtn ghost" id="pg-msg">💬 মেসেজ</button><button class="sbtn ghost" id="pg-share">🔗</button>${tel ? `<a class="sbtn ghost" style="text-decoration:none;display:inline-grid;place-items:center" href="tel:${esc(tel)}">কল করুন</a>` : ''}<button class="more" id="pg-more" aria-label="আরও">⋯</button>`}</div></div>${profTabs('page')}`;
     if (!pg.isOwner && !silent) S.api.entVisit?.('page', pg.id).catch(() => {});
     $('#pg-badge')?.addEventListener('click', () => pageBadgeSheet(pg));
@@ -2854,6 +2857,7 @@ async function openPage(id, silent) {
     $('#pcoverfile')?.addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) picSheet('cover', f, pg); });
     $('#pcover-btn')?.addEventListener('click', () => pageCoverMenu(pg));
     $('#pg-share')?.addEventListener('click', () => sharePage(pg));
+    if (pg.canManage) S.api.pageUnread().then(m => { const n = m.get(pg.id) || 0, b = $('#pg-unread'); if (b) { b.hidden = !n; b.textContent = bn(n); } }).catch(() => {});
     $('#pg-set')?.addEventListener('click', () => pageSettingsMenu(pg));
     $('#pg-more')?.addEventListener('click', () => { if (!needUser()) return; openSheet(`<div class="menu">${me()?.admin ? `<button data-act="ab">${ic('shield', 16)} অ্যাডমিন: পেইজের ব্যাজ</button>` : ''}<button data-act="r">পেইজ রিপোর্ট করুন</button><button data-close>বন্ধ করুন</button></div>`); $('#sheet').onclick = ev => { if (ev.target.closest('[data-act=r]')) reportSheet('user', 'page:' + pg.id); if (ev.target.closest('[data-act=ab]')) adminPageBadgeSheet(pg); }; });
     showProfPane('page');

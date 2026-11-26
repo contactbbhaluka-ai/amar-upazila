@@ -993,3 +993,6 @@ button.pv-opt.on{border-color:var(--g);background:var(--g2)}
 .tfaq{position:sticky;bottom:64px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 10px;background:var(--bg,#f4f6f5)}
 .tfaq button{border:1px solid var(--g);background:var(--card);color:var(--gt);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;min-height:0}
 .pa-list .person{padding:6px 0}
+
+.pg-ub{position:static;display:inline-block;margin-right:6px;padding:2px 8px;font-size:12px}
+#pg-inbox .badge{position:static;margin-left:4px}

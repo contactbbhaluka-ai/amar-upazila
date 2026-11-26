@@ -569,6 +569,7 @@ async function supabaseApi() {
     },
     async sendMessage(id, body, pageId) { ok(await sb.from('messages').insert({ sender_id: me.id, recipient_id: id, body, page_id: pageId || null })); },
     async markRead(id, pageId) { ok(await sb.rpc('mark_read2', { partner: id, p_page: pageId || null })); },
+    async pageUnread() { return new Map((ok(await sb.rpc('my_page_unread')) || []).map(r => [r.page_id, Number(r.unread)])); },
     async setAutoReply(pageId, { on, text }) { ok(await sb.from('pages').update({ auto_reply_on: !!on, auto_reply: (text || '').trim() || null }).eq('id', pageId)); },
     async unreadCount() {
       if (!me) return 0;
@@ -1373,7 +1374,8 @@ function demoApi() {
       }, 1500);
     },
     async markRead(id, pageId) { for (const m of db.messages) if (m.from === id && m.to === meId && (m.pageId || null) === (pageId ? Number(pageId) : null)) m.read = true; save(); },
-    async unreadCount() { return db.messages.filter(m => m.to === meId && !m.read && !isBlocked(m.from)).length; },
+    async unreadCount() { return db.messages.filter(m => m.to === meId && !m.read && !isBlocked(m.from) && !(m.pageId && pageOf(m.pageId)?.ownerId === meId)).length; },
+    async pageUnread() { const out = new Map(); for (const m of db.messages) if (m.to === meId && !m.read && m.pageId && pageOf(m.pageId)?.ownerId === meId) out.set(m.pageId, (out.get(m.pageId) || 0) + 1); return wait(out); },
     onMessage(cb) { listeners.add(cb); return () => listeners.delete(cb); },
 
     async notifications() {

@@ -1424,13 +1424,15 @@ const ABOUT = [
 ];
 // ================================================================ প্রোফাইলের "পরিচিতি" কার্ড: কোন বিষয় দেখাবে মালিক বেছে নেন
 const FEATURED0 = ['works', 'educations', 'addr', 'social', 'joined'];
-const DETAIL_ITEMS = [   // [key, নাম, প্রাইভেসির key (না থাকলে সবসময় দেখা যায়)] — গুরুত্ব অনুযায়ী ক্রম; প্রোফাইলেও এই ক্রমে দেখায়
+const DETAIL_ITEMS = [   // [key, নাম, প্রাইভেসির key (না থাকলে সবসময় দেখা যায়)] — "কী দেখাবে" বাছাইয়ের তালিকার ক্রম
   ['blood', 'রক্তের গ্রুপ ও রক্তদান', null], ['social', 'সোশ্যাল লিংক', 'social'],
   ['addr', 'কোথায় থাকেন', null], ['works', 'কাজ', 'works'], ['educations', 'শিক্ষা', 'educations'], ['phone', 'মোবাইল নম্বর', 'contact'],
   ['orgs', 'সংগঠন ও ক্লাব', 'orgs'], ['birth', 'জন্মতারিখ', 'birth'], ['relationship', 'সম্পর্কের অবস্থা', 'relationship'],
   ['gender', 'লিঙ্গ', null], ['religion', 'ধর্ম', 'religion'], ['joined', 'কবে থেকে সদস্য', null],
 ];
-const ALL_DETAIL_KEYS = DETAIL_ITEMS.map(x => x[0]).filter(k => k !== 'blood');   // রক্তদানের তথ্য শুধু মালিক বেছে নিলে
+// প্রোফাইলে দেখানোর ক্রম (আগের মতোই)
+const PROFILE_ORDER = ['works', 'educations', 'addr', 'gender', 'birth', 'relationship', 'religion', 'orgs', 'phone', 'social', 'joined', 'blood'];
+const ALL_DETAIL_KEYS = PROFILE_ORDER.filter(k => k !== 'blood');   // রক্তদানের তথ্য শুধু মালিক বেছে নিলে
 const row = (i, t) => `<div class="av-row"><span class="av-i">${ic(i, 18)}</span><span>${t}</span></div>`;
 // একেকটা বিষয়ের লাইন (যা দেখার অনুমতি নেই তা আগেই সার্ভার থেকে বাদ পড়ে আসে)
 function detailRows(u, keys) {
@@ -1475,7 +1477,7 @@ function introRows(u, keys) {
 // রক্তের গ্রুপ ও সর্বশেষ রক্তদান (মালিক "প্রোফাইলে কী দেখাবে"-তে বেছে নিলে তবেই দেখায়)
 const bloodRow = (u, short) => row('drop', `<b>${esc(u.bloodGroup)}</b>${u.lastDonated ? `${short ? ' · ' : ' · সর্বশেষ রক্তদান '}${esc(bnDate(u.lastDonated))}` : ''}${u.donorVisible ? ` · ${donateStatus(u.lastDonated)}` : ''}`);
 function introCard(u, own) {
-  const sel = new Set(u.featured || FEATURED0), rows = introRows(u, DETAIL_ITEMS.map(x => x[0]).filter(k => sel.has(k)));
+  const sel = new Set(u.featured || FEATURED0), rows = introRows(u, PROFILE_ORDER.filter(k => sel.has(k)));
   if (!rows.length && !own) return '';
   return `<div class="intro-card">${rows.join('')}
     ${!rows.length ? '<p class="mut" style="margin:0;font-size:13px">কাজ, শিক্ষা, ঠিকানা ইত্যাদি এখানে দেখাতে পারেন</p>' : ''}

@@ -4681,7 +4681,7 @@ function renderMenu() {
     <details class="card"${u ? '' : ' hidden'}><summary>🔔 নোটিফিকেশন ও শব্দ</summary><div class="setlist">
       <button id="ntset2"><span class="set-ic">🔔</span>নোটিফিকেশন সেটিং</button>
       <button id="msgsnd"><span class="set-ic">🔊</span>শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
-    <div class="card lang-card"><button id="fontsz" class="lang-row"><span class="lang-ic">🔠</span><span class="lang-t">ফন্ট সাইজ<small>${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</small></span><span class="fs-go" aria-hidden="true">›</span></button></div>
+    <div class="card lang-card"><button id="fontsz" class="lang-row"><span class="lang-ic">🔠</span><span class="lang-t">${EN ? 'Font size' : 'ফন্ট সাইজ (Font size)'}<small>${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</small></span><span class="fs-go" aria-hidden="true">›</span></button></div>
     <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
       ${S.api.demoLogin ? '<button id="demo-guide"><span class="set-ic">🧪</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">🔄</span>ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
       <button id="help"><span class="set-ic">🐞</span>কোনো সমস্যা জানান</button>

@@ -905,7 +905,7 @@ async function supabaseApi() {
 
     // ---------- সেবা ডিরেক্টরি ও রিপোর্ট
     async services({ category, q }) {
-      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count')
+      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng')
         .eq('upazila_id', UPAZILA_ID).order('verified', { ascending: false }).order('name').limit(500);
       if (category) s = s.eq('category', category);
       const term = (q || '').replace(/[,%()*\\]/g, ' ').trim();
@@ -916,6 +916,7 @@ async function supabaseApi() {
     async serviceFavs() { return me ? ok(await sb.from('service_favs').select('service_id').eq('user_id', me.id)).map(r => r.service_id) : []; },
     async setServiceFav(id, on) { if (on) ok(await sb.from('service_favs').upsert({ user_id: me.id, service_id: id }, { ignoreDuplicates: true })); else ok(await sb.from('service_favs').delete().eq('user_id', me.id).eq('service_id', id)); },
     async serviceCalled(id) { await sb.rpc('service_called', { sid: id }); },
+    async setServiceLoc(id, lat, lng) { ok(await sb.from('services').update({ lat, lng }).eq('id', id)); },
     async verifyService(id) { ok(await sb.from('services').update({ verified: true }).eq('id', id)); },
     async report(targetType, targetId, reason) {
       ok(await sb.from('reports').insert({ reporter_id: me.id, target_type: targetType, target_id: String(targetId), reason }));
@@ -2052,12 +2053,15 @@ function demoApi() {
 
     async services({ category, q }) {
       const t = (q || '').trim().toLowerCase();
-      return wait(db.services.filter(s => (!category || s.category === category) && (!t || (s.name + ' ' + s.address).toLowerCase().includes(t)))
+      // ডেমো: অবস্থান না থাকলে ভালুকার আশেপাশে একটা আন্দাজি অবস্থান
+      const geo = s => (s.lat == null && !s.noGeo ? { ...s, lat: 24.38 + ((s.id * 37) % 50 - 25) / 1000, lng: 90.385 + ((s.id * 53) % 50 - 25) / 1000 } : s);
+      return wait(db.services.map(geo).filter(s => (!category || s.category === category) && (!t || (s.name + ' ' + s.address).toLowerCase().includes(t)))
         .sort((a, b) => (b.verified - a.verified) || a.name.localeCompare(b.name, 'bn')));
     },
     async addService(v) { db.services.push({ ...v, id: nid(db.services), verified: false }); save(); },
     async serviceFavs() { return wait(meId ? (db.svcFavs[meId] || []) : []); },
     async setServiceFav(id, on) { const l = new Set(db.svcFavs[meId] || []); on ? l.add(id) : l.delete(id); db.svcFavs[meId] = [...l]; save(); return wait(); },
+    async setServiceLoc(id, lat, lng) { const s = db.services.find(x => x.id === id); if (s) { s.lat = lat; s.lng = lng; s.noGeo = lat == null; } save(); return wait(); },
     async serviceCalled(id) { const s = db.services.find(x => x.id === id); if (s) { s.call_count = (s.call_count || 0) + 1; save(); } },
     async verifyService(id) { const s = db.services.find(x => x.id === id); if (s) s.verified = true; save(); },
     async report() { return wait(true); },

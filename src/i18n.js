@@ -144,6 +144,12 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'কাছের সেবা': 'Nearby', 'আমার কাছের সেবা': 'Services near me', 'লোকেশন দিলে কাছের হাসপাতাল, ডাক্তার, ব্যাংক দূরত্বসহ দেখাবে': 'Share your location to see nearby hospitals, doctors and banks with distance',
+  'আবার খুঁজুন': 'Refresh', 'পথ দেখুন': 'Directions', 'অবস্থান দিন': 'Set location', 'অবস্থান বদলান': 'Change location', 'অবস্থান সংরক্ষণ হয়েছে': 'Location saved', 'মিটার': 'm', 'কিমি': 'km',
+  '{x} মিটার': '{x} m', '{x} কিমি': '{x} km', 'আপনার অবস্থান খোঁজা হচ্ছে…': 'Finding your location…', 'আপনার অবস্থান খোঁজা হচ্ছে': 'Finding your location',
+  'কাছাকাছি অবস্থান দেওয়া কোনো সেবা পাওয়া যায়নি। সেবা যোগ করার সময় "ম্যাপে অবস্থান" দিলে এখানে দেখাবে': 'No services with a map location found nearby. Services added with a "Location on map" will show here',
+  'শুধু যে সেবাগুলোর ম্যাপে অবস্থান দেওয়া আছে সেগুলো দেখাচ্ছে। দূরত্ব সোজা পথে, রাস্তায় একটু বেশি হতে পারে': 'Only services with a map location are shown. Distance is straight-line; by road it may be a bit more',
+  'সেবার জায়গায় দাঁড়িয়ে "আমি এখন যেখানে আছি" চাপুন, অথবা গুগল ম্যাপের লিংক দিন': 'Stand at the service location and tap "Where I am now", or paste a Google Maps link',
   'আমার প্রিয় সেবা': 'My favorite services', 'প্রিয়': 'Favorites', 'প্রিয় সেবায় রাখুন': 'Add to favorites', 'প্রিয় থেকে সরান': 'Remove from favorites', 'প্রিয় সেবায় রাখা হয়েছে': 'Added to favorites',
   'প্রিয় থেকে সরানো হয়েছে': 'Removed from favorites', 'এখনো কোনো প্রিয় সেবা নেই। যেকোনো সেবার কার্ডে 🤍 চাপলে এখানে থাকবে': 'No favorite services yet. Tap 🤍 on any service card to keep it here',
   'সাম্প্রতিক খোঁজা': 'Recent searches', 'জনপ্রিয় সেবা': 'Popular services', '{x}টি সেবা': '{x} services', 'খুঁজুন: হাসপাতাল, doctor, bidyut…': 'Search: hospital, doctor, electricity…',

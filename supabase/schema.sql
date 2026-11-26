@@ -5058,6 +5058,10 @@ $$;
 revoke all on function public.service_called(bigint) from public;
 grant execute on function public.service_called(bigint) to anon, authenticated;
 
+-- সেবা ডিরেক্টরি: ম্যাপে অবস্থান (কাছের সেবা দূরত্বসহ দেখাতে)
+alter table public.services add column if not exists lat double precision check (lat between -90 and 90);
+alter table public.services add column if not exists lng double precision check (lng between -180 and 180);
+
 -- =====================================================================
 --  নিজেকে অ্যাডমিন বানাতে: অ্যাপে প্রথমে সাইনআপ করুন, তারপর নিচের লাইনে
 --  নিজের ইমেইল বসিয়ে আলাদাভাবে চালান:

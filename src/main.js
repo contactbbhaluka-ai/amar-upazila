@@ -3834,7 +3834,9 @@ function afterAuth() {
 const svcCard = s => `<div class="card svc">
   <div class="ic svc-ic">${svcIc(s.category, 24)}</div>
   <div style="flex:1;min-width:0"><h3>${esc(s.name)}</h3><div class="meta">${esc(s.address)}</div>${s.hours ? `<div class="meta">🕘 ${esc(s.hours)}</div>` : ''}
-    ${s.verified ? '<span class="ver">✔ যাচাইকৃত</span>' : `<span class="mut">যাচাই বাকি</span>${me()?.admin ? ` <button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button>` : ''}`}</div>
+    ${s.verified ? '<span class="ver">✔ যাচাইকৃত</span>' : `<span class="mut">যাচাই বাকি</span>${me()?.admin ? ` <button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button>` : ''}`}
+    ${s.lat != null ? `<div class="svc-geo">${svcDist(s) != null ? `<span class="svc-km">📍 ${fmtDist(svcDist(s))}</span>` : ''}<a class="svc-dir" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}" target="_blank" rel="noopener">🧭 পথ দেখুন</a></div>` : ''}
+    ${me()?.admin ? `<button class="link svc-setloc" data-svcloc="${esc(s.id)}">${s.lat != null ? '📍 অবস্থান বদলান' : '📍 অবস্থান দিন'}</button>` : ''}</div>
   <div class="svc-act"><button class="svc-fav${S.svcFav?.has(s.id) ? ' on' : ''}" data-svcfav="${esc(s.id)}" aria-pressed="${!!S.svcFav?.has(s.id)}" aria-label="${S.svcFav?.has(s.id) ? 'প্রিয় থেকে সরান' : 'প্রিয় সেবায় রাখুন'}">${S.svcFav?.has(s.id) ? '❤️' : '🤍'}</button>
   <a class="call" data-svccall="${esc(s.id)}" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a></div></div>`;
 const emergencyHtml = () => `<a class="big" href="tel:999"><span class="n">৯৯৯</span><span><b>জাতীয় জরুরি সেবা</b><br>পুলিশ, ফায়ার সার্ভিস, অ্যাম্বুলেন্স: টোল ফ্রি</span></a>
@@ -3889,6 +3891,7 @@ const SVC_IC = {
   ladies: '<path d="M9 21h6M10 21V12h4v9M10 12l.8-6.5 3.2 2V12"/>',
   gents: '<circle cx="6" cy="6.5" r="2.5"/><circle cx="6" cy="17.5" r="2.5"/><path d="M8.2 7.8L20 17M8.2 16.2L20 7"/>',
   band: '<ellipse cx="12" cy="8" rx="8" ry="3"/><path d="M4 8v8c0 1.7 3.6 3 8 3s8-1.3 8-3V8M8 3l3 4M16 3l-3 4"/>',
+  near: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22"/>',
   fav: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
   all: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><path d="M17 13.5v7M13.5 17h7"/>',
 };
@@ -3903,7 +3906,7 @@ const SVC_GROUPS = [
   ['খাবার, বাজার ও কাজ', '#e8710a', ['food', 'cook', 'shop', 'sale', 'job']],
   ['দৈনন্দিন সেবা', '#b7791f', ['bank', 'courier', 'net', 'power', 'clean', 'fix', 'ladies', 'gents', 'band']],
 ];
-const svcColor = k => k === 'fav' ? '#e0245e' : (SVC_GROUPS.find(g => g[2].includes(k)) || [, '#0f8a5f'])[1];
+const svcColor = k => k === 'fav' ? '#e0245e' : k === 'near' ? '#0e9aa7' : (SVC_GROUPS.find(g => g[2].includes(k)) || [, '#0f8a5f'])[1];
 const svcIc = (k, size = 24) => `<span class="sic" style="--c:${svcColor(k)}"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SVC_IC[k] || SVC_IC.all}</svg></span>`;
 const svcCats = () => SERVICE_CATS.filter(c => c[0] !== 'blood' || feat('featBlood'));
 
@@ -3968,6 +3971,43 @@ function showQPanel() {
     + (pop.length ? `<div class="qp-h"><span>🔥 জনপ্রিয় সেবা</span></div>${pop.map(x => `<div class="qp-pop">${svcIc(x.category, 18)}<span class="qp-n">${esc(x.name)}<small>${esc(catName(x.category))}</small></span><a class="qp-call" data-svccall="${esc(x.id)}" href="tel:${esc(String(x.phone).replace(/[^\d+]/g, ''))}">📞 কল</a></div>`).join('')}` : '');
   p.hidden = false;
 }
+// ---------- কাছের সেবা: ফোনের লোকেশন থেকে দূরত্ব
+function distKm(a, b) { const r = x => x * Math.PI / 180, dLa = r(b.lat - a.lat), dLo = r(b.lng - a.lng); const h = Math.sin(dLa / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLo / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); }
+const fmtDist = km => km < 1 ? `${bn(Math.max(10, Math.round(km * 100) * 10))} মিটার` : `${bn(km < 10 ? km.toFixed(1) : Math.round(km))} কিমি`;
+const svcDist = x => (S.myLoc && x.lat != null ? distKm(S.myLoc, x) : null);
+function getMyLoc() {
+  return new Promise((res, rej) => {
+    if (S.myLoc && Date.now() - S.myLoc.t < 10 * 6e4) return res(S.myLoc);
+    if (!navigator.geolocation) return rej(new Error('nogeo'));
+    navigator.geolocation.getCurrentPosition(p => { S.myLoc = { lat: p.coords.latitude, lng: p.coords.longitude, t: Date.now() }; res(S.myLoc); }, rej, { enableHighAccuracy: true, timeout: 12000, maximumAge: 120000 });
+  });
+}
+function svcLocSheet(id) {
+  const x = (S.svcAll || []).find(y => String(y.id) === String(id)); if (!x) return;
+  const st = { geo: x.lat != null ? { lat: x.lat, lng: x.lng } : null };
+  openSheet(`<h2>📍 ${esc(x.name)}: ম্যাপে অবস্থান</h2><p class="mut" style="margin-top:-4px">সেবার জায়গায় দাঁড়িয়ে "আমি এখন যেখানে আছি" চাপুন, অথবা গুগল ম্যাপের লিংক দিন।</p>${geoFieldHtml(st.geo)}
+    <div class="row" style="margin-top:14px"><button class="btn" id="sl-go" style="flex:1">সংরক্ষণ</button><button class="btn ghost" data-close>বাতিল</button></div>`);
+  bindGeoField(st);
+  $('#sl-go').onclick = e => {
+    if ($('#geo-link').value.trim() && !coordsFrom($('#geo-link').value)) return toast('ম্যাপের লিংক থেকে লোকেশন বোঝা যায়নি। লিংকটা আবার দেখুন বা "আমি এখন যেখানে আছি" চাপুন।');
+    busy(e.currentTarget, async () => { await S.api.setServiceLoc(x.id, st.geo?.lat ?? null, st.geo?.lng ?? null); x.lat = st.geo?.lat ?? null; x.lng = st.geo?.lng ?? null; closeSheet(); toast('অবস্থান সংরক্ষণ হয়েছে'); drawDir(); });
+  };
+}
+// ম্যাপে অবস্থান বাছাইয়ের ঘর (সেবা যোগ ও অবস্থান বদলে একই রকম)
+const geoFieldHtml = g => `<label>ম্যাপে অবস্থান (ঐচ্ছিক)</label><div class="geo-box"><span id="geo-val">${g ? `📌 ${g.lat.toFixed(5)}, ${g.lng.toFixed(5)}` : 'এখনো দেওয়া নেই'}</span>
+  <button type="button" class="sbtn ghost" id="geo-here">📍 আমি এখন যেখানে আছি</button><button type="button" class="link" id="geo-clear" ${g ? '' : 'hidden'}>মুছুন</button></div>
+  <input class="f" id="geo-link" placeholder="অথবা গুগল ম্যাপের লিংক বা 24.38, 90.38 পেস্ট করুন" style="margin-top:6px">`;
+function bindGeoField(st) {
+  const show = () => { $('#geo-val').textContent = st.geo ? `📌 ${st.geo.lat.toFixed(5)}, ${st.geo.lng.toFixed(5)}` : 'এখনো দেওয়া নেই'; $('#geo-clear').hidden = !st.geo; };
+  $('#geo-here').onclick = () => {
+    if (!navigator.geolocation) return toast('এই ডিভাইসে লোকেশন পাওয়া যাচ্ছে না');
+    $('#geo-val').textContent = 'লোকেশন খুঁজছি…';
+    navigator.geolocation.getCurrentPosition(p => { st.geo = { lat: +p.coords.latitude.toFixed(6), lng: +p.coords.longitude.toFixed(6) }; show(); toast('লোকেশন নেওয়া হয়েছে'); },
+      () => { show(); toast('লোকেশন পাওয়া যায়নি। অনুমতি দিন বা ম্যাপের লিংক পেস্ট করুন।'); }, { enableHighAccuracy: true, timeout: 12000 });
+  };
+  $('#geo-clear').onclick = () => { st.geo = null; show(); };
+  $('#geo-link').oninput = () => { const c = coordsFrom($('#geo-link').value); if (c) { st.geo = c; show(); } };
+}
 function renderSvcGrid(list) {
   const n = k => list.filter(x => x.category === k).length;
   const total = list.length, cats = svcCats(), has = k => k === 'sos' || cats.some(c => c[0] === k);
@@ -3975,13 +4015,14 @@ function renderSvcGrid(list) {
     return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
   const favs = list.filter(x => S.svcFav?.has(x.id));
   $('#dir').innerHTML = `<div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div>`
+    + `<button class="near-card" data-svc="near">${svcIc('near', 24)}<span><b>আমার কাছের সেবা</b><small>লোকেশন দিলে কাছের হাসপাতাল, ডাক্তার, ব্যাংক দূরত্বসহ দেখাবে</small></span><span class="near-go">›</span></button>`
     + (favs.length ? `<h3 class="svc-sec" style="--c:#e0245e"><i></i>❤️ আমার প্রিয় সেবা <button class="svc-more" data-svc="fav">সব দেখুন</button></h3>${favs.slice(0, 3).map(svcCard).join('')}` : '')
     + SVC_GROUPS.map(([t, col, keys]) => { const ks = keys.filter(has); return ks.length ? `<h3 class="svc-sec" style="--c:${col}"><i></i>${esc(t)}</h3><div class="svc-grid">${ks.map(tile).join('')}</div>` : ''; }).join('');
 }
 function dirChips() {
   const c = $('#dchips'), chipX = c.scrollLeft;   // চিপের সারি যেখানে ছিল সেখানেই থাকবে
   const fav = S.svcFav?.size ? [['fav', 'প্রিয়', '']] : [];
-  c.innerHTML = [['', 'সব সেবা'], ...fav, ['sos', 'জরুরি নম্বর'], ...svcCats()].map(x => `<button class="chip svc-chip${x[0] === S.dcat ? ' on' : ''}" data-d="${x[0]}">${svcIc(x[0] || 'all', 16)}${esc(x[1])}</button>`).join('');
+  c.innerHTML = [['', 'সব সেবা'], ['near', 'কাছের সেবা'], ...fav, ['sos', 'জরুরি নম্বর'], ...svcCats()].map(x => `<button class="chip svc-chip${x[0] === S.dcat ? ' on' : ''}" data-d="${x[0]}">${svcIc(x[0] || 'all', 16)}${esc(x[1])}</button>`).join('');
   const on = c.querySelector('.chip.on'); c.scrollLeft = chipX;
   // বাছাই করা চিপ পুরো চোখের বাইরে থাকলে (যেমন গ্রিড থেকে ঢুকলে) শুধু যতটুকু দরকার ততটুকু সরাই
   if (on && (on.offsetLeft + on.offsetWidth <= c.scrollLeft || on.offsetLeft >= c.scrollLeft + c.clientWidth)) c.scrollLeft = Math.max(0, on.offsetLeft - 8 - (on.offsetLeft > c.scrollLeft ? c.clientWidth - on.offsetWidth - 16 : 0));
@@ -3992,15 +4033,32 @@ function drawDir() {
   dirChips();
   if (S.dcat === 'sos' || S.dcat === 'blood') return;
   if (!S.dcat && !q) return renderSvcGrid(list);
+  if (S.dcat === 'near') return drawNear(list, q);
   const cat = S.dcat === 'fav' ? ['fav', 'আমার প্রিয় সেবা'] : SERVICE_CATS.find(c => c[0] === S.dcat);
   let base = S.dcat === 'fav' ? list.filter(x => S.svcFav?.has(x.id)) : S.dcat ? list.filter(x => x.category === S.dcat) : list, cats = [];
   if (q) { const r = svcSearch(base, q); base = r.hits; if (!S.dcat) cats = r.cats; clearTimeout(S.recentT); if (base.length || cats.length) S.recentT = setTimeout(() => addSvcRecent(q), 1500); }
+  if (S.myLoc) base = [...base].sort((a, b) => (svcDist(a) ?? 1e9) - (svcDist(b) ?? 1e9));   // লোকেশন জানা থাকলে কাছেরটা আগে
   const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(base.length)}টি</span></div>`
     : `<div class="svc-head"><b>"${esc(q)}"</b><span class="mut">${bn(base.length)}টি সেবা</span></div>`;
   const catHtml = cats.length ? `<div class="svc-grid svc-qcats">${cats.slice(0, 8).map(([k, n]) => `<button class="svc-tile" data-svc="${k}">${svcIc(k, 22)}<span class="st-n">${esc(n)}</span></button>`).join('')}</div>` : '';
   const empty = S.dcat === 'fav' ? 'এখনো কোনো প্রিয় সেবা নেই। যেকোনো সেবার কার্ডে 🤍 চাপলে এখানে থাকবে।'
     : cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।';
   $('#dir').innerHTML = head + catHtml + (base.length ? base.map(svcCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
+}
+function drawNear(list, q) {
+  const located = list.filter(x => x.lat != null && (!S.nearCat || x.category === S.nearCat) && (!q || svcSearch([x], q).hits.length));
+  const rows = located.map(x => ({ x, d: svcDist(x) })).sort((a, b) => a.d - b.d).slice(0, 40);
+  const cats = [...new Set(list.filter(x => x.lat != null).map(x => x.category))];
+  $('#dir').innerHTML = `<div class="svc-head">${svcIc('near', 22)}<b>আমার কাছের সেবা</b><button class="svc-more" data-nearref>↻ আবার খুঁজুন</button></div>
+    <div class="near-f"><button class="${S.nearCat ? '' : 'on'}" data-nearcat="">সব</button>${cats.map(k => `<button class="${S.nearCat === k ? 'on' : ''}" data-nearcat="${k}">${esc(catName(k))}</button>`).join('')}</div>
+    ${rows.length ? rows.map(r => svcCard(r.x)).join('') : '<div class="empty">কাছাকাছি অবস্থান দেওয়া কোনো সেবা পাওয়া যায়নি। সেবা যোগ করার সময় "ম্যাপে অবস্থান" দিলে এখানে দেখাবে।</div>'}
+    <p class="mut near-note">শুধু যে সেবাগুলোর ম্যাপে অবস্থান দেওয়া আছে সেগুলো দেখাচ্ছে। দূরত্ব সোজা পথে, রাস্তায় একটু বেশি হতে পারে।</p>`;
+}
+async function openNear() {
+  const box = $('#dir');
+  box.innerHTML = '<div class="empty">📍 আপনার অবস্থান খোঁজা হচ্ছে…</div>';
+  try { await getMyLoc(); S.nearCat = ''; S.dcat = 'near'; drawDir(); window.scrollTo(0, 0); }
+  catch { S.dcat = ''; S.dirSub = false; drawDir(); toast('লোকেশন পাওয়া যায়নি। ফোনের লোকেশন (GPS) চালু করে এই অ্যাপকে অনুমতি দিন।'); }
 }
 async function loadDir() {
   if (S.dcat === 'blood' && !feat('featBlood')) S.dcat = '';
@@ -4028,6 +4086,7 @@ function openSvcCat(k) {
   }   // ক্রয়বিক্রয় ও চাকরি: ফিডের সেই ধরনের পোস্ট
   // গ্রিড থেকে কোনো ধরনে ঢুকলে Back চাপলে আবার গ্রিডে ফেরে (অ্যাপ থেকে বেরিয়ে যায় না)
   if (S.view === 'dir' && !S.dcat && !S.dirSub && k) { S.dirSub = true; S.dirBackY = window.scrollY; pushNav(); }
+  if (k === 'near') { S.dcat = ''; return openNear(); }
   S.dcat = k; loadDir(); window.scrollTo(0, 0);
 }
 $('#q').addEventListener('input', () => { showQPanel(); clearTimeout(svcTimer); svcTimer = setTimeout(() => (S.svcAll ? drawDir() : loadDir()), 200); document.body.classList.toggle('dir-sub', !!(S.dcat || $('#q').value.trim())); });
@@ -4035,6 +4094,9 @@ $('#dchips').addEventListener('click', e => { const b = e.target.closest('[data-
 document.addEventListener('click', e => {
   const f = e.target.closest('[data-svcfav]'); if (f) { e.preventDefault(); return toggleSvcFav(Number(f.dataset.svcfav) || f.dataset.svcfav); }
   const c = e.target.closest('[data-svccall]'); if (c) S.api.serviceCalled(Number(c.dataset.svccall) || c.dataset.svccall).catch(() => {});
+  const lo = e.target.closest('[data-svcloc]'); if (lo) return svcLocSheet(lo.dataset.svcloc);
+  const nc = e.target.closest('[data-nearcat]'); if (nc) { S.nearCat = nc.dataset.nearcat; return drawDir(); }
+  if (e.target.closest('[data-nearref]')) { S.myLoc = null; return openNear(); }
   const r = e.target.closest('[data-qprec]'); if (r) { $('#q').value = r.dataset.qprec; $('#qpanel').hidden = true; loadDir(); return; }
   if (e.target.closest('[data-qpclear]')) { local.set('svc_recent', []); showQPanel(); }
 });
@@ -4088,12 +4150,15 @@ $('#addsvc').addEventListener('click', () => {
     <label for="sa">ঠিকানা / এলাকা</label><input id="sa" required maxlength="120">
     <label for="sp">ফোন নম্বর</label><input id="sp" required inputmode="tel" maxlength="20" pattern="[0-9০-৯+\\- ]{3,20}">
     <label for="sh">খোলার সময় (ঐচ্ছিক)</label><input id="sh" maxlength="60">
+    ${geoFieldHtml(null)}
     <div class="row" style="margin-top:16px"><button class="btn" style="flex:1">জমা দিন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div>
     <p class="mut">যাচাইয়ের পর তালিকায় "যাচাইকৃত" চিহ্ন দেখাবে।</p></form>`);
+  const sst = { geo: null }; bindGeoField(sst);
   $('#sform').onsubmit = e => {
     e.preventDefault();
+    if ($('#geo-link').value.trim() && !coordsFrom($('#geo-link').value)) return toast('ম্যাপের লিংক থেকে লোকেশন বোঝা যায়নি। লিংকটা আবার দেখুন বা "আমি এখন যেখানে আছি" চাপুন।');
     const toEn = s => s.replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
-    const v = { name: $('#sn').value.trim(), category: $('#sc').value, address: $('#sa').value.trim(), phone: toEn($('#sp').value.trim()), hours: $('#sh').value.trim() || null };
+    const v = { name: $('#sn').value.trim(), category: $('#sc').value, address: $('#sa').value.trim(), phone: toEn($('#sp').value.trim()), hours: $('#sh').value.trim() || null, lat: sst.geo?.lat ?? null, lng: sst.geo?.lng ?? null };
     busy(e.submitter, async () => { await S.api.addService(v); closeSheet(); S.dcat = ''; await loadDir(); toast('জমা হয়েছে, যাচাইয়ের অপেক্ষায়'); });
   };
 });

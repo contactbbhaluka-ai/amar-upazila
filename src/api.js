@@ -826,7 +826,6 @@ function demoApi() {
     if (!db.posts.some(p => p.id === 13)) db.posts.push({ id: 13, userId: 'd5', unionId: 4, category: 'খবর', createdAt: h(2), body: 'আজ ভালুকা হাটে শীতের সবজির দাম কমেছে। #ভালুকা_হাট #বাজারদর', image: '', likes: 5, rx: { like: 5 }, cm: [] });
     if (!db.posts.some(p => p.id === 14)) db.posts.push({ id: 14, userId: 'd1', unionId: 2, category: 'খবর', createdAt: h(5), body: 'শনিবার ভালুকা হাটে বিশেষ গরুর হাট বসবে। #ভালুকা_হাট', image: '', likes: 3, rx: { like: 3 }, cm: [] });
     if (!db.posts.some(p => p.id === 12)) db.posts.push({ id: 12, userId: 'd6', unionId: 2, category: 'খবর', createdAt: h(3), body: 'শীত আসছে, পুরোনো গরম কাপড় দান করুন। পাশে দাঁড়ান অসহায় মানুষের 🤝', image: '', likes: 9, rx: { like: 6, love: 3 }, cm: [], bg: 'g5' });
-    { const d4 = person('d4'); if (d4 && d4.donorReady === undefined) d4.donorReady = true; }
     if (!db.friendships.some(f => [f.requester, f.addressee].sort().join() === 'd1,d2')) db.friendships.push({ requester: 'd1', addressee: 'd2', status: 'accepted' });
     if (!db.posts.some(p => p.id === 15)) db.posts.push({ id: 15, userId: 'd2', unionId: 2, category: 'খবর', createdAt: h(30), body: 'আলহামদুলিল্লাহ, আজ থেকে ভালুকা উপজেলা স্বাস্থ্য কমপ্লেক্সে নার্স হিসেবে যোগ দিলাম। সবার দোয়া চাই।', image: '', likes: 24, rx: { like: 14, love: 10 }, cm: [], lifeEvent: 'job', lifeDate: h(30).slice(0, 10) });
     // ডেমো: আজ সুমি আক্তারের জন্মদিন (বন্ধু), যাতে জন্মদিনের কার্ড দেখা যায়

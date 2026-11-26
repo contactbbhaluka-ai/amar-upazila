@@ -1273,10 +1273,6 @@ body{overscroll-behavior-y:contain}
 .mu-avs{display:flex}
 .mu-avs .avbtn+.avbtn{margin-left:-10px}
 .mu-avs .av{border:2px solid var(--card)}
-.ready-chip{display:inline-flex;align-items:center;gap:4px;margin:6px auto 0;padding:4px 12px;border-radius:999px;border:1px dashed light-dark(#fda4af,#881337);background:none;color:light-dark(#be123c,#fecdd3);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
-.ready-chip.on{border-style:solid;background:light-dark(#ffe4e6,#4c1018)}
-.ready-chip.wait{border-style:solid;color:var(--mut);border-color:var(--line)}
-.d-ready{margin:-2px 0 6px;font-size:12.5px;font-weight:700;color:light-dark(#be123c,#fecdd3)}
 .qr-sheet{text-align:center}
 .qr-card{display:grid;justify-items:center;gap:4px;border:1px solid var(--line);border-radius:16px;padding:16px;margin:8px 0 12px;background:var(--bg)}
 .qr-box{display:grid;place-items:center;min-height:200px;margin:8px 0 4px;padding:10px;background:#fff;border-radius:12px}

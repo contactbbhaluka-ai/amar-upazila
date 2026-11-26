@@ -2182,7 +2182,7 @@ async function openUser(id, silent, keepState) {
     const p = await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
     if (!silent) S.api.profileVisit?.(id).catch(() => {});
-    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${readyChip(p, false)}${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
+    $('#user').innerHTML = `<div class="card prof prof-fb">${coverHtml(p, false)}<h2 style="margin:8px 0 0">${esc(p.name)}${vb(p.verified, true)}</h2>${p.username ? `<div class="uname">@${esc(p.username)}</div>` : ''}
       ${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}
       <div id="mutual"></div>
       ${p.lockedOut ? `<div class="lock-banner">🔒 <div><b>${esc(p.name)} প্রোফাইল লক করে রেখেছেন</b><small>শুধু বন্ধুরা পোস্ট, ছবি ও বিস্তারিত দেখতে পারেন।</small></div></div>` : introCard(p, false)}
@@ -2337,7 +2337,7 @@ function donorCard(d, mine) {
     ? `${av(d, 'md')}<div class="info"><b class="dname">${esc(d.name)}</b>${owner ? ' <span class="tag">আপনার যোগ করা</span>' : ''}<div class="meta">${ic('user', 13)} যোগ করেছেন: <button class="via-btn" data-user="${esc(d.addedBy)}">${esc(d.addedByName)}</button></div></div>`
     : `${userLink(d.id, av(d, 'md'))}<div class="info">${userLink(d.id, esc(d.name), 'who-btn dname')}${mine ? ' <span class="tag">আমি</span>' : ''}<div class="meta">${ic('user', 13)} প্রোফাইল দেখতে নামে চাপুন</div></div>`;
   return `<div class="card dcard${mine || owner ? ' mine' : ''}">
-    ${d.ready ? '<div class="d-ready">🩸 রক্ত দিতে প্রস্তুত</div>' : ''}<div class="dtop">${top}${bloodDrop(d.bloodGroup)}</div>
+    <div class="dtop">${top}${bloodDrop(d.bloodGroup)}</div>
     <div class="dfields">
       ${field(ic('pin'), 'এলাকা', esc(d.area || '—'))}
       ${field(ic('mobile'), 'মোবাইল', d.phone ? esc(fmtPhone(d.phone)) : '<span class="mut">লগইন করলে দেখা যাবে</span>')}
@@ -2468,7 +2468,7 @@ async function renderMe(mode = 'login') {
   const u = me();
   if (u) {
     $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
-      <h2 style="margin:6px 0 0">${esc(u.name)}${u.verified ? vb(u.verified, true) : vbGet('me')}</h2>${readyChip(u, true)}${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.locked ? '<button class="lock-chip">🔒 প্রোফাইল লক করা</button>' : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
+      <h2 style="margin:6px 0 0">${esc(u.name)}${u.verified ? vb(u.verified, true) : vbGet('me')}</h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.locked ? '<button class="lock-chip">🔒 প্রোফাইল লক করা</button>' : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       ${introCard(u, true)}
       <div id="mystats">${statsHtml({ id: u.id, friends: '…', followers: '…', following: '…' })}</div>
@@ -3145,28 +3145,6 @@ async function fillLife(key, uid) {
     ${key === 'me' ? `<button class="link" data-lifenew>+ জীবনের ঘটনা যোগ করুন</button>` : ''}</div>` : '';
 }
 document.addEventListener('click', e => { if (e.target.closest('[data-lifenew]')) { openPostComposer({}); setTimeout(() => $('#pc-lifet')?.click(), 60); } });
-// ---------- রক্ত দিতে প্রস্তুত
-function readyChip(u, own) {
-  if (own) {
-    if (!u.bloodGroup) return '';
-    if (u.donorReady && !canDonate(u.lastDonated)) { const d = new Date(new Date(u.lastDonated).getTime() + 90 * 864e5).toISOString().slice(0, 10); return `<button class="ready-chip wait" data-ready>🩸 আবার রক্ত দিতে পারবেন ${dateBnFull(d)} থেকে</button>`; }
-    return u.donorReady ? `<button class="ready-chip on" data-ready>🩸 রক্ত দিতে প্রস্তুত · ${esc(u.bloodGroup)}</button>` : `<button class="ready-chip" data-ready>🩸 রক্ত দিতে প্রস্তুত? চালু করুন</button>`;
-  }
-  return u.donorReady && u.bloodGroup && canDonate(u.lastDonated) ? `<button class="ready-chip on" data-dm="${esc(u.id)}" title="মেসেজ দিন">🩸 রক্ত দিতে প্রস্তুত · ${esc(u.bloodGroup)}</button>` : '';
-}
-document.addEventListener('click', e => {
-  if (!e.target.closest('[data-ready]')) return;
-  const u = me(); if (!u) return;
-  const on = !!u.donorReady;
-  openSheet(`<div class="lock-sheet"><div class="lock-ic">🩸</div><h2>${on ? 'আপনি রক্ত দিতে প্রস্তুত' : 'রক্ত দিতে প্রস্তুত?'}</h2>
-    <ul class="lock-list"><li>✅ প্রোফাইলে নামের নিচে "🩸 রক্ত দিতে প্রস্তুত · ${esc(u.bloodGroup)}" দেখাবে, চাপলে মানুষ সরাসরি মেসেজ দিতে পারবেন</li>
-      <li>✅ ব্লাড ব্যাংকে আপনার নাম সবার উপরে "প্রস্তুত" চিহ্নসহ থাকবে</li>
-      <li>⏳ রক্ত দেওয়ার পর ৯০ দিন "প্রস্তুত" দেখাবে না, তারপর নিজে থেকে আবার দেখাবে</li>
-      <li>👁 এটা চালু করলে আপনার ব্লাড গ্রুপ প্রোফাইলে সবাই দেখবেন</li></ul>
-    <button class="btn wide${on ? ' ghost' : ''}" id="ready-go">${on ? 'বন্ধ করুন' : '🩸 চালু করুন'}</button>
-    <button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button></div>`);
-  $('#ready-go').onclick = ev => busy(ev.currentTarget, async () => { await S.api.setDonorReady(!on); u.donorReady = !on; closeSheet(); toast(on ? 'বন্ধ করা হয়েছে' : 'ধন্যবাদ! আপনি এখন "রক্ত দিতে প্রস্তুত"'); renderMe(); });
-});
 // ================================================================ ডেমো প্রোফাইল (শুধু ডেমো মোডে)
 function renderDemoBar() {
   const bar = $('#demo'); bar.hidden = S.api.mode !== 'demo'; if (bar.hidden) return;

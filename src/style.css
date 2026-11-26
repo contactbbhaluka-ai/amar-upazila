@@ -393,7 +393,7 @@ label .ic-line{color:var(--mut);margin-right:2px}
 .shared-embed.missing{color:var(--mut);font-size:14px;align-items:center}
 .se-top{display:flex;gap:8px;align-items:center;font-size:14px}
 .se-body{font-size:15px;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
-.shared-embed img{width:calc(100% + 20px);margin:2px -10px -10px;max-height:240px;object-fit:cover}
+.shared-embed img:not(.av){width:calc(100% + 20px);margin:2px -10px -10px;max-height:240px;object-fit:cover}
 .rsum-r{display:inline-flex;align-items:center;gap:2px}
 .rsum-r button{font-size:14px}
 /* মন্তব্যের পাতা */
@@ -1573,3 +1573,6 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .snd-row label{display:flex;align-items:center;gap:8px;flex:1;cursor:pointer}
 .snd-row.off{opacity:.5}
 .snd-all{font-size:16px}
+/* শেয়ার করা পোস্টে প্রোফাইল ছবি ঠিক মাপে, নাম ছবির উপর উঠবে না */
+.se-top .av{flex:none;width:36px;height:36px;min-width:36px;margin:0;max-height:none}
+.se-top>span:last-child{min-width:0;flex:1}

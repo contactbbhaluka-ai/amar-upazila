@@ -3904,6 +3904,14 @@ const SVC_GROUPS = [
 const svcColor = k => (SVC_GROUPS.find(g => g[2].includes(k)) || [, '#0f8a5f'])[1];
 const svcIc = (k, size = 24) => `<span class="sic" style="--c:${svcColor(k)}"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SVC_IC[k] || SVC_IC.all}</svg></span>`;
 const svcCats = () => SERVICE_CATS.filter(c => c[0] !== 'blood' || feat('featBlood'));
+function renderSvcGrid(list) {
+  const n = k => list.filter(x => x.category === k).length;
+  const total = list.length, cats = svcCats(), has = k => k === 'sos' || cats.some(c => c[0] === k);
+  const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : c[1], cnt = k === 'sos' || SVC_SPECIAL[k] ? 0 : n(k);
+    return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
+  $('#dir').innerHTML = `<div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div>`
+    + SVC_GROUPS.map(([t, col, keys]) => { const ks = keys.filter(has); return ks.length ? `<h3 class="svc-sec" style="--c:${col}"><i></i>${esc(t)}</h3><div class="svc-grid">${ks.map(tile).join('')}</div>` : ''; }).join('');
+}
 async function loadDir() {
   if (S.dcat === 'blood' && !feat('featBlood')) S.dcat = '';
   const q = $('#q').value.trim(), landing = !S.dcat && !q;
@@ -3915,18 +3923,11 @@ async function loadDir() {
   if (!landing) setTimeout(() => $('#dchips .chip.on')?.scrollIntoView({ inline: 'center', block: 'nearest' }), 0);
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }
   if (S.dcat === 'blood') return loadBlood();
-  $('#dir').innerHTML = '<div class="skel"></div>';
+  if (landing && S.svcAll) { renderSvcGrid(S.svcAll); if (S.dirY != null) window.scrollTo(0, S.dirY); }   // আগের তালিকা সাথে সাথে দেখাই, পরে হালনাগাদ
+  else $('#dir').innerHTML = '<div class="skel"></div>';
   try {
     const list = await S.api.services({ category: landing ? null : S.dcat || null, q });
-    if (landing) {
-      const n = k => list.filter(x => x.category === k).length;
-      const total = list.length, cats = svcCats(), has = k => k === 'sos' || cats.some(c => c[0] === k);
-      const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : c[1], cnt = k === 'sos' || SVC_SPECIAL[k] ? 0 : n(k);
-        return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
-      $('#dir').innerHTML = `<div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div>`
-        + SVC_GROUPS.map(([t, col, keys]) => { const ks = keys.filter(has); return ks.length ? `<h3 class="svc-sec" style="--c:${col}"><i></i>${esc(t)}</h3><div class="svc-grid">${ks.map(tile).join('')}</div>` : ''; }).join('');
-      return;
-    }
+    if (landing) { S.svcAll = list; renderSvcGrid(list); if (S.dirY != null) { const y = S.dirY; S.dirY = null; requestAnimationFrame(() => window.scrollTo(0, y)); } return; }
     const cat = SERVICE_CATS.find(c => c[0] === S.dcat);
     const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(list.length)}টি</span></div>` : '';
     if (!list.length) { $('#dir').innerHTML = head + `<div class="empty">${cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।'}</div>`; return; }
@@ -3935,9 +3936,12 @@ async function loadDir() {
 }
 function openSvcCat(k) {
   const sp = SVC_SPECIAL[k];
-  if (sp && sp !== 'blood') { S.fcat = sp; go('home'); renderFilters(); loadFeed('home'); return; }   // ক্রয়বিক্রয় ও চাকরি: ফিডের সেই ধরনের পোস্ট
+  if (sp && sp !== 'blood') {   // ক্রয়বিক্রয় ও চাকরি: ফিডের সেই ধরনের পোস্ট; Back চাপলে ডিরেক্টরির একই জায়গায় ফেরা
+    S.dirRet = { tab: S.tab, y: window.scrollY, root: document.body.classList.contains('upz-root') };
+    S.fcat = sp; open('home'); renderFilters(); loadFeed('home'); return;
+  }   // ক্রয়বিক্রয় ও চাকরি: ফিডের সেই ধরনের পোস্ট
   // গ্রিড থেকে কোনো ধরনে ঢুকলে Back চাপলে আবার গ্রিডে ফেরে (অ্যাপ থেকে বেরিয়ে যায় না)
-  if (S.view === 'dir' && !S.dcat && !S.dirSub && k) { S.dirSub = true; pushNav(); }
+  if (S.view === 'dir' && !S.dcat && !S.dirSub && k) { S.dirSub = true; S.dirBackY = window.scrollY; pushNav(); }
   S.dcat = k; loadDir(); window.scrollTo(0, 0);
 }
 $('#q').addEventListener('input', () => { clearTimeout(svcTimer); svcTimer = setTimeout(loadDir, 300); });
@@ -5864,9 +5868,15 @@ function back() { try { history.back(); } catch { onPop(); } }
 function onPop() {
   if (S.viewerOpen) return closeViewer();
   if ($('#modal').classList.contains('on')) return closeSheet();
-  if (S.view === 'dir' && S.dirSub) { S.dirSub = false; S.dcat = ''; if ($('#q')) $('#q').value = ''; loadDir(); window.scrollTo(0, 0); return; }
+  if (S.view === 'dir' && S.dirSub) { S.dirSub = false; S.dcat = ''; if ($('#q')) $('#q').value = ''; S.dirY = S.dirBackY || 0; loadDir(); return; }   // যেখান থেকে ঢুকেছিলেন সেখানেই ফেরা
   if (!S.stack.length) return;
-  const prev = S.stack.pop(); show(prev); RELOAD[prev]?.();
+  const prev = S.stack.pop(); show(prev);
+  if (prev === 'dir' && S.dirRet) {
+    const r = S.dirRet; S.dirRet = null; S.tab = r.tab; S.dirY = r.y;
+    document.querySelectorAll('header [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === S.tab)); document.body.classList.toggle('upz-root', !!r.root);
+    if (S.fcat) { S.fcat = ''; renderFilters(); loadFeed('home'); }
+  }
+  RELOAD[prev]?.();
 }
 window.addEventListener('popstate', onPop);
 document.addEventListener('click', e => {

@@ -1543,3 +1543,6 @@ img.av{aspect-ratio:1/1}
 #pc-text.pc-bg{padding:72px 18px 40px;min-height:220px}
 .pc-bgs-below{margin:8px 0 4px}
 .pc-bgs-below{display:grid;grid-template-columns:repeat(9,minmax(0,40px));justify-content:space-between;gap:6px;overflow:visible}.pc-bgs-below .pc-sw{width:100%;height:auto;aspect-ratio:1/1}
+.pc-foot .pc-bgs-below{margin:0}.pc-foot .pc-bgnote{margin:-4px 0 0}
+@media (max-width:380px){.pc-add-l{display:none}.pc-add .pc-tool{width:36px;height:36px}}
+#pc-cat{min-width:84px}

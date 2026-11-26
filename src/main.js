@@ -1,6 +1,6 @@
 // আমার উপজেলা — অ্যাপের UI
 import { createApi, PAGE, boostState } from './api.js';
-import { POST_CATS, CAT_ICON, SERVICE_CATS, EMERGENCY, PUBLIC_URL, SETTING_KEYS, PLAY_URL } from './config.js';
+import { POST_CATS, CAT_ICON, SERVICE_CATS, SVC_SPECIAL, EMERGENCY, PUBLIC_URL, SETTING_KEYS, PLAY_URL } from './config.js';
 import { DISTRICTS, DISTRICT_ORDER, HOME_UPAZILA, HOME_DISTRICT, BLOOD_GROUPS } from './bd-geo.js';
 // ভাষা: ডিফল্ট বাংলা; ইংরেজি বাছাই করলে অনুবাদক লোড হয় (মেনু → দেখতে কেমন → ভাষা)
 let EN = (() => { try { return localStorage.getItem('au_lang') === '"en"'; } catch { return false; } })();
@@ -3832,37 +3832,49 @@ function afterAuth() {
 
 // ================================================================ ☰ সেবা ডিরেক্টরি
 const svcCard = s => `<div class="card svc">
-  <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#006a4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${SVC_ICONS[s.category] || ''}</svg></div>
+  <div class="ic svc-emo" aria-hidden="true">${SERVICE_CATS.find(c => c[0] === s.category)?.[2] || '📍'}</div>
   <div style="flex:1"><h3>${esc(s.name)}</h3><div class="meta">${esc(s.address)}</div>${s.hours ? `<div class="meta">🕘 ${esc(s.hours)}</div>` : ''}
     ${s.verified ? '<span class="ver">✔ যাচাইকৃত</span>' : `<span class="mut">যাচাই বাকি</span>${me()?.admin ? ` <button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button>` : ''}`}</div>
   <a class="call" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a></div>`;
 const emergencyHtml = () => `<a class="big" href="tel:999"><span class="n">৯৯৯</span><span><b>জাতীয় জরুরি সেবা</b><br>পুলিশ, ফায়ার সার্ভিস, অ্যাম্বুলেন্স: টোল ফ্রি</span></a>
   <div class="em">${EMERGENCY.map(e => `<a class="emc" href="tel:${e[2]}"><div class="n">${e[0]}</div><div class="t">${esc(e[1])}</div></a>`).join('')}</div>`;
 let svcTimer;
+const svcCats = () => SERVICE_CATS.filter(c => c[0] !== 'blood' || feat('featBlood'));
 async function loadDir() {
   if (S.dcat === 'blood' && !feat('featBlood')) S.dcat = '';
-  $('#dchips').innerHTML = [['', 'সব সেবা'], ...(feat('featBlood') ? [['blood', '🩸 ব্লাড ব্যাংক']] : []), ['sos', 'জরুরি নম্বর'], ...SERVICE_CATS].map(c => `<button class="chip${c[0] === S.dcat ? ' on' : ''}" data-d="${c[0]}">${esc(c[1])}</button>`).join('');
-  const q = $('#q').value.trim();
+  const q = $('#q').value.trim(), landing = !S.dcat && !q;
+  // প্রথম পাতায় আইকনের গ্রিড; কোনো ধরনের ভেতরে বা খোঁজার সময় উপরে দ্রুত বদলানোর চিপ
+  $('#dchips').hidden = landing;
+  if (!landing) $('#dchips').innerHTML = [['', 'সব সেবা', '🗂️'], ['sos', 'জরুরি নম্বর', '🚨'], ...svcCats()].map(c => `<button class="chip${c[0] === S.dcat ? ' on' : ''}" data-d="${c[0]}">${c[2]} ${esc(c[1])}</button>`).join('');
+  if (!landing) setTimeout(() => $('#dchips .chip.on')?.scrollIntoView({ inline: 'center', block: 'nearest' }), 0);
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }
   if (S.dcat === 'blood') return loadBlood();
   $('#dir').innerHTML = '<div class="skel"></div>';
   try {
-    const list = await S.api.services({ category: S.dcat || null, q });
-    if (!list.length) { $('#dir').innerHTML = `<div class="empty">কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।</div>`; return; }
-    if (S.dcat || q) { $('#dir').innerHTML = list.map(svcCard).join(''); return; }
-    // "সব সেবা": উপরে জরুরি নম্বর, তারপর ধরন অনুযায়ী ভাগ করে সব সেবা
-    const donors = await S.api.donors({ upazila: HOME_UPAZILA }).catch(() => []);
-    const bloodCard = `<button class="card blood-sum" data-d="blood"><b>🩸 ব্লাড ব্যাংক</b><span class="mut">${esc(HOME_UPAZILA)} উপজেলায় ${bn(donors.length)} জন রক্তদাতা</span>
-      <span class="bg-row">${BLOOD_GROUPS.map(g => `<span class="bg-pill">${g} <b>${bn(donors.filter(d => d.bloodGroup === g).length)}</b></span>`).join('')}</span></button>`;
-    $('#dir').innerHTML = emergencyHtml() + bloodCard + SERVICE_CATS.map(([k, name]) => {
-      const items = list.filter(s => s.category === k);
-      return items.length ? `<h3 class="cat-h">${esc(name)} <span class="n">${bn(items.length)}টি</span></h3>${items.map(svcCard).join('')}` : '';
-    }).join('');
+    const list = await S.api.services({ category: landing ? null : S.dcat || null, q });
+    if (landing) {
+      const n = k => list.filter(x => x.category === k).length;
+      $('#dir').innerHTML = `<div class="svc-grid">
+        <button class="svc-tile sos" data-svc="sos"><span class="st-e">🚨</span><span class="st-n">জরুরি নম্বর</span></button>
+        ${svcCats().map(([k, name, e]) => { const c = SVC_SPECIAL[k] ? 0 : n(k); return `<button class="svc-tile" data-svc="${k}"><span class="st-e">${e}</span><span class="st-n">${esc(name)}</span>${c ? `<span class="st-c">${bn(c)}</span>` : ''}</button>`; }).join('')}
+      </div>`;
+      return;
+    }
+    const cat = SERVICE_CATS.find(c => c[0] === S.dcat);
+    const head = cat ? `<div class="svc-head"><span class="st-e">${cat[2]}</span><b>${esc(cat[1])}</b><span class="mut">${bn(list.length)}টি</span></div>` : '';
+    if (!list.length) { $('#dir').innerHTML = head + `<div class="empty">${cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।'}</div>`; return; }
+    $('#dir').innerHTML = head + list.map(svcCard).join('');
   } catch (e) { $('#dir').innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
+function openSvcCat(k) {
+  const sp = SVC_SPECIAL[k];
+  if (sp && sp !== 'blood') { S.fcat = sp; go('home'); renderFilters(); loadFeed('home'); return; }   // ক্রয়বিক্রয় ও চাকরি: ফিডের সেই ধরনের পোস্ট
+  S.dcat = k; loadDir(); window.scrollTo(0, 0);
+}
 $('#q').addEventListener('input', () => { clearTimeout(svcTimer); svcTimer = setTimeout(loadDir, 300); });
-$('#dchips').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (b) { S.dcat = b.dataset.d; loadDir(); } });
+$('#dchips').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (b) openSvcCat(b.dataset.d); });
 $('#dir').addEventListener('click', e => {
+  const t = e.target.closest('[data-svc]'); if (t) return openSvcCat(t.dataset.svc);
   const b = e.target.closest('.blood-sum[data-d]'); if (b) { S.dcat = 'blood'; loadDir(); window.scrollTo(0, 0); return; }
   const g = e.target.closest('[data-bg]'); if (g) { S.bgroup = g.dataset.bg; loadBlood(); return; }
   const sc = e.target.closest('[data-bscope]'); if (sc) { S.bscope = sc.dataset.bscope; loadBlood(); }
@@ -3905,7 +3917,7 @@ $('#addsvc').addEventListener('click', () => {
   if (!needUser()) return;
   openSheet(`<h2>নতুন সেবা যোগ করুন</h2><form id="sform">
     <label for="sn">নাম</label><input id="sn" required minlength="2" maxlength="80">
-    <label for="sc">ধরন</label><select class="f" id="sc">${SERVICE_CATS.map(c => `<option value="${c[0]}">${esc(c[1])}</option>`).join('')}</select>
+    <label for="sc">ধরন</label><select class="f" id="sc">${SERVICE_CATS.filter(c => !SVC_SPECIAL[c[0]]).map(c => `<option value="${c[0]}" ${c[0] === S.dcat ? 'selected' : ''}>${c[2]} ${esc(c[1])}</option>`).join('')}</select>
     <label for="sa">ঠিকানা / এলাকা</label><input id="sa" required maxlength="120">
     <label for="sp">ফোন নম্বর</label><input id="sp" required inputmode="tel" maxlength="20" pattern="[0-9০-৯+\\- ]{3,20}">
     <label for="sh">খোলার সময় (ঐচ্ছিক)</label><input id="sh" maxlength="60">

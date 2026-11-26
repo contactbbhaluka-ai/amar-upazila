@@ -5031,6 +5031,10 @@ create index if not exists likes_user_time_idx on public.likes (user_id, created
 create index if not exists comments_user_time_idx on public.comments (user_id, created_at desc);
 create index if not exists posts_user_shared_idx on public.posts (user_id, created_at desc) where shared_post_id is not null;
 
+-- সেবা ডিরেক্টরি: beautifulbhaluka.com-এর মতো ৪৫টি ধরন (ব্লাড ব্যাংক, ক্রয়বিক্রয়, চাকরি অ্যাপের নিজস্ব পাতায় যায়)
+alter table public.services drop constraint if exists services_category_check;
+alter table public.services add constraint services_category_check check (category in ('upz','pouro','union','fire','police','gov','doc','amb','health','press','lawyer','famous','ff','voter','edu','tour','food','hotel','courier','bank','rentcar','net','clean','power','gym','ladies','gents','office','kazi','shop','cook','fix','air','graphics','tutor','it','video','band','pride','tolet','bride','ghotok','bus'));
+
 -- =====================================================================
 --  নিজেকে অ্যাডমিন বানাতে: অ্যাপে প্রথমে সাইনআপ করুন, তারপর নিচের লাইনে
 --  নিজের ইমেইল বসিয়ে আলাদাভাবে চালান:

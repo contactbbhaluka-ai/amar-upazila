@@ -1,0 +1,3 @@
+-- সেবা ডিরেক্টরি: beautifulbhaluka.com-এর মতো ৪৫টি ধরন (ব্লাড ব্যাংক, ক্রয়বিক্রয়, চাকরি অ্যাপের নিজস্ব পাতায় যায়)
+alter table public.services drop constraint if exists services_category_check;
+alter table public.services add constraint services_category_check check (category in ('upz','pouro','union','fire','police','gov','doc','amb','health','press','lawyer','famous','ff','voter','edu','tour','food','hotel','courier','bank','rentcar','net','clean','power','gym','ladies','gents','office','kazi','shop','cook','fix','air','graphics','tutor','it','video','band','pride','tolet','bride','ghotok','bus'));

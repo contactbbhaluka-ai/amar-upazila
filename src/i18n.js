@@ -144,6 +144,13 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'উপজেলা': 'Upazila', 'পৌরসভা': 'Pourashava', 'ইউনিয়ন': 'Union', 'ফায়ার সার্ভিস': 'Fire service', 'থানা পুলিশ': 'Police station', 'প্রশাসন': 'Administration', 'এ্যাম্বুলেন্স': 'Ambulance',
+  'হাসপাতাল': 'Hospital', 'সাংবাদিক': 'Journalists', 'আইনজীবী': 'Lawyers', 'প্রসিদ্ধ ব্যক্তি': 'Notable people', 'মুক্তিযোদ্ধা': 'Freedom fighters', 'ভোটার তালিকা': 'Voter list', 'স্কুল কলেজ': 'Schools & colleges',
+  'দর্শনীয় স্থান': 'Places to visit', 'রেস্টুরেন্ট': 'Restaurants', 'আবাসিক হোটেল': 'Hotels', 'কুরিয়ার': 'Courier', 'ব্যাংক': 'Banks', 'গাড়ি ভাড়া': 'Car rental', 'ব্রডব্যান্ড': 'Broadband',
+  'পরিচ্ছন্নতা': 'Cleaning', 'বিদ্যুৎ': 'Electricity', 'জিম': 'Gym', 'লেডিস পার্লার': 'Ladies parlour', 'জেন্টস পার্লার': 'Gents parlour', 'অফিস': 'Offices', 'কাজী অফিস': 'Kazi office',
+  'হাট বাজার': 'Markets', 'কসাই ও বাবুর্চি': 'Butchers & cooks', 'সকল মিস্ত্রি': 'All mechanics', 'এয়ার ট্রাভেল': 'Air travel', 'গ্রাফিক্স': 'Graphics', 'টিউশন': 'Tuition', 'সাইবার এক্সপার্ট': 'Cyber expert',
+  'ভিডিও': 'Video', 'ব্যান্ডপার্টি': 'Band party', 'কৃতি সন্তান': 'Achievers', 'বাসা ভাড়া': 'House rent', 'পাত্রপাত্রী': 'Matrimony', 'ঘটক': 'Matchmaker', 'ক্রয়বিক্রয়': 'Buy & sell', 'পরিবহন': 'Transport',
+  'সব সেবা': 'All services', 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন': 'No services of this type yet. Tap the button below to add the first one', '{x}টি': '{x}',
   'উপজেলা সেবা ডিরেক্টরি': 'Upazila service directory',
   'আমার শর্টকাট': 'My shortcuts', 'সাজান': 'Arrange', '"সাজান" চেপে পছন্দের শর্টকাট এখানে রাখুন': 'Tap "Arrange" to keep favorite shortcuts here',
   'শর্টকাট সাজান': 'Arrange shortcuts', 'মেনুর একদম উপরে কোন শর্টকাটগুলো থাকবে বেছে নিন। ↑ ↓ দিয়ে আগে-পরে করুন। সর্বোচ্চ {x}টি': 'Choose which shortcuts stay at the top of the menu. Reorder with ↑ ↓. Up to {x}',

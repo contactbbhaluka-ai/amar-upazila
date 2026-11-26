@@ -18,7 +18,8 @@ async function supabaseApi() {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
-  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,bio,role,unions(name)';
+  // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
+  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,bio,role,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
     id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
     union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
@@ -39,7 +40,7 @@ async function supabaseApi() {
     shared: r.sp ? { id: r.sp.id, body: r.sp.body, image: r.sp.image_urls?.[0] || r.sp.image_url || '', createdAt: r.sp.created_at, userId: r.sp.user_id, pageId: r.sp.page_id || null,
       author: r.sp.pages?.name || r.sp.profiles?.name || 'সদস্য', avatar: (r.sp.page_id ? r.sp.pages?.avatar_url : r.sp.profiles?.avatar_url) || '' } : null,
   });
-  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:posts!posts_shared_post_id_fkey(id,body,image_url,image_urls,created_at,user_id,page_id,profiles(name,avatar_url),pages(name,avatar_url)),user_id,union_id,page_id,group_id,profiles(name,avatar_url,upazila),unions(name),pages(name,avatar_url),groups(name)';
+  const POST_COLS = 'id,body,image_url,image_urls,privacy,post_tags(profiles(id,name)),post_mentions(profiles(id,name)),category,created_at,like_count,reactions,comment_count,share_count,save_count,pinned_comment_id,shared_post_id,edited_at,sp:posts!posts_shared_post_id_fkey(id,body,image_url,image_urls,created_at,user_id,page_id,profiles!posts_user_id_fkey(name,avatar_url),pages!posts_page_id_fkey(name,avatar_url)),user_id,union_id,page_id,group_id,profiles!posts_user_id_fkey(name,avatar_url,upazila),unions!posts_union_id_fkey(name),pages!posts_page_id_fkey(name,avatar_url),groups!posts_group_id_fkey(name)';
   const toPage = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, category: r.category, about: r.about || '', phone: r.phone || '', avatar: r.avatar_url || '', followers: r.follower_count });
   const toGroup = r => r && ({ id: r.id, ownerId: r.owner_id, name: r.name, about: r.about || '', privacy: r.privacy, avatar: r.avatar_url || '', members: r.member_count });
   const inList = ids => `(${ids.join(',')})`;
@@ -297,7 +298,7 @@ async function supabaseApi() {
     },
     // sort: 'top' (বেশি রিয়্যাক্ট), 'new' (নতুন), 'old' (পুরাতন)
     async comments(postId, sort = 'old') {
-      let q = sb.from('comments').select('id,body,created_at,edited_at,parent_id,user_id,like_count,reactions,profiles(name,avatar_url),comment_mentions(profiles(id,name))').eq('post_id', postId).limit(300);
+      let q = sb.from('comments').select('id,body,created_at,edited_at,parent_id,user_id,like_count,reactions,profiles!comments_user_id_fkey(name,avatar_url),comment_mentions(profiles(id,name))').eq('post_id', postId).limit(300);
       q = sort === 'top' ? q.order('like_count', { ascending: false }).order('created_at') : q.order('created_at', { ascending: sort === 'old' });
       const rows = ok(await q).filter(r => !blocked.has(r.user_id));
       let mine = new Map();
@@ -399,7 +400,7 @@ async function supabaseApi() {
 
     // ---------- নোটিফিকেশন
     async notifications() {
-      const rows = ok(await sb.from('notifications').select('id,type,post_id,group_id,read,created_at,actor_id, a:profiles!notifications_actor_id_fkey(id,name,avatar_url), p:posts(body), g:groups(name)')
+      const rows = ok(await sb.from('notifications').select('id,type,post_id,group_id,read,created_at,actor_id, a:profiles!notifications_actor_id_fkey(id,name,avatar_url), p:posts!notifications_post_id_fkey(body), g:groups!notifications_group_id_fkey(name)')
         .eq('user_id', me.id).order('created_at', { ascending: false }).limit(60));
       return rows.filter(n => n.a && !blocked.has(n.actor_id)).map(n => ({
         id: n.id, type: n.type, postId: n.post_id, groupId: n.group_id, groupName: n.g?.name || '', read: n.read, createdAt: n.created_at,

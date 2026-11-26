@@ -1048,9 +1048,9 @@ const ABOUT = [
     read: () => { const name = $('#ab-name').value.trim(); if (name.length < 2) return { err: 'নাম অন্তত ২ অক্ষরের দিন' }; return { name, bio: $('#ab-bio').value.trim() }; } },
   { id: 'work', ic: 'work', t: 'কাজ ও শিক্ষা',
     sum: u => [...(u.works || []).map(workText), ...(u.educations || []).map(eduText)].join(' · '), empty: 'কর্মস্থল ও শিক্ষাপ্রতিষ্ঠান যোগ করুন',
-    form: u => `<details class="ab-sub" open><summary>${ic('work', 16)} কাজ <small class="mut">(সর্বোচ্চ ${bn(MAX_WORK)}টি)</small></summary>
+    form: u => `<details class="ab-sub"><summary>${ic('work', 16)} কাজ <small class="mut">· ${u.works?.length ? `${bn(u.works.length)}টি কর্মস্থল` : 'এখনো যোগ করা হয়নি'}</small></summary>
         <div id="we-works">${weList('work', u.works)}</div><button type="button" class="we-add" data-weadd="work">${ic('plus', 15)} আরেকটি কর্মস্থল যোগ করুন</button></details>
-      <details class="ab-sub" open><summary>${ic('school', 16)} শিক্ষা <small class="mut">(সর্বোচ্চ ${bn(MAX_EDU)}টি)</small></summary>
+      <details class="ab-sub"><summary>${ic('school', 16)} শিক্ষা <small class="mut">· ${u.educations?.length ? `${bn(u.educations.length)}টি শিক্ষাপ্রতিষ্ঠান` : 'এখনো যোগ করা হয়নি'}</small></summary>
         <div id="we-edus">${weList('edu', u.educations)}</div><button type="button" class="we-add" data-weadd="edu">${ic('plus', 15)} আরেকটি শিক্ষাপ্রতিষ্ঠান যোগ করুন</button></details>
       <datalist id="subj-hints">${SUBJECT_HINTS.map(x => `<option value="${x}">`).join('')}</datalist>`,
     after: () => weSyncAdd(),
@@ -1136,7 +1136,7 @@ function renderAbout(key) {
   ${u.joinedAt ? `<div class="ab-joined">${ic('calendar', 15)} ${joinedText(u.joinedAt)}</div>` : ''}</div>`;
   const a = ABOUT.find(x => x.id === open);
   if (a?.after) a.after(u);
-  if (a) setTimeout(() => pane.querySelector('.ab-form input, .ab-form select, .ab-form textarea')?.focus({ preventScroll: true }), 30);
+  if (a && a.id !== 'work') setTimeout(() => pane.querySelector('.ab-form input, .ab-form select, .ab-form textarea')?.focus({ preventScroll: true }), 30);
 }
 function openAbout(section) {
   Object.assign(S.pstate.me, { tab: 'about', open: section || null, album: null });

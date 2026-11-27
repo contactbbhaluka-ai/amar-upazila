@@ -2229,3 +2229,15 @@ body:has(#modal.on) .totop{display:none}
 .up .sd-phones{margin-bottom:8px}
 .up .sd-gomap{margin-top:8px}
 .up .dsec{scroll-margin-top:110px}
+/* উপজেলা পাতা: এক নজরের পরের অংশগুলো ড্রপডাউন */
+.sdet-body details.dacc{padding:0;overflow:hidden}
+.sdet-body .dacc>summary h3{display:flex;align-items:center;gap:8px;font-size:1.08rem;color:var(--ink)}
+.sdet-body .dacc>summary h3::before{content:"";flex:0 0 4px;height:20px;border-radius:3px;background:var(--sc)}
+.sdet-body .dacc-b>h4:first-child{margin-top:8px}
+details.dacc>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+details.dacc>summary::-webkit-details-marker{display:none}
+details.dacc>summary h3{flex:1;margin:0!important}
+details.dacc>summary i{font-style:normal;font-size:18px;color:var(--mut);transition:transform .2s}
+details.dacc[open]>summary i{transform:rotate(180deg)}
+details.dacc[open]>summary{border-bottom:1px solid var(--line)}
+.dacc-b{padding:4px 16px 14px}

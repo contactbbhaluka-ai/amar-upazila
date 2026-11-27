@@ -3920,17 +3920,19 @@ const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : EMG_CATS.h
   : s.category === 'union' ? svcUnionCard(s) : INFO_CATS.has(s.category) && !s.image_url ? svcInfoCard(s) : s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
 // বিস্তারিত লেখা: ### শিরোনাম, • তালিকা, ফাঁকা লাইনে অনুচ্ছেদ
 // বিস্তারিত লেখা: "## " প্রধান অংশ, "### " তার ভেতরের উপ-অংশ, "• " তালিকা
-function detHtml(t, idp) {
+function detHtml(t, idp, acc) {
   const out = []; let ul = [], inSec = false, n = 0;
   const flush = () => { if (ul.length) out.push(`<ul>${ul.join('')}</ul>`); ul = []; };
   for (const raw of String(t || '').split(/\n+/)) {
     const l = raw.trim(); if (!l) continue;
-    if (l.startsWith('## ')) { flush(); if (inSec) out.push('</section>'); inSec = true; out.push(`<section class="dsec"${idp ? ` id="${idp}${n}"` : ''}><h3>${esc(l.slice(3))}</h3>`); n++; }
+    if (l.startsWith('## ')) { flush(); if (inSec) out.push(inSec === 'd' ? '</div></details>' : '</section>'); const id = idp ? ` id="${idp}${n}"` : '';
+      if (acc && n > 0) { inSec = 'd'; out.push(`<details class="dsec dacc"${id}><summary><h3>${esc(l.slice(3))}</h3><i>⌄</i></summary><div class="dacc-b">`); }
+      else { inSec = true; out.push(`<section class="dsec"${id}><h3>${esc(l.slice(3))}</h3>`); } n++; }
     else if (l.startsWith('### ')) { flush(); out.push(`<h4>${esc(l.slice(4))}</h4>`); }
     else if (/^[•\-*]\s/.test(l)) ul.push(`<li>${esc(l.replace(/^[•\-*]\s+/, ''))}</li>`);
     else { flush(); out.push(`<p${/^সূত্র:/.test(l) ? ' class="dsrc"' : ''}>${esc(l)}</p>`); }
   }
-  flush(); if (inSec) out.push('</section>'); return out.join('');
+  flush(); if (inSec) out.push(inSec === 'd' ? '</div></details>' : '</section>'); return out.join('');
 }
 // উপজেলা/পৌরসভা: ক্যাটাগরিতে ঢুকলেই পুরো তথ্য (কার্ডে চাপতে হয় না)
 function svcInlinePage(s) {
@@ -3951,7 +3953,7 @@ function svcInlinePage(s) {
       <div class="ip-acts">${ph[0] ? `<a class="si-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞 <b>${esc(bn(ph[0].n))}</b></a>` : ''}${s.email ? `<a class="si-mail" href="mailto:${esc(s.email)}">✉️</a>` : ''}
         <button class="ip-btn" data-svcsh="${esc(s.id)}">↗️ শেয়ার</button>${me()?.admin ? `<button class="ip-btn" data-ipedit="${esc(s.id)}">✏️ সম্পাদনা</button>` : ''}</div></div>
     ${secs.length > 2 ? `<div class="ip-toc">${secs.map((t, i) => `<button data-iptoc="${i}">${esc(t)}</button>`).join('')}</div>` : ''}
-    <div class="sdet-body ip-body">${detHtml(s.details, 'ip-sec-')}</div>
+    <div class="sdet-body ip-body">${detHtml(s.details, 'ip-sec-', s.category === 'upz')}</div>
     ${links}
     <button class="link ip-rep" data-iprep="${esc(s.id)}">⚠️ ভুল তথ্য জানান</button>
   </div>`;
@@ -5203,7 +5205,7 @@ document.addEventListener('click', e => {
   const lo = e.target.closest('[data-svcloc]'); if (lo) return svcLocSheet(lo.dataset.svcloc);
   const shb = e.target.closest('[data-svcsh]'); if (shb) { const x = (S.svcAll || []).find(y => String(y.id) === shb.dataset.svcsh); if (x) { S.sdId = x.id; return svcShareSheet(x); } return; }
   const dt = e.target.closest('[data-svcdet]'); if (dt) return svcDetailSheet(dt.dataset.svcdet);
-  const tc = e.target.closest('[data-iptoc]'); if (tc) return document.getElementById('ip-sec-' + tc.dataset.iptoc)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const tc = e.target.closest('[data-iptoc]'); if (tc) { const el = document.getElementById('ip-sec-' + tc.dataset.iptoc); if (el?.tagName === 'DETAILS') el.open = true; return el?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   const ipc = e.target.closest('[data-ipcat]'); if (ipc) return openSvcCat(ipc.dataset.ipcat);
   const ipe = e.target.closest('[data-ipedit]'); if (ipe) { const x = (S.svcAll || []).find(y => String(y.id) === ipe.dataset.ipedit); return x && svcEditSheet(x); }
   const ipr = e.target.closest('[data-iprep]'); if (ipr) { const x = (S.svcAll || []).find(y => String(y.id) === ipr.dataset.iprep); return x && svcReportSheet(x); }

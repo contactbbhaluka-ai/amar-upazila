@@ -4216,10 +4216,9 @@ function greetText() { const [g, e] = greetPart(), n = me()?.name?.trim(); retur
 function dirHeroHtml(total, cats) {
   const now = new Date(), t = dhakaParts(now), bd = banglaDate(t);
   const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)}`;
-  return `<div class="dir-hero" id="dir-hero"><div class="dh-date"><b>${esc(BN_WD[t.wd])}</b><i>·</i><span>${esc(son)}</span><i>·</i><span>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</span></div>
-    <div class="dh-greet">${esc(greetText())}</div>
+  return `<div class="dir-hero" id="dir-hero"><div class="dh-greet">${esc(greetText())}</div><div class="dh-date"><b>আজ ${esc(BN_WD[t.wd])}</b><i>·</i><span>${esc(son)}</span><i>·</i><span>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</span></div>
     <div class="dh-wxrow"><button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ"></button><div class="dh-msg" id="dh-msg" hidden></div></div>
-    <div class="dh-bot"><small>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায় · ${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা</small></div></div>`;
+</div>`;
 }
 // সবুজ কার্ডটা পুরো ডিরেক্টরির হেডার: সব পাতায় একদম উপরে থাকে
 function renderDirHead(list) {
@@ -4301,7 +4300,8 @@ function renderSvcGrid(list) {
   const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : k === 'aid' ? 'প্রাথমিক চিকিৎসা' : c[1], cnt = k === 'sos' || k === 'aid' || SVC_SPECIAL[k] ? 0 : n(k);
     return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
   const favs = list.filter(x => S.svcFav?.has(x.id));
-  $('#dir').innerHTML = sliderHtml(total, cats)
+  $('#dir').innerHTML = `<div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div>`
+    + sliderHtml(total, cats)
     + dayNoticeHtml()
     + `<div class="sos-row2"><button class="sos-btn" data-sos>🆘 বিপদে আছি</button><button class="aid-btn" data-svc="aid">🩹 প্রাথমিক চিকিৎসা</button></div>`
     + timeSuggestHtml()

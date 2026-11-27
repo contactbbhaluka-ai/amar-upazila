@@ -3835,14 +3835,15 @@ function afterAuth() {
 }
 
 // ================================================================ ☰ সেবা ডিরেক্টরি
-const svcCard = s => `<div class="card svc">
-  <div class="ic svc-ic">${svcIc(s.category, 24)}</div>
+const svcCard = s => `<div class="card svc${s.image_url ? ' has-img' : ''}">
+  <div class="ic svc-ic${s.image_url ? ' svc-imgw' : ''}">${svcIc(s.category, 24)}${s.image_url ? `<img class="svc-img" src="${esc(s.image_url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}</div>
   <div style="flex:1;min-width:0"><h3>${esc(s.name)}</h3><div class="meta">${esc(s.address)}</div>${s.hours ? `<div class="meta">🕘 ${esc(s.hours)}</div>` : ''}
     ${s.verified ? '<span class="ver">✔ যাচাইকৃত</span>' : `<span class="mut">যাচাই বাকি</span>${me()?.admin ? ` <button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button>` : ''}`}
     ${s.lat != null ? `<div class="svc-geo">${svcDist(s) != null ? `<span class="svc-km">📍 ${fmtDist(svcDist(s))}</span>` : ''}<a class="svc-dir" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}" target="_blank" rel="noopener">🧭 পথ দেখুন</a></div>` : ''}
     ${me()?.admin ? `<button class="link svc-setloc" data-svcloc="${esc(s.id)}">${s.lat != null ? '📍 অবস্থান বদলান' : '📍 অবস্থান দিন'}</button>` : ''}</div>
   <div class="svc-act"><button class="svc-fav${S.svcFav?.has(s.id) ? ' on' : ''}" data-svcfav="${esc(s.id)}" aria-pressed="${!!S.svcFav?.has(s.id)}" aria-label="${S.svcFav?.has(s.id) ? 'প্রিয় থেকে সরান' : 'প্রিয় সেবায় রাখুন'}">${S.svcFav?.has(s.id) ? '❤️' : '🤍'}</button>
-  <a class="call" data-svccall="${esc(s.id)}" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a></div></div>`;
+  ${s.phone ? `<a class="call" data-svccall="${esc(s.id)}" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a>` : ''}
+  ${s.url ? `<a class="svc-web" href="${esc(s.url)}" target="_blank" rel="noopener">🌐 বিস্তারিত</a>` : ''}</div></div>`;
 const emergencyHtml = () => `<a class="big" href="tel:999"><span class="n">৯৯৯</span><span><b>জাতীয় জরুরি সেবা</b><br>পুলিশ, ফায়ার সার্ভিস, অ্যাম্বুলেন্স: টোল ফ্রি</span></a>
   <div class="em">${EMERGENCY.map(e => `<a class="emc" href="tel:${e[2]}"><div class="n">${e[0]}</div><div class="t">${esc(e[1])}</div></a>`).join('')}</div>`;
 let svcTimer;

@@ -144,6 +144,7 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'বিস্তারিত': 'Details',
   'উপরে ফিরুন': 'Back to top',
   'বৃষ্টি হতে পারে, বের হলে ছাতা সাথে রাখতে পারেন': 'Rain is possible, take an umbrella if you go out', 'আজকের আবহাওয়া ভালো, বাইরে যাওয়ার জন্য উপযুক্ত দিন': 'Nice weather today, a good day to go out', '°সে': '°C',
   'বৃষ্টি {x}%': 'Rain {x}%', 'আজ': 'Today',

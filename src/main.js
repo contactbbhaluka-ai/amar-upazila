@@ -3523,8 +3523,20 @@ function addrHtml(p, cur = {}) {
     </select><div id="${p}-a2w"></div><div id="${p}-a3w"></div>`;
 }
 const unionSelect = (id, sel) => `<label for="${id}">${ic('home', 16)} পৌরসভা / ইউনিয়ন</label><select class="f" id="${id}" required><option value="" disabled ${sel ? '' : 'selected'}>বাছাই করুন</option>${S.unions.map(u => `<option value="${esc(u.id)}" ${String(u.id) === String(sel) ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select>`;
+// ইউনিয়নের তালিকা কোনো কারণে না এসে থাকলে দরকারের সময় আবার আনা
+async function ensureUnions() {
+  if (S.unions?.length) return S.unions;
+  try { const u = await S.api.unions(); if (u?.length) { S.unions = u; local.set('c_unions', u); } } catch { /* নেট নেই */ }
+  if (!S.unions?.length) { const c = local.get('c_unions'); if (c?.length) S.unions = c; }
+  return S.unions || [];
+}
 function addrRefresh(p, cur = {}) {
   const a1 = $(`#${p}-a1`)?.value, w2 = $(`#${p}-a2w`), w3 = $(`#${p}-a3w`); if (!w2) return;
+  if (!S.unions?.length && (a1 === HOME || a1 === HOME_DISTRICT)) {
+    w2.innerHTML = '<p class="mut" style="margin:8px 4px">⏳ ইউনিয়নের তালিকা আনা হচ্ছে…</p>'; w3.innerHTML = '';
+    ensureUnions().then(u => { if (!$(`#${p}-a1`)) return; if (u.length) addrRefresh(p, cur); else w2.innerHTML = '<p class="au-err">ইউনিয়নের তালিকা আনা যায়নি। ইন্টারনেট চালু করে আবার বাছাই করুন।</p>'; });
+    return;
+  }
   w3.innerHTML = '';
   if (!a1) { w2.innerHTML = ''; return; }
   if (a1 === HOME) { w2.innerHTML = unionSelect(`${p}-un`, cur.unionId); return; }
@@ -3535,7 +3547,7 @@ function addrRefresh(p, cur = {}) {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.addr) addrRefresh(t.dataset.addr);
-  if (t.dataset.addr2) { const p = t.dataset.addr2; $(`#${p}-a3w`).innerHTML = t.value === HOME_UPAZILA && $(`#${p}-a1`).value === HOME_DISTRICT ? unionSelect(`${p}-un`) : ''; }
+  if (t.dataset.addr2) { const p = t.dataset.addr2, home = t.value === HOME_UPAZILA && $(`#${p}-a1`).value === HOME_DISTRICT; if (home && !S.unions?.length) { $(`#${p}-a3w`).innerHTML = '<p class="mut" style="margin:8px 4px">⏳ ইউনিয়নের তালিকা আনা হচ্ছে…</p>'; ensureUnions().then(() => { const w = $(`#${p}-a3w`); if (w) w.innerHTML = S.unions.length ? unionSelect(`${p}-un`) : '<p class="au-err">ইউনিয়নের তালিকা আনা যায়নি। ইন্টারনেট চালু করে আবার বাছাই করুন।</p>'; }); } else $(`#${p}-a3w`).innerHTML = home ? unionSelect(`${p}-un`) : ''; }
   if (t.id && t.id.endsWith('-bg')) { const d = $(`#${t.id.replace('-bg', '-donorw')}`); if (d) d.hidden = !t.value || t.value === 'none'; }
 });
 function readAddr(p) {
@@ -8043,11 +8055,14 @@ function restoreNav() {
     S.api = await createApi();
     S.api.onTokens?.((id, rt) => { if (accSaved(id)) accUpd(id, { rt }); });
     renderDemoBar();
+    // ইউনিয়নের তালিকা লগইন যাচাইয়ের অপেক্ষা না করে আগেই আনা (সাইনআপের ঠিকানায় লাগে)
+    const upP = cachedCall('upazila', () => S.api.upazila()), unP = cachedCall('unions', () => S.api.unions()).then(u => { if (u?.length) S.unions = u; return u; });
+    upP.catch(() => {}); unP.catch(() => {});
     await S.api.init(() => afterAuth());
     S.api.onPasswordRecovery?.(() => recoverySheet());
     S.api.onDeletionCancelled?.(() => deletionCancelledNotice());
     renderNetBar(); renderNotices(); checkForceUpdate();
-    const [up, unions] = await Promise.all([cachedCall('upazila', () => S.api.upazila()), cachedCall('unions', () => S.api.unions())]);
+    const [up, unions] = await Promise.all([upP, unP]);
     S.unions = unions;
     $('#upname').textContent = `${up.name}, ${up.district}`;
     $('#loc').innerHTML = '<option value="">সব এলাকা</option>' + unions.map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');

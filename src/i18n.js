@@ -144,6 +144,7 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'বৃষ্টি হতে পারে, বের হলে ছাতা সাথে রাখতে পারেন': 'Rain is possible, take an umbrella if you go out', 'আজকের আবহাওয়া ভালো, বাইরে যাওয়ার জন্য উপযুক্ত দিন': 'Nice weather today, a good day to go out', '°সে': '°C',
   'বৃষ্টি {x}%': 'Rain {x}%', 'আজ': 'Today',
   'শুভ সকাল, {n}': 'Good morning, {n}', 'শুভ দুপুর, {n}': 'Good afternoon, {n}', 'শুভ বিকাল, {n}': 'Good afternoon, {n}', 'শুভ সন্ধ্যা, {n}': 'Good evening, {n}', 'শুভ রাত্রি, {n}': 'Good night, {n}',
   'ভালুকাবাসী': 'people of Bhaluka', 'ভালুকার সব সেবা এক জায়গায় · {x}টি ধরন · মোট {x}টি সেবা': 'All Bhaluka services in one place · {x} categories · {x} services',

@@ -1768,3 +1768,28 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .dir-hero .dh-greet{display:block;margin-top:8px;font-weight:800;font-size:17px!important}.dir-hero .dh-bot{margin-top:10px;padding-top:8px}.dir-hero .dh-bot small{font-size:12.5px;opacity:.92}
 .dir-hero .dh-greet{margin:0 0 6px}#dir>.svc-hero{margin-top:0}
 .dh-today{font-size:.78em;font-weight:600;opacity:.85}.dh-wxt{display:flex;flex-direction:column;line-height:1.25}.dh-wxt small{white-space:nowrap}.dh-rain{font-weight:700}
+
+/* ---- ডিরেক্টরির হেডার (নতুন রূপ) ---- */
+.dir-hero{position:relative;overflow:hidden;margin:0 0 12px!important;padding:16px 16px 14px;border-radius:22px;color:#fff;box-shadow:0 6px 18px -8px rgba(6,78,59,.55);isolation:isolate}
+.dir-hero::before,.dir-hero::after{content:'';position:absolute;border-radius:50%;z-index:-1;pointer-events:none}
+.dir-hero::before{width:190px;height:190px;right:-60px;top:-80px;background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,0) 70%)}
+.dir-hero::after{width:140px;height:140px;left:-50px;bottom:-70px;background:radial-gradient(circle,rgba(255,255,255,.14),rgba(255,255,255,0) 70%)}
+.dir-hero.tone-dawn{background:linear-gradient(135deg,#0b7a55 0%,#12a17a 55%,#f0a350 130%)}
+.dir-hero.tone-day{background:linear-gradient(135deg,#086b4b 0%,#0f9a6c 60%,#2fbf8f 100%)}
+.dir-hero.tone-noon{background:linear-gradient(135deg,#0a7458 0%,#109a7a 55%,#e8a33d 140%)}
+.dir-hero.tone-dusk{background:linear-gradient(135deg,#7b2d6b 0%,#c2410c 70%,#f59f00 120%);box-shadow:0 6px 18px -8px rgba(124,45,18,.6)}
+.dir-hero.tone-night{background:linear-gradient(135deg,#0b1d3a 0%,#1e3a6e 60%,#3b5bdb 130%);box-shadow:0 6px 18px -8px rgba(15,23,42,.7)}
+.dir-hero .dh-greet{margin:0!important;font-size:19px!important;font-weight:800;line-height:1.3;letter-spacing:.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dir-hero .dh-date{display:flex;align-items:center;flex-wrap:nowrap;gap:7px;margin-top:8px;white-space:nowrap;overflow:hidden;font-size:min(13.5px,3.7vw)}
+.dir-hero .dh-date span{font-weight:600;opacity:.95}.dir-hero .dh-date i{width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.55;flex:none}
+.dir-hero .dh-wd{background:rgba(255,255,255,.18);border-radius:999px;padding:3px 10px;font-weight:800!important;opacity:1!important}.dir-hero .dh-wd small{font-size:.82em;font-weight:600;opacity:.85}
+.dir-hero .dh-wx{display:block;width:100%;margin-top:12px;padding:10px 12px;border:1px solid rgba(255,255,255,.22);border-radius:16px;background:rgba(255,255,255,.14);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#fff;font:inherit;text-align:left;cursor:pointer;min-width:0}
+.dir-hero .dh-wx[hidden]{display:none}.dir-hero .dh-wx:active{transform:scale(.99)}
+.dh-wxmain{display:flex;align-items:center;gap:10px}.dir-hero .dh-ico{font-size:34px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.18))}
+.dir-hero .dh-temp{font-size:30px;font-weight:800;line-height:1;letter-spacing:-.5px}.dir-hero .dh-temp sup{font-size:12px;font-weight:700;margin-left:1px;vertical-align:top;position:relative;top:3px;opacity:.9}
+.dir-hero .dh-wxt{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}.dir-hero .dh-wxt b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dh-chips{display:flex;gap:5px;flex-wrap:wrap}.dh-chips span{background:rgba(0,0,0,.14);border-radius:999px;padding:1px 8px;font-size:12px;font-weight:700;white-space:nowrap}
+.dh-more{font-size:26px;opacity:.75;line-height:1}
+.dir-hero .dh-msg{margin:9px 0 0!important;padding:7px 0 0!important;background:none!important;border-top:1px dashed rgba(255,255,255,.3);border-radius:0!important;font-size:13px;line-height:1.45;display:block}
+.dh-wxerr{font-size:13px;opacity:.95}
+.dh-chips{flex-wrap:nowrap;gap:4px}.dh-chips span{font-size:11.5px;padding:1px 6px}.dir-hero .dh-temp{font-size:28px}.dir-hero .dh-ico{font-size:32px}.dh-wxmain{gap:8px}

@@ -4200,30 +4200,36 @@ function wxMsg(w) {
   if (w.max >= 35) return `🥵 আজ গরম বেশি (${bn(w.max)}°), বেশি করে পানি খান, রোদে কম থাকুন`;
   if (w.min <= 12) return `🥶 আজ শীত বেশি (${bn(w.min)}°), গরম কাপড় পরুন`;
   if (c === 45 || c === 48) return '🌫️ কুয়াশা আছে, সাবধানে গাড়ি চালান';
-  if (w.rain != null && w.rain >= 30) return `🌦️ বৃষ্টি হতে পারে (${bn(w.rain)}%) · সর্বোচ্চ ${bn(w.max)}°, সর্বনিম্ন ${bn(w.min)}°`;
-  return `🌤️ আজকের আবহাওয়া ভালো · সর্বোচ্চ ${bn(w.max)}°, সর্বনিম্ন ${bn(w.min)}°`;
+  if (w.rain != null && w.rain >= 30) return '🌦️ বৃষ্টি হতে পারে, বের হলে ছাতা সাথে রাখতে পারেন';
+  return '🌤️ আজকের আবহাওয়া ভালো, বাইরে যাওয়ার জন্য উপযুক্ত দিন';
 }
 function dirHeroWx(w) {
-  const el = $('#dh-wx'), msg = $('#dh-msg'); if (!el) return;
-  if (!w) { el.innerHTML = ''; msg.textContent = S.wxErr ? 'আবহাওয়ার তথ্য এখন আনা যায়নি' : ''; msg.hidden = !msg.textContent; $('#dir-hero .dh-wxrow').hidden = !msg.textContent; return; }
-  const [ico, name] = WX[w.code] || ['🌡️', ''];
-  el.innerHTML = `<span class="dh-ico">${ico}</span><span class="dh-temp">${bn(w.temp)}°</span><span class="dh-wxt"><small>${esc(name)}</small>${w.rain != null ? `<small class="dh-rain">☔ বৃষ্টি ${bn(w.rain)}%</small>` : ''}</span>`; $('#dir-hero .dh-wxrow').hidden = false;
-  msg.textContent = wxMsg(w); msg.hidden = !msg.textContent;
+  const el = $('#dh-wx'); if (!el) return;
+  if (!w) { el.hidden = !S.wxErr; el.innerHTML = S.wxErr ? '<div class="dh-wxerr">🌥️ আবহাওয়ার তথ্য এখন আনা যায়নি</div>' : ''; return; }
+  const [ico, name] = WX[w.code] || ['🌡️', ''], msg = wxMsg(w);
+  el.hidden = false;
+  el.innerHTML = `<div class="dh-wxmain"><span class="dh-ico">${ico}</span><span class="dh-temp">${bn(w.temp)}<sup>°সে</sup></span>
+      <span class="dh-wxt"><b>${esc(name)}</b><span class="dh-chips">${w.rain != null ? `<span>☔ ${bn(w.rain)}%</span>` : ''}<span>↑ ${bn(w.max)}°</span><span>↓ ${bn(w.min)}°</span></span></span><span class="dh-more" aria-hidden="true">›</span></div>
+    ${msg ? `<div class="dh-msg">${esc(msg)}</div>` : ''}`;
 }
 // সময় অনুযায়ী শুভেচ্ছা, অ্যাকাউন্ট থাকলে নামসহ, না থাকলে "ভালুকাবাসী"
 function greetPart() { const h = dhakaParts(new Date()).h; return h >= 5 && h < 12 ? ['শুভ সকাল', '🌅'] : h < 15 && h >= 12 ? ['শুভ দুপুর', '☀️'] : h < 18 && h >= 15 ? ['শুভ বিকাল', '🌤️'] : h < 20 && h >= 18 ? ['শুভ সন্ধ্যা', '🌆'] : ['শুভ রাত্রি', '🌙']; }
 function greetText() { const [g, e] = greetPart(), n = me()?.name?.trim(); return `${e} ${g}, ${n || HOME_UPAZILA + 'বাসী'}!`; }
+// দিনের সময় অনুযায়ী হেডারের রং: ভোর, দিন, বিকাল, সন্ধ্যা, রাত
+function heroTone() { const h = dhakaParts(new Date()).h; return h >= 5 && h < 9 ? 'dawn' : h < 15 && h >= 9 ? 'day' : h < 18 && h >= 15 ? 'noon' : h < 20 && h >= 18 ? 'dusk' : 'night'; }
 function dirHeroHtml(total, cats) {
   const now = new Date(), t = dhakaParts(now), bd = banglaDate(t);
   const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)}`;
-  return `<div class="dir-hero" id="dir-hero"><div class="dh-greet">${esc(greetText())}</div><div class="dh-date"><b><small class="dh-today">আজ</small> ${esc(BN_WD[t.wd])}</b><i>·</i><span>${esc(son)}</span><i>·</i><span>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</span></div>
-    <div class="dh-wxrow"><button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ"></button><div class="dh-msg" id="dh-msg" hidden></div></div>
-</div>`;
+  return `<div class="dir-hero tone-${heroTone()}" id="dir-hero">
+    <div class="dh-greet">${esc(greetText())}</div>
+    <div class="dh-date"><span class="dh-wd"><small>আজ</small> ${esc(BN_WD[t.wd])}</span><i></i><span>${esc(son)}</span><i></i><span>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</span></div>
+    <button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ" hidden></button>
+  </div>`;
 }
 // সবুজ কার্ডটা পুরো ডিরেক্টরির হেডার: সব পাতায় একদম উপরে থাকে
 function renderDirHead(list) {
   const box = $('#dir-head'); if (!box) return;
-  const cats = svcCats(), key = `${list.length}|${cats.length}|${dkKey(new Date())}|${EN}|${greetPart()[0]}|${me()?.name || ''}`;
+  const cats = svcCats(), key = `${list.length}|${cats.length}|${dkKey(new Date())}|${EN}|${greetPart()[0]}|${heroTone()}|${me()?.name || ''}`;
   if (box.dataset.k !== key || !box.children.length) { box.innerHTML = dirHeroHtml(list.length, cats); box.dataset.k = key; const c = local.get('wx'); if (c?.v) dirHeroWx(c.v); else dirHeroWx(null); }
   if (!S.wxT || Date.now() - S.wxT > 6e4) { S.wxT = Date.now(); loadWeather().then(dirHeroWx); }
 }

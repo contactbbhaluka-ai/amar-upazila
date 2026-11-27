@@ -212,6 +212,7 @@ let sheetHist = false;
 function openSheet(html) { if (!sheetHist && !$('#modal').classList.contains('on')) sheetHist = pushNav(); const s = $('#sheet'); s.setAttribute('translate', DIR_BN ? 'no' : 'yes'); s.onclick = null; s.onchange = null; s.classList.remove('tall'); s.innerHTML = html; $('#modal').classList.add('on'); s.querySelector('input,textarea,select,button')?.focus(); }
 function closeSheet(fromPop) {
   try { if (window.speechSynthesis?.speaking) speechSynthesis.cancel(); } catch { /* না থাকলে থাক */ }
+  S.sdSheetId = null;
   document.querySelector('.sd-lbx')?.remove(); $('#modal').classList.remove('on'); $('#sheet').classList.remove('tall'); $('#sheet').innerHTML = '';
   if (sheetHist) { sheetHist = false; if (!fromPop) { S.skipPop = (S.skipPop || 0) + 1; S.hd = Math.max(0, (S.hd || 0) - 1); try { history.back(); } catch { S.skipPop--; S.hd++; } } }   // বোতামে বন্ধ করলে শিটের ধাপটাও সরাই
 }
@@ -4001,6 +4002,7 @@ function svcDetailSheet(id, opt = {}) {
   const long = String(s.details || '').length > 700, sub = subsOf(s.category).find(x => x[0] === s.subtype);
   const cname = catName(s.category) || 'সেবা', person = s.category === 'famous';
   const act = (k, icon, label, attrs) => `<${k} class="sd-act" ${attrs}><span class="sd-aic">${icon}</span><small>${label}</small></${k}>`;
+  S.sdSheetId = s.id;
   openSheet(s.category === 'union' ? unionPage(s, imgs, admin) : `<div class="sdet${person ? ' sd-person' : ''}" style="--sc:${c}">
     ${person ? `<div class="sp-hero">${imgs[0] ? `<div class="sp-bg" style="background-image:url('${esc(imgs[0])}')"></div>` : ''}
       <button class="sd-x" data-close aria-label="বন্ধ করুন">✕</button>${admin ? '<button class="sd-edit" data-sdedit>✏️ সম্পাদনা</button>' : ''}
@@ -7626,7 +7628,11 @@ function onPop() {
   if (S.skipPop) { if (--S.skipPop === 0) while (S.pendPush > 0) { S.pendPush--; try { history.pushState({ au: 1 }, ''); } catch { /* sandbox */ } } return; }
   S.hd = Math.max(0, (S.hd || 0) - 1);
   if (S.viewerOpen) return closeViewer();
-  if ($('#modal').classList.contains('on')) return closeSheet(true);
+  if ($('#modal').classList.contains('on')) {
+    // বিস্তারিত থেকে খোলা সম্পাদনা, দাম, রিভিউ ইত্যাদি থেকে Back → আবার সেই বিস্তারিতে
+    if (S.sdSheetId != null && !$('#sheet').querySelector('.sdet, .ip.up')) { const id = S.sdSheetId; try { history.pushState({ au: 1 }, ''); S.hd = (S.hd || 0) + 1; } catch { /* sandbox */ } return svcDetailSheet(id); }
+    return closeSheet(true);
+  }
   if (S.view === 'dir' && S.dirSub) { S.dirSub = false; S.dcat = ''; if ($('#q')) $('#q').value = ''; S.dirY = S.dirBackY || 0; loadDir(); return; }   // যেখান থেকে ঢুকেছিলেন সেখানেই ফেরা
   if (!S.stack.length) { if (S.view !== 'home') go('home'); return; }   // অন্য ট্যাব থেকে Back → নিউজফিডের হোম
   const prev = S.stack.pop(); show(prev);

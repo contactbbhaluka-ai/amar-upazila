@@ -687,7 +687,7 @@ const stSeen = () => new Set(local.get('stseen', []));
 function markStSeen(id) { const s0 = stSeen(); if (s0.has(id)) return; s0.add(id); const live = new Set(S.stories.map(x => x.id)); local.set('stseen', [...s0].filter(x => live.has(x)).slice(-400)); }
 async function loadStories() {
   const had = storyUserSet();
-  try { S.stories = await S.api.stories(); } catch { S.stories = []; }
+  try { S.stories = me() ? await S.api.stories() : []; } catch { S.stories = []; }
   renderStories();
   // কারো স্টোরি এল/গেল: ফিডের ছবির বৃত্ত হালনাগাদ
   const now = storyUserSet();
@@ -1021,11 +1021,28 @@ function withAds(f) {
   if (posts.length < 2 && ads.length) out.push(ads.shift());
   return out;
 }
+// ---------- লগইন ছাড়া (মেহমান): ফিডে অল্প পোস্ট, প্রোফাইলের শুধু ঝলক
+const GUEST_POSTS = 4;
+const UP_IC = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.6"/><path d="M2.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M19 8v6M16 11h6"/></svg>';
+const guestBtns = () => `<button class="btn wide au-btn gt-ic" data-gate2="signup">${UP_IC}<span>নতুন অ্যাকাউন্ট খুলুন</span></button><button class="gt-login gt-ic" data-gate2="login">${ic('login', 19)}<span>লগইন করুন</span></button>`;
+const guestMoreCard = () => `<div class="card gst-card"><div class="gst-fade" aria-hidden="true"></div><div class="gst-ic">${ic('lock', 26)}</div><h3>আরও পোস্ট দেখতে লগইন করুন</h3><p class="mut">ভালুকার মানুষের সব পোস্ট, ছবি আর এলাকার খবর দেখতে অ্যাকাউন্ট খুলুন। এক মিনিটেই হয়ে যাবে।</p>${guestBtns()}</div>`;
+document.addEventListener('click', e => { const b = e.target.closest('[data-gate2]'); if (!b) return; closeSheet(); go('me'); authView(b.dataset.gate2 === 'signup' ? 'signup' : 'login'); window.scrollTo(0, 0); });
+async function guestProfile(id) {
+  S.userId = id; open('user'); $('#feed-user').innerHTML = ''; $('#user').innerHTML = '<div class="skel"></div>';
+  let p = null; try { p = await S.api.profile(id); } catch { /* */ }
+  if (S.userId !== id) return;
+  if (!p || p.gone) { $('#user').innerHTML = '<div class="empty">প্রোফাইলটি পাওয়া যায়নি।</div>'; return; }
+  $('#user').innerHTML = `<div class="card gst-prof"><div class="gst-cover"${p.cover ? ` style="background-image:url('${esc(p.cover)}')"` : ''}></div>
+    <div class="gst-av">${av(p)}</div><h2>${esc(p.name)}${p.verified ? vb(p.verified) : ''}</h2>${p.union ? `<p class="mut">${ic('pin', 15)} ${esc(p.union)}</p>` : ''}
+    <div class="gst-lock"><div class="gst-ic">${ic('lock', 24)}</div><b>প্রোফাইল দেখতে লগইন করুন</b><p class="mut">পোস্ট, ছবি ও বিস্তারিত তথ্য শুধু অ্যাপের সদস্যরা দেখতে পান। এতে সবার গোপনীয়তা সুরক্ষিত থাকে।</p>${guestBtns()}</div></div>`;
+}
 function renderFeed(key) {
   const f = S.feeds[key], box = $('#feed-' + key);
   let list = key === 'home' ? withAds(f) : f.posts;
   if (key === 'home' && f.urgent?.length) { const top = f.urgent.filter(p => !p.resolvedAt), ids = new Set(top.map(p => String(p.id))); list = [...top, ...list.filter(p => !ids.has(String(p.id)))]; }
-  box.innerHTML = f.posts.length ? list.map((p, i) => postHtml(p) + (key === 'home' && i === 3 ? pymkHtml() : '')).join('')
+  const guest = key === 'home' && !me() && f.posts.length;
+  if (guest) list = list.slice(0, GUEST_POSTS);
+  box.innerHTML = f.posts.length ? list.map((p, i) => postHtml(p) + (key === 'home' && i === 3 && !guest ? pymkHtml() : '')).join('') + (guest ? guestMoreCard() : '')
     : key === 'search' ? '' : key === 'post' ? '<div class="empty">পোস্টটি আর নেই।</div>'
     : key === 'mem' ? '<div class="empty">🕰️<br>আগের বছরগুলোতে আজকের তারিখে আপনার কোনো পোস্ট নেই।<br>পরের বছর এই দিনে আজকের পোস্টগুলো এখানে দেখাবে।</div>'
     : key === 'saved' ? '<div class="empty">কোনো সেভ করা পোস্ট নেই।<br>পোস্টের ⋯ মেনু থেকে "পোস্ট সেভ করুন" চাপুন।</div>'
@@ -1065,6 +1082,7 @@ async function loadFeed(key, append) {
     let rows2 = key === 'user' && S.preview ? rows.filter(p => p.privacy === 'public' || (S.preview === 'friends' && p.privacy === 'friends')) : rows;
     if (key === 'home' && !append) { const cut = new Date(Date.now() - 2 * 864e5).toISOString(), top = rows2.filter(p => p.closeFriend && p.createdAt > cut); if (top.length) { const ids = new Set(top.map(p => p.id)); rows2.splice(0, rows2.length, ...top, ...rows2.filter(p => !ids.has(p.id))); } }
     f.posts = append ? [...f.posts, ...rows2] : rows2; f.more = !['post', 'saved', 'mem'].includes(key) && rows.length >= PAGE;
+    if (key === 'home' && !me()) f.more = false;   // লগইন ছাড়া: অল্প কয়েকটা পোস্ট, তারপর লগইনের কার্ড
     if (pinP) { const pin = (await pinP)[0]; if (pin) f.posts = [{ ...pin, pinnedPage: true }, ...f.posts.filter(x => x.id !== pin.id)]; }
   } catch (e) { toast(errText(e)); if (!append) f.posts = []; }
   renderFeed(key);
@@ -2497,6 +2515,7 @@ document.addEventListener('submit', e => {
 });
 
 async function openUser(id, silent, keepState, preview) {
+  if (!me() && !preview) { if (!silent) guestProfile(id); return; }
   if (!preview) S.preview = null;
   if (me() && id === me().id && !S.preview) return go('me');
   if (!keepState && S.pstate.user.uid !== id) Object.assign(S.pstate.user, { tab: 'posts', seg: 'all', album: null });

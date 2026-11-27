@@ -50,7 +50,10 @@ async function supabaseApi() {
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
   let tokCb = null;
   let recoveryPending = false, recoveryCb = null, delCancelled = false, delCb = null; const delChecked = new Set();
-  const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,friend_req_from,delete_requested_at,unions!profiles_union_id_fkey(name)';
+  const PROFILE_FULL = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,friend_req_from,delete_requested_at,unions!profiles_union_id_fkey(name)';
+  // লগইন ছাড়া: লিঙ্গ, ব্লাড গ্রুপ, রক্তদানের তারিখ ডাটাবেস দেয় না, তাই চাওয়াও হয় না
+  const PROFILE_PUB = 'id,name,union_id,district,upazila,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,username,verified,verified_until,locked,pinned_post_id,friend_req_from,delete_requested_at,unions!profiles_union_id_fkey(name)';
+  let PROFILE = PROFILE_PUB;
   const toUser = p => p && ({
     gone: !!p.delete_requested_at, id: p.id, name: p.name, unionId: p.union_id, district: p.district || '', upazila: p.upazila || '',
     union: (p.unions?.name ? [p.unions.name, p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '),
@@ -85,6 +88,7 @@ async function supabaseApi() {
   let me = null, unionIds = [], blocked = new Set();
 
   async function loadMe(session) {
+    PROFILE = session ? PROFILE_FULL : PROFILE_PUB;
     if (!session) { me = null; blocked = new Set(); return null; }
     const p = ok(await sb.from('profiles').select(PROFILE).eq('id', session.user.id).maybeSingle());
     me = p ? { ...toUser(p), email: session.user.email } : null;

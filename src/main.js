@@ -10,6 +10,7 @@ if (EN) import('./i18n.js').then(m => { I18N = m; return m.startI18n(); }).catch
 
 // সাধারণ এক রঙের রেখার আইকন (লেখার রং-ই আইকনের রং)
 const ICONS = {
+  eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.8 8.4 2 12 2 12s4 7 10 7c1.8 0 3.4-.6 4.8-1.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
   play: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5l5.5 3.5-5.5 3.5z"/>',
@@ -3761,7 +3762,7 @@ function authErr(el, msg) {
 }
 const authClr = root => { root?.querySelectorAll('.au-err').forEach(x => x.remove()); root?.querySelectorAll('.bad').forEach(x => x.classList.remove('bad')); };
 ['input', 'change'].forEach(ev => document.addEventListener(ev, e => { const b = e.target.closest?.('.bad'); if (b && b.matches(AU_BOX)) { b.classList.remove('bad'); if (b.nextElementSibling?.classList.contains('au-err')) b.nextElementSibling.remove(); } }));
-const auF = (id, icon, label, attrs = '', eye = false) => `<div class="au-f"><span class="au-i">${icon}</span><input id="${id}" placeholder=" " ${attrs}><label for="${id}">${label}</label>${eye ? `<button type="button" class="au-eye" data-pweye="${id}" aria-label="পাসওয়ার্ড দেখুন">👁️</button>` : ''}</div>`;
+const auF = (id, icon, label, attrs = '', eye = false) => `<div class="au-f${eye ? ' has-eye' : ''}"><input id="${id}" placeholder=" " ${attrs}><label for="${id}">${label}</label>${eye ? `<button type="button" class="au-eye" data-pweye="${id}" aria-label="পাসওয়ার্ড দেখুন">${ic('eye', 20)}</button>` : ''}</div>`;
 const auHero = sub => `<div class="au-hero"><div class="au-logo"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#006a4e"/><circle cx="256" cy="220" r="104" fill="#e5303f"/><path d="M104 420c40-66 94-96 152-96s112 30 152 96" stroke="#fff" stroke-width="40" fill="none" stroke-linecap="round"/></svg></div><h1>আমার উপজেলা</h1><p>${sub || 'ভালুকার মানুষের নিজের সামাজিক অ্যাপ'}</p></div>`;
 const auSpin = btn => { const old = btn?.innerHTML; if (btn) { btn.disabled = true; btn.innerHTML = '<span class="au-spin" aria-label="অপেক্ষা করুন"></span>'; } return () => { if (btn?.isConnected) { btn.disabled = false; btn.innerHTML = old; } }; };
 
@@ -3770,10 +3771,10 @@ function authView(mode = 'login', pre = '') {
   if (mode === 'signup') return signupView();
   const accs = accList(), tiles = accs.length && mode === 'login';
   $('#me').innerHTML = `<div class="au">${auHero()}
-    ${tiles ? `<div class="au-card"><h2>আবার স্বাগতম 👋</h2><p class="au-sub">আপনার অ্যাকাউন্টে চাপলেই ঢুকে যাবেন</p>
-      <div class="au-accs">${accs.map(a => `<div class="au-acc" role="button" tabindex="0" data-acc="${esc(a.id)}"><button class="au-acc-x" data-accx="${esc(a.id)}" aria-label="${esc(a.name)} তালিকা থেকে সরান">✕</button>${av(a, 'au-acc-av')}<b>${esc(a.name)}</b><small>${a.rt ? '⚡ এক চাপে লগইন' : '🔒 পাসওয়ার্ড লাগবে'}</small></div>`).join('')}
-      <div class="au-acc au-acc-add" role="button" tabindex="0" data-accadd><span class="au-plus">＋</span><b>অন্য অ্যাকাউন্ট</b><small>নতুন করে লগইন</small></div></div>
-      <div class="au-or"><span>নতুন এসেছেন?</span></div><button class="au-new" data-auswap="signup">✨ নতুন অ্যাকাউন্ট খুলুন</button></div>`
+    ${tiles ? `<div class="au-card"><h2>আবার স্বাগতম</h2><p class="au-sub">আপনার অ্যাকাউন্টে চাপলেই ঢুকে যাবেন</p>
+      <div class="au-accs">${accs.map(a => `<div class="au-acc" role="button" tabindex="0" data-acc="${esc(a.id)}"><button class="au-acc-x" data-accx="${esc(a.id)}" aria-label="${esc(a.name)} তালিকা থেকে সরান">✕</button>${av(a, 'au-acc-av')}<b>${esc(a.name)}</b><small>${a.rt ? 'এক চাপে লগইন' : 'পাসওয়ার্ড লাগবে'}</small></div>`).join('')}
+      <div class="au-acc au-acc-add" role="button" tabindex="0" data-accadd><span class="au-plus">${ic('plus', 26)}</span><b>অন্য অ্যাকাউন্ট</b><small>নতুন করে লগইন</small></div></div>
+      <div class="au-or"><span>নতুন এসেছেন?</span></div><button class="au-new" data-auswap="signup">নতুন অ্যাকাউন্ট খুলুন</button></div>`
     : `<div class="au-card"><h2>লগইন করুন</h2><p class="au-sub">বন্ধু, পোস্ট আর মেসেজে ফিরে যান</p>
       <form id="aform" novalidate>
         ${auF('ae', ic('user', 18), 'ইমেইল, মোবাইল নম্বর বা ইউজারনেম', `autocomplete="username" autocapitalize="none" spellcheck="false" value="${esc(pre)}"`)}
@@ -3781,7 +3782,7 @@ function authView(mode = 'login', pre = '') {
         <div class="au-row"><label class="au-chk"><input type="checkbox" id="au-rem" checked><span>এই ফোনে মনে রাখুন</span></label><button type="button" class="link" id="login-forgot">পাসওয়ার্ড ভুলে গেছেন?</button></div>
         <button class="btn wide au-btn">লগইন</button></form>
       <div class="au-or"><span>অথবা</span></div>
-      <button class="au-new" data-auswap="signup">✨ নতুন অ্যাকাউন্ট খুলুন</button>
+      <button class="au-new" data-auswap="signup">নতুন অ্যাকাউন্ট খুলুন</button>
       ${accs.length ? '<button class="link au-back" data-auswap="login">← সেভ করা অ্যাকাউন্টগুলো</button>' : ''}</div>`}
     ${S.api?.demoLogin ? `<div class="au-demo">${demoCard()}</div>` : ''}
     <p class="au-foot"><a class="link" href="./privacy.html">গোপনীয়তা নীতি</a> · পোস্ট, বন্ধু ও মেসেজের জন্য অ্যাকাউন্ট লাগবে। সেবা ডিরেক্টরি লগইন ছাড়াই দেখা যায়।</p></div>`;
@@ -3842,43 +3843,43 @@ async function addAccount() {
 }
 function accSwitchSheet() {
   const accs = accList();
-  openSheet(`<h2>🔁 অ্যাকাউন্ট বদলান</h2><p class="mut" style="margin-top:0">এই ফোনে সেভ করা অ্যাকাউন্ট। চাপলেই সেটায় চলে যাবেন।</p>
-    <div class="au-swl">${accs.map(a => `<div class="au-swr${me()?.id === a.id ? ' on' : ''}" role="button" tabindex="0" data-acc="${esc(a.id)}">${av(a)}<div><b>${esc(a.name)}</b><small>${me()?.id === a.id ? '✓ এখন এই অ্যাকাউন্টে আছেন' : a.rt ? '⚡ এক চাপে' : '🔒 পাসওয়ার্ড লাগবে'}</small></div>${me()?.id === a.id ? '' : `<button class="au-acc-x" data-accx="${esc(a.id)}" aria-label="সরান">✕</button>`}</div>`).join('')}
-    <div class="au-swr au-swadd" role="button" tabindex="0" data-accadd><span class="au-plus">＋</span><div><b>অন্য অ্যাকাউন্ট যোগ করুন</b><small>এই অ্যাকাউন্টটাও মনে থাকবে</small></div></div></div>
+  openSheet(`<h2>অ্যাকাউন্ট বদলান</h2><p class="mut" style="margin-top:0">এই ফোনে সেভ করা অ্যাকাউন্ট। চাপলেই সেটায় চলে যাবেন।</p>
+    <div class="au-swl">${accs.map(a => `<div class="au-swr${me()?.id === a.id ? ' on' : ''}" role="button" tabindex="0" data-acc="${esc(a.id)}">${av(a)}<div><b>${esc(a.name)}</b><small>${me()?.id === a.id ? 'এখন এই অ্যাকাউন্টে আছেন' : a.rt ? 'এক চাপে লগইন' : 'পাসওয়ার্ড লাগবে'}</small></div>${me()?.id === a.id ? '' : `<button class="au-acc-x" data-accx="${esc(a.id)}" aria-label="সরান">✕</button>`}</div>`).join('')}
+    <div class="au-swr au-swadd" role="button" tabindex="0" data-accadd><span class="au-plus">${ic('plus', 22)}</span><div><b>অন্য অ্যাকাউন্ট যোগ করুন</b><small>এই অ্যাকাউন্টটাও মনে থাকবে</small></div></div></div>
     <button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
 }
 
 // ---------- নতুন অ্যাকাউন্ট: ৩ ধাপ
-const SU_ST = [['👋', 'আপনার পরিচয়', 'আসল নাম দিন, যাতে বন্ধুরা আপনাকে চিনতে পারেন'], ['📍', 'ঠিকানা ও যোগাযোগ', 'আপনার এলাকার খবর আর মানুষ দেখাতে কাজে লাগবে'], ['🔐', 'লগইনের তথ্য', 'এই ইমেইল ও পাসওয়ার্ড দিয়ে পরে লগইন করবেন']];
+const SU_ST = [['১', 'আপনার পরিচয়', 'আসল নাম দিন, যাতে বন্ধুরা আপনাকে চিনতে পারেন'], ['২', 'ঠিকানা ও যোগাযোগ', 'আপনার এলাকার খবর আর মানুষ দেখাতে কাজে লাগবে'], ['৩', 'লগইনের তথ্য', 'এই ইমেইল ও পাসওয়ার্ড দিয়ে পরে লগইন করবেন']];
 function pwScore(p) {
   if (p.length < 6) return 0;
   let s = 0; if (p.length >= 8) s++; if (p.length >= 12) s++; if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++; if (/\d/.test(p) && /\D/.test(p)) s++; if (/[^A-Za-z0-9]/.test(p)) s++;
   if (/^(.)\1+$/.test(p) || /^(123456|12345678|password|qwerty|abcdef)/i.test(p)) s = 0;
   return s >= 3 ? 3 : s >= 1 ? 2 : 1;
 }
-const PW_LV = [['', 'কমপক্ষে ৬ অক্ষর দিন'], ['weak', 'দুর্বল · সংখ্যা ও চিহ্ন মেশান'], ['mid', 'মাঝারি · আরও একটু লম্বা করুন'], ['strong', 'শক্ত পাসওয়ার্ড 💪']];
+const PW_LV = [['', 'কমপক্ষে ৬ অক্ষর দিন'], ['weak', 'দুর্বল · সংখ্যা ও চিহ্ন মেশান'], ['mid', 'মাঝারি · আরও একটু লম্বা করুন'], ['strong', 'শক্ত পাসওয়ার্ড']];
 function signupView() {
   $('#me').innerHTML = `<div class="au au-su">
-    <div class="au-top"><button type="button" class="au-backbtn" id="su-back" aria-label="পেছনে">←</button><div><b>নতুন অ্যাকাউন্ট</b><small id="su-stl"></small></div></div>
+    <div class="au-top"><button type="button" class="au-backbtn" id="su-back" aria-label="পেছনে">${ic('chevL', 22)}</button><div><b>নতুন অ্যাকাউন্ট</b><small id="su-stl"></small></div></div>
     <div class="au-prog" aria-hidden="true">${SU_ST.map((s, i) => `<span data-pi="${i + 1}"><i>${s[0]}</i><em>${s[1]}</em></span>`).join('')}</div>
     <div class="au-card"><form id="sform" novalidate>
-      <section data-st="1"><h2>👋 আপনার পরিচয়</h2><p class="au-sub">${SU_ST[0][2]}</p>
+      <section data-st="1"><h2>আপনার পরিচয়</h2><p class="au-sub">${SU_ST[0][2]}</p>
         ${auF('an', ic('user', 18), 'আপনার পূর্ণ নাম', 'maxlength="40" autocomplete="name"')}
-        <div class="au-blk"><div class="au-lbl">${ic('users', 16)} লিঙ্গ</div><input type="hidden" id="su-g"><div class="au-seg">${[['male', '👨 পুরুষ'], ['female', '👩 নারী'], ['none', '🙂 বলতে চাই না']].map(([k, l]) => `<button type="button" data-sug="${k}">${l}</button>`).join('')}</div></div>
-        <div class="au-blk" id="su-bd-b"><div class="au-lbl">${ic('calendar', 16)} জন্মতারিখ <span>(বয়স ${bn(MIN_AGE)} বছরের বেশি হতে হবে)</span></div>${dateSelect('su-bd', '', true)}</div></section>
-      <section data-st="2" hidden><h2>📍 ঠিকানা ও যোগাযোগ</h2><p class="au-sub">${SU_ST[1][2]}</p>
+        <div class="au-blk"><div class="au-lbl">লিঙ্গ</div><input type="hidden" id="su-g"><div class="au-seg">${[['male', 'পুরুষ'], ['female', 'নারী'], ['none', 'বলতে চাই না']].map(([k, l]) => `<button type="button" data-sug="${k}">${l}</button>`).join('')}</div></div>
+        <div class="au-blk" id="su-bd-b"><div class="au-lbl">জন্মতারিখ <span>(বয়স ${bn(MIN_AGE)} বছরের বেশি হতে হবে)</span></div>${dateSelect('su-bd', '', true)}</div></section>
+      <section data-st="2" hidden><h2>ঠিকানা ও যোগাযোগ</h2><p class="au-sub">${SU_ST[1][2]}</p>
         <div class="au-blk" id="su-addr-b">${addrHtml('su')}</div>
         ${auF('su-ph', ic('mobile', 18), 'মোবাইল নম্বর (WhatsApp থাকলে এটাই)', 'inputmode="tel" autocomplete="tel" maxlength="17"')}
-        <p class="au-hint">🔒 নম্বরটা আপনি চাইলে লগইনেও ব্যবহার করতে পারবেন</p>
+        <p class="au-hint">এই নম্বর দিয়েও পরে লগইন করতে পারবেন</p>
         <div class="au-blk" id="su-bl-b">${bloodHtml('su', null)}</div></section>
-      <section data-st="3" hidden><h2>🔐 লগইনের তথ্য</h2><p class="au-sub">${SU_ST[2][2]}</p>
+      <section data-st="3" hidden><h2>লগইনের তথ্য</h2><p class="au-sub">${SU_ST[2][2]}</p>
         ${auF('ae', ic('mail', 18), 'ইমেইল', 'type="email" inputmode="email" autocomplete="email" autocapitalize="none"')}
         ${auF('ap', ic('lock', 18), 'নতুন পাসওয়ার্ড', 'type="password" autocomplete="new-password"', true)}
         <div class="pw-meter" id="pw-m" data-lv="0"><div><i></i><i></i><i></i></div><span>${PW_LV[0][1]}</span></div>
         ${auF('ap2', ic('lock', 18), 'পাসওয়ার্ড আবার লিখুন', 'type="password" autocomplete="new-password"', true)}
         <p class="pw-match" id="pw-mt" hidden></p>
         <div class="au-blk au-agree"><label class="au-chk"><input type="checkbox" id="agree"><span>আমার বয়স ${bn(MIN_AGE)} বছরের বেশি। আমি <a href="./privacy.html">ব্যবহারের নিয়ম</a> মেনে চলব: মিথ্যা খবর, গালিগালাজ বা আপত্তিকর কিছু পোস্ট করব না।</span></label></div></section>
-      <button class="btn wide au-btn" id="su-next">পরবর্তী →</button></form>
+      <button class="btn wide au-btn" id="su-next">পরবর্তী</button></form>
       <p class="au-swap">আগে থেকে অ্যাকাউন্ট আছে? <button type="button" class="link" data-auswap="login">লগইন করুন</button></p></div></div>`;
   addrRefresh('su');
   let step = 1;
@@ -3886,7 +3887,7 @@ function signupView() {
     step = n; $$('#sform section').forEach(s => { s.hidden = Number(s.dataset.st) !== n; });
     $$('.au-prog span').forEach(s => { const i = Number(s.dataset.pi); s.className = i < n ? 'done' : i === n ? 'on' : ''; });
     $('#su-stl').textContent = `ধাপ ${bn(n)}/৩ · ${SU_ST[n - 1][1]}`;
-    $('#su-next').textContent = n === 3 ? 'অ্যাকাউন্ট খুলুন ✓' : 'পরবর্তী →';
+    $('#su-next').textContent = n === 3 ? 'অ্যাকাউন্ট খুলুন' : 'পরবর্তী';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   show(1);
@@ -3897,7 +3898,7 @@ function signupView() {
     const blk = g.closest('.au-blk'); blk.classList.remove('bad'); if (blk.nextElementSibling?.classList.contains('au-err')) blk.nextElementSibling.remove();
   });
   $('#ap').addEventListener('input', () => { const v = $('#ap').value, lv = v ? pwScore(v) : 0; $('#pw-m').dataset.lv = lv; $('#pw-m span').textContent = PW_LV[lv][1]; pwMatch(); });
-  const pwMatch = () => { const a = $('#ap').value, b = $('#ap2').value, m = $('#pw-mt'); m.hidden = !b; m.className = 'pw-match ' + (a === b ? 'ok' : 'no'); m.textContent = a === b ? '✓ দুটো পাসওয়ার্ড মিলেছে' : '✗ এখনো মেলেনি'; };
+  const pwMatch = () => { const a = $('#ap').value, b = $('#ap2').value, m = $('#pw-mt'); m.hidden = !b; m.className = 'pw-match ' + (a === b ? 'ok' : 'no'); m.textContent = a === b ? 'দুটো পাসওয়ার্ড মিলেছে' : 'এখনো মেলেনি'; };
   $('#ap2').addEventListener('input', pwMatch);
   const check = n => {
     const f = $('#sform'); authClr(f);
@@ -3945,11 +3946,11 @@ function signupView() {
 // ---------- ইমেইলে আসা কোড (সাইনআপ যাচাই ও পাসওয়ার্ড রিসেট)
 function codeSheet(email, type, opt = {}) {
   const rec = type === 'recovery';
-  openSheet(`<div class="au-code"><div class="au-code-ic">${rec ? '🔑' : '📩'}</div><h2>${rec ? 'কোডটি লিখুন' : 'ইমেইল যাচাই করুন'}</h2>
+  openSheet(`<div class="au-code"><div class="au-code-ic">${ic(rec ? 'lock' : 'mail', 30)}</div><h2>${rec ? 'কোডটি লিখুন' : 'ইমেইল যাচাই করুন'}</h2>
     <p class="mut"><b>${esc(email)}</b> ঠিকানায় একটি কোড পাঠানো হয়েছে। ইমেইল খুলে কোডটি এখানে লিখুন।</p>
     <form id="cdf" novalidate><div class="au-otp-wrap"><input id="cd-v" class="au-otp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="––––––" aria-label="যাচাই কোড"></div>
     <button class="btn wide au-btn">${rec ? 'যাচাই করুন' : 'অ্যাকাউন্ট চালু করুন'}</button></form>
-    <div class="au-code-acts"><a class="au-mail" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">📬 Gmail খুলুন</a><button type="button" class="link" id="cd-re" disabled>আবার পাঠান</button></div>
+    <div class="au-code-acts"><a class="au-mail" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">${ic('mail', 16)} Gmail খুলুন</a><button type="button" class="link" id="cd-re" disabled>আবার পাঠান</button></div>
     <p class="mut au-code-tip">ইমেইল না পেলে স্প্যাম ফোল্ডার দেখুন। ইমেইলে লিংক থাকলে সেটায় চাপলেও হবে।</p></div>`);
   const re = $('#cd-re'); let left = 60, t;
   const run = () => { clearInterval(t); t = setInterval(() => { if (!re.isConnected) return clearInterval(t); left--; re.disabled = left > 0; re.textContent = left > 0 ? `আবার পাঠান (${bn(left)})` : 'আবার পাঠান'; if (left <= 0) clearInterval(t); }, 1000); re.disabled = true; re.textContent = `আবার পাঠান (${bn(left)})`; };
@@ -3978,10 +3979,10 @@ async function welcomeFlow(n) {
   const dots = `<div class="wf-dots">${[1, 2, 3].map(i => `<i class="${i === n ? 'on' : i < n ? 'done' : ''}"></i>`).join('')}</div>`;
   if (n === 1 || n === 2) {
     const cover = n === 2;
-    openSheet(`<div class="wel">${dots}<h2>${cover ? 'একটা কভার ছবি দিন 🌄' : `স্বাগতম, ${esc(u.name.split(' ')[0])}! 🎉`}</h2>
+    openSheet(`<div class="wel">${dots}<h2>${cover ? 'একটা কভার ছবি দিন' : `স্বাগতম, ${esc(u.name.split(' ')[0])}!`}</h2>
       <p class="mut">${cover ? 'প্রোফাইলের উপরের বড় ছবি। আপনার এলাকা, প্রিয় জায়গা বা যেকোনো সুন্দর ছবি।' : 'একটা প্রোফাইল ছবি দিন, যাতে বন্ধুরা আপনাকে সহজে চিনতে পারেন।'}</p>
-      <label class="wel-pic${cover ? ' cv' : ''}" id="wel-pic">${cover ? (u.cover ? `<img src="${esc(u.cover)}" alt="">` : '<span>🖼️<b>কভার ছবি বাছাই করুন</b></span>') : (u.avatar ? `<img src="${esc(u.avatar)}" alt="">` : `<span class="wel-in">${esc(u.name.charAt(0))}</span>`)}<em class="wel-cam">📷</em><input type="file" accept="image/*" id="wel-f" hidden></label>
-      <button class="btn wide au-btn" id="wel-next">${(cover ? u.cover : u.avatar) ? 'পরবর্তী →' : 'ছবি বাছাই করুন'}</button><button class="btn ghost wide" id="wel-skip" style="margin-top:8px">এখন না</button></div>`);
+      <label class="wel-pic${cover ? ' cv' : ''}" id="wel-pic">${cover ? (u.cover ? `<img src="${esc(u.cover)}" alt="">` : `<span>${ic('photo', 30)}<b>কভার ছবি বাছাই করুন</b></span>`) : (u.avatar ? `<img src="${esc(u.avatar)}" alt="">` : `<span class="wel-in">${esc(u.name.charAt(0))}</span>`)}<em class="wel-cam">${ic('camera', 18)}</em><input type="file" accept="image/*" id="wel-f" hidden></label>
+      <button class="btn wide au-btn" id="wel-next">${(cover ? u.cover : u.avatar) ? 'পরবর্তী' : 'ছবি বাছাই করুন'}</button><button class="btn ghost wide" id="wel-skip" style="margin-top:8px">এখন না</button></div>`);
     $('#wel-f').onchange = async e => {
       const f = e.target.files[0]; if (!f) return;
       await busy($('#wel-next'), async () => { const b = await compress(f, cover ? 1280 : 512, 0.8); if (cover) await S.api.setCover(b, true); else await S.api.setAvatar(b, true); await S.api.reloadMe?.(); });
@@ -3991,29 +3992,29 @@ async function welcomeFlow(n) {
     $('#wel-skip').onclick = () => welcomeFlow(n + 1);
     return;
   }
-  openSheet(`<div class="wel">${dots}<h2>আপনার এলাকার মানুষ 🤝</h2><p class="mut">পরিচিতদের ফ্রেন্ড রিকোয়েস্ট পাঠান, তাদের পোস্ট আপনার হোমে দেখাবে।</p><div class="wel-ppl" id="wel-ppl"><div class="spin"></div></div><button class="btn wide au-btn" id="wel-done">শুরু করুন 🚀</button></div>`);
-  $('#wel-done').onclick = () => { closeSheet(); toast('সব তৈরি! আপনার প্রথম পোস্টটা লিখে ফেলুন ✍️'); loadFeed('home'); };
+  openSheet(`<div class="wel">${dots}<h2>আপনার এলাকার মানুষ</h2><p class="mut">পরিচিতদের ফ্রেন্ড রিকোয়েস্ট পাঠান, তাদের পোস্ট আপনার হোমে দেখাবে।</p><div class="wel-ppl" id="wel-ppl"><div class="spin"></div></div><button class="btn wide au-btn" id="wel-done">শুরু করুন</button></div>`);
+  $('#wel-done').onclick = () => { closeSheet(); toast('সব তৈরি! আপনার প্রথম পোস্টটা লিখে ফেলুন'); loadFeed('home'); };
   const list = (await S.api.suggestions().catch(() => [])).slice(0, 8);
   const box = $('#wel-ppl'); if (!box) return;
-  box.innerHTML = list.length ? list.map(p => `<div class="wel-p">${av(p)}<div><b>${esc(p.name)}</b><small>${esc(p.mutual ? `${bn(p.mutual)} জন মিউচুয়াল বন্ধু` : p.union || 'আপনার এলাকার')}</small></div><button class="sbtn" data-welfr="${esc(p.id)}">➕ বন্ধু</button></div>`).join('') : '<p class="mut" style="text-align:center">এখনো কাউকে পাওয়া যায়নি। পরে "বন্ধু" ট্যাবে দেখবেন।</p>';
-  box.onclick = e => { const b = e.target.closest('[data-welfr]'); if (b) busy(b, async () => { await S.api.sendFriendRequest(b.dataset.welfr); b.textContent = '✓ পাঠানো হয়েছে'; b.disabled = true; b.classList.add('ghost'); }); };
+  box.innerHTML = list.length ? list.map(p => `<div class="wel-p">${av(p)}<div><b>${esc(p.name)}</b><small>${esc(p.mutual ? `${bn(p.mutual)} জন মিউচুয়াল বন্ধু` : p.union || 'আপনার এলাকার')}</small></div><button class="sbtn" data-welfr="${esc(p.id)}">${ic('plus', 15)} বন্ধু</button></div>`).join('') : '<p class="mut" style="text-align:center">এখনো কাউকে পাওয়া যায়নি। পরে "বন্ধু" ট্যাবে দেখবেন।</p>';
+  box.onclick = e => { const b = e.target.closest('[data-welfr]'); if (b) busy(b, async () => { await S.api.sendFriendRequest(b.dataset.welfr); b.textContent = 'পাঠানো হয়েছে'; b.disabled = true; b.classList.add('ghost'); }); };
 }
 
 // ---------- লগইন করা ডিভাইস
 function uaName(ua = '') {
   const os = /Android/i.test(ua) ? 'Android ফোন' : /iPhone|iPad/i.test(ua) ? 'iPhone' : /Windows/i.test(ua) ? 'Windows কম্পিউটার' : /Mac OS/i.test(ua) ? 'Mac কম্পিউটার' : /Linux/i.test(ua) ? 'Linux কম্পিউটার' : 'অজানা ডিভাইস';
   const br = /; wv\)|AmarUpazila/i.test(ua) ? 'আমার উপজেলা অ্যাপ' : /Edg\//.test(ua) ? 'Edge' : /OPR\/|Opera/.test(ua) ? 'Opera' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'ব্রাউজার';
-  return { os, br, ic: /Android|iPhone/i.test(ua) ? '📱' : /iPad/i.test(ua) ? '📲' : '💻' };
+  return { os, br, ic: /Android|iPhone|iPad/i.test(ua) ? ic('mobile', 22) : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M2 20h20"/></svg>` };
 }
 async function devicesSheet() {
   if (!needUser()) return;
-  openSheet(`<h2>📱 লগইন করা ডিভাইস</h2><p class="mut" style="margin-top:0">যেসব ফোন বা কম্পিউটারে আপনার অ্যাকাউন্ট খোলা আছে। অচেনা কিছু দেখলে লগআউট করে পাসওয়ার্ড বদলান।</p><div id="dev-l"><div class="spin"></div></div>`);
+  openSheet(`<h2>লগইন করা ডিভাইস</h2><p class="mut" style="margin-top:0">যেসব ফোন বা কম্পিউটারে আপনার অ্যাকাউন্ট খোলা আছে। অচেনা কিছু দেখলে লগআউট করে পাসওয়ার্ড বদলান।</p><div id="dev-l"><div class="spin"></div></div>`);
   const draw = async () => {
     const list = await S.api.sessions().catch(() => null), box = $('#dev-l'); if (!box) return;
     if (!list) { box.innerHTML = '<p class="mut">তালিকা আনা যায়নি, পরে আবার চেষ্টা করুন।</p>'; return; }
-    box.innerHTML = list.map(s => { const d = uaName(s.ua); return `<div class="dev${s.current ? ' cur' : ''}"><span class="dev-ic">${d.ic}</span><div class="dev-t"><b>${esc(d.os)} · ${esc(d.br)}</b><small>${s.current ? '<em>● এই ডিভাইস</em>' : `সক্রিয়: ${esc(ago(s.lastAt))}`} · প্রথম লগইন ${esc(bnDate(String(s.createdAt).slice(0, 10)))}</small></div>${s.current ? '' : `<button class="sbtn ghost" data-devout="${esc(s.id)}">লগআউট</button>`}</div>`; }).join('')
-      + (list.filter(s => !s.current).length ? '<button class="btn ghost wide" id="dev-all" style="margin-top:10px;color:var(--r)">এটা ছাড়া সব ডিভাইস থেকে লগআউট</button>' : '<p class="mut" style="font-size:13px;margin-top:8px">✓ শুধু এই ডিভাইসেই লগইন করা আছে।</p>')
-      + '<button class="btn wide" id="dev-pw" style="margin-top:8px">🔑 পাসওয়ার্ড বদলান</button>';
+    box.innerHTML = list.map(s => { const d = uaName(s.ua); return `<div class="dev${s.current ? ' cur' : ''}"><span class="dev-ic">${d.ic}</span><div class="dev-t"><b>${esc(d.os)} · ${esc(d.br)}</b><small>${s.current ? '<em>এই ডিভাইস</em>' : `সক্রিয়: ${esc(ago(s.lastAt))}`} · প্রথম লগইন ${esc(bnDate(String(s.createdAt).slice(0, 10)))}</small></div>${s.current ? '' : `<button class="sbtn ghost" data-devout="${esc(s.id)}">লগআউট</button>`}</div>`; }).join('')
+      + (list.filter(s => !s.current).length ? '<button class="btn ghost wide" id="dev-all" style="margin-top:10px;color:var(--r)">এটা ছাড়া সব ডিভাইস থেকে লগআউট</button>' : '<p class="mut" style="font-size:13px;margin-top:8px">শুধু এই ডিভাইসেই লগইন করা আছে।</p>')
+      + '<button class="btn wide" id="dev-pw" style="margin-top:8px">পাসওয়ার্ড বদলান</button>';
     box.onclick = e => {
       const b = e.target.closest('[data-devout]'); if (b) return busy(b, async () => { await S.api.endSession(b.dataset.devout); toast('ওই ডিভাইস থেকে লগআউট হয়েছে'); draw(); });
       if (e.target.id === 'dev-all') return busy(e.target, async () => { for (const s of list.filter(x => !x.current)) await S.api.endSession(s.id); toast('অন্য সব ডিভাইস থেকে লগআউট হয়েছে'); draw(); });
@@ -6909,7 +6910,7 @@ document.addEventListener('click', e => {
 // লগআউট: নিশ্চিত করা, চাইলে সব ডিভাইস থেকে
 function logoutSheet() {
   const u = me();
-  openSheet(`<div class="lock-sheet"><div class="lock-ic">👋</div><h2>লগআউট করবেন?</h2>
+  openSheet(`<div class="lock-sheet"><h2>লগআউট করবেন?</h2>
     <label class="au-chk lo-rem"><input type="checkbox" id="lo-rem" ${!u || accSaved(u.id) || !accList().length ? 'checked' : ''}><span><b>এই ফোনে অ্যাকাউন্ট মনে রাখুন</b><small>পরের বার পাসওয়ার্ড ছাড়াই ছবিতে চেপে ঢুকতে পারবেন। ফোনটা অন্য কেউ ব্যবহার করলে বন্ধ রাখুন।</small></span></label>
     <button class="btn wide" id="lo-one">লগআউট</button>
     ${S.api.demoLogin ? '' : '<button class="btn ghost wide" id="lo-all" style="margin-top:8px">সব ডিভাইস থেকে লগআউট</button><p class="mut" style="font-size:12.5px;margin-top:6px">অন্য কোনো ফোনে বা কম্পিউটারে লগইন করা থাকলে সেখান থেকেও বের হয়ে যাবেন। ফোন হারালে বা পাসওয়ার্ড অন্য কেউ জানলে এটা ব্যবহার করুন।</p>'}
@@ -7397,7 +7398,7 @@ document.addEventListener('click', e => {
 
 // ================================================================ অ্যাকাউন্ট: নাম, ইমেইল, নম্বর, পাসওয়ার্ড (প্রোফাইলে না গিয়েই)
 const pwField = (id, label, ac) => `<label for="${id}">${label}</label><div class="pw-wrap"><input id="${id}" type="password" minlength="6" required autocomplete="${ac}"><button type="button" class="pw-eye" data-pweye="${id}" aria-label="পাসওয়ার্ড দেখুন">👁️</button></div>`;
-document.addEventListener('click', e => { const b = e.target.closest('[data-pweye]'); if (!b) return; const i = document.getElementById(b.dataset.pweye); if (i) { i.type = i.type === 'password' ? 'text' : 'password'; b.textContent = i.type === 'password' ? '👁️' : '🙈'; } });
+document.addEventListener('click', e => { const b = e.target.closest('[data-pweye]'); if (!b) return; const i = document.getElementById(b.dataset.pweye); if (i) { i.type = i.type === 'password' ? 'text' : 'password'; if (b.classList.contains('au-eye')) b.innerHTML = ic(i.type === 'password' ? 'eye' : 'eyeOff', 20); else b.textContent = i.type === 'password' ? '👁️' : '🙈'; } });
 function passwordSheet() {
   const u = me(); if (!u) return;
   openSheet(`<h2>🔑 পাসওয়ার্ড পরিবর্তন</h2><form id="pwform">
@@ -7419,7 +7420,7 @@ async function forgotPassword(email) {
     if (!(await confirmSheet(`${email} ঠিকানায় পাসওয়ার্ড বদলানোর কোড পাঠাব?`, 'কোড পাঠান'))) return passwordSheet();
     return busy(null, async () => { await S.api.sendPasswordReset(email); codeSheet(email, 'recovery'); });
   }
-  openSheet(`<div class="au-code"><div class="au-code-ic">🔑</div><h2>পাসওয়ার্ড ভুলে গেছেন?</h2><p class="mut">অ্যাকাউন্টের ইমেইল দিন। সেখানে একটি কোড যাবে, সেটা দিয়ে নতুন পাসওয়ার্ড দিতে পারবেন।</p>
+  openSheet(`<div class="au-code"><div class="au-code-ic">${ic('lock', 30)}</div><h2>পাসওয়ার্ড ভুলে গেছেন?</h2><p class="mut">অ্যাকাউন্টের ইমেইল দিন। সেখানে একটি কোড যাবে, সেটা দিয়ে নতুন পাসওয়ার্ড দিতে পারবেন।</p>
     <form id="fpf" novalidate>${auF('fp-em', ic('mail', 18), 'আপনার ইমেইল', `type="email" inputmode="email" autocomplete="email" autocapitalize="none" value="${esc(email || '')}"`)}<button class="btn wide au-btn">কোড পাঠান</button></form></div>`);
   setTimeout(() => $('#fp-em')?.focus(), 250);
   $('#fpf').onsubmit = async e => {

@@ -2555,3 +2555,34 @@ details.sv[open]>summary{background:color-mix(in srgb,var(--sc) 7%,var(--card))}
 .dev-t{flex:1;min-width:0}.dev-t b{display:block;font-size:14.5px}.dev-t small{color:var(--mut);font-size:12.5px}.dev-t em{color:var(--g);font-style:normal;font-weight:700}
 .lo-rem{text-align:left;background:light-dark(#f7faf8,#111b17);border-radius:14px;padding:12px;margin:10px 0 12px}
 .nt-login .self-ic{background:linear-gradient(140deg,#fff3bf,#ffd43b)}
+/* লগইন/সাইনআপ: ফেসবুকের মতো পরিষ্কার (আইকন ছাড়া ঘর) */
+.au-f{background:var(--card);border:1px solid light-dark(#d5dcd8,#2c3c36);border-radius:12px}
+.au-f:focus-within{background:var(--card)}
+.au-f input{padding:22px 16px 8px 16px;min-height:56px}
+.au-f.has-eye input{padding-right:50px}
+.au-f label{left:16px;right:16px;top:17px}
+.au-f.has-eye label{right:50px}
+.au-eye{right:4px;padding:10px;color:var(--mut);display:flex;align-items:center}
+.au-eye:active{background:var(--g2)}
+.au-err::before{content:'!';flex:none;width:16px;height:16px;border-radius:50%;background:var(--r);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;margin-top:1px}
+.au-blk label svg,.au-blk .ic-line{display:none}
+.au-blk label{font-weight:700;font-size:14px}
+.au-blk .f,.au-blk select,.au-blk input[type=date]{background:var(--card);border:1px solid light-dark(#d5dcd8,#2c3c36)}
+.au-seg button{background:var(--card);border:1px solid light-dark(#d5dcd8,#2c3c36);font-weight:600}
+.au-seg button.on{border:1.5px solid var(--g)}
+.au-new{background:var(--g2);color:var(--g);box-shadow:none;padding:13px 26px;font-weight:700}
+.au-new:active{filter:brightness(.96)}
+.au-prog i{font-size:14px;font-weight:800;color:var(--mut);border-width:1.5px}
+.au-prog .on i{color:var(--g)}
+.au-backbtn{display:grid;place-items:center;box-shadow:none;border:1px solid var(--line)}
+.au-plus{color:var(--g)}
+.au-acc .au-acc-av{box-shadow:none;border:1px solid var(--line)}
+.au-acc small,.au-swr small{color:var(--mut)}
+.au-code-ic{color:var(--g);width:68px;height:68px;background:var(--g2)}
+.au-mail{display:inline-flex;align-items:center;gap:6px}
+.wel-cam{color:var(--ink)}
+.wel-pic.cv span{color:var(--g)}
+.wel-p .sbtn{display:inline-flex;align-items:center;gap:4px}
+.dev-ic{color:var(--g)}
+.pw-match::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:middle}
+.lo-rem small{line-height:1.5}

@@ -4207,7 +4207,7 @@ function dirHeroWx(w) {
   const el = $('#dh-wx'), msg = $('#dh-msg'); if (!el) return;
   if (!w) { el.innerHTML = ''; msg.textContent = S.wxErr ? 'আবহাওয়ার তথ্য এখন আনা যায়নি' : ''; msg.hidden = !msg.textContent; $('#dir-hero .dh-wxrow').hidden = !msg.textContent; return; }
   const [ico, name] = WX[w.code] || ['🌡️', ''];
-  el.innerHTML = `<span class="dh-ico">${ico}</span><span class="dh-temp">${bn(w.temp)}°</span><small>${esc(name)}</small>`; $('#dir-hero .dh-wxrow').hidden = false;
+  el.innerHTML = `<span class="dh-ico">${ico}</span><span class="dh-temp">${bn(w.temp)}°</span><span class="dh-wxt"><small>${esc(name)}</small>${w.rain != null ? `<small class="dh-rain">☔ বৃষ্টি ${bn(w.rain)}%</small>` : ''}</span>`; $('#dir-hero .dh-wxrow').hidden = false;
   msg.textContent = wxMsg(w); msg.hidden = !msg.textContent;
 }
 // সময় অনুযায়ী শুভেচ্ছা, অ্যাকাউন্ট থাকলে নামসহ, না থাকলে "ভালুকাবাসী"
@@ -4216,7 +4216,7 @@ function greetText() { const [g, e] = greetPart(), n = me()?.name?.trim(); retur
 function dirHeroHtml(total, cats) {
   const now = new Date(), t = dhakaParts(now), bd = banglaDate(t);
   const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)}`;
-  return `<div class="dir-hero" id="dir-hero"><div class="dh-greet">${esc(greetText())}</div><div class="dh-date"><b>আজ ${esc(BN_WD[t.wd])}</b><i>·</i><span>${esc(son)}</span><i>·</i><span>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</span></div>
+  return `<div class="dir-hero" id="dir-hero"><div class="dh-greet">${esc(greetText())}</div><div class="dh-date"><b><small class="dh-today">আজ</small> ${esc(BN_WD[t.wd])}</b><i>·</i><span>${esc(son)}</span><i>·</i><span>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</span></div>
     <div class="dh-wxrow"><button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ"></button><div class="dh-msg" id="dh-msg" hidden></div></div>
 </div>`;
 }

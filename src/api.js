@@ -6,6 +6,7 @@
 //   User     { id, name, unionId, union, avatar, bio }
 //   Relation { friend: 'none'|'sent'|'received'|'friends', following, blocked }
 //   Post     { id, body, image, category, createdAt, likes, comments, userId, author, avatar, union, liked }
+import { DEMO_TOURS } from './demo-tours.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, UPAZILA_ID, DEMO, SETTING_KEYS, PUBLIC_URL } from './config.js';
 // অ্যালবামের ছবি: পোস্টের তালিকা থেকে একেকটা ছবি আলাদা করে [{ url, postId, i, createdAt }]
 const flattenPhotos = rows => rows.flatMap(r => (r.images || []).map((url, i) => ({ url, postId: r.id, i, createdAt: r.createdAt })));
@@ -1007,8 +1008,7 @@ function demoApi() {
       { groupId: 2, userId: 'd5', role: 'admin', status: 'active' },
     ]),
     services: get('services', [
-      { id: 901, category: 'tour', name: 'কাদিগড় জাতীয় উদ্যান', address: 'পালগাঁও চৌরাস্তার পাশে, কাচিনা ইউনিয়ন', phone: '', verified: true, image_url: 'https://picsum.photos/seed/kadigarh/800/500', images: ['https://picsum.photos/seed/kadigarh2/800/500', 'https://picsum.photos/seed/kadigarh3/800/500'], details: 'ভালুকা উপজেলার কাচিনা ইউনিয়নে অবস্থিত একটি বিশাল শালবন।\n\n### কীভাবে যাবেন\n\n• ভালুকা সিডস্টোর বাজার থেকে সখিপুর রোডে\n• পালগাঁও চৌরাস্তায় নেমে হেঁটে বা অটোতে\n\nনিজেদের খাবার সাথে নিয়ে যাওয়াই ভালো।' },
-      { id: 902, category: 'tour', name: 'ভালুকা কৃত্রিম কুমির প্রজনন কেন্দ্র', address: 'হাতিবেড় গ্রাম, উথুরা ইউনিয়ন', phone: '', verified: true, image_url: 'https://picsum.photos/seed/kumir/800/500', images: [], details: 'দেশের প্রথম বাণিজ্যিক কুমির খামার, ২০০৪ সালে প্রতিষ্ঠিত।\n\n### যা দেখবেন\n\n• পুকুরে বিভিন্ন বয়সের কুমির\n• চারপাশে ফলদ, বনজ ও ঔষধি গাছ' },
+      ...DEMO_TOURS,
       { id: 1, name: 'উপজেলা স্বাস্থ্য কমপ্লেক্স', category: 'health', address: 'হাসপাতাল রোড, সদর', phone: '01700-000001', hours: 'জরুরি বিভাগ ২৪ ঘণ্টা', verified: true },
       { id: 2, name: 'উপজেলা নির্বাহী অফিসারের কার্যালয়', category: 'gov', address: 'উপজেলা পরিষদ চত্বর', phone: '01700-000002', hours: 'রবি–বৃহস্পতি, সকাল ৯টা–বিকাল ৫টা', verified: true },
       { id: 3, name: 'সহকারী কমিশনার (ভূমি) অফিস', category: 'gov', address: 'উপজেলা পরিষদ চত্বর', phone: '01700-000003', hours: 'রবি–বৃহস্পতি, সকাল ৯টা–বিকাল ৫টা', verified: true },
@@ -1025,6 +1025,8 @@ function demoApi() {
       { id: 11, name: 'বটতলা সাপ্তাহিক হাট', category: 'shop', address: 'বটতলা ইউনিয়ন', phone: '01700-000012', hours: 'প্রতি মঙ্গলবার', verified: true },
     ]),
   };
+  // পুরোনো ডেমো ডেটাতেও নতুন দর্শনীয় স্থানগুলো বসাই
+  for (const t of DEMO_TOURS) { const i = db.services.findIndex(x => x.id === t.id); if (i < 0) db.services.unshift({ ...t }); else db.services[i] = { ...db.services[i], ...t, lat: db.services[i].lat, lng: db.services[i].lng }; }
   let meId = get('me', null);
   const save = () => { for (const k of ['dirBanners', 'svcCatVisits', 'svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);

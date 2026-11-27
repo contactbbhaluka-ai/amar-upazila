@@ -2322,3 +2322,34 @@ details.sv[open]>summary{background:color-mix(in srgb,var(--sc) 7%,var(--card))}
 .uvs th,.uvs td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:center}
 .uvs tbody th{text-align:left;font-weight:500;color:var(--mut);font-size:12.5px}.uvs thead th{color:var(--sc);font-size:13.5px}
 .uvs td.win{font-weight:800;color:var(--sc)}
+/* অফিস ও কাজী অফিস */
+.svc-off{padding:13px 14px}
+.of-h{display:flex;gap:11px;align-items:flex-start}
+.of-ic{width:42px;height:42px;flex:0 0 42px;border-radius:12px;display:grid;place-items:center;font-size:21px;background:color-mix(in srgb,var(--sc) 13%,var(--card))}
+.of-t{flex:1;min-width:0}.of-t h3{margin:0;font-size:15px;line-height:1.35}.of-t p{margin:3px 0 0;font-size:12.5px;color:var(--mut)}
+.of-op{flex:0 0 auto;font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--line);color:var(--mut)}
+.of-op.on{background:color-mix(in srgb,#16a34a 15%,var(--card));color:#16a34a}
+.of-tags{display:flex;flex-wrap:wrap;gap:5px;margin:9px 0 0 53px}
+.of-tags span{font-size:11.5px;padding:3px 8px;border-radius:10px;background:color-mix(in srgb,var(--sc) 7%,var(--card));border:1px solid color-mix(in srgb,var(--sc) 18%,var(--line))}
+.of-foot{display:flex;align-items:center;gap:8px;margin:9px 0 0 53px}.of-foot small{flex:1;font-size:11.5px;color:var(--mut)}
+.of-call,.of-map{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;text-decoration:none;font-size:15px}
+.of-call{background:#16a34a;color:#fff}.of-map{background:var(--line)}
+.of-ban{display:flex;gap:10px;align-items:center;padding:11px 13px;border-radius:14px;margin:0 0 12px;border:1px solid var(--line);background:var(--card)}
+.of-ban>span{font-size:22px}.of-ban b{display:block;font-size:13.5px}.of-ban small{font-size:12px;color:var(--mut)}
+.of-ban.on{border-color:color-mix(in srgb,#16a34a 35%,var(--line));background:color-mix(in srgb,#16a34a 6%,var(--card))}
+.svc-kazi{padding:13px 14px}
+.kz-h{display:flex;gap:11px;align-items:center}
+.kz-av{width:46px;height:46px;flex:0 0 46px;border-radius:50%;display:grid;place-items:center;font-size:22px;background:color-mix(in srgb,#db2777 14%,var(--card))}
+.kz-t{flex:1;min-width:0}.kz-t h3{margin:0;font-size:15px}.kz-t p{margin:3px 0 0;font-size:12.5px;color:var(--mut)}
+.kz-area{font-size:11px;padding:3px 9px;border-radius:10px;background:color-mix(in srgb,var(--sc) 12%,var(--card));color:var(--ink);white-space:nowrap}
+.kz-acts{display:flex;gap:8px;margin-top:11px}
+.kz-call{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:12px;background:#16a34a;color:#fff;text-decoration:none;font-size:14px}
+.kz-wa{padding:9px 14px;border-radius:12px;background:color-mix(in srgb,#25d366 16%,var(--card));color:#128c3e;text-decoration:none;font-weight:700;font-size:13.5px}
+details.kz-info{border:1px solid var(--line);border-radius:14px;background:var(--card);margin:0 0 12px;overflow:hidden}
+details.kz-info>summary{list-style:none;display:flex;align-items:center;gap:9px;padding:11px 13px;cursor:pointer}
+details.kz-info>summary::-webkit-details-marker{display:none}details.kz-info>summary b{flex:1;font-size:14px}details.kz-info>summary i{font-style:normal;color:var(--mut)}
+details.kz-info>div{padding:0 14px 13px}details.kz-info ul{margin:4px 0 8px;padding-left:18px}details.kz-info li{font-size:13.5px;margin:4px 0}
+details.kz-info p{font-size:12.5px;color:var(--mut);margin:0 0 9px}
+.kz-109{display:inline-block;font-size:13px;color:#dc2626;font-weight:700;text-decoration:none}
+.card.svc.svc-off,.card.svc.svc-kazi{display:block;border-radius:16px;cursor:pointer;animation:srIn .4s ease both;animation-delay:calc(min(var(--i,0),8) * 40ms)}
+.card.svc.svc-off{border-left:4px solid var(--sc)}

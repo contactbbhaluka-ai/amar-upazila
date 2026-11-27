@@ -3916,7 +3916,24 @@ const svcEmgCard = s => {
   <div class="se-nums">${ph.slice(0, 3).map(p => `<a class="se-num" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(p.n))}"><span>${esc(p.l)}</span><b>${esc(bn(p.n))}</b><i>📞</i></a>`).join('')}</div>
   ${ph.length > 3 ? `<div class="se-more">আরও ${bn(ph.length - 3)}টি নম্বর · বিস্তারিত →</div>` : ''}</article>`;
 };
-const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : EMG_CATS.has(s.category) && phoneList(s).length ? svcEmgCard(s)
+// অফিস: সরকারি সময়সূচি অনুযায়ী এখন খোলা কিনা (রবি–বৃহস্পতি ৯টা–৫টা)
+const offOpen = h => { if (!h) return null; if (/২৪|24/.test(h)) return true; if (!/রবি–বৃহস্পতি|রবি-বৃহস্পতি/.test(h)) return null; const t = dhakaParts(new Date()); return t.wd <= 4 && t.h >= 9 && t.h < 17; };
+const svcBullets = s => (String(s.details || '').match(/^•\s*(.+)$/gm) || []).map(x => x.replace(/^•\s*/, ''));
+const svcOfficeCard = s => {
+  const sub = subsOf('office').find(x => x[0] === s.subtype), op = offOpen(s.hours), ph = phoneList(s), bl = svcBullets(s).slice(0, 3);
+  return `<article class="card svc svc-off" style="--sc:${svcColor(s.category)};--i:${TI()}" data-svcdet="${esc(s.id)}">
+  <div class="of-h"><span class="of-ic">${sub ? sub[2] : svcIc(s.category, 22)}</span><div class="of-t"><h3>${esc(s.name)}</h3>${s.address ? `<p>📍 ${esc(s.address)}</p>` : ''}</div>
+    ${op == null ? '' : `<span class="of-op${op ? ' on' : ''}">${op ? 'এখন খোলা' : 'এখন বন্ধ'}</span>`}</div>
+  ${bl.length ? `<div class="of-tags">${bl.map(b => `<span>${esc(b)}</span>`).join('')}</div>` : ''}
+  <div class="of-foot"><small>${sub ? esc(sub[1]) : ''}${s.hours ? ` · 🕘 ${esc(s.hours)}` : ''}</small>${ph[0] ? `<a class="of-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞</a>` : ''}<a class="of-map" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ' + (s.address || 'ভালুকা'))}" target="_blank" rel="noopener" aria-label="ম্যাপ">🧭</a></div></article>`;
+};
+const svcKaziCard = s => {
+  const ph = phoneList(s), sub = subsOf('kazi').find(x => x[0] === s.subtype);
+  return `<article class="card svc svc-kazi" style="--sc:${svcColor(s.category)};--i:${TI()}" data-svcdet="${esc(s.id)}">
+  <div class="kz-h"><span class="kz-av">💍</span><div class="kz-t"><h3>${esc(s.name)}</h3><p>📍 ${esc(s.address || 'ভালুকা')}</p></div>${sub ? `<span class="kz-area">${esc(sub[1])}</span>` : ''}</div>
+  ${ph[0] ? `<div class="kz-acts"><a class="kz-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞 <b>${esc(bn(ph[0].n))}</b></a><a class="kz-wa" href="https://wa.me/${waNum(ph[0].n)}" target="_blank" rel="noopener">WhatsApp</a></div>` : ''}</article>`;
+};
+const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : s.category === 'office' ? svcOfficeCard(s) : s.category === 'kazi' ? svcKaziCard(s) : EMG_CATS.has(s.category) && phoneList(s).length ? svcEmgCard(s)
   : s.category === 'union' ? svcUnionCard(s) : INFO_CATS.has(s.category) && !s.image_url ? svcInfoCard(s) : s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
 // বিস্তারিত লেখা: ### শিরোনাম, • তালিকা, ফাঁকা লাইনে অনুচ্ছেদ
 // বিস্তারিত লেখা: "## " প্রধান অংশ, "### " তার ভেতরের উপ-অংশ, "• " তালিকা
@@ -3978,6 +3995,8 @@ function svcInlinePage(s) {
 const SUBS = {
   amb: [['ambulance', 'এম্বুলেন্স', '🚑'], ['hearse', 'লাশবাহী গাড়ি', '⚰️'], ['helpline', 'হেল্পলাইন', '☎️']],
   tour: [['resort', 'রিসোর্ট', '🏡'], ['park', 'পার্ক', '🎡'], ['nature', 'প্রকৃতি ও বন', '🌳'], ['history', 'ঐতিহাসিক', '🏛️'], ['other', 'অন্যান্য', '📍']],
+  office: [['upz', 'উপজেলা পরিষদ চত্বর', '🏛️'], ['gov', 'সরকারি অফিস', '🏢'], ['utility', 'বিদ্যুৎ ও ডাক', '⚡'], ['security', 'পুলিশ ও নিরাপত্তা', '👮'], ['rest', 'ডাকবাংলো', '🏡'], ['private', 'বেসরকারি সেবা কেন্দ্র', '📱']],
+  kazi: [['pouro', 'পৌরসভা', '🏢'], ['uthura', 'উথুরা', '🏘️'], ['meduari', 'মেদুয়ারী', '🏘️'], ['varadoba', 'ভরাডোবা', '🏘️'], ['dhitpur', 'ধীতপুর', '🏘️'], ['birunia', 'বিরুনিয়া', '🏘️'], ['bhaluka', 'ভালুকা ইউনিয়ন', '🏘️'], ['mallikbari', 'মল্লিকবাড়ী', '🏘️'], ['dakatia', 'ডাকাতিয়া', '🏘️'], ['kachina', 'কাচিনা', '🏘️'], ['habirbari', 'হবিরবাড়ী', '🏘️'], ['rajoi', 'রাজৈ', '🏘️']],
   famous: [['language', 'ভাষা সৈনিক', '🗣️'], ['freedom', 'মুক্তিযোদ্ধা', '🎖️'], ['politics', 'রাজনীতিবিদ', '🏛️'], ['doctor', 'চিকিৎসক', '🩺'], ['education', 'শিক্ষাবিদ', '🎓'], ['culture', 'সাহিত্য ও সংস্কৃতি', '🎭'], ['sports', 'খেলাধুলা', '🏅'], ['other', 'অন্যান্য', '⭐']],
 };
 const subsOf = cat => SUBS[cat] || [];
@@ -4434,7 +4453,7 @@ function svcEditSheet(s, category) {
   openSheet(`<form class="rvf sde"><h2>${s ? '✏️ তথ্য সম্পাদনা' : `＋ নতুন ${esc(person ? 'প্রসিদ্ধ ব্যক্তি' : cname)}`}</h2>
     <p class="mut" style="margin:-4px 0 6px">${svcIc(cat, 14)} ${esc(cname)}</p>
     ${inp('se-name', person ? 'পূর্ণ নাম *' : 'নাম *', v.name, `required maxlength="120"${person ? ' placeholder="যেমন: ভাষা সৈনিক মোস্তফা এম,এ মতিন"' : ''}`)}
-    ${subs.length ? `<label>${person ? 'পরিচয়ের ধরন' : 'ধরন'}<select class="f" id="se-sub"><option value="">—</option>${subs.map(x => `<option value="${x[0]}"${x[0] === v.subtype ? ' selected' : ''}>${x[2]} ${x[1]}</option>`).join('')}</select></label>` : ''}
+    ${subs.length ? `<label>${person ? 'পরিচয়ের ধরন' : cat === 'kazi' ? 'এলাকা' : 'ধরন'}<select class="f" id="se-sub"><option value="">—</option>${subs.map(x => `<option value="${x[0]}"${x[0] === v.subtype ? ' selected' : ''}>${x[2]} ${x[1]}</option>`).join('')}</select></label>` : ''}
     ${F.tag ? inp('se-tag', 'পরিচিতি (এক লাইনে)', v.tagline, 'maxlength="120" placeholder="যেমন: বীর মুক্তিযোদ্ধা, আফসার বাহিনীর প্রতিষ্ঠাতা"') : ''}
     ${F.life ? inp('se-life', 'জীবনকাল', v.life, 'maxlength="80" placeholder="যেমন: ১৯৩৫ – ২০০৯ বা জন্ম ১৯৪০"') : ''}
     ${inp('se-addr', F.addr, v.address, 'maxlength="200"')}
@@ -5327,6 +5346,7 @@ function drawDir() {
   const subHtml = subs.length > 1 ? `<div class="sub-chips"><button data-dsub=""${S.dsub ? '' : ' class="on"'}>সব <small>${bn(base.length)}</small></button>${subs.map(x => `<button data-dsub="${x[0]}"${S.dsub === x[0] ? ' class="on"' : ''}>${x[2]} ${x[1]} <small>${bn(base.filter(b => b.subtype === x[0]).length)}</small></button>`).join('')}</div>` : '';
   if (S.dsub) base = base.filter(b => b.subtype === S.dsub);
   if (S.dcat === 'union') base = [...base].sort((a, b) => unionNo(a) - unionNo(b));
+  if (S.dcat === 'office' || S.dcat === 'kazi') { const ord = k => { const i = subsOf(S.dcat).findIndex(x => x[0] === k); return i < 0 ? 99 : i; }; base = [...base].sort((a, b) => ord(a.subtype) - ord(b.subtype)); }
   if (S.dcat === 'police') base = [...base].sort((a, b) => phoneList(b).length - phoneList(a).length);
   if (S.dcat === 'amb') { const ord = k => { const i = subsOf('amb').findIndex(x => x[0] === k); return i < 0 ? 9 : i; }; base = [...base].sort((a, b) => ord(a.subtype) - ord(b.subtype)); }
   const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(base.length)}টি</span>${me()?.admin && cat[0] !== 'fav' ? `<button class="svc-addbtn" data-svcadd="${esc(cat[0])}">＋ যোগ করুন</button>` : ''}</div>${subHtml}`
@@ -5336,11 +5356,16 @@ function drawDir() {
     : cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।';
   const famHtml = S.dcat === 'famous' && !q ? annivHtml(list) + `<div class="fam-acts"><button data-famquiz><span>🧠</span><b>আজকের কুইজ</b><small>সঠিক উত্তরে কয়েন</small></button><button data-famsugg><span>📝</span><b>নাম প্রস্তাব করুন</b><small>কৃতী কাউকে চেনেন?</small></button>${me()?.admin ? `<button data-famadmin class="adm"><span>📋</span><b>প্রস্তাব দেখুন</b><small class="fam-pend">…</small></button>` : ''}</div>` : '';
   if (famHtml && me()?.admin) S.api.pendingSuggestions('famous').then(n => { const el = $('.fam-pend'); if (el) el.textContent = n ? `${bn(n)}টি অপেক্ষায়` : 'নতুন কিছু নেই'; }).catch(() => {});
+  const offHtml = S.dcat === 'office' && !q ? (() => { const op = offOpen('রবি–বৃহস্পতি'); return `<div class="of-ban${op ? ' on' : ''}"><span>🕘</span><div><b>সরকারি অফিস: রবি–বৃহস্পতি, সকাল ৯টা–বিকেল ৫টা</b><small>${op ? 'এখন অফিস সময় চলছে' : 'এখন অফিস সময় নয়'} · শুক্র, শনি ও সরকারি ছুটির দিনে বন্ধ</small></div></div>`; })() : '';
+  const kaziHtml = S.dcat === 'kazi' && !q ? `<details class="kz-info"><summary><span>📋</span><b>বিয়ে নিবন্ধনে যা লাগে</b><i>⌄</i></summary><div>
+    <ul><li>বর ও কনের জাতীয় পরিচয়পত্র বা জন্ম নিবন্ধন</li><li>বয়স: বর কমপক্ষে ২১ বছর, কনে কমপক্ষে ১৮ বছর</li><li>বর ও কনের ছবি</li><li>দুজন সাক্ষী ও তাঁদের পরিচয়পত্র, কনের পক্ষে উকিল</li><li>দেনমোহরের পরিমাণ ঠিক করে নিকাহনামায় লেখা</li><li>আগে বিয়ে হয়ে থাকলে তালাক বা মৃত্যুর কাগজ</li></ul>
+    <p>নিবন্ধন ফি সরকার নির্ধারিত, দেনমোহরের পরিমাণের ওপর নির্ভর করে। নিবন্ধনের পর নিকাহনামার সত্যায়িত কপি সংগ্রহ করে রাখুন।</p>
+    <a class="kz-109" href="tel:109">🛡️ বাল্যবিবাহের খবর জানাতে ১০৯-এ ফোন করুন</a></div></details>` : '';
   const upzRow = (S.svcAll || []).find(x => x.category === 'upz');
   const unionMap = S.dcat === 'union' && !q && upzRow?.image_url ? `<div class="u-map"><img src="${esc(upzRow.image_url)}" alt="ভালুকার ইউনিয়নের মানচিত্র" data-ipzoom loading="lazy" onerror="this.parentNode.remove()"><span>🗺️ ভালুকা উপজেলার ইউনিয়নসমূহ · বড় করে দেখতে চাপুন</span></div>` : '';
   const emgHtml = (unionMap || '') + (EMG_CATS.has(S.dcat) && !q ? `<a class="emg-strip" href="tel:999"><span>🚨</span><div><b>জীবন-মৃত্যুর জরুরি অবস্থায় ৯৯৯</b><small>পুলিশ, ফায়ার সার্ভিস ও এম্বুলেন্স — বিনা খরচে, ২৪ ঘণ্টা</small></div><i>কল</i></a>${S.dcat === 'fire' ? '<a class="emg-strip fire" href="tel:102"><span>🚒</span><div><b>ফায়ার সার্ভিস হটলাইন ১০২</b><small>আগুন ও উদ্ধারকাজে সরাসরি</small></div><i>কল</i></a>' : ''}` : '');
   if (['upz', 'pouro'].includes(S.dcat) && !q && !S.dsub && base.length === 1 && base[0].details) { $('#dir').innerHTML = head + svcInlinePage(base[0]); return; }
-  $('#dir').innerHTML = head + famHtml + emgHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
+  $('#dir').innerHTML = head + famHtml + offHtml + kaziHtml + emgHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
 }
 function drawNear(list, q) {
   const located = list.filter(x => x.lat != null && (!S.nearCat || x.category === S.nearCat) && (!q || svcSearch([x], q).hits.length));
@@ -5406,7 +5431,7 @@ document.addEventListener('click', e => {
   const c = e.target.closest('[data-svccall]'); if (c) S.api.serviceCalled(Number(c.dataset.svccall) || c.dataset.svccall).catch(() => {});
   const lo = e.target.closest('[data-svcloc]'); if (lo) return svcLocSheet(lo.dataset.svcloc);
   const shb = e.target.closest('[data-svcsh]'); if (shb) { const x = (S.svcAll || []).find(y => String(y.id) === shb.dataset.svcsh); if (x) { S.sdId = x.id; return svcShareSheet(x); } return; }
-  const dt = e.target.closest('[data-svcdet]'); if (dt) return svcDetailSheet(dt.dataset.svcdet);
+  const dt = e.target.closest('[data-svcdet]'); if (dt) { const ln = e.target.closest('a[href]'); if (ln && ln !== dt && dt.contains(ln)) return; return svcDetailSheet(dt.dataset.svcdet); }
   const tc = e.target.closest('[data-iptoc]'); if (tc) { const el = document.getElementById('ip-sec-' + tc.dataset.iptoc); if (el?.tagName === 'DETAILS') el.open = true; return el?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   const ipc = e.target.closest('[data-ipcat]'); if (ipc) return openSvcCat(ipc.dataset.ipcat);
   const ipe = e.target.closest('[data-ipedit]'); if (ipe) { const x = (S.svcAll || []).find(y => String(y.id) === ipe.dataset.ipedit); return x && svcEditSheet(x); }

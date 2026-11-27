@@ -5341,6 +5341,10 @@ alter table public.services add column if not exists email text check (email is 
 -- ইউনিয়ন পরিষদের চেয়ারম্যান-সদস্যদের তালিকা: [{r: পদ, n: নাম, w: ওয়ার্ড, p: মোবাইল}]
 alter table public.services add column if not exists council jsonb not null default '[]' check (jsonb_typeof(council) = 'array' and jsonb_array_length(council) <= 60);
 
+-- ইউনিয়নের হাট-বাজার ও হাটবার
+alter table public.services add column if not exists hats jsonb not null default '[]'::jsonb;
+comment on column public.services.hats is 'হাট-বাজার ও হাটবার: [{n: নাম, d: [0-6 দিন, 0=রবিবার], t: নোট}]';
+
 -- =====================================================================
 --  নিজেকে অ্যাডমিন বানাতে: অ্যাপে প্রথমে সাইনআপ করুন, তারপর নিচের লাইনে
 --  নিজের ইমেইল বসিয়ে আলাদাভাবে চালান:

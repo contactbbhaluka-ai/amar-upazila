@@ -3961,6 +3961,7 @@ function svcInlinePage(s) {
   const ph = phoneList(s);
   const links = s.category === 'upz' ? `
     ${pouro || unions.length ? `<section class="dsec ip-links"><h3>পৌরসভা ও ইউনিয়নসমূহ</h3><div class="ip-chips">${pouro ? `<button data-svcdet="${esc(pouro.id)}" class="pr">🏢 ${esc(pouro.name)}</button>` : ''}${unions.map(u => `<button data-svcdet="${esc(u.id)}">${esc(String(u.name).replace(/ পরিষদ$/, ''))}</button>`).join('')}</div></section>` : ''}
+    ${(() => { const th = todayHats(); return th.length ? `<section class="dsec ip-links"><h3>🛒 আজ (${BN_DAYS[new Date().getDay()]}) যেসব হাট বসছে</h3><div class="ip-chips">${th.map(h => `<button data-svcdet="${esc(h.u.id)}">${esc(h.n)} <small class="mut">· ${esc(areaCore(h.u))}</small></button>`).join('')}</div></section>` : ''; })()}
     ${peoplePlaces(fam, tour)}`
     : s.category === 'pouro' ? `${peoplePlaces(fam.filter(x => inArea(x, s)), tour.filter(x => inArea(x, s)), { where: 'পৌরসভার' })}${upz ? `<section class="dsec ip-links"><h3>আরও দেখুন</h3><div class="ip-chips"><button data-svcdet="${esc(upz.id)}" class="pr">🏛️ ভালুকা উপজেলা</button></div></section>` : ''}` : '';
   return `<div class="ip" style="--sc:${svcColor(s.category)}">
@@ -4098,6 +4099,12 @@ function svcDetailSheet(id, opt = {}) {
   };
   const drawReps = reps => { const box = sh.querySelector('.sd-reps'); if (!box) return; box.innerHTML = reps.length ? `<div class="sd-repbox"><b>⚠️ ${bn(reps.length)}টি ভুল তথ্যের রিপোর্ট</b>${reps.map(r => `<div><span>${esc(r.reason)} <small class="mut">· ${ago(r.created_at)}</small></span><button class="link" data-repok="${esc(r.id)}">✔ ঠিক করেছি</button></div>`).join('')}</div>` : ''; box._reps = reps; };
   if (admin) S.api.serviceReports(s.id).then(drawReps).catch(() => {});
+  sh.querySelector('.wf-in')?.addEventListener('input', e => {
+    const q = bnNorm(e.target.value.trim()), box = sh.querySelector('.wf-res'); sh.querySelectorAll('[data-ward]').forEach(x => x.classList.remove('on'));
+    if (q.length < 2) { box.innerHTML = ''; return; }
+    const hits = unionWards(s).flatMap(x => x.vs.filter(v => bnNorm(v).includes(q)).map(v => ({ v, ws: x.ws })));
+    box.innerHTML = hits.length ? hits.slice(0, 3).map(h => h.ws.map(w => wardResult(s, w, h.v)).join('')).join('') : '<p class="mut wf-none">এই নামে কোনো গ্রাম পাওয়া যায়নি। নিচের ওয়ার্ড নম্বর থেকে বাছুন।</p>';
+  });
   sh.querySelector('.cn-ward')?.addEventListener('change', e => { const w = e.target.value; sh.querySelectorAll('.cn-row').forEach(r => { r.hidden = !!w && r.dataset.w !== w && !r.classList.contains('lead'); }); });
   if (person && me()) ensureTributes().then(() => sh.querySelector('[data-sdtrib]')?.classList.toggle('on', !!S.tribSet?.has(s.id)));
   S.api.serviceReviews(s.id).then(r => { revs = r; drawRev(); if (opt.toRev) sh.querySelector('#sd-rev')?.scrollIntoView({ block: 'start' }); }).catch(() => { const b = sh.querySelector('.sd-revbox'); if (b) b.innerHTML = '<p class="mut">রিভিউ লোড করা যায়নি।</p>'; });
@@ -4106,6 +4113,9 @@ function svcDetailSheet(id, opt = {}) {
     const z = e.target.closest('[data-sdzoom]'); if (z) { if (g) return sdZoom([...g.querySelectorAll('img')].map(i => i.src), [...g.querySelectorAll('img')].indexOf(z)); return sdZoom(imgs, +z.dataset.sdzoom || 0); }
     const yb = e.target.closest('[data-yt]'); if (yb) { const w = document.createElement('div'); w.className = 'yt on'; w.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yb.dataset.yt)}?autoplay=1&rel=0&playsinline=1" title="ভিডিও" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>`; yb.replaceWith(w); return; }
     const r = e.target.closest('[data-sdrel]'); if (r) return svcDetailSheet(r.dataset.sdrel);
+    const wb = e.target.closest('[data-ward]'); if (wb) { sh.querySelectorAll('[data-ward]').forEach(x => x.classList.toggle('on', x === wb)); const inp = sh.querySelector('.wf-in'); if (inp) inp.value = ''; sh.querySelector('.wf-res').innerHTML = wardResult(s, wb.dataset.ward); return; }
+    const cm = e.target.closest('[data-ucmp]'); if (cm) { sh.querySelectorAll('[data-ucmp]').forEach(x => x.classList.toggle('on', x === cm)); sh.querySelector('.uc-box').innerHTML = unionCompare(s, cm.dataset.ucmp); return; }
+    if (e.target.closest('[data-usmore]')) { sh.querySelectorAll('.us-svc [hidden]').forEach(x => { x.hidden = false; }); e.target.closest('[data-usmore]').remove(); return; }
     const uc = e.target.closest('[data-upcat]'); if (uc) { closeSheet(); return openSvcCat(uc.dataset.upcat); }
     const ut = e.target.closest('[data-utoc]'); if (ut) { const el = sh.querySelector('#' + ut.dataset.utoc); if (el?.tagName === 'DETAILS') el.open = true; return el?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     const gt = e.target.closest('[data-sdgo]'); if (gt) return sh.querySelector('#' + gt.dataset.sdgo)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -4131,6 +4141,34 @@ function svcDetailSheet(id, opt = {}) {
   };
 }
 // ইউনিয়নের বিস্তারিত: এক নজরে টাইল, পরিষদ (চাপলে খোলে, ওয়ার্ড বাছাই), মানচিত্র
+// ইউনিয়ন: হাটবার, ওয়ার্ড খোঁজা, সাবেক চেয়ারম্যান, তুলনা
+const BN_DAYS = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+const dayIdx = t => { const k = String(t || '').trim().replace(/বার$/, ''); return k ? BN_DAYS.findIndex(d => d.startsWith(k)) : -1; };
+const numOf = v => { const m = enDigits(String(v || '')).replace(/,/g, '').match(/\d+(?:\.\d+)?/); return m ? +m[0] : null; };
+const todayHats = () => { const d = new Date().getDay(); return (S.svcAll || []).filter(x => x.category === 'union').flatMap(u => (u.hats || []).filter(h => (h.d || []).includes(d)).map(h => ({ ...h, u }))); };
+function unionWards(s) {
+  const out = [];
+  for (const m of String(s.details || '').matchAll(/^•\s*([০-৯0-9]+(?:\s*ও\s*[০-৯0-9]+)*)নং ওয়ার্ড\s*[–-]\s*(.+)$/gm))
+    out.push({ ws: m[1].split(/\s*ও\s*/).map(w => String(+enDigits(w))), vs: m[2].replace(/\(.*?\)/g, '').split(/[,،]/).map(v => v.trim()).filter(Boolean) });
+  return out;
+}
+function wardResult(s, w, vlabel) {
+  const cn = s.council || [], mem = cn.filter(c => String(+enDigits(c.w || 'x')) === w), chair = cn.find(c => /চেয়ারম্যান|প্রশাসক/.test(c.r || ''));
+  const row = c => `<div class="cn-row${/চেয়ারম্যান|প্রশাসক/.test(c.r || '') ? ' lead' : ''}"><span class="cn-role">${esc(c.r || 'সদস্য')}</span><div class="cn-t"><b>${esc(c.n)}</b><small>${c.p ? esc(bn(c.p)) : 'নম্বর যোগ হয়নি'}</small></div>${c.p ? `<a class="cn-call" href="tel:${esc(telOf(c.p))}" aria-label="কল করুন">📞</a>` : ''}</div>`;
+  const vs = unionWards(s).filter(x => x.ws.includes(w)).flatMap(x => x.vs);
+  return `<div class="wf-card"><div class="wf-h"><b>${bn(w)}নং ওয়ার্ড</b>${vlabel ? `<small>${esc(vlabel)} গ্রাম এই ওয়ার্ডে</small>` : vs.length ? `<small>${esc(vs.join(', '))}</small>` : ''}</div>
+    ${mem.length ? mem.map(row).join('') : '<p class="mut wf-none">এই ওয়ার্ডের মেম্বারের তথ্য এখনো যোগ হয়নি।</p>'}
+    ${chair ? `<div class="wf-sub">ইউনিয়ন পরিষদ প্রধান</div>${row(chair)}` : ''}</div>`;
+}
+function unionCompare(s, key) {
+  const K = { pop: ['জনসংখ্যা (২০২২)', 'জনসংখ্যা', ' জন'], area: ['আয়তন', 'আয়তন', ' বর্গ কিমি'], lit: ['শিক্ষার হার', 'শিক্ষার হার', '%'] }[key];
+  const rows = (S.svcAll || []).filter(x => x.category === 'union').map(u => ({ u, v: numOf((u.facts || []).find(f => f.k === K[0])?.v) })).filter(r => r.v != null).sort((a, b) => b.v - a.v);
+  if (!rows.length) return '<p class="mut">তুলনার তথ্য নেই।</p>';
+  const max = rows[0].v, rank = rows.findIndex(r => r.u.id === s.id);
+  const fmt = v => bn(key === 'pop' ? Math.round(v).toLocaleString('en-IN') : String(v)) + K[2];
+  return `${rank >= 0 ? `<p class="uc-rank">${esc(K[1])}য় ${bn(rows.length)}টি ইউনিয়নের মধ্যে <b>${bn(rank + 1)} নম্বরে</b></p>` : `<p class="uc-rank mut">এই ইউনিয়নের ${esc(K[1])} যোগ হয়নি</p>`}
+    <div class="uc-bars">${rows.map(r => `<button class="uc-row${r.u.id === s.id ? ' me' : ''}" data-sdrel="${esc(r.u.id)}"><span class="uc-n">${esc(areaCore(r.u))}</span><span class="uc-b"><i style="width:${Math.max(3, r.v / max * 100)}%"></i></span><span class="uc-v">${fmt(r.v)}</span></button>`).join('')}</div>`;
+}
 // ইউনিয়নের ভেতরের পাতা: উপজেলা/পৌরসভার মতো সূচিপত্র ও অংশভিত্তিক সাজানো
 function unionPage(s, imgs, admin) {
   const short = String(s.name).replace(/^[০-৯0-9]+নং\s*/, '').replace(/ পরিষদ$/, '');
@@ -4139,18 +4177,29 @@ function unionPage(s, imgs, admin) {
   const wards = [...new Set(cn.map(c => String(c.w || '').trim()).filter(Boolean))].sort((a, b) => +enDigits(a) - +enDigits(b));
   const q = s.lat != null ? `${s.lat},${s.lng}` : `${short}, ভালুকা, ময়মনসিংহ`;
   const det0 = f.length ? String(s.details || '').replace(/## এক নজরে[\s\S]*?(?=\n## |$)/, '') : String(s.details || '');
-  const srcLine = (det0.match(/^সূত্র:.*$/m) || [])[0] || '', det = det0.replace(/^সূত্র:.*$/m, '').trim();
+  const srcLine = (det0.match(/^সূত্র:.*$/m) || [])[0] || '';
+  let det = det0.replace(/^সূত্র:.*$/m, '').trim();
+  // সাবেক চেয়ারম্যানদের তালিকা → টাইমলাইন
+  const exM = det.match(/^## ([^\n]*সাবেক চেয়ারম্যান[^\n]*)\n([\s\S]*?)(?=\n## |(?![\s\S]))/m), ex = [];
+  if (exM) { for (const m of exM[2].matchAll(/^•\s*(.+?)\s*[—–]\s*([০-৯0-9]{4})\s*-\s*([০-৯0-9]{4})\s*$/gm)) { const n = m[1].replace(/^জনাবা?\s*/, '').trim(), pv = ex[ex.length - 1];
+      if (pv && pv.n === n) { pv.b = m[3]; pv.k++; } else ex.push({ n, a: m[2], b: m[3], k: 1 }); }
+    if (ex.length) det = det.replace(exM[0], '').trim(); }
+  const wmap = unionWards(s), villages = [...new Set(wmap.flatMap(x => x.vs))];
+  const wcount = numOf(f.find(x => x.k === 'ওয়ার্ড')?.v) || 9, wardAll = [...new Set([...Array.from({ length: Math.min(wcount, 15) }, (_, i) => String(i + 1)), ...wards.map(w => String(+enDigits(w))), ...wmap.flatMap(x => x.ws)])].sort((a, b) => a - b);
+  const hats = (s.hats || []).filter(h => h.n), today = new Date().getDay(), hatsToday = hats.filter(h => (h.d || []).includes(today));
+  const svcs = (S.svcAll || []).filter(x => !['famous', 'tour', 'union', 'upz', 'pouro'].includes(x.category) && inArea(x, s));
   const site = s.url && !/beautifulbhaluka/.test(s.url) ? s.url : '';
   const dsecs = [...det.matchAll(/^## (.+)$/gm)].map(m => m[1]);
   const all = S.svcAll || [], others = all.filter(x => x.category === 'union' && x.id !== s.id).sort((a, b) => unionNo(a) - unionNo(b));
   const upz = all.find(x => x.category === 'upz'), pouro = all.find(x => x.category === 'pouro');
   const fam = all.filter(x => x.category === 'famous' && inArea(x, s)), tour = all.filter(x => x.category === 'tour' && inArea(x, s));
   const chair = cn.find(c => /চেয়ারম্যান/.test(c.r || ''));
-  const toc = [f.length ? ['us-f', 'এক নজরে'] : null, ['us-c', 'ইউনিয়ন পরিষদ'], ...dsecs.map((t, i) => ['us-d' + i, t]), ['us-m', 'মানচিত্র'], fam.length ? ['us-p', 'বিশেষ ব্যক্তিবর্গ'] : null, tour.length ? ['us-t', 'দর্শনীয় স্থান'] : null, others.length ? ['us-o', 'অন্যান্য ইউনিয়ন'] : null].filter(Boolean);
+  const toc = [f.length ? ['us-f', 'এক নজরে'] : null, ['us-w', 'ওয়ার্ড খুঁজুন'], ['us-c', 'ইউনিয়ন পরিষদ'], ...dsecs.map((t, i) => ['us-d' + i, t]), hats.length ? ['us-h', 'হাটবার'] : null, ex.length ? ['us-x', 'সাবেক চেয়ারম্যান'] : null, ['us-k', 'তুলনা'], ['us-m', 'মানচিত্র'], svcs.length ? ['us-s', 'সেবা ও প্রতিষ্ঠান'] : null, fam.length ? ['us-p', 'বিশেষ ব্যক্তিবর্গ'] : null, tour.length ? ['us-t', 'দর্শনীয় স্থান'] : null, others.length ? ['us-o', 'অন্যান্য ইউনিয়ন'] : null].filter(Boolean);
   return `<div class="ip up" style="--sc:${svcColor(s.category)}">
     <div class="up-bar"><button class="up-x" data-close aria-label="বন্ধ করুন">✕</button><span>${esc(short)}</span>${admin ? '<button class="ip-btn" data-sdedit>✏️ সম্পাদনা</button>' : ''}</div>
     ${imgs.length ? `<div class="ip-hero"><img src="${esc(imgs[0])}" alt="" data-sdzoom="0" onerror="this.parentNode.remove()">${imgs.length > 1 ? `<span class="up-cnt">🖼️ ${bn(imgs.length)}টি ছবি</span>` : ''}</div>` : ''}
     <div class="ip-head"><h2>${esc(s.name)}</h2><p>${esc(s.tagline || 'ভালুকা উপজেলা, ময়মনসিংহ')}</p>
+      ${hatsToday.length ? `<button class="up-hat" data-utoc="us-h">🛒 আজ হাট বসছে: <b>${esc(hatsToday.map(h => h.n).join(', '))}</b></button>` : ''}
       ${chair ? `<div class="up-chair"><span>👤</span><div><small>${esc(chair.r)}</small><b>${esc(chair.n)}</b></div>${chair.p ? `<a class="cn-call" href="tel:${esc(telOf(chair.p))}" aria-label="কল করুন">📞</a>` : ''}</div>` : ''}
       <div class="ip-acts">${ph[0] ? `<a class="si-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞 <b>${esc(bn(ph[0].n))}</b></a>` : ''}${s.email ? `<a class="si-mail" href="mailto:${esc(s.email)}">✉️</a>` : ''}
         ${site ? `<a class="ip-btn" href="${esc(site)}" target="_blank" rel="noopener">🌐 ওয়েবসাইট</a>` : ''}<button class="ip-btn" data-svcshare="1">↗️ শেয়ার</button><button class="ip-btn" data-utoc="us-m">🗺️ মানচিত্র</button></div></div>
@@ -4158,6 +4207,10 @@ function unionPage(s, imgs, admin) {
     ${admin ? '<div class="sd-reps"></div>' : ''}
     <div class="sdet-body ip-body">
       ${f.length ? `<section class="dsec" id="us-f"><h3>এক নজরে</h3><div class="u-tiles">${f.map(x => `<div><b>${esc(String(x.v))}</b><small>${esc(x.k)}</small></div>`).join('')}</div></section>` : ''}
+      <section class="dsec wf" id="us-w"><h3>কোন ওয়ার্ড, কোন মেম্বার?</h3>
+        ${villages.length ? `<input class="f wf-in" list="wf-dl" placeholder="🔍 আপনার গ্রামের নাম লিখুন" autocomplete="off"><datalist id="wf-dl">${villages.map(v => `<option value="${esc(v)}">`).join('')}</datalist>` : ''}
+        <div class="wf-chips"><small>${villages.length ? 'অথবা ওয়ার্ড বাছুন' : 'ওয়ার্ড বাছুন'}</small>${wardAll.map(w => `<button data-ward="${w}">${bn(w)}</button>`).join('')}</div>
+        <div class="wf-res"></div></section>
       <details class="dsec dacc" id="us-c"><summary><h3>ইউনিয়ন পরিষদ</h3><i>⌄</i></summary><div class="dacc-b">
         ${ph.length > 1 || s.email ? `<div class="sd-phones">${ph.map(p => `<div class="sd-ph"><div><small>${esc(p.l)}</small><b>${esc(bn(p.n))}</b></div><button class="sd-phc" data-copy="${esc(p.n)}" aria-label="কপি">⧉</button><a class="sd-phk" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(p.n))}">📞 কল</a></div>`).join('')}${s.email ? `<div class="sd-ph"><div><small>ইমেইল</small><b>${esc(s.email)}</b></div><button class="sd-phc" data-copy="${esc(s.email)}" aria-label="কপি">⧉</button><a class="sd-phk" href="mailto:${esc(s.email)}">✉️ লিখুন</a></div>` : ''}</div>` : ''}
         <div class="cn"><div class="cn-cap">👥 চেয়ারম্যান ও সদস্য${cn.length ? ` · ${bn(cn.length)} জন` : ''}</div>
@@ -4167,11 +4220,20 @@ function unionPage(s, imgs, admin) {
           ${c.p ? `<a class="cn-call" href="tel:${esc(telOf(c.p))}" aria-label="কল করুন">📞</a>` : ''}</div>`).join('')}</div><p class="mut cn-note">তালিকায় কোনো পরিবর্তন থাকলে নিচের "⚠️ ভুল তথ্য জানান" দিয়ে জানান।</p>`
         : `<p class="mut" style="margin:8px 12px 12px">চেয়ারম্যান ও সদস্যদের নাম-নম্বর জানা থাকলে নিচের "ছবি বা তথ্য পাঠান" দিয়ে পাঠান।</p>`}</div></div></details>
       ${detHtml(det, 'us-d', 'all')}
+      ${hats.length ? `<details class="dsec dacc" id="us-h"${hatsToday.length ? ' open' : ''}><summary><h3>হাট-বাজার ও হাটবার</h3><i>⌄</i></summary><div class="dacc-b">
+        <div class="hb-week">${BN_DAYS.map((d, i) => `<span class="${i === today ? 'on' : ''}${hats.some(h => (h.d || []).includes(i)) ? ' has' : ''}">${['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'][i]}</span>`).join('')}</div>
+        ${hats.map(h => `<div class="hb-row${(h.d || []).includes(today) ? ' today' : ''}"><b>🛒 ${esc(h.n)}</b><span>${(h.d || []).length ? (h.d || []).map(i => BN_DAYS[i]).join(', ') : 'প্রতিদিন'}${(h.d || []).includes(today) ? ' <em>আজ</em>' : ''}</span>${h.t ? `<small>${esc(h.t)}</small>` : ''}</div>`).join('')}</div></details>` : ''}
+      ${ex.length ? `<details class="dsec dacc" id="us-x"><summary><h3>সাবেক চেয়ারম্যানগণ</h3><i>⌄</i></summary><div class="dacc-b"><ol class="sp-tl ex-tl">${ex.map(e => `<li><b>${esc(e.a)}–${esc(e.b)}</b><span>${esc(e.n)}${e.k > 1 ? ` <small class="mut">(${bn(e.k)} মেয়াদ)</small>` : ''}</span></li>`).join('')}</ol></div></details>` : ''}
+      <details class="dsec dacc" id="us-k"><summary><h3>অন্যান্য ইউনিয়নের সাথে তুলনা</h3><i>⌄</i></summary><div class="dacc-b">
+        <div class="uc-tabs"><button data-ucmp="pop" class="on">👥 জনসংখ্যা</button><button data-ucmp="area">📐 আয়তন</button><button data-ucmp="lit">🎓 শিক্ষার হার</button></div>
+        <div class="uc-box">${unionCompare(s, 'pop')}</div></div></details>
       <details class="dsec dacc" id="us-m"><summary><h3>মানচিত্র</h3><i>⌄</i></summary><div class="dacc-b"><button class="map-load" data-mapq="${esc(q)}"><span>🗺️</span><b>মানচিত্রে ${esc(short)} দেখুন</b><small>চাপলে মানচিত্র লোড হবে</small></button>
         <a class="sd-gomap" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}" target="_blank" rel="noopener">🧭 পথ দেখুন</a></div></details>
       ${imgs.length > 1 ? `<details class="dsec dacc" id="us-g"><summary><h3>ছবি</h3><i>⌄</i></summary><div class="dacc-b"><div class="sp-gal">${imgs.map((u, i) => `<img src="${esc(u)}" alt="" loading="lazy" data-sdzoom="${i}" onerror="this.remove()">`).join('')}</div></div></details>` : ''}
       ${s.details ? '' : '<p class="mut">এখনো বিস্তারিত তথ্য যোগ করা হয়নি।</p>'}
     </div>
+    ${svcs.length ? `<section class="dsec ip-links" id="us-s"><h3>এই ইউনিয়নের সেবা ও প্রতিষ্ঠান</h3><div class="sd-near us-svc">${svcs.map((x, i) => `<button data-sdrel="${esc(x.id)}" style="--c:${svcColor(x.category)}"${i >= 8 ? ' hidden' : ''}><span class="sn-ic">${svcIc(x.category, 18)}</span><span class="sn-t"><b>${esc(x.name)}</b><small>${esc(catName(x.category) || '')}${x.address ? ` · ${esc(x.address)}` : ''}</small></span><span class="sn-km">›</span></button>`).join('')}</div>
+      ${svcs.length > 8 ? `<button class="ip-all" data-usmore>সব দেখুন (${bn(svcs.length)}) ⌄</button>` : ''}</section>` : ''}
     ${peoplePlaces(fam, tour, { sheet: 1, ids: 1, where: 'ইউনিয়নের' })}
     ${others.length || upz ? `<section class="dsec ip-links" id="us-o"><h3>অন্যান্য ইউনিয়ন</h3><div class="ip-chips">${upz ? `<button data-upcat="upz" class="pr">🏛️ ভালুকা উপজেলা</button>` : ''}${pouro ? `<button data-upcat="pouro" class="pr">🏢 ${esc(pouro.name)}</button>` : ''}${others.map(u => `<button data-sdrel="${esc(u.id)}">${esc(String(u.name).replace(/ পরিষদ$/, ''))}</button>`).join('')}</div></section>` : ''}
     <div class="sp-help"><button data-sdmedia>📷 এই ইউনিয়নের ছবি বা তথ্য পাঠান</button></div>
@@ -4274,7 +4336,8 @@ function svcEditSheet(s, category) {
     <div class="se-imgs"></div>
     <label>${F.det} <small class="mut">(### দিয়ে শিরোনাম, • দিয়ে তালিকা)</small><textarea id="se-det" rows="8" maxlength="20000"${person ? ' placeholder="### প্রারম্ভিক জীবন&#10;...&#10;&#10;### কর্মজীবন&#10;...&#10;&#10;### অবদান ও সম্মাননা&#10;• ..."' : ''}>${esc(v.details || '')}</textarea></label>
     ${cat === 'union' ? `<label>এক নজরে তথ্য <small class="mut">(প্রতি লাইনে "বিষয়: তথ্য")</small><textarea id="se-facts" rows="4" placeholder="জনসংখ্যা (২০২২): ৩২,২৪৯ জন&#10;আয়তন: ৪৩.৩১ বর্গ কিমি&#10;ওয়ার্ড: ৯টি">${esc((v.facts || []).map(f => `${f.k}: ${f.v}`).join('\n'))}</textarea></label>
-    <label>ইউনিয়ন পরিষদ <small class="mut">(প্রতি লাইনে "পদ | নাম | ওয়ার্ড | মোবাইল")</small><textarea id="se-council" rows="6" placeholder="চেয়ারম্যান | মো: ... | | 017...&#10;সদস্য | ... | ১ | 017...&#10;সংরক্ষিত মহিলা সদস্য | ... | ১,২,৩ | 017...">${esc((v.council || []).map(c => [c.r, c.n, c.w || '', c.p || ''].join(' | ')).join('\n'))}</textarea></label>` : ''}
+    <label>ইউনিয়ন পরিষদ <small class="mut">(প্রতি লাইনে "পদ | নাম | ওয়ার্ড | মোবাইল")</small><textarea id="se-council" rows="6" placeholder="চেয়ারম্যান | মো: ... | | 017...&#10;সদস্য | ... | ১ | 017...&#10;সংরক্ষিত মহিলা সদস্য | ... | ১,২,৩ | 017...">${esc((v.council || []).map(c => [c.r, c.n, c.w || '', c.p || ''].join(' | ')).join('\n'))}</textarea></label>
+    <label>হাট-বাজার ও হাটবার <small class="mut">(প্রতি লাইনে "নাম | দিন | নোট" — দিন না দিলে প্রতিদিন)</small><textarea id="se-hats" rows="4" placeholder="উথুরা হাট | শনি, মঙ্গল | বিকেলে জমে&#10;কৈয়াদী বাজার | | প্রতিদিন সকাল">${esc((v.hats || []).map(h => [h.n, (h.d || []).map(i => BN_DAYS[i].replace(/বার$/, '')).join(', '), h.t || ''].join(' | ')).join('\n'))}</textarea></label>` : ''}
     ${person ? `<label>বিখ্যাত উক্তি<textarea id="se-quote" rows="2" maxlength="500" placeholder="তাঁর কোনো কথা বা বক্তব্যের অংশ">${esc(v.quote || '')}</textarea></label>
     <label>সম্মাননা ও পদক <small class="mut">(প্রতি লাইনে একটি)</small><textarea id="se-hon" rows="2" placeholder="একুশে পদক (১৯৯০)&#10;বীর প্রতীক">${esc((v.honors || []).join('\n'))}</textarea></label>
     <div class="bk-row"><label>জন্মের তারিখ<input type="date" id="se-bd" value="${v.born_md ? '2000-' + v.born_md : ''}"></label><label>মৃত্যুর তারিখ<input type="date" id="se-dd" value="${v.died_md ? '2000-' + v.died_md : ''}"></label></div>
@@ -4335,6 +4398,7 @@ function svcEditSheet(s, category) {
     if (cat === 'union') {
       const lines = id => $(id).value.split('\n').map(x => x.trim()).filter(Boolean);
       p.facts = lines('#se-facts').map(l => { const i = l.search(/[:：]/); return i > 0 ? { k: l.slice(0, i).trim(), v: l.slice(i + 1).trim() } : null; }).filter(f => f && f.v).slice(0, 20);
+      if (has('#se-hats')) p.hats = lines('#se-hats').map(l => { const c = l.split('|').map(x => x.trim()); return c[0] ? { n: c[0], d: [...new Set((c[1] || '').split(/[,،\s]+/).map(dayIdx).filter(i => i >= 0))].sort(), t: c[2] || '' } : null; }).filter(Boolean).slice(0, 30);
       p.council = lines('#se-council').map(l => { const c = l.split('|').map(x => x.trim()); return c[1] ? { r: c[0] || 'সদস্য', n: c[1], w: c[2] || '', p: enDigits(c[3] || '') } : null; }).filter(Boolean).slice(0, 60);
     }
     if (person) {

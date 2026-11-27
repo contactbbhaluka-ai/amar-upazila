@@ -2247,3 +2247,35 @@ details.dacc[open]>summary{border-bottom:1px solid var(--line)}
 .up-src{margin:14px 4px 4px;font-size:12.5px;color:var(--mut);line-height:1.6;word-break:break-word}
 .dsrc a{color:var(--sc);text-decoration:underline}
 .cn-note{font-size:12px;margin:8px 12px 12px}
+/* ইউনিয়ন: ওয়ার্ড খোঁজা, হাটবার, তুলনা */
+.up-hat{display:block;width:100%;text-align:left;margin-top:10px;padding:9px 12px;border-radius:12px;border:1px solid color-mix(in srgb,#f59e0b 45%,var(--line));background:color-mix(in srgb,#f59e0b 12%,var(--card));color:var(--ink);font-family:inherit;font-size:13.5px;cursor:pointer}
+.wf .wf-in{width:100%;margin:2px 0 10px}
+.wf-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.wf-chips small{width:100%;color:var(--mut);font-size:12px}
+.wf-chips button{min-width:38px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:inherit;font-weight:700;cursor:pointer}
+.wf-chips button.on{background:var(--sc);border-color:var(--sc);color:#fff}
+.wf-res:not(:empty){margin-top:12px}
+.wf-card{border:1px solid color-mix(in srgb,var(--sc) 30%,var(--line));border-radius:14px;padding:4px 12px 6px;margin-bottom:10px;background:color-mix(in srgb,var(--sc) 5%,var(--card))}
+.wf-h{padding:8px 0 6px;border-bottom:1px solid var(--line)}.wf-h b{display:block;font-size:15px;color:var(--sc)}.wf-h small{color:var(--mut);font-size:12.5px}
+.wf-sub{font-size:11.5px;color:var(--mut);padding-top:8px}
+.wf-none{font-size:13px;margin:10px 0}
+.hb-week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:6px 0 10px}
+.hb-week span{text-align:center;padding:6px 0;border-radius:8px;font-size:12px;background:var(--line);color:var(--mut)}
+.hb-week span.has{background:color-mix(in srgb,var(--sc) 18%,var(--card));color:var(--ink);font-weight:700}
+.hb-week span.on{outline:2px solid #f59e0b}
+.hb-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.hb-row:last-child{border-bottom:0}.hb-row b{flex:1 1 auto;font-size:14px}.hb-row span{font-size:13px;color:var(--mut)}
+.hb-row small{width:100%;font-size:12px;color:var(--mut)}
+.hb-row em{font-style:normal;background:#f59e0b;color:#fff;border-radius:8px;padding:1px 7px;font-size:11px;margin-left:4px}
+.hb-row.today b{color:var(--sc)}
+.ex-tl{margin-top:4px}
+.uc-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 8px}
+.uc-tabs button{padding:6px 11px;border-radius:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:inherit;font-size:13px;cursor:pointer}
+.uc-tabs button.on{background:var(--sc);border-color:var(--sc);color:#fff}
+.uc-rank{font-size:13.5px;margin:4px 0 10px}.uc-rank b{color:var(--sc)}
+.uc-bars{display:flex;flex-direction:column;gap:6px}
+.uc-row{display:grid;grid-template-columns:78px 1fr auto;align-items:center;gap:8px;border:0;background:none;padding:2px 0;color:var(--ink);font-family:inherit;text-align:left;cursor:pointer}
+.uc-n{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.uc-b{height:12px;border-radius:6px;background:var(--line);overflow:hidden}.uc-b i{display:block;height:100%;border-radius:6px;background:color-mix(in srgb,var(--sc) 45%,var(--card))}
+.uc-v{font-size:12px;color:var(--mut);white-space:nowrap}
+.uc-row.me .uc-n{font-weight:700;color:var(--sc)}.uc-row.me .uc-b i{background:var(--sc)}.uc-row.me .uc-v{color:var(--ink);font-weight:700}

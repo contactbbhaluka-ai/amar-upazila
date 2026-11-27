@@ -3814,7 +3814,7 @@ async function doLogin(btn, ident, password, remember, onErr) {
 }
 document.addEventListener('click', async e => {
   const x = e.target.closest('[data-accx]');
-  if (x) { e.stopPropagation(); const a = accList().find(y => y.id === x.dataset.accx); if (a && await confirmSheet(`"${a.name}" এই ফোনের তালিকা থেকে সরাবেন?`, 'সরান')) { accForget(a.id); if (S.view === 'me' && !me()) authView(); } return; }
+  if (x) { e.stopPropagation(); const a = accList().find(y => y.id === x.dataset.accx); if (a && await confirmSheet('এই অ্যাকাউন্টটা এই ফোনের তালিকা থেকে সরাবেন?', 'সরান')) { accForget(a.id); if (S.view === 'me' && !me()) authView(); } return; }
   if (e.target.closest('[data-accadd]')) { if ($('#modal').classList.contains('on')) closeSheet(); return addAccount(); }
   const sw = e.target.closest('[data-auswap]'); if (sw) return authView(sw.dataset.auswap);
   const t = e.target.closest('[data-acc]'); if (t) accTap(t.dataset.acc, t);
@@ -3861,7 +3861,7 @@ const PW_LV = [['', 'কমপক্ষে ৬ অক্ষর দিন'], ['we
 function signupView() {
   $('#me').innerHTML = `<div class="au au-su">
     <div class="au-top"><button type="button" class="au-backbtn" id="su-back" aria-label="পেছনে">${ic('chevL', 22)}</button><div><b>নতুন অ্যাকাউন্ট</b><small id="su-stl"></small></div></div>
-    <div class="au-prog" aria-hidden="true">${SU_ST.map((s, i) => `<span data-pi="${i + 1}"><i>${s[0]}</i><em>${s[1]}</em></span>`).join('')}</div>
+    <div class="au-prog" aria-hidden="true">${SU_ST.map((s, i) => `<span data-pi="${i + 1}"><i translate="no">${bn(i + 1)}</i><em>${s[1]}</em></span>`).join('')}</div>
     <div class="au-card"><form id="sform" novalidate>
       <section data-st="1"><h2>আপনার পরিচয়</h2><p class="au-sub">${SU_ST[0][2]}</p>
         ${auF('an', ic('user', 18), 'আপনার পূর্ণ নাম', 'maxlength="40" autocomplete="name"')}
@@ -6106,7 +6106,7 @@ function renderNotifs() {
 function specialNotif(n) {
   const m = n.meta || {}, base = (cls, icon, body) => `<div class="notif nt-sp ${cls}${n.isNew ? ' new' : ''}" data-n-type="${esc(n.type)}" data-n-post="${esc(n.postId ?? '')}" data-n-group="" data-n-user="${esc(n.actor.id)}" data-n-aid="${esc(n.id)}" role="button" tabindex="0">
     <span class="ico">${icon}</span><span class="txt">${body}<span class="time">${esc(ago(n.createdAt))}</span></span>${ntMoreBtn(n)}</div>`;
-  if (n.type === 'login_alert') { const d = uaName(m.ua); return base('nt-login', '<span class="self-ic">🔐</span>', `<b>নতুন ডিভাইস থেকে আপনার অ্যাকাউন্টে লগইন হয়েছে</b> · ${esc(d.os)}, ${esc(d.br)}। আপনি না হলে এখনই পাসওয়ার্ড বদলান।`); }
+  if (n.type === 'login_alert') { const d = uaName(m.ua); return base('nt-login', '<span class="self-ic">🔐</span>', `<b>নতুন ডিভাইস থেকে আপনার অ্যাকাউন্টে লগইন হয়েছে</b> · <span>${esc(d.os)}</span>, <span>${esc(d.br)}</span>. <span>আপনি না হলে এখনই পাসওয়ার্ড বদলান</span>`); }
   if (n.type === 'announce') return base('nt-ann', '<span class="self-ic">📢</span>', `<b class="ann-h">📢 জরুরি ঘোষণা · ${esc(m.from || 'উপজেলা')}${m.union ? ` · ${esc(m.union)}` : ''}</b><span class="ann-t">${esc(m.text || '')}</span>`);
   if (n.type === 'birthday') { const c = Number(m.count) || 1; return base('nt-bd', `${av(n.actor)}<i>🎂</i>`, `আজ <b>${esc(n.actor.name)}</b>${c > 1 ? ` ও আরও <b>${bn(c - 1)} জনের</b>` : '-এর'} জন্মদিন। শুভেচ্ছা জানাতে চাপুন 🎉`); }
   if (n.type === 'friend_anniv') return base('nt-an', `${av(n.actor)}<i>🤝</i>`, `আজ <b>${esc(n.actor.name)}</b>-এর সাথে আপনার বন্ধুত্বের <b>${bn(m.years || 1)} বছর</b> পূর্ণ হলো`);

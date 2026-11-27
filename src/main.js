@@ -3762,7 +3762,7 @@ function authErr(el, msg) {
 }
 const authClr = root => { root?.querySelectorAll('.au-err').forEach(x => x.remove()); root?.querySelectorAll('.bad').forEach(x => x.classList.remove('bad')); };
 ['input', 'change'].forEach(ev => document.addEventListener(ev, e => { const b = e.target.closest?.('.bad'); if (b && b.matches(AU_BOX)) { b.classList.remove('bad'); if (b.nextElementSibling?.classList.contains('au-err')) b.nextElementSibling.remove(); } }));
-const auF = (id, icon, label, attrs = '', eye = false) => `<div class="au-f${eye ? ' has-eye' : ''}"><input id="${id}" placeholder=" " ${attrs}><label for="${id}">${label}</label>${eye ? `<button type="button" class="au-eye" data-pweye="${id}" aria-label="পাসওয়ার্ড দেখুন">${ic('eye', 20)}</button>` : ''}</div>`;
+const auF = (id, icon, label, attrs = '', eye = false) => `<div class="au-f${eye ? ' has-eye' : ''}${icon ? ' has-ic' : ''}">${icon ? `<span class="au-i">${icon}</span>` : ''}<input id="${id}" placeholder=" " ${attrs}><label for="${id}">${label}</label>${eye ? `<button type="button" class="au-eye" data-pweye="${id}" aria-label="পাসওয়ার্ড দেখুন">${ic('eye', 20)}</button>` : ''}</div>`;
 const auHero = sub => `<div class="au-hero"><div class="au-logo"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#006a4e"/><circle cx="256" cy="220" r="104" fill="#e5303f"/><path d="M104 420c40-66 94-96 152-96s112 30 152 96" stroke="#fff" stroke-width="40" fill="none" stroke-linecap="round"/></svg></div><h1>আমার উপজেলা</h1><p>${sub || 'ভালুকার মানুষের নিজের সামাজিক অ্যাপ'}</p></div>`;
 const auSpin = btn => { const old = btn?.innerHTML; if (btn) { btn.disabled = true; btn.innerHTML = '<span class="au-spin" aria-label="অপেক্ষা করুন"></span>'; } return () => { if (btn?.isConnected) { btn.disabled = false; btn.innerHTML = old; } }; };
 
@@ -3865,8 +3865,8 @@ function signupView() {
     <div class="au-card"><form id="sform" novalidate>
       <section data-st="1"><h2>আপনার পরিচয়</h2><p class="au-sub">${SU_ST[0][2]}</p>
         ${auF('an', ic('user', 18), 'আপনার পূর্ণ নাম', 'maxlength="40" autocomplete="name"')}
-        <div class="au-blk"><div class="au-lbl">লিঙ্গ</div><input type="hidden" id="su-g"><div class="au-seg">${[['male', 'পুরুষ'], ['female', 'নারী'], ['none', 'বলতে চাই না']].map(([k, l]) => `<button type="button" data-sug="${k}">${l}</button>`).join('')}</div></div>
-        <div class="au-blk" id="su-bd-b"><div class="au-lbl">জন্মতারিখ <span>(বয়স ${bn(MIN_AGE)} বছরের বেশি হতে হবে)</span></div>${dateSelect('su-bd', '', true)}</div></section>
+        <div class="au-blk"><label for="su-g">${ic('users', 16)} লিঙ্গ</label>${genderSelect('su-g', undefined, true)}</div>
+        <div class="au-blk" id="su-bd-b"><div class="au-lbl">${ic('calendar', 16)} জন্মতারিখ <span>(বয়স ${bn(MIN_AGE)} বছরের বেশি হতে হবে)</span></div>${dateSelect('su-bd', '', true)}</div></section>
       <section data-st="2" hidden><h2>ঠিকানা ও যোগাযোগ</h2><p class="au-sub">${SU_ST[1][2]}</p>
         <div class="au-blk" id="su-addr-b">${addrHtml('su')}</div>
         ${auF('su-ph', ic('mobile', 18), 'মোবাইল নম্বর (WhatsApp থাকলে এটাই)', 'inputmode="tel" autocomplete="tel" maxlength="17"')}

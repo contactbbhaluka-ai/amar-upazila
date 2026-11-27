@@ -2586,3 +2586,15 @@ details.sv[open]>summary{background:color-mix(in srgb,var(--sc) 7%,var(--card))}
 .dev-ic{color:var(--g)}
 .pw-match::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:middle}
 .lo-rem small{line-height:1.5}
+/* ঘরের ভেতরে অ্যাপের নিজস্ব লাইন আইকন (ট্যাবের আইকনের মতো, এক রঙের) */
+.au-f.has-ic input{padding-left:46px}
+.au-f.has-ic label{left:46px}
+.au-i{left:15px;color:light-dark(#65676b,#9bb0a7)}
+.au-i svg{width:20px;height:20px;stroke-width:1.9}
+.au-f:focus-within .au-i{color:var(--g)}
+.au-blk label svg,.au-blk .ic-line,.au-lbl svg{display:inline-block;color:light-dark(#65676b,#9bb0a7);vertical-align:-3px;margin-right:2px}
+.au-blk label{display:flex;align-items:center;gap:6px;margin:0 0 8px}
+.au-blk label.chk{display:flex;align-items:flex-start;font-weight:500}
+.au-blk label.chk svg{display:none}
+.au-blk select.f{min-height:50px;font-size:15px}
+.au-blk label:not(:first-child):not(.chk){margin-top:14px}.au-blk .chk{margin-top:10px}

@@ -906,7 +906,7 @@ async function supabaseApi() {
 
     // ---------- সেবা ডিরেক্টরি ও রিপোর্ট
     async services({ category, q }) {
-      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng,url,image_url,details,images')
+      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng,url,image_url,details,images,subtype,amenities,how_to_go,best_time,rating_avg,rating_count')
         .eq('upazila_id', UPAZILA_ID).order('verified', { ascending: false }).order('name').limit(500);
       if (category) s = s.eq('category', category);
       const term = (q || '').replace(/[,%()*\\]/g, ' ').trim();
@@ -924,6 +924,23 @@ async function supabaseApi() {
     async serviceCatVisit(c) { await sb.rpc('svc_cat_visit', { c }); },
     async setServiceLoc(id, lat, lng) { ok(await sb.from('services').update({ lat, lng }).eq('id', id)); },
     async verifyService(id) { ok(await sb.from('services').update({ verified: true }).eq('id', id)); },
+    async serviceReviews(id) {
+      const rows = ok(await sb.from('service_reviews').select('id,user_id,rating,body,created_at').eq('service_id', id).order('created_at', { ascending: false }).limit(50));
+      const ids = [...new Set(rows.map(r => r.user_id))];
+      const ps = ids.length ? ok(await sb.from('profiles').select('id,name,avatar_url').in('id', ids)) : [];
+      const pm = new Map(ps.map(p => [p.id, p]));
+      return rows.filter(r => pm.has(r.user_id) && !blocked.has(r.user_id)).map(r => ({ ...r, name: pm.get(r.user_id).name, avatar: pm.get(r.user_id).avatar_url || '', mine: r.user_id === me?.id }));
+    },
+    async saveReview(id, rating, body) { ok(await sb.from('service_reviews').upsert({ service_id: id, user_id: me.id, rating, body: body || null }, { onConflict: 'service_id,user_id' })); },
+    async delReview(rid) { ok(await sb.from('service_reviews').delete().eq('id', rid)); },
+    async uploadServiceImage(blob) { return upload(blob, 'svc'); },
+    async serviceReports(id) { return ok(await sb.from('reports').select('id,reason,created_at').eq('target_type', 'service').eq('target_id', String(id)).eq('resolved', false).order('created_at', { ascending: false }).limit(20)); },
+    async resolveReport(rid) { ok(await sb.from('reports').update({ resolved: true }).eq('id', rid)); },
+    async saveService(id, v) {
+      if (id) { ok(await sb.from('services').update(v).eq('id', id)); return id; }
+      const r = ok(await sb.from('services').insert({ ...v, upazila_id: UPAZILA_ID, created_by: me.id, verified: false }).select('id').single());
+      ok(await sb.from('services').update({ verified: true }).eq('id', r.id)); return r.id;
+    },
     async report(targetType, targetId, reason) {
       ok(await sb.from('reports').insert({ reporter_id: me.id, target_type: targetType, target_id: String(targetId), reason }));
     },
@@ -1027,8 +1044,16 @@ function demoApi() {
   };
   // পুরোনো ডেমো ডেটাতেও নতুন দর্শনীয় স্থানগুলো বসাই
   for (const t of DEMO_TOURS) { const i = db.services.findIndex(x => x.id === t.id); if (i < 0) db.services.unshift({ ...t }); else db.services[i] = { ...db.services[i], ...t, lat: db.services[i].lat, lng: db.services[i].lng }; }
+  db.svcReports = get('svcReports', []);
+  db.svcReviews = get('svcReviews', [
+    { id: 1, service_id: 901, user_id: 'd3', rating: 5, body: 'শালবনের ভেতর হাঁটতে দারুণ লাগে, ওয়াচ টাওয়ার থেকে পুরো বন দেখা যায়।', created_at: ago(30) },
+    { id: 2, service_id: 901, user_id: 'd4', rating: 4, body: 'সুন্দর জায়গা, তবে খাবার সাথে নিয়ে যাবেন।', created_at: ago(80) },
+    { id: 3, service_id: 904, user_id: 'd5', rating: 5, body: 'পরিবার নিয়ে পিকনিকে গিয়েছিলাম, খাবার ভালো ছিল।', created_at: ago(50) },
+  ]);
+  const svcRate = id => { const rs = db.svcReviews.filter(r => r.service_id === id), s = db.services.find(x => x.id === id); if (s) { s.rating_count = rs.length; s.rating_avg = rs.length ? Math.round(rs.reduce((a, r) => a + r.rating, 0) / rs.length * 10) / 10 : 0; } };
+  [...new Set(db.svcReviews.map(r => r.service_id))].forEach(svcRate);
   let meId = get('me', null);
-  const save = () => { for (const k of ['dirBanners', 'svcCatVisits', 'svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['svcReports', 'svcReviews', 'dirBanners', 'svcCatVisits', 'svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone', gone: !!p.deleteAt && p.id !== meId }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -2078,7 +2103,23 @@ function demoApi() {
     async serviceCatVisit(c) { db.svcCatVisits[c] = (db.svcCatVisits[c] || 0) + 1; save(); },
     async serviceCalled(id) { const s = db.services.find(x => x.id === id); if (s) { s.call_count = (s.call_count || 0) + 1; save(); } },
     async verifyService(id) { const s = db.services.find(x => x.id === id); if (s) s.verified = true; save(); },
-    async report() { return wait(true); },
+    async serviceReviews(id) {
+      return wait((db.svcReviews || []).filter(r => r.service_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)).map(r => { const u = person(r.user_id) || {}; return { ...r, name: u.name || 'সদস্য', avatar: u.avatar || '', mine: r.user_id === meId }; }));
+    },
+    async saveReview(id, rating, body) {
+      db.svcReviews ||= []; const o = db.svcReviews.find(r => r.service_id === id && r.user_id === meId);
+      if (o) Object.assign(o, { rating, body: body || null }); else db.svcReviews.push({ id: Date.now(), service_id: id, user_id: meId, rating, body: body || null, created_at: new Date().toISOString() });
+      svcRate(id); save(); return wait();
+    },
+    async delReview(rid) { const r = (db.svcReviews || []).find(x => x.id === rid); db.svcReviews = (db.svcReviews || []).filter(x => x.id !== rid); if (r) svcRate(r.service_id); save(); return wait(); },
+    async uploadServiceImage(blob) { return toBlobUrl(blob); },
+    async saveService(id, v) {
+      if (id) { const s = db.services.find(x => x.id === id); if (s) Object.assign(s, v); save(); return wait(id); }
+      const nidv = nid(db.services); db.services.unshift({ ...v, id: nidv, verified: true }); save(); return wait(nidv);
+    },
+    async report(t, id, reason) { if (t === 'service') { db.svcReports ||= []; db.svcReports.push({ id: Date.now(), sid: String(id), reason, created_at: new Date().toISOString() }); save(); } return wait(true); },
+    async serviceReports(id) { return wait((db.svcReports || []).filter(r => r.sid === String(id))); },
+    async resolveReport(rid) { db.svcReports = (db.svcReports || []).filter(r => r.id !== rid); save(); return wait(); },
   };
 }
 

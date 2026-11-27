@@ -26,3 +26,17 @@ export const DEMO_TOURS = [
   T(910, 18, 0, 'তেপান্তর রিসোর্ট', 'জামিরদিয়া মাষ্টার বাড়ি, ভালুকা',
     'ঢাকা থেকে ময়মনসিংহ যাওয়ার পথে ভালুকায় গড়ে উঠেছে তেপান্তর রিসোর্ট। সুন্দর পরিবেশ আর সহজ যোগাযোগের জন্য অল্পদিনেই পরিচিতি পেয়েছে।\n\n### সুবিধা\n\n• দৃষ্টিনন্দন সুইমিং পুল\n• পার্টি জোন, বারবিকিউ ও মিউজিক জোন\n• মিটিং ও প্রশিক্ষণের আলাদা জায়গা\n• নিজস্ব ক্যাটারিং, কিড জোন ও খেলার মাঠ'),
 ];
+// ধরন, সুবিধা, যাতায়াত ও ভালো সময় (ডেমো)
+const EXTRA = {
+  901: { subtype: 'nature', amenities: ['stay', 'picnic', 'parking'], best_time: 'শীতকাল (নভেম্বর–ফেব্রুয়ারি), সকালে গেলে পাখি বেশি দেখা যায়', how_to_go: 'ঢাকা থেকে ময়মনসিংহগামী বাসে ভালুকা সিডস্টোর নামুন (প্রায় ২ ঘণ্টা)।\n\n• সিডস্টোর থেকে সখিপুর রোডে অটোতে কাচিনা বাজার\n• কাচিনা বাজার থেকে ১ কিমি উত্তরে পালগাঁও চৌরাস্তা' },
+  902: { subtype: 'nature', amenities: ['parking'], how_to_go: 'ভালুকা সদর থেকে সিএনজি বা অটোতে উথুরা হয়ে হাতিবেড় গ্রাম (প্রায় ১৭ কিমি)।' },
+  903: { subtype: 'park', amenities: ['kids', 'boat', 'picnic', 'food'], best_time: 'বিকেল, ছুটির দিনে ভিড় বেশি', how_to_go: 'বাসে স্কয়ার মাস্টারবাড়ী বা সিডস্টোর বাজার নেমে রিক্সায় হবিরবাড়ি (প্রায় ২ কিমি)।' },
+  904: { subtype: 'resort', amenities: ['pool', 'food', 'stay', 'kids', 'boat', 'picnic', 'fishing', 'parking'], phone: '01700-000904', how_to_go: 'ময়মনসিংহগামী বাসে ভালুকা পেরিয়ে নিশিন্দা নামুন, সেখান থেকে অটোতে কয়েক মিনিট।' },
+  905: { subtype: 'resort', amenities: ['pool', 'stay', 'kids', 'picnic', 'food'], how_to_go: 'ঢাকা বা ময়মনসিংহ থেকে বাসে ভালুকা নেমে রিক্সা বা অটোতে কাঠালী।' },
+  906: { subtype: 'resort', amenities: ['pool', 'food', 'stay', 'fishing', 'kids'], best_time: 'বর্ষা ও শরৎ, ধানক্ষেত সবুজ থাকে' },
+  907: { subtype: 'resort', amenities: ['stay', 'kids', 'hall', 'food'] },
+  908: { subtype: 'park', amenities: ['pool', 'kids'] },
+  909: { subtype: 'park', amenities: ['stay', 'kids', 'boat', 'picnic', 'hall'] },
+  910: { subtype: 'resort', amenities: ['pool', 'food', 'kids', 'hall'] },
+};
+for (const t of DEMO_TOURS) Object.assign(t, EXTRA[t.id] || {});

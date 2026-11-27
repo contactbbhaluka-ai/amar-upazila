@@ -3858,7 +3858,8 @@ const svcRichCard = s => {
     <h3>${esc(s.name)}${s.verified ? ' <span class="sr-ver" title="যাচাইকৃত">✔</span>' : ''}</h3>
     ${s.address ? `<div class="sr-addr">📍 ${esc(s.address)}</div>` : ''}
     ${s.details ? `<p class="sr-ex">${esc(svcExcerpt(s.details))}</p>` : ''}
-    <div class="sr-foot"><span class="sr-meta">${s.details ? `📖 ${bn(mins)} মিনিট` : ''}</span><span class="sr-go">বিস্তারিত দেখুন <b>→</b></span></div>
+    ${s.amenities?.length ? `<div class="sr-amen">${s.amenities.filter(k => AMEN[k]).slice(0, 6).map(k => `<span title="${AMEN[k][1]}">${AMEN[k][0]}</span>`).join('')}${s.amenities.length > 6 ? `<small>+${bn(s.amenities.length - 6)}</small>` : ''}</div>` : ''}
+    <div class="sr-foot"><span class="sr-meta">${s.rating_count ? `<b class="sr-rate">★ ${bnNum1(s.rating_avg)}</b> (${bn(s.rating_count)})` : s.details ? `📖 ${bn(mins)} মিনিট` : ''}</span><span class="sr-go">বিস্তারিত দেখুন <b>→</b></span></div>
   </div>
   ${me()?.admin ? `<div class="sr-admin">${s.verified ? '' : `<button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button>`}<button class="link svc-setloc" data-svcloc="${esc(s.id)}">${s.lat != null ? '📍 অবস্থান বদলান' : '📍 অবস্থান দিন'}</button></div>` : ''}
 </article>`;
@@ -3876,14 +3877,21 @@ function detHtml(t) {
   }
   flush(); return out.join('');
 }
-function svcDetailSheet(id) {
+const SVC_SUB = [['resort', 'রিসোর্ট', '🏡'], ['park', 'পার্ক', '🎡'], ['nature', 'প্রকৃতি ও বন', '🌳'], ['history', 'ঐতিহাসিক', '🏛️'], ['other', 'অন্যান্য', '📍']];
+const AMEN = { pool: ['🏊', 'সুইমিং পুল'], food: ['🍽️', 'খাবার'], stay: ['🛏️', 'থাকার ব্যবস্থা'], parking: ['🅿️', 'পার্কিং'], toilet: ['🚻', 'টয়লেট'], kids: ['👶', 'শিশুদের খেলা'], boat: ['🚣', 'বোটিং'], picnic: ['🧺', 'পিকনিক স্পট'], hall: ['🏢', 'হলরুম'], fishing: ['🎣', 'মাছ ধরা'], wifi: ['📶', 'ওয়াইফাই'], prayer: ['🕌', 'নামাজের স্থান'] };
+const starsHtml = (r, cls = '') => `<span class="stars ${cls}" aria-label="${bn(r)} তারা">${[1, 2, 3, 4, 5].map(i => `<i class="${r >= i - 0.25 ? 'f' : r >= i - 0.75 ? 'h' : ''}">★</i>`).join('')}</span>`;
+const bnNum1 = n => bn((Math.round(n * 10) / 10).toFixed(1));
+const waNum = p => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('0')) d = '88' + d; else if (d.length === 10 && d.startsWith('1')) d = '880' + d; return d; };
+function svcDetailSheet(id, opt = {}) {
   const s = (S.svcAll || []).find(x => String(x.id) === String(id)); if (!s) return;
   const imgs = [...new Set([s.image_url, ...(s.images || [])].filter(Boolean))];
   const fav = S.svcFav?.has(s.id), tel = s.phone ? String(s.phone).replace(/[^\d+]/g, '') : '';
-  const c = svcColor(s.category), d = svcDist(s);
+  const c = svcColor(s.category), d = svcDist(s), admin = !!me()?.admin;
   const words = String(s.details || '').split(/\s+/).filter(Boolean).length, mins = Math.max(1, Math.round(words / 180));
   const rel = (S.svcAll || []).filter(x => x.category === s.category && x.id !== s.id && svcHasDet(x)).slice(0, 10);
-  const long = String(s.details || '').length > 700;
+  const near = s.lat != null ? (S.svcAll || []).filter(x => x.id !== s.id && x.lat != null).map(x => ({ x, km: distKm(s, x) })).filter(r => r.km <= 20).sort((a, b) => a.km - b.km).slice(0, 6) : [];
+  const long = String(s.details || '').length > 700, sub = SVC_SUB.find(x => x[0] === s.subtype);
+  const cname = catName(s.category) || 'সেবা';
   const act = (k, icon, label, attrs) => `<${k} class="sd-act" ${attrs}><span class="sd-aic">${icon}</span><small>${label}</small></${k}>`;
   openSheet(`<div class="sdet" style="--sc:${c}">
     <div class="sd-hero">
@@ -3891,28 +3899,37 @@ function svcDetailSheet(id) {
         : `<div class="sd-noimg">${svcIc(s.category, 64)}</div>`}
       <div class="sd-shade"></div>
       <button class="sd-x" data-close aria-label="বন্ধ করুন">✕</button>
-      ${imgs.length > 1 ? `<span class="sd-count"><b>১</b>/${bn(imgs.length)}</span>` : ''}
-      <div class="sd-title"><span class="sd-cat">${svcIc(s.category, 14)} ${esc(catName(s.category) || 'সেবা')}</span><h2>${esc(s.name)}</h2>
+      ${admin ? `<button class="sd-edit" data-sdedit>✏️ সম্পাদনা</button>` : imgs.length > 1 ? `<span class="sd-count"><b>১</b>/${bn(imgs.length)}</span>` : ''}
+      <div class="sd-title"><span class="sd-cat">${sub ? sub[2] : svcIc(s.category, 14)} ${esc(sub ? sub[1] : cname)}</span><h2>${esc(s.name)}</h2>
         ${s.address ? `<div class="sd-addr">📍 ${esc(s.address)}</div>` : ''}</div>
     </div>
     ${imgs.length > 1 ? `<div class="sd-thumbs">${imgs.map((u, i) => `<button data-sdthumb="${i}"${i ? '' : ' class="on"'}><img src="${esc(u)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></button>`).join('')}</div>` : ''}
     <div class="sd-chips">
+      ${s.rating_count ? `<button class="sd-chip rate" data-sdgo="sd-rev">★ ${bnNum1(s.rating_avg)} <span>(${bn(s.rating_count)})</span></button>` : ''}
       ${s.verified ? '<span class="sd-chip ok">✔ যাচাইকৃত</span>' : ''}
       ${d != null ? `<span class="sd-chip">📍 ${fmtDist(d)} দূরে</span>` : ''}
       ${s.hours ? `<span class="sd-chip">🕘 ${esc(s.hours)}</span>` : ''}
       ${words ? `<span class="sd-chip">📖 ${bn(mins)} মিনিটে পড়ুন</span>` : ''}
-      ${imgs.length ? `<span class="sd-chip">🖼️ ${bn(imgs.length)}টি ছবি</span>` : ''}
     </div>
     <div class="sd-acts">
       ${tel ? act('a', '📞', 'কল করুন', `data-svccall="${esc(s.id)}" href="tel:${esc(tel)}"`) : ''}
+      ${tel ? act('button', '🗓️', 'বুকিং', 'data-sdbook="1"') : ''}
       ${act('a', '🧭', 'পথ দেখুন', `href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ভালুকা')}`}" target="_blank" rel="noopener"`)}
       <button class="sd-act sd-fav${fav ? ' on' : ''}" data-sdfav="${esc(s.id)}" aria-pressed="${!!fav}"><span class="sd-aic">${fav ? '❤️' : '🤍'}</span><small>${fav ? 'প্রিয়তে আছে' : 'প্রিয়তে রাখুন'}</small></button>
       ${act('button', '↗️', 'শেয়ার', 'data-svcshare="1"')}
     </div>
+    ${admin ? '<div class="sd-reps"></div>' : ''}
+    ${s.best_time ? `<div class="sd-best"><span>🌤️</span><div><b>যাওয়ার ভালো সময়</b>${esc(s.best_time)}</div></div>` : ''}
     <div class="sd-sec"><h3>সম্পর্কে</h3>
       <div class="sdet-body${long ? ' clamp' : ''}">${detHtml(s.details) || '<p class="mut">এখনো বিস্তারিত তথ্য যোগ করা হয়নি।</p>'}</div>
       ${long ? '<button class="sd-more" data-sdmore>আরও পড়ুন ⌄</button>' : ''}</div>
-    ${rel.length ? `<div class="sd-sec"><h3>আরও ${esc(catName(s.category) || 'সেবা')}</h3><div class="sd-rel">${rel.map(x => `<button class="sd-rc" data-sdrel="${esc(x.id)}">${x.image_url || x.images?.[0] ? `<img src="${esc(x.image_url || x.images[0])}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sd-rph'}))">` : '<span class="sd-rph"></span>'}<b>${esc(x.name)}</b></button>`).join('')}</div></div>` : ''}
+    ${s.amenities?.length ? `<div class="sd-sec"><h3>সুবিধাসমূহ</h3><div class="sd-amen">${s.amenities.filter(k => AMEN[k]).map(k => `<span><i>${AMEN[k][0]}</i>${AMEN[k][1]}</span>`).join('')}</div></div>` : ''}
+    ${s.how_to_go ? `<div class="sd-sec"><h3>কীভাবে যাবেন</h3><div class="sd-go"><div class="sdet-body">${detHtml(s.how_to_go)}</div>
+      <a class="sd-gomap" href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ভালুকা')}`}" target="_blank" rel="noopener">🧭 ম্যাপে পথ দেখুন</a></div></div>` : ''}
+    <div class="sd-sec" id="sd-rev"><h3>রেটিং ও রিভিউ</h3><div class="sd-revbox"><div class="skel" style="height:90px"></div></div></div>
+    ${near.length ? `<div class="sd-sec"><h3>কাছাকাছি যা আছে</h3><div class="sd-near">${near.map(({ x, km }) => `<button data-sdrel="${esc(x.id)}" style="--c:${svcColor(x.category)}"><span class="sn-ic">${svcIc(x.category, 18)}</span><span class="sn-t"><b>${esc(x.name)}</b><small>${esc(catName(x.category) || '')}</small></span><span class="sn-km">${fmtDist(km)}</span></button>`).join('')}</div></div>` : ''}
+    ${rel.length ? `<div class="sd-sec"><h3>আরও ${esc(cname)}</h3><div class="sd-rel">${rel.map(x => `<button class="sd-rc" data-sdrel="${esc(x.id)}">${x.image_url || x.images?.[0] ? `<img src="${esc(x.image_url || x.images[0])}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sd-rph'}))">` : '<span class="sd-rph"></span>'}<b>${esc(x.name)}</b>${x.rating_count ? `<small>★ ${bnNum1(x.rating_avg)}</small>` : ''}</button>`).join('')}</div></div>` : ''}
+    <div class="sd-foot"><button class="link" data-sdreport>⚠️ ভুল তথ্য জানান</button>${admin ? '<button class="link" data-sdedit>✏️ সম্পাদনা</button>' : ''}</div>
   </div>`);
   const sh = $('#sheet'); sh.classList.add('tall'); sh.scrollTop = 0;
   const g = sh.querySelector('.sdet-gal'), cnt = sh.querySelector('.sd-count b');
@@ -3922,16 +3939,132 @@ function svcDetailSheet(id) {
     if (cnt) cnt.textContent = bn(k + 1);
     sh.querySelectorAll('[data-sdthumb]').forEach((t, i) => t.classList.toggle('on', i === k));
   }, { passive: true });
+  let revs = [];
+  const drawRev = () => {
+    const box = sh.querySelector('.sd-revbox'); if (!box) return;
+    const n = revs.length, avg = n ? revs.reduce((a, r) => a + r.rating, 0) / n : 0, mine = revs.find(r => r.mine);
+    s.rating_count = n; s.rating_avg = Math.round(avg * 10) / 10;
+    const dist = [5, 4, 3, 2, 1].map(k => [k, revs.filter(r => r.rating === k).length]);
+    box.innerHTML = `${n ? `<div class="sr-sum"><div class="sr-big"><b>${bnNum1(avg)}</b>${starsHtml(avg)}<small>${bn(n)}টি রিভিউ</small></div>
+        <div class="sr-bars">${dist.map(([k, v]) => `<div><span>${bn(k)}</span><i><u style="width:${n ? v / n * 100 : 0}%"></u></i><small>${bn(v)}</small></div>`).join('')}</div></div>` : '<p class="mut" style="margin:0 0 10px">এখনো কেউ রিভিউ দেননি। প্রথম রিভিউটি আপনিই দিন!</p>'}
+      <button class="sd-write" data-sdrev>${mine ? '✏️ আমার রিভিউ বদলান' : '⭐ রেটিং ও রিভিউ দিন'}</button>
+      ${revs.filter(r => r.body || r.mine).slice(0, opt.allRev ? 50 : 4).map(r => `<div class="rv"><div class="rv-h">${av({ name: r.name, avatar: r.avatar }, 'sm')}<div><b>${esc(r.name)}${r.mine ? ' <small class="mut">(আপনি)</small>' : ''}</b><div>${starsHtml(r.rating, 'sm')} <small class="mut">${ago(r.created_at)}</small></div></div>
+        ${r.mine || admin ? `<button class="link rv-del" data-rvdel="${esc(r.id)}">মুছুন</button>` : ''}</div>${r.body ? `<p>${esc(r.body)}</p>` : ''}</div>`).join('')}
+      ${!opt.allRev && revs.filter(r => r.body || r.mine).length > 4 ? '<button class="sd-more" data-sdallrev>সব রিভিউ দেখুন</button>' : ''}`;
+  };
+  const drawReps = reps => { const box = sh.querySelector('.sd-reps'); if (!box) return; box.innerHTML = reps.length ? `<div class="sd-repbox"><b>⚠️ ${bn(reps.length)}টি ভুল তথ্যের রিপোর্ট</b>${reps.map(r => `<div><span>${esc(r.reason)} <small class="mut">· ${ago(r.created_at)}</small></span><button class="link" data-repok="${esc(r.id)}">✔ ঠিক করেছি</button></div>`).join('')}</div>` : ''; box._reps = reps; };
+  if (admin) S.api.serviceReports(s.id).then(drawReps).catch(() => {});
+  S.api.serviceReviews(s.id).then(r => { revs = r; drawRev(); if (opt.toRev) sh.querySelector('#sd-rev')?.scrollIntoView({ block: 'start' }); }).catch(() => { const b = sh.querySelector('.sd-revbox'); if (b) b.innerHTML = '<p class="mut">রিভিউ লোড করা যায়নি।</p>'; });
   sh.onclick = async e => {
     const t = e.target.closest('[data-sdthumb]'); if (t) return goImg(+t.dataset.sdthumb);
     const z = e.target.closest('[data-sdzoom]'); if (z) return sdZoom([...g.querySelectorAll('img')].map(i => i.src), [...g.querySelectorAll('img')].indexOf(z));
     const r = e.target.closest('[data-sdrel]'); if (r) return svcDetailSheet(r.dataset.sdrel);
+    const gt = e.target.closest('[data-sdgo]'); if (gt) return sh.querySelector('#' + gt.dataset.sdgo)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const ro = e.target.closest('[data-repok]'); if (ro) { await busy(ro, async () => { await S.api.resolveReport(+ro.dataset.repok); drawReps((sh.querySelector('.sd-reps')._reps || []).filter(x => String(x.id) !== ro.dataset.repok)); }); return; }
+    if (e.target.closest('[data-sdedit]')) return svcEditSheet(s);
+    if (e.target.closest('[data-sdreport]')) return svcReportSheet(s);
+    if (e.target.closest('[data-sdbook]')) return svcBookSheet(s);
+    if (e.target.closest('[data-sdrev]')) { if (!needUser()) return; return svcReviewSheet(s, revs.find(x => x.mine)); }
+    if (e.target.closest('[data-sdallrev]')) { opt.allRev = true; return drawRev(); }
+    const rd = e.target.closest('[data-rvdel]'); if (rd) { if (!confirm('রিভিউটি মুছে ফেলবেন?')) return; await busy(rd, async () => { await S.api.delReview(+rd.dataset.rvdel); revs = revs.filter(x => String(x.id) !== rd.dataset.rvdel); drawRev(); toast('রিভিউ মুছে ফেলা হয়েছে'); }); return; }
     const f = e.target.closest('[data-sdfav]'); if (f) { await toggleSvcFav(s.id); const on = S.svcFav?.has(s.id); f.classList.toggle('on', on); f.setAttribute('aria-pressed', on); f.innerHTML = `<span class="sd-aic">${on ? '❤️' : '🤍'}</span><small>${on ? 'প্রিয়তে আছে' : 'প্রিয়তে রাখুন'}</small>`; if (on) f.querySelector('.sd-aic').classList.add('pop'); return; }
     const m = e.target.closest('[data-sdmore]'); if (m) { sh.querySelector('.sdet-body').classList.remove('clamp'); m.remove(); return; }
     if (e.target.closest('[data-svcshare]')) {
       const text = `${s.name}${s.address ? '\n📍 ' + s.address : ''}${s.phone ? '\n📞 ' + s.phone : ''}\n\n— আমার উপজেলা অ্যাপ`;
       try { if (navigator.share) await navigator.share({ title: s.name, text }); else { await navigator.clipboard.writeText(text); toast('কপি হয়েছে'); } } catch {}
     }
+  };
+}
+// রেটিং ও রিভিউ লেখা
+function svcReviewSheet(s, mine) {
+  let rate = mine?.rating || 0;
+  const lbl = ['', 'খারাপ', 'চলনসই', 'ভালো', 'খুব ভালো', 'অসাধারণ'];
+  openSheet(`<form class="rvf" style="--sc:${svcColor(s.category)}"><h2>${esc(s.name)}</h2><p class="mut" style="margin:-4px 0 12px">আপনার অভিজ্ঞতা কেমন ছিল?</p>
+    <div class="rvf-stars">${[1, 2, 3, 4, 5].map(i => `<button type="button" data-st="${i}" aria-label="${bn(i)} তারা">★</button>`).join('')}</div><div class="rvf-l mut">&nbsp;</div>
+    <textarea id="rvf-b" rows="4" maxlength="1000" placeholder="কী ভালো লেগেছে, কী উন্নতি দরকার — লিখুন (ঐচ্ছিক)">${esc(mine?.body || '')}</textarea>
+    <button class="btn" style="width:100%;margin-top:12px">জমা দিন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-back>ফিরে যান</button></form>`);
+  const sh = $('#sheet'), paint = () => { sh.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('on', +b.dataset.st <= rate)); sh.querySelector('.rvf-l').textContent = rate ? lbl[rate] : ' '; };
+  paint();
+  sh.onclick = e => { const b = e.target.closest('[data-st]'); if (b) { rate = +b.dataset.st; paint(); } if (e.target.closest('[data-back]')) svcDetailSheet(s.id, { toRev: true }); };
+  sh.querySelector('form').onsubmit = e => { e.preventDefault(); if (!rate) return toast('তারা বেছে নিন'); busy(e.submitter, async () => { await S.api.saveReview(s.id, rate, $('#rvf-b').value.trim()); toast('ধন্যবাদ! রিভিউ জমা হয়েছে'); svcDetailSheet(s.id, { toRev: true }); }); };
+}
+// ভুল তথ্য জানানো
+function svcReportSheet(s) {
+  const opts = ['ফোন নম্বর ভুল / বন্ধ', 'ঠিকানা বা অবস্থান ভুল', 'স্থানটি বন্ধ হয়ে গেছে', 'ছবি ভুল বা পুরোনো', 'বিস্তারিত তথ্য ভুল', 'অন্য কিছু'];
+  openSheet(`<form class="rvf"><h2>⚠️ ভুল তথ্য জানান</h2><p class="mut" style="margin:-4px 0 12px">${esc(s.name)} — কোন তথ্যটি ভুল?</p>
+    <div class="rp-opts">${opts.map((o, i) => `<label><input type="radio" name="rp" value="${esc(o)}"${i ? '' : ' checked'}> ${esc(o)}</label>`).join('')}</div>
+    <textarea id="rp-b" rows="3" maxlength="240" placeholder="সঠিক তথ্যটি জানা থাকলে লিখুন (যেমন নতুন নম্বর)"></textarea>
+    <button class="btn" style="width:100%;margin-top:12px">পাঠান</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-back>ফিরে যান</button></form>`);
+  const sh = $('#sheet');
+  sh.onclick = e => { if (e.target.closest('[data-back]')) svcDetailSheet(s.id); };
+  sh.querySelector('form').onsubmit = e => { e.preventDefault(); if (!needUser()) return; const r = sh.querySelector('[name=rp]:checked').value, b = $('#rp-b').value.trim();
+    busy(e.submitter, async () => { await S.api.report('service', s.id, (r + (b ? ': ' + b : '')).slice(0, 300)); toast('ধন্যবাদ! অ্যাডমিন যাচাই করে ঠিক করবেন'); svcDetailSheet(s.id); }); };
+}
+// বুকিং বার্তা: WhatsApp বা SMS
+function svcBookSheet(s) {
+  const today = new Date(Date.now() + 6 * 3600e3).toISOString().slice(0, 10);
+  openSheet(`<form class="rvf bk"><h2>🗓️ বুকিং / খোঁজ নিন</h2><p class="mut" style="margin:-4px 0 12px">${esc(s.name)}-এ সরাসরি বার্তা যাবে</p>
+    <label>কী ধরনের<select class="f" id="bk-t"><option>দিনের ভ্রমণ / পিকনিক</option><option>রাত্রিযাপন (রুম)</option><option>অনুষ্ঠান / হলরুম</option><option>শুধু তথ্য জানতে চাই</option></select></label>
+    <div class="bk-row"><label>তারিখ<input type="date" id="bk-d" min="${today}" value="${today}"></label><label>কতজন<input type="number" id="bk-n" min="1" max="2000" value="4" inputmode="numeric"></label></div>
+    <label>আপনার নাম<input id="bk-name" maxlength="60" value="${esc(me()?.name || '')}"></label>
+    <label>আরও কিছু (ঐচ্ছিক)<textarea id="bk-x" rows="2" maxlength="300" placeholder="যেমন: খাবারসহ প্যাকেজ আছে কি?"></textarea></label>
+    <button class="btn wa" data-bk="wa" style="width:100%;margin-top:12px">💬 WhatsApp-এ পাঠান</button>
+    <button class="btn ghost" data-bk="sms" style="width:100%;margin-top:8px">✉️ SMS-এ পাঠান</button>
+    <p class="mut" style="font-size:12px;margin:10px 0 0">বুকিং ও দাম সরাসরি প্রতিষ্ঠানের সঙ্গে ঠিক করবেন। অ্যাপ শুধু বার্তাটি তৈরি করে দেয়।</p>
+    <button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-back>ফিরে যান</button></form>`);
+  const sh = $('#sheet');
+  sh.onclick = e => { if (e.target.closest('[data-back]')) svcDetailSheet(s.id); };
+  sh.querySelector('form').onsubmit = e => { e.preventDefault();
+    const dd = $('#bk-d').value, dt = dd ? (p => `${bn(+p[2])} ${MON_BN[+p[1] - 1]} ${bn(p[0])}`)(dd.split('-')) : '';
+    const msg = `আসসালামু আলাইকুম। "আমার উপজেলা" অ্যাপে ${s.name}-এর তথ্য দেখে যোগাযোগ করছি।\n\nধরন: ${$('#bk-t').value}\nতারিখ: ${dt}\nজন: ${bn($('#bk-n').value || 1)}\nনাম: ${$('#bk-name').value.trim()}${$('#bk-x').value.trim() ? '\n' + $('#bk-x').value.trim() : ''}\n\nখরচ ও খালি আছে কিনা জানাবেন। ধন্যবাদ।`;
+    const url = e.submitter?.dataset.bk === 'sms' ? `sms:${String(s.phone).replace(/[^\d+]/g, '')}?body=${encodeURIComponent(msg)}` : `https://wa.me/${waNum(s.phone)}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank'); S.api.serviceCalled?.(s.id)?.catch?.(() => {});
+  };
+}
+// অ্যাডমিন: অ্যাপ থেকেই স্থান/সেবা যোগ বা সম্পাদনা (লেখা, ছবি, সুবিধা)
+function svcEditSheet(s, category) {
+  const v = s || { category: category || 'tour', amenities: [], images: [] };
+  const imgs = [...new Set([v.image_url, ...(v.images || [])].filter(Boolean))], am = new Set(v.amenities || []);
+  const cats = SERVICE_CATS.filter(c => !SVC_SPECIAL[c[0]] && c[0] !== 'sos');
+  openSheet(`<form class="rvf sde"><h2>${s ? '✏️ তথ্য সম্পাদনা' : '＋ নতুন যোগ করুন'}</h2>
+    <label>নাম *<input id="se-name" required maxlength="120" value="${esc(v.name || '')}"></label>
+    <div class="bk-row"><label>ক্যাটাগরি<select class="f" id="se-cat">${cats.map(c => `<option value="${c[0]}"${c[0] === v.category ? ' selected' : ''}>${esc(c[1])}</option>`).join('')}</select></label>
+      <label>ধরন<select class="f" id="se-sub"><option value="">—</option>${SVC_SUB.map(x => `<option value="${x[0]}"${x[0] === v.subtype ? ' selected' : ''}>${x[2]} ${x[1]}</option>`).join('')}</select></label></div>
+    <label>ঠিকানা<input id="se-addr" maxlength="200" value="${esc(v.address || '')}"></label>
+    <div class="bk-row"><label>ফোন<input id="se-phone" maxlength="40" inputmode="tel" value="${esc(v.phone || '')}"></label><label>খোলার সময়<input id="se-hours" maxlength="80" placeholder="যেমন সকাল ৯টা–সন্ধ্যা ৬টা" value="${esc(v.hours || '')}"></label></div>
+    <label>ছবি <small class="mut">(প্রথমটি প্রচ্ছদ · সর্বোচ্চ ১৩টি)</small></label>
+    <div class="se-imgs"></div>
+    <label>বিস্তারিত লেখা <small class="mut">(### দিয়ে শিরোনাম, • দিয়ে তালিকা)</small><textarea id="se-det" rows="8" maxlength="20000">${esc(v.details || '')}</textarea></label>
+    <label>কীভাবে যাবেন<textarea id="se-go" rows="3" maxlength="3000" placeholder="ঢাকা/ময়মনসিংহ/ভালুকা সদর থেকে কোন বাস, ভাড়া কত">${esc(v.how_to_go || '')}</textarea></label>
+    <label>যাওয়ার ভালো সময়<input id="se-best" maxlength="300" placeholder="যেমন শীতকাল, বিকেলে" value="${esc(v.best_time || '')}"></label>
+    <label>সুবিধাসমূহ</label><div class="se-amen">${Object.entries(AMEN).map(([k, [i, n]]) => `<button type="button" data-am="${k}" class="${am.has(k) ? 'on' : ''}">${i} ${n}</button>`).join('')}</div>
+    <button class="btn" style="width:100%;margin-top:14px">সেভ করুন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-back>বাতিল</button>
+    ${s ? '<p class="mut" style="font-size:12px;margin-top:10px">ম্যাপে অবস্থান দিতে তালিকার কার্ডে "📍 অবস্থান দিন" চাপুন।</p>' : ''}</form>`);
+  const sh = $('#sheet'); sh.classList.add('tall');
+  const drawImgs = () => { sh.querySelector('.se-imgs').innerHTML = imgs.map((u, i) => `<div class="se-im"><img src="${esc(u)}" alt="">${i ? `<button type="button" data-imcover="${i}" title="প্রচ্ছদ বানান">★</button>` : '<span>প্রচ্ছদ</span>'}<button type="button" class="x" data-imdel="${i}" aria-label="সরান">✕</button></div>`).join('')
+    + (imgs.length < 13 ? `<label class="se-add">＋<small>ছবি</small><input type="file" accept="image/*" multiple hidden id="se-file"></label>` : ''); };
+  drawImgs();
+  sh.addEventListener('change', async e => {
+    if (e.target.id !== 'se-file') return;
+    const files = [...e.target.files].slice(0, 13 - imgs.length); if (!files.length) return;
+    toast('ছবি আপলোড হচ্ছে…');
+    for (const f of files) { try { const b = await compress(f, 1600, 0.8); imgs.push(await S.api.uploadServiceImage(b)); drawImgs(); } catch (er) { toast(errText(er)); } }
+  });
+  sh.onclick = e => {
+    const a = e.target.closest('[data-am]'); if (a) { a.classList.toggle('on'); am[a.classList.contains('on') ? 'add' : 'delete'](a.dataset.am); return; }
+    const d = e.target.closest('[data-imdel]'); if (d) { imgs.splice(+d.dataset.imdel, 1); return drawImgs(); }
+    const cv = e.target.closest('[data-imcover]'); if (cv) { imgs.unshift(...imgs.splice(+cv.dataset.imcover, 1)); return drawImgs(); }
+    if (e.target.closest('[data-back]')) return s ? svcDetailSheet(s.id) : closeSheet();
+  };
+  sh.querySelector('form').onsubmit = e => { e.preventDefault();
+    const val = id => $(id).value.trim() || null;
+    const p = { name: $('#se-name').value.trim(), category: $('#se-cat').value, subtype: val('#se-sub'), address: val('#se-addr') || '', phone: val('#se-phone') || '', hours: val('#se-hours'),
+      details: val('#se-det'), how_to_go: val('#se-go'), best_time: val('#se-best'), amenities: [...am].filter(k => AMEN[k]), image_url: imgs[0] || null, images: imgs.slice(1, 13) };
+    busy(e.submitter, async () => {
+      const id = await S.api.saveService(s?.id || null, p);
+      S.svcAll = await S.api.services({}); try { local.set('svc_cache', { ...(local.get('svc_cache') || {}), t: Date.now(), list: S.svcAll }); } catch {}
+      toast('সেভ হয়েছে'); if (S.view === 'dir') drawDir(); svcDetailSheet(id);
+    });
   };
 }
 // ছবি বড় করে দেখা (পুরো স্ক্রিন, সোয়াইপ)
@@ -4448,7 +4581,12 @@ function drawDir() {
   let base = S.dcat === 'fav' ? list.filter(x => S.svcFav?.has(x.id)) : S.dcat ? list.filter(x => x.category === S.dcat) : list, cats = [];
   if (q) { const r = svcSearch(base, q); base = r.hits; if (!S.dcat) cats = r.cats; clearTimeout(S.recentT); if (base.length || cats.length) S.recentT = setTimeout(() => addSvcRecent(q), 1500); }
   if (S.myLoc) base = [...base].sort((a, b) => (svcDist(a) ?? 1e9) - (svcDist(b) ?? 1e9));   // লোকেশন জানা থাকলে কাছেরটা আগে
-  const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(base.length)}টি</span></div>`
+  // ধরন অনুযায়ী ফিল্টার (রিসোর্ট / পার্ক / প্রকৃতি ...)
+  const subs = S.dcat && S.dcat !== 'fav' ? SVC_SUB.filter(x => base.some(b => b.subtype === x[0])) : [];
+  if (S.dsub && !subs.some(x => x[0] === S.dsub)) S.dsub = null;
+  const subHtml = subs.length > 1 ? `<div class="sub-chips"><button data-dsub=""${S.dsub ? '' : ' class="on"'}>সব <small>${bn(base.length)}</small></button>${subs.map(x => `<button data-dsub="${x[0]}"${S.dsub === x[0] ? ' class="on"' : ''}>${x[2]} ${x[1]} <small>${bn(base.filter(b => b.subtype === x[0]).length)}</small></button>`).join('')}</div>` : '';
+  if (S.dsub) base = base.filter(b => b.subtype === S.dsub);
+  const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(base.length)}টি</span>${me()?.admin && cat[0] !== 'fav' ? `<button class="svc-addbtn" data-svcadd="${esc(cat[0])}">＋ যোগ করুন</button>` : ''}</div>${subHtml}`
     : `<div class="svc-head"><b>"${esc(q)}"</b><span class="mut">${bn(base.length)}টি সেবা</span></div>`;
   const catHtml = cats.length ? `<div class="svc-grid svc-qcats">${cats.slice(0, 8).map(([k, n]) => `<button class="svc-tile" data-svc="${k}" style="--c:${svcColor(k)};--i:${TI()}">${svcIc(k, 22)}<span class="st-n">${esc(n)}</span></button>`).join('')}</div>` : '';
   const empty = S.dcat === 'fav' ? 'এখনো কোনো প্রিয় সেবা নেই। যেকোনো সেবার কার্ডে 🤍 চাপলে এখানে থাকবে।'
@@ -4510,7 +4648,7 @@ function openSvcCat(k) {
   // গ্রিড থেকে কোনো ধরনে ঢুকলে Back চাপলে আবার গ্রিডে ফেরে (অ্যাপ থেকে বেরিয়ে যায় না)
   if (S.view === 'dir' && !S.dcat && !S.dirSub && k) { S.dirSub = true; S.dirBackY = window.scrollY; pushNav(); }
   if (k === 'near') { S.dcat = ''; return openNear(); }
-  S.dcat = k; loadDir(); window.scrollTo(0, 0);
+  S.dcat = k; S.dsub = null; loadDir(); window.scrollTo(0, 0);
 }
 $('#q').addEventListener('input', () => { showQPanel(); clearTimeout(svcTimer); svcTimer = setTimeout(() => (S.svcAll ? drawDir() : loadDir()), 200); document.body.classList.toggle('dir-sub', !!(S.dcat || $('#q').value.trim())); });
 $('#dchips').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (b) openSvcCat(b.dataset.d); });
@@ -4519,6 +4657,8 @@ document.addEventListener('click', e => {
   const c = e.target.closest('[data-svccall]'); if (c) S.api.serviceCalled(Number(c.dataset.svccall) || c.dataset.svccall).catch(() => {});
   const lo = e.target.closest('[data-svcloc]'); if (lo) return svcLocSheet(lo.dataset.svcloc);
   const dt = e.target.closest('[data-svcdet]'); if (dt) return svcDetailSheet(dt.dataset.svcdet);
+  const ds = e.target.closest('[data-dsub]'); if (ds) { S.dsub = ds.dataset.dsub || null; return drawDir(); }
+  const sa = e.target.closest('[data-svcadd]'); if (sa) return svcEditSheet(null, sa.dataset.svcadd);
   const cd = e.target.closest('#dir .card.svc'); if (cd && !e.target.closest('a,button')) { const b = cd.querySelector('[data-svcdet]'); if (b) return svcDetailSheet(b.dataset.svcdet); }
   const nc = e.target.closest('[data-nearcat]'); if (nc) { S.nearCat = nc.dataset.nearcat; return drawDir(); }
   if (e.target.closest('[data-nearref]')) { S.myLoc = null; return openNear(); }

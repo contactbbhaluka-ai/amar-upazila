@@ -2178,3 +2178,38 @@ body:has(#modal.on) .totop{display:none}
 .ip-places b{padding:7px 9px 0;font-size:13px;line-height:1.35}.ip-places small{padding:2px 9px 9px;font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ip-all{display:block;margin:4px 0 0 auto;border:0;background:none;color:var(--sc);font-family:inherit;font-weight:700;font-size:13.5px;cursor:pointer}
 .ip-rep{display:block;margin:6px auto 20px;color:var(--mut)}
+/* ইউনিয়ন */
+.u-map{position:relative;border-radius:16px;overflow:hidden;margin:0 0 12px;background:var(--line)}
+.u-map img{width:100%;max-height:220px;object-fit:cover;display:block;cursor:zoom-in}
+.u-map span{position:absolute;left:0;right:0;bottom:0;padding:18px 12px 9px;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;font-size:12.5px;font-weight:600}
+.card.svc.svc-union{display:block;padding:0;overflow:hidden;border-radius:18px;cursor:pointer;animation:srIn .4s ease both;animation-delay:calc(min(var(--i,0),8) * 40ms);box-shadow:0 3px 14px rgba(0,0,0,.06)}
+.su-img{height:120px;overflow:hidden}.su-img img{width:100%;height:100%;object-fit:cover;display:block}
+.su-top{display:flex;gap:12px;align-items:center;padding:14px 14px 0}
+.su-go{font-size:26px;color:var(--mut);line-height:1}
+.su-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 14px 0}
+.su-stats div{padding:8px 6px;border-radius:12px;text-align:center;background:color-mix(in srgb,var(--sc) 7%,var(--card));border:1px solid color-mix(in srgb,var(--sc) 14%,var(--line))}
+.su-stats b{display:block;font-size:14px;line-height:1.3}.su-stats small{font-size:11px;color:var(--mut)}
+.svc-union .si-ex{margin:10px 14px 0}
+.su-foot{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 13px;font-size:12px;color:var(--mut)}
+.u-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin:14px 0 0}
+.u-tiles div{padding:11px 8px;border-radius:14px;text-align:center;background:linear-gradient(160deg,color-mix(in srgb,var(--sc) 10%,var(--card)),var(--card));border:1px solid color-mix(in srgb,var(--sc) 16%,var(--line))}
+.u-tiles b{display:block;font-size:15px;line-height:1.3;color:var(--ink)}.u-tiles small{font-size:11.5px;color:var(--mut)}
+.cn{margin:14px 0 0;border:1px solid color-mix(in srgb,var(--sc) 25%,var(--line));border-radius:16px;background:var(--card);overflow:hidden}
+.cn summary{display:flex;align-items:center;gap:11px;padding:13px 14px;cursor:pointer;list-style:none;background:color-mix(in srgb,var(--sc) 6%,var(--card))}
+.cn summary::-webkit-details-marker{display:none}
+.cn-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:var(--card)}
+.cn summary div{flex:1;min-width:0}.cn summary b{display:block;font-size:15px}.cn summary small{font-size:12px;color:var(--mut)}
+.cn summary i{font-style:normal;font-size:20px;color:var(--mut);transition:transform .2s}
+.cn[open] summary i{transform:rotate(180deg)}
+.cn .cn-ward{margin:10px 12px 0;width:calc(100% - 24px)}
+.cn-list{padding:6px 12px 12px}
+.cn-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.cn-row:last-child{border-bottom:0}
+.cn-role{flex:0 0 auto;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;background:var(--line);color:var(--ink);max-width:110px;text-align:center}
+.cn-row.lead .cn-role{background:var(--sc);color:#fff}
+.cn-t{flex:1;min-width:0}.cn-t b{display:block;font-size:14px}.cn-t small{font-size:12px;color:var(--mut)}
+.cn-call{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#16a34a;color:#fff;text-decoration:none;font-size:15px}
+.map-load{width:100%;display:flex;flex-direction:column;align-items:center;gap:3px;padding:22px 12px;border-radius:16px;border:1px dashed color-mix(in srgb,var(--sc) 40%,var(--line));background:color-mix(in srgb,var(--sc) 5%,var(--card));color:var(--ink);font-family:inherit;cursor:pointer}
+.map-load span{font-size:30px}.map-load small{color:var(--mut);font-size:12px}
+.u-gmap{border-radius:16px;overflow:hidden;border:1px solid var(--line);aspect-ratio:4/3}
+.u-gmap iframe{width:100%;height:100%;border:0;display:block}

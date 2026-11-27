@@ -5338,6 +5338,9 @@ alter table public.services add column if not exists phones jsonb not null defau
 alter table public.services add column if not exists email text check (email is null or (char_length(email) <= 120 and email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'));
 -- (উপজেলা, পৌরসভা, ১১টি ইউনিয়ন, প্রশাসন, থানা, ফায়ার সার্ভিস ও এম্বুলেন্সের তথ্য beautifulbhaluka.com ও সরকারি/সংবাদ সূত্র থেকে আনা হয়েছে)
 
+-- ইউনিয়ন পরিষদের চেয়ারম্যান-সদস্যদের তালিকা: [{r: পদ, n: নাম, w: ওয়ার্ড, p: মোবাইল}]
+alter table public.services add column if not exists council jsonb not null default '[]' check (jsonb_typeof(council) = 'array' and jsonb_array_length(council) <= 60);
+
 -- =====================================================================
 --  নিজেকে অ্যাডমিন বানাতে: অ্যাপে প্রথমে সাইনআপ করুন, তারপর নিচের লাইনে
 --  নিজের ইমেইল বসিয়ে আলাদাভাবে চালান:

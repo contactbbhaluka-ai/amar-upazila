@@ -211,7 +211,7 @@ let sheetHist = false;
 function openSheet(html) { if (!sheetHist && !$('#modal').classList.contains('on')) sheetHist = pushNav(); const s = $('#sheet'); s.setAttribute('translate', DIR_BN ? 'no' : 'yes'); s.onclick = null; s.onchange = null; s.classList.remove('tall'); s.innerHTML = html; $('#modal').classList.add('on'); s.querySelector('input,textarea,select,button')?.focus(); }
 function closeSheet(fromPop) {
   document.querySelector('.sd-lbx')?.remove(); $('#modal').classList.remove('on'); $('#sheet').classList.remove('tall'); $('#sheet').innerHTML = '';
-  if (sheetHist) { sheetHist = false; if (!fromPop) { S.skipPop = (S.skipPop || 0) + 1; try { history.back(); } catch { S.skipPop--; } } }   // বোতামে বন্ধ করলে শিটের ধাপটাও সরাই
+  if (sheetHist) { sheetHist = false; if (!fromPop) { S.skipPop = (S.skipPop || 0) + 1; S.hd = Math.max(0, (S.hd || 0) - 1); try { history.back(); } catch { S.skipPop--; S.hd++; } } }   // বোতামে বন্ধ করলে শিটের ধাপটাও সরাই
 }
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' || e.target.closest('[data-close]')) closeSheet(); });
 function confirmSheet(text, okLabel, danger) {
@@ -6618,9 +6618,16 @@ const RELOAD = {
   pages: () => loadPages(), groups: () => loadGroups(), saved: () => loadFeed('saved'), dir: () => loadDir(),
   page: () => openPage(S.pageId, true), group: () => openGroup(S.groupId, true), user: () => openUser(S.userId, true), admin: () => loadAdmin(), post: () => { renderFeed('post'); loadComments(); },
 };
+// S.hd = অ্যাপের নিজের কয়টা Back-ধাপ জমা আছে (০ = নিউজফিডের হোম; সেখান থেকে Back চাপলে অ্যাপ বন্ধ)
 function pushNav() {
-  if (S.skipPop) { S.pendPush = (S.pendPush || 0) + 1; return true; }   // শিটের ধাপ সরানো শেষ হলে তারপর নতুন ধাপ
-  try { history.pushState({ au: 1 }, ''); return true; } catch { return false; /* sandbox */ }
+  if (S.skipPop) { S.pendPush = (S.pendPush || 0) + 1; S.hd = (S.hd || 0) + 1; return true; }   // শিটের ধাপ সরানো শেষ হলে তারপর নতুন ধাপ
+  try { history.pushState({ au: 1 }, ''); S.hd = (S.hd || 0) + 1; return true; } catch { return false; /* sandbox */ }
+}
+// প্রধান ট্যাবে গেলে Back-ধাপ ঠিক করা: হোমে ০টি, অন্য ট্যাবে ১টি (Back চাপলে হোমে ফেরে)
+function syncRootNav(v) {
+  const want = v === 'home' ? 0 : 1, hd = S.hd || 0;
+  if (hd > want) { S.hd = want; S.skipPop = (S.skipPop || 0) + 1; try { history.go(want - hd); } catch { S.skipPop--; } }
+  else if (hd < want) pushNav();
 }
 function show(v) {
   DIR_BN = v === 'dir';
@@ -6641,16 +6648,18 @@ function go(v) {
   if (v === 'pinsights') {
     if (!S.actAs) return go('friends');
     closeSheet(); S.stack = []; S.insTarget = { kind: 'page', id: S.actAs.id, name: S.actAs.name };
-    show('insights'); S.tab = 'pinsights'; document.querySelectorAll('header [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === 'pinsights'));
+    syncRootNav('pinsights'); show('insights'); S.tab = 'pinsights'; document.querySelectorAll('header [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === 'pinsights'));
     return loadInsights();
   }
   if (v === 'friends' && S.actAs) return go('pinsights');
   if (v === 'upz') {   // নিচের "উপজেলা" ট্যাব: সেবা ডিরেক্টরি
     closeSheet(); S.stack = []; S.dcat = ''; if ($('#q')) $('#q').value = '';
     show('dir'); S.tab = 'upz'; document.body.classList.add('upz-root'); document.querySelectorAll('header [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === 'upz'));
+    S.dirSub = false; syncRootNav('upz');
     return loadDir();
   }
   closeSheet(); S.stack = [];
+  syncRootNav(v);
   show(v);
   if (v === 'me') renderMe(); if (v === 'friends') loadFriends(); if (v === 'msgs') loadConvs();
   if (v === 'notif') loadNotifs(); if (v === 'menu') renderMenu();
@@ -6660,10 +6669,11 @@ function open(v) { closeSheet(); if (S.view !== v) S.stack.push(S.view); pushNav
 function back() { try { history.back(); } catch { onPop(); } }
 function onPop() {
   if (S.skipPop) { if (--S.skipPop === 0) while (S.pendPush > 0) { S.pendPush--; try { history.pushState({ au: 1 }, ''); } catch { /* sandbox */ } } return; }
+  S.hd = Math.max(0, (S.hd || 0) - 1);
   if (S.viewerOpen) return closeViewer();
   if ($('#modal').classList.contains('on')) return closeSheet(true);
   if (S.view === 'dir' && S.dirSub) { S.dirSub = false; S.dcat = ''; if ($('#q')) $('#q').value = ''; S.dirY = S.dirBackY || 0; loadDir(); return; }   // যেখান থেকে ঢুকেছিলেন সেখানেই ফেরা
-  if (!S.stack.length) return;
+  if (!S.stack.length) { if (S.view !== 'home') go('home'); return; }   // অন্য ট্যাব থেকে Back → নিউজফিডের হোম
   const prev = S.stack.pop(); show(prev);
   if (prev === 'dir' && S.dirRet) {
     const r = S.dirRet; S.dirRet = null; S.tab = r.tab; S.dirY = r.y;

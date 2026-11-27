@@ -1817,3 +1817,4 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .ds-slide{flex:0 0 88%;min-height:96px;scroll-snap-align:start}
 .ds-track>.ds-slide:only-child{flex-basis:100%}
 .ds-txt{padding:12px 40px 13px 14px}.ds-txt b{font-size:16px}
+.dslider .ds-edit{right:calc(12% + 14px)}.dslider:has(.ds-slide:only-child) .ds-edit{right:8px}

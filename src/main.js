@@ -3961,7 +3961,7 @@ function svcInlinePage(s) {
   const ph = phoneList(s);
   const links = s.category === 'upz' ? `
     ${pouro || unions.length ? `<section class="dsec ip-links"><h3>পৌরসভা ও ইউনিয়নসমূহ</h3><div class="ip-chips">${pouro ? `<button data-svcdet="${esc(pouro.id)}" class="pr">🏢 ${esc(pouro.name)}</button>` : ''}${unions.map(u => `<button data-svcdet="${esc(u.id)}">${esc(String(u.name).replace(/ পরিষদ$/, ''))}</button>`).join('')}</div></section>` : ''}
-    ${(() => { const th = todayHats(); return th.length ? `<section class="dsec ip-links"><h3>🛒 আজ (${BN_DAYS[new Date().getDay()]}) যেসব হাট বসছে</h3><div class="ip-chips">${th.map(h => `<button data-svcdet="${esc(h.u.id)}">${esc(h.n)} <small class="mut">· ${esc(areaCore(h.u))}</small></button>`).join('')}</div></section>` : ''; })()}
+    ${(() => { const th = todayHats(); return th.length ? `<section class="dsec ip-links"><h3>🛒 আজ (${BN_DAYS[new Date().getDay()]}) যেসব হাট বসছে</h3><div class="ip-chips">${th.map(h => `<button data-svcdet="${esc(h.id || h.u.id)}">${esc(h.n)} <small class="mut">· ${esc(areaCore(h.u))}</small></button>`).join('')}</div></section>` : ''; })()}
     ${peoplePlaces(fam, tour)}`
     : s.category === 'pouro' ? `${peoplePlaces(fam.filter(x => inArea(x, s)), tour.filter(x => inArea(x, s)), { where: 'পৌরসভার' })}${upz ? `<section class="dsec ip-links"><h3>আরও দেখুন</h3><div class="ip-chips"><button data-svcdet="${esc(upz.id)}" class="pr">🏛️ ভালুকা উপজেলা</button></div></section>` : ''}` : '';
   return `<div class="ip" style="--sc:${svcColor(s.category)}">
@@ -4145,7 +4145,17 @@ function svcDetailSheet(id, opt = {}) {
 const BN_DAYS = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
 const dayIdx = t => { const k = String(t || '').trim().replace(/বার$/, ''); return k ? BN_DAYS.findIndex(d => d.startsWith(k)) : -1; };
 const numOf = v => { const m = enDigits(String(v || '')).replace(/,/g, '').match(/\d+(?:\.\d+)?/); return m ? +m[0] : null; };
-const todayHats = () => { const d = new Date().getDay(); return (S.svcAll || []).filter(x => x.category === 'union').flatMap(u => (u.hats || []).filter(h => (h.d || []).includes(d)).map(h => ({ ...h, u }))); };
+const hatDays = t => [...new Set((String(t || '').match(/রবি|সোম|মঙ্গল|বুধ|বৃহস্পতি|শুক্র|শনি/g) || []).map(dayIdx).filter(i => i >= 0))].sort();
+// ইউনিয়নের হাট: সম্পাদনায় লেখা হাট + "হাট বাজার" ক্যাটাগরির যেসব বাজারের ঠিকানা এই ইউনিয়নে মেলে
+function unionHats(u) {
+  const own = (u.hats || []).filter(h => h.n).map(h => ({ ...h }));
+  for (const x of (S.svcAll || []).filter(x => x.category === 'shop' && inArea(x, u))) {
+    const d = hatDays(x.hours), t = [x.hours, x.address].filter(Boolean).join(' · '), same = own.find(h => bnNorm(h.n) === bnNorm(x.name));
+    if (same) { same.id = x.id; if (d.length) same.d = d; same.t = t || same.t; }   // ক্যাটাগরির বাজারের তথ্যই আগে else own.push({ n: x.name, d, t, id: x.id });
+  }
+  return own;
+}
+const todayHats = () => { const d = new Date().getDay(); return (S.svcAll || []).filter(x => x.category === 'union').flatMap(u => unionHats(u).filter(h => (h.d || []).includes(d)).map(h => ({ ...h, u }))); };
 function unionWards(s) {
   const out = [];
   for (const m of String(s.details || '').matchAll(/^•\s*([০-৯0-9]+(?:\s*ও\s*[০-৯0-9]+)*)নং ওয়ার্ড\s*[–-]\s*(.+)$/gm))
@@ -4186,8 +4196,8 @@ function unionPage(s, imgs, admin) {
     if (ex.length) det = det.replace(exM[0], '').trim(); }
   const wmap = unionWards(s), villages = [...new Set(wmap.flatMap(x => x.vs))];
   const wcount = numOf(f.find(x => x.k === 'ওয়ার্ড')?.v) || 9, wardAll = [...new Set([...Array.from({ length: Math.min(wcount, 15) }, (_, i) => String(i + 1)), ...wards.map(w => String(+enDigits(w))), ...wmap.flatMap(x => x.ws)])].sort((a, b) => a - b);
-  const hats = (s.hats || []).filter(h => h.n), today = new Date().getDay(), hatsToday = hats.filter(h => (h.d || []).includes(today));
-  const svcs = (S.svcAll || []).filter(x => !['famous', 'tour', 'union', 'upz', 'pouro'].includes(x.category) && inArea(x, s));
+  const hats = unionHats(s), today = new Date().getDay(), hatsToday = hats.filter(h => (h.d || []).includes(today));
+  const svcs = (S.svcAll || []).filter(x => !['famous', 'tour', 'union', 'upz', 'pouro', 'shop'].includes(x.category) && inArea(x, s));
   const site = s.url && !/beautifulbhaluka/.test(s.url) ? s.url : '';
   const dsecs = [...det.matchAll(/^## (.+)$/gm)].map(m => m[1]);
   const all = S.svcAll || [], others = all.filter(x => x.category === 'union' && x.id !== s.id).sort((a, b) => unionNo(a) - unionNo(b));
@@ -4222,11 +4232,11 @@ function unionPage(s, imgs, admin) {
       ${detHtml(det, 'us-d', 'all')}
       ${hats.length ? `<details class="dsec dacc" id="us-h"${hatsToday.length ? ' open' : ''}><summary><h3>হাট-বাজার ও হাটবার</h3><i>⌄</i></summary><div class="dacc-b">
         <div class="hb-week">${BN_DAYS.map((d, i) => `<span class="${i === today ? 'on' : ''}${hats.some(h => (h.d || []).includes(i)) ? ' has' : ''}">${['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'][i]}</span>`).join('')}</div>
-        ${hats.map(h => `<div class="hb-row${(h.d || []).includes(today) ? ' today' : ''}"><b>🛒 ${esc(h.n)}</b><span>${(h.d || []).length ? (h.d || []).map(i => BN_DAYS[i]).join(', ') : 'প্রতিদিন'}${(h.d || []).includes(today) ? ' <em>আজ</em>' : ''}</span>${h.t ? `<small>${esc(h.t)}</small>` : ''}</div>`).join('')}</div></details>` : ''}
-      ${ex.length ? `<details class="dsec dacc" id="us-x"><summary><h3>সাবেক চেয়ারম্যানগণ</h3><i>⌄</i></summary><div class="dacc-b"><ol class="sp-tl ex-tl">${ex.map(e => `<li><b>${esc(e.a)}–${esc(e.b)}</b><span>${esc(e.n)}${e.k > 1 ? ` <small class="mut">(${bn(e.k)} মেয়াদ)</small>` : ''}</span></li>`).join('')}</ol></div></details>` : ''}
-      <details class="dsec dacc" id="us-k"><summary><h3>অন্যান্য ইউনিয়নের সাথে তুলনা</h3><i>⌄</i></summary><div class="dacc-b">
+        ${hats.map(h => `<${h.id ? `button data-sdrel="${esc(h.id)}"` : 'div'} class="hb-row${(h.d || []).includes(today) ? ' today' : ''}${h.id ? ' lnk' : ''}"><b>🛒 ${esc(h.n)}${h.id ? ' <i>›</i>' : ''}</b><span>${(h.d || []).length ? (h.d || []).map(i => BN_DAYS[i]).join(', ') : h.id ? '' : 'প্রতিদিন'}${(h.d || []).includes(today) ? ' <em>আজ</em>' : ''}</span>${h.t ? `<small>${esc(h.t)}</small>` : ''}</${h.id ? 'button' : 'div'}>`).join('')}</div></details>` : ''}
+      ${ex.length ? `<section class="dsec" id="us-x"><h3>সাবেক চেয়ারম্যানগণ</h3><ol class="sp-tl ex-tl">${ex.map(e => `<li><b>${esc(e.a)}–${esc(e.b)}</b><span>${esc(e.n)}${e.k > 1 ? ` <small class="mut">(${bn(e.k)} মেয়াদ)</small>` : ''}</span></li>`).join('')}</ol></section>` : ''}
+      <section class="dsec" id="us-k"><h3>অন্যান্য ইউনিয়নের সাথে তুলনা</h3>
         <div class="uc-tabs"><button data-ucmp="pop" class="on">👥 জনসংখ্যা</button><button data-ucmp="area">📐 আয়তন</button><button data-ucmp="lit">🎓 শিক্ষার হার</button></div>
-        <div class="uc-box">${unionCompare(s, 'pop')}</div></div></details>
+        <div class="uc-box">${unionCompare(s, 'pop')}</div></section>
       <details class="dsec dacc" id="us-m"><summary><h3>মানচিত্র</h3><i>⌄</i></summary><div class="dacc-b"><button class="map-load" data-mapq="${esc(q)}"><span>🗺️</span><b>মানচিত্রে ${esc(short)} দেখুন</b><small>চাপলে মানচিত্র লোড হবে</small></button>
         <a class="sd-gomap" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}" target="_blank" rel="noopener">🧭 পথ দেখুন</a></div></details>
       ${imgs.length > 1 ? `<details class="dsec dacc" id="us-g"><summary><h3>ছবি</h3><i>⌄</i></summary><div class="dacc-b"><div class="sp-gal">${imgs.map((u, i) => `<img src="${esc(u)}" alt="" loading="lazy" data-sdzoom="${i}" onerror="this.remove()">`).join('')}</div></div></details>` : ''}

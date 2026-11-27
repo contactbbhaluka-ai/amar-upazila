@@ -2279,3 +2279,5 @@ details.dacc[open]>summary{border-bottom:1px solid var(--line)}
 .uc-b{height:12px;border-radius:6px;background:var(--line);overflow:hidden}.uc-b i{display:block;height:100%;border-radius:6px;background:color-mix(in srgb,var(--sc) 45%,var(--card))}
 .uc-v{font-size:12px;color:var(--mut);white-space:nowrap}
 .uc-row.me .uc-n{font-weight:700;color:var(--sc)}.uc-row.me .uc-b i{background:var(--sc)}.uc-row.me .uc-v{color:var(--ink);font-weight:700}
+button.hb-row{width:100%;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);font-family:inherit;text-align:left;cursor:pointer}
+.hb-row b i{font-style:normal;color:var(--mut)}

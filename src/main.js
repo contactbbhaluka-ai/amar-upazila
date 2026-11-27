@@ -3840,7 +3840,7 @@ const svcCard = s => `<div class="card svc${s.image_url ? ' has-img' : ''}">
   <div style="flex:1;min-width:0"><h3>${esc(s.name)}</h3><div class="meta">${esc(s.address)}</div>${s.hours ? `<div class="meta">🕘 ${esc(s.hours)}</div>` : ''}
     ${s.verified ? '<span class="ver">✔ যাচাইকৃত</span>' : `<span class="mut">যাচাই বাকি</span>${me()?.admin ? ` <button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button>` : ''}`}
     ${s.lat != null ? `<div class="svc-geo">${svcDist(s) != null ? `<span class="svc-km">📍 ${fmtDist(svcDist(s))}</span>` : ''}<a class="svc-dir" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}" target="_blank" rel="noopener">🧭 পথ দেখুন</a></div>` : ''}
-    ${me()?.admin ? `<button class="link svc-setloc" data-svcloc="${esc(s.id)}">${s.lat != null ? '📍 অবস্থান বদলান' : '📍 অবস্থান দিন'}</button>` : ''}</div>
+</div>
   <div class="svc-act"><button class="svc-fav${S.svcFav?.has(s.id) ? ' on' : ''}" data-svcfav="${esc(s.id)}" aria-pressed="${!!S.svcFav?.has(s.id)}" aria-label="${S.svcFav?.has(s.id) ? 'প্রিয় থেকে সরান' : 'প্রিয় সেবায় রাখুন'}">${S.svcFav?.has(s.id) ? '❤️' : '🤍'}</button>
   ${s.phone ? `<a class="call" data-svccall="${esc(s.id)}" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a>` : ''}
   ${svcHasDet(s) ? `<button class="svc-web" data-svcdet="${esc(s.id)}">📖 বিস্তারিত</button>` : ''}</div></div>`;
@@ -3861,7 +3861,7 @@ const svcRichCard = s => {
     ${s.amenities?.length ? `<div class="sr-amen">${s.amenities.filter(k => AMEN[k]).slice(0, 6).map(k => `<span title="${AMEN[k][1]}">${AMEN[k][0]}</span>`).join('')}${s.amenities.length > 6 ? `<small>+${bn(s.amenities.length - 6)}</small>` : ''}</div>` : ''}
     <div class="sr-foot"><span class="sr-meta">${s.rating_count ? `<b class="sr-rate">★ ${bnNum1(s.rating_avg)}</b> (${bn(s.rating_count)})` : s.details ? `📖 ${bn(mins)} মিনিট` : ''}</span><span class="sr-go">বিস্তারিত দেখুন <b>→</b></span></div>
   </div>
-  ${me()?.admin ? `<div class="sr-admin">${s.verified ? '' : `<button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button>`}<button class="link svc-setloc" data-svcloc="${esc(s.id)}">${s.lat != null ? '📍 অবস্থান বদলান' : '📍 অবস্থান দিন'}</button></div>` : ''}
+  ${me()?.admin && !s.verified ? `<div class="sr-admin"><button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button></div>` : ''}
 </article>`;
 };
 const svcAnyCard = s => (s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
@@ -3929,7 +3929,7 @@ function svcDetailSheet(id, opt = {}) {
     <div class="sd-sec" id="sd-rev"><h3>রেটিং ও রিভিউ</h3><div class="sd-revbox"><div class="skel" style="height:90px"></div></div></div>
     ${near.length ? `<div class="sd-sec"><h3>কাছাকাছি যা আছে</h3><div class="sd-near">${near.map(({ x, km }) => `<button data-sdrel="${esc(x.id)}" style="--c:${svcColor(x.category)}"><span class="sn-ic">${svcIc(x.category, 18)}</span><span class="sn-t"><b>${esc(x.name)}</b><small>${esc(catName(x.category) || '')}</small></span><span class="sn-km">${fmtDist(km)}</span></button>`).join('')}</div></div>` : ''}
     ${rel.length ? `<div class="sd-sec"><h3>আরও ${esc(cname)}</h3><div class="sd-rel">${rel.map(x => `<button class="sd-rc" data-sdrel="${esc(x.id)}">${x.image_url || x.images?.[0] ? `<img src="${esc(x.image_url || x.images[0])}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sd-rph'}))">` : '<span class="sd-rph"></span>'}<b>${esc(x.name)}</b>${x.rating_count ? `<small>★ ${bnNum1(x.rating_avg)}</small>` : ''}</button>`).join('')}</div></div>` : ''}
-    <div class="sd-foot"><button class="link" data-sdreport>⚠️ ভুল তথ্য জানান</button>${admin ? '<button class="link" data-sdedit>✏️ সম্পাদনা</button>' : ''}</div>
+    <div class="sd-foot"><button class="link" data-sdreport>⚠️ ভুল তথ্য জানান</button>${admin ? `<button class="link" data-sdedit>✏️ সম্পাদনা</button><button class="link" data-svcloc="${esc(s.id)}">📍 ${s.lat != null ? 'অবস্থান বদলান' : 'অবস্থান দিন'}</button>` : ''}</div>
   </div>`);
   const sh = $('#sheet'); sh.classList.add('tall'); sh.scrollTop = 0;
   const g = sh.querySelector('.sdet-gal'), cnt = sh.querySelector('.sd-count b');
@@ -4039,7 +4039,7 @@ function svcEditSheet(s, category) {
     <label>যাওয়ার ভালো সময়<input id="se-best" maxlength="300" placeholder="যেমন শীতকাল, বিকেলে" value="${esc(v.best_time || '')}"></label>
     <label>সুবিধাসমূহ</label><div class="se-amen">${Object.entries(AMEN).map(([k, [i, n]]) => `<button type="button" data-am="${k}" class="${am.has(k) ? 'on' : ''}">${i} ${n}</button>`).join('')}</div>
     <button class="btn" style="width:100%;margin-top:14px">সেভ করুন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-back>বাতিল</button>
-    ${s ? '<p class="mut" style="font-size:12px;margin-top:10px">ম্যাপে অবস্থান দিতে তালিকার কার্ডে "📍 অবস্থান দিন" চাপুন।</p>' : ''}</form>`);
+    ${s ? `<button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-svcloc="${esc(s.id)}">📍 ম্যাপে ${s.lat != null ? 'অবস্থান বদলান' : 'অবস্থান দিন'}</button>` : ''}</form>`);
   const sh = $('#sheet'); sh.classList.add('tall');
   const drawImgs = () => { sh.querySelector('.se-imgs').innerHTML = imgs.map((u, i) => `<div class="se-im"><img src="${esc(u)}" alt="">${i ? `<button type="button" data-imcover="${i}" title="প্রচ্ছদ বানান">★</button>` : '<span>প্রচ্ছদ</span>'}<button type="button" class="x" data-imdel="${i}" aria-label="সরান">✕</button></div>`).join('')
     + (imgs.length < 13 ? `<label class="se-add">＋<small>ছবি</small><input type="file" accept="image/*" multiple hidden id="se-file"></label>` : ''); };

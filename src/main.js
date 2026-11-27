@@ -3884,6 +3884,7 @@ const bnNum1 = n => bn((Math.round(n * 10) / 10).toFixed(1));
 const waNum = p => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('0')) d = '88' + d; else if (d.length === 10 && d.startsWith('1')) d = '880' + d; return d; };
 function svcDetailSheet(id, opt = {}) {
   const s = (S.svcAll || []).find(x => String(x.id) === String(id)); if (!s) return;
+  S.sdId = s.id;
   const imgs = [...new Set([s.image_url, ...(s.images || [])].filter(Boolean))];
   const fav = S.svcFav?.has(s.id), tel = s.phone ? String(s.phone).replace(/[^\d+]/g, '') : '';
   const c = svcColor(s.category), d = svcDist(s), admin = !!me()?.admin;
@@ -4598,7 +4599,7 @@ function drawDir() {
   if (S.myLoc) base = [...base].sort((a, b) => (svcDist(a) ?? 1e9) - (svcDist(b) ?? 1e9));   // লোকেশন জানা থাকলে কাছেরটা আগে
   // ধরন অনুযায়ী ফিল্টার (রিসোর্ট / পার্ক / প্রকৃতি ...)
   const subs = S.dcat && S.dcat !== 'fav' ? SVC_SUB.filter(x => base.some(b => b.subtype === x[0])) : [];
-  if (S.dsub && !subs.some(x => x[0] === S.dsub)) S.dsub = null;
+  if (S.dsub && base.length && !subs.some(x => x[0] === S.dsub)) S.dsub = null;
   const subHtml = subs.length > 1 ? `<div class="sub-chips"><button data-dsub=""${S.dsub ? '' : ' class="on"'}>সব <small>${bn(base.length)}</small></button>${subs.map(x => `<button data-dsub="${x[0]}"${S.dsub === x[0] ? ' class="on"' : ''}>${x[2]} ${x[1]} <small>${bn(base.filter(b => b.subtype === x[0]).length)}</small></button>`).join('')}</div>` : '';
   if (S.dsub) base = base.filter(b => b.subtype === S.dsub);
   const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(base.length)}টি</span>${me()?.admin && cat[0] !== 'fav' ? `<button class="svc-addbtn" data-svcadd="${esc(cat[0])}">＋ যোগ করুন</button>` : ''}</div>${subHtml}`
@@ -4652,7 +4653,7 @@ async function loadDir() {
     S.svcOffline = S.svcCacheT || Date.now(); const y = window.scrollY; drawDir(); window.scrollTo(0, y);
   }
 }
-function openSvcCat(k) {
+function openSvcCat(k, sub = null) {
   if (k === 'aid') return aidSheet();
   if (k && k !== 'near' && k !== 'fav') { S.catSeen = S.catSeen || new Set(); if (!S.catSeen.has(k)) { S.catSeen.add(k); S.api.serviceCatVisit(k).catch(() => {}); } }   // একই সেশনে একবারই গোনা
   const sp = SVC_SPECIAL[k];
@@ -4663,7 +4664,7 @@ function openSvcCat(k) {
   // গ্রিড থেকে কোনো ধরনে ঢুকলে Back চাপলে আবার গ্রিডে ফেরে (অ্যাপ থেকে বেরিয়ে যায় না)
   if (S.view === 'dir' && !S.dcat && !S.dirSub && k) { S.dirSub = true; S.dirBackY = window.scrollY; pushNav(); }
   if (k === 'near') { S.dcat = ''; return openNear(); }
-  S.dcat = k; S.dsub = null; loadDir(); window.scrollTo(0, 0);
+  S.dcat = k; S.dsub = sub; loadDir(); window.scrollTo(0, 0);
 }
 $('#q').addEventListener('input', () => { showQPanel(); clearTimeout(svcTimer); svcTimer = setTimeout(() => (S.svcAll ? drawDir() : loadDir()), 200); document.body.classList.toggle('dir-sub', !!(S.dcat || $('#q').value.trim())); });
 $('#dchips').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (b) openSvcCat(b.dataset.d); });
@@ -6755,7 +6756,8 @@ async function cachedCall(key, fn) {
 function saveNav() {
   try {
     const th = S.view === 'thread' && S.th ? { kind: S.th.kind, id: S.th.id, pageId: S.th.pageId || null } : null;
-    sessionStorage.setItem('au_nav', JSON.stringify({ v: S.view, tab: S.tab, userId: S.userId, pageId: S.pageId, groupId: S.groupId, postId: S.postId, th, frTab: S.frTab, cvTab: S.cvTab, y: scrollY, at: Date.now() }));
+    sessionStorage.setItem('au_nav', JSON.stringify({ v: S.view, tab: S.tab, userId: S.userId, pageId: S.pageId, groupId: S.groupId, postId: S.postId, th, frTab: S.frTab, cvTab: S.cvTab, y: scrollY, at: Date.now(),
+      dcat: S.view === 'dir' ? S.dcat || '' : '', dsub: S.dsub || null, dq: S.view === 'dir' ? $('#q')?.value.trim() || '' : '', sd: $('#modal').classList.contains('on') && $('#sheet .sdet') ? S.sdId : null }));
   } catch { /* প্রাইভেট মোডে সেশন না থাকলেও চলে */ }
 }
 addEventListener('pagehide', saveNav);
@@ -6769,7 +6771,14 @@ function restoreNav() {
   const scroll = () => { if (n.y > 0) setTimeout(() => window.scrollTo(0, n.y), 700); };
   const base = TABS.includes(n.tab) ? n.tab : 'home';
   try {
-    if (n.tab === 'upz' && n.v === 'dir') { go('upz'); return scroll(); }
+    if (n.tab === 'upz' && n.v === 'dir') {
+      go('upz');
+      // ক্যাটাগরি, ধরন-ফিল্টার, খোঁজার লেখা আর খোলা বিস্তারিত পাতা — রিফ্রেশের পরেও একই জায়গায়
+      if (n.dcat && n.dcat !== 'aid' && !SVC_SPECIAL[n.dcat]) openSvcCat(n.dcat, n.dsub || null);
+      if (n.dq) { $('#q').value = n.dq; $('#q').dispatchEvent(new Event('input')); }
+      if (n.sd) { const t0 = Date.now(), tryOpen = () => (S.svcAll?.some(x => String(x.id) === String(n.sd)) ? svcDetailSheet(n.sd) : Date.now() - t0 < 8000 && setTimeout(tryOpen, 300)); setTimeout(tryOpen, 300); }
+      return scroll();
+    }
     if (TABS.includes(n.v)) { go(n.v); return scroll(); }
     if (base !== 'home') go(base);
     if (n.v === 'thread' && n.th) return openConv(n.th);

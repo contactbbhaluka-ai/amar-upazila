@@ -5302,9 +5302,15 @@ function dirChips() {
   const c = $('#dchips'), chipX = c.scrollLeft;   // চিপের সারি যেখানে ছিল সেখানেই থাকবে
   const fav = S.svcFav?.size ? [['fav', 'প্রিয়', '']] : [];
   c.innerHTML = [['', 'সব সেবা'], ['near', 'কাছের সেবা'], ...fav, ['sos', 'জরুরি নম্বর'], ...svcCats()].map(x => `<button class="chip svc-chip${x[0] === S.dcat ? ' on' : ''}" data-d="${x[0]}">${svcIc(x[0] || 'all', 16)}${esc(x[1])}</button>`).join('');
-  const on = c.querySelector('.chip.on'); c.scrollLeft = chipX;
-  // বাছাই করা চিপ পুরো চোখের বাইরে থাকলে (যেমন গ্রিড থেকে ঢুকলে) শুধু যতটুকু দরকার ততটুকু সরাই
-  if (on && (on.offsetLeft + on.offsetWidth <= c.scrollLeft || on.offsetLeft >= c.scrollLeft + c.clientWidth)) c.scrollLeft = Math.max(0, on.offsetLeft - 8 - (on.offsetLeft > c.scrollLeft ? c.clientWidth - on.offsetWidth - 16 : 0));
+  c.scrollLeft = chipX; chipCenter(c);
+}
+// বাছাই করা চিপ সারির মাঝখানে আনা, যাতে দুই পাশের পরের/আগের ক্যাটাগরিও দেখা যায়
+function chipCenter(row) {
+  const on = row?.querySelector('.on'); if (!on) return;
+  const r = row.getBoundingClientRect(), o = on.getBoundingClientRect();
+  const left = Math.max(0, Math.min(row.scrollWidth - row.clientWidth, row.scrollLeft + (o.left - r.left) - (row.clientWidth - o.width) / 2));
+  const seen = o.right > r.left && o.left < r.right;   // আগে থেকেই চোখে পড়লে মসৃণভাবে, নইলে সরাসরি
+  if (Math.abs(left - row.scrollLeft) > 2) row.scrollTo({ left, behavior: seen && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto' });
 }
 // আগে আনা সব সেবা থেকে এখানেই ছেঁকে দেখাই (খোঁজা, ধরন, প্রিয়)
 function drawDir() {
@@ -5340,7 +5346,9 @@ function drawDir() {
   const unionMap = S.dcat === 'union' && !q && upzRow?.image_url ? `<div class="u-map"><img src="${esc(upzRow.image_url)}" alt="ভালুকার ইউনিয়নের মানচিত্র" data-ipzoom loading="lazy" onerror="this.parentNode.remove()"><span>🗺️ ভালুকা উপজেলার ইউনিয়নসমূহ · বড় করে দেখতে চাপুন</span></div>` : '';
   const emgHtml = (unionMap || '') + (EMG_CATS.has(S.dcat) && !q ? `<a class="emg-strip" href="tel:999"><span>🚨</span><div><b>জীবন-মৃত্যুর জরুরি অবস্থায় ৯৯৯</b><small>পুলিশ, ফায়ার সার্ভিস ও এম্বুলেন্স — বিনা খরচে, ২৪ ঘণ্টা</small></div><i>কল</i></a>${S.dcat === 'fire' ? '<a class="emg-strip fire" href="tel:102"><span>🚒</span><div><b>ফায়ার সার্ভিস হটলাইন ১০২</b><small>আগুন ও উদ্ধারকাজে সরাসরি</small></div><i>কল</i></a>' : ''}` : '');
   if (['upz', 'pouro'].includes(S.dcat) && !q && !S.dsub && base.length === 1 && base[0].details) { $('#dir').innerHTML = head + svcInlinePage(base[0]); return; }
+  const subX = $('#dir .sub-chips')?.scrollLeft || 0;
   $('#dir').innerHTML = head + famHtml + emgHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
+  const sc = $('#dir .sub-chips'); if (sc) { sc.scrollLeft = subX; chipCenter(sc); }
 }
 function drawNear(list, q) {
   const located = list.filter(x => x.lat != null && (!S.nearCat || x.category === S.nearCat) && (!q || svcSearch([x], q).hits.length));

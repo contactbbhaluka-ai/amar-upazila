@@ -4485,9 +4485,10 @@ function svcEditSheet(s, category) {
   const v = s || { category: category || 'tour', amenities: [], images: [] };
   const imgs = [...new Set([v.image_url, ...(v.images || [])].filter(Boolean))], am = new Set(v.amenities || []);
   // যে ক্যাটাগরিতে আছেন শুধু সেই ক্যাটাগরির দরকারি ঘরগুলো
-  const cat = v.category, person = cat === 'famous', place = cat === 'tour', subs = subsOf(cat), cname = catName(cat) || 'সেবা';
+  const cat = v.category, person = cat === 'famous', place = cat === 'tour', hat = cat === 'shop', subs = subsOf(cat), cname = catName(cat) || 'সেবা';
   const F = person ? { tag: 1, life: 1, addr: 'জন্মস্থান / গ্রাম', det: 'জীবনী', vid: 1, imgs: 'ছবি (প্রথমটি প্রতিকৃতি)' }
     : place ? { addr: 'ঠিকানা', phone: 1, hours: 1, det: 'বিস্তারিত বিবরণ', vid: 1, go: 1, best: 1, amen: 1, loc: 1, imgs: 'ছবি (প্রথমটি প্রচ্ছদ)' }
+    : hat ? { addr: 'এলাকা / গ্রামের নাম <small class="mut">(ঐচ্ছিক)</small>', det: 'আরও তথ্য (ঐচ্ছিক)', loc: 1, imgs: 'ছবি (ঐচ্ছিক)' }
     : { addr: 'ঠিকানা / এলাকা', phone: 1, hours: 1, det: 'বিস্তারিত (ঐচ্ছিক)', loc: 1, imgs: 'ছবি (ঐচ্ছিক)' };
   const inp = (id, label, val, attrs = '') => `<label>${label}<input id="${id}" ${attrs} value="${esc(val || '')}"></label>`;
   openSheet(`<form class="rvf sde"><h2>${s ? '✏️ তথ্য সম্পাদনা' : `＋ নতুন ${esc(person ? 'প্রসিদ্ধ ব্যক্তি' : cname)}`}</h2>
@@ -4496,10 +4497,11 @@ function svcEditSheet(s, category) {
     ${subs.length ? `<label>${person ? 'পরিচয়ের ধরন' : 'ধরন'}<select class="f" id="se-sub"><option value="">—</option>${subs.map(x => `<option value="${x[0]}"${x[0] === v.subtype ? ' selected' : ''}>${x[2]} ${x[1]}</option>`).join('')}</select></label>` : ''}
     ${F.tag ? inp('se-tag', 'পরিচিতি (এক লাইনে)', v.tagline, 'maxlength="120" placeholder="যেমন: বীর মুক্তিযোদ্ধা, আফসার বাহিনীর প্রতিষ্ঠাতা"') : ''}
     ${F.life ? inp('se-life', 'জীবনকাল', v.life, 'maxlength="80" placeholder="যেমন: ১৯৩৫ – ২০০৯ বা জন্ম ১৯৪০"') : ''}
-    ${inp('se-addr', F.addr, v.address, 'maxlength="200"')}
-    ${person || place ? (() => { const ar = (S.svcAll || []).filter(x => (x.category === 'union' || x.category === 'pouro') && x.union_id).sort((x, y) => (x.category === 'pouro' ? -1 : unionNo(x)) - (y.category === 'pouro' ? -1 : unionNo(y)));
-      return ar.length ? `<label>${person ? 'জন্মস্থান কোন ইউনিয়ন/পৌরসভায়' : 'কোন ইউনিয়ন/পৌরসভায়'} <small class="mut">(সেই এলাকার পাতায় দেখাবে)</small><select class="f" id="se-area"><option value="">ঠিকানা দেখে নিজে মিলিয়ে নিক</option>${ar.map(x => `<option value="${esc(x.union_id)}"${x.union_id === v.union_id ? ' selected' : ''}>${esc(String(x.name).replace(/ পরিষদ$/, ''))}</option>`).join('')}</select></label>` : ''; })() : ''}
-    ${!person ? `<label>সব যোগাযোগ নম্বর <small class="mut">(প্রতি লাইনে "পদবি/নাম: নম্বর" — প্রথমটি প্রধান)</small><textarea id="se-phones" rows="3" placeholder="ডিউটি অফিসার: 01320103300&#10;ওসি: 01320103295">${esc((v.phones || []).map(p => `${p.l}: ${p.n}`).join('\n'))}</textarea></label>
+    ${hat ? '' : `${inp('se-addr', F.addr, v.address, 'maxlength="200"')}`}
+    ${person || place || hat ? (() => { const ar = (S.svcAll || []).filter(x => (x.category === 'union' || x.category === 'pouro') && x.union_id).sort((x, y) => (x.category === 'pouro' ? -1 : unionNo(x)) - (y.category === 'pouro' ? -1 : unionNo(y)));
+      return ar.length ? `<label>${person ? 'জন্মস্থান কোন ইউনিয়ন/পৌরসভায়' : hat ? 'ইউনিয়ন / পৌরসভা *' : 'কোন ইউনিয়ন/পৌরসভায়'} <small class="mut">(সেই এলাকার পাতায় দেখাবে)</small><select class="f" id="se-area"><option value="">${hat ? '— বাছাই করুন —' : 'ঠিকানা দেখে নিজে মিলিয়ে নিক'}</option>${ar.map(x => `<option value="${esc(x.union_id)}"${x.union_id === v.union_id ? ' selected' : ''}>${esc(String(x.name).replace(/ পরিষদ$/, ''))}</option>`).join('')}</select></label>` : ''; })() : ''}
+    ${hat ? `${inp('se-addr', F.addr, v.address, 'maxlength="200"')}` : ''}
+    ${!person && !hat ? `<label>সব যোগাযোগ নম্বর <small class="mut">(প্রতি লাইনে "পদবি/নাম: নম্বর" — প্রথমটি প্রধান)</small><textarea id="se-phones" rows="3" placeholder="ডিউটি অফিসার: 01320103300&#10;ওসি: 01320103295">${esc((v.phones || []).map(p => `${p.l}: ${p.n}`).join('\n'))}</textarea></label>
     <label>ইমেইল<input id="se-email" type="email" maxlength="120" value="${esc(v.email || '')}"></label>
     ${INFO_CATS.has(cat) ? `<label>ওয়েবসাইট<input id="se-url" type="url" maxlength="300" placeholder="https://" value="${esc(/beautifulbhaluka/.test(v.url || '') ? '' : v.url || '')}"></label>` : ''}` : ''}
     ${F.phone ? `<div class="bk-row">${inp('se-phone', 'ফোন', v.phone, 'maxlength="40" inputmode="tel"')}${F.hours ? inp('se-hours', 'খোলার সময়', v.hours, 'maxlength="80" placeholder="যেমন সকাল ৯টা–সন্ধ্যা ৬টা"') : ''}</div>` : ''}
@@ -4561,6 +4563,7 @@ function svcEditSheet(s, category) {
     if (has('#se-sub')) p.subtype = val('#se-sub');
     if (has('#se-url')) p.url = val('#se-url') || (/beautifulbhaluka/.test(v.url || '') ? v.url : null);
     if (has('#se-area')) p.union_id = val('#se-area') ? +val('#se-area') : null;
+    if (hat && !p.union_id) return toast('ইউনিয়ন বা পৌরসভা বাছাই করুন');
     if (has('#se-phone')) p.phone = val('#se-phone') || ''; else if (!s) p.phone = '';
     if (has('#se-hours')) p.hours = val('#se-hours');
     if (has('#se-htime')) { p.hat_days = [...sh.querySelectorAll('[data-hfd].on')].map(b => +b.dataset.hfd); p.hat_time = val('#se-htime') || null; p.goods = [...sh.querySelectorAll('[data-hfg].on')].map(b => b.dataset.hfg); p.season_from = val('#se-sfrom') || null; p.season_to = val('#se-sto') || null; }
@@ -5607,14 +5610,13 @@ function hatAddSheet() {
     <label>হাট/বাজারের নাম *<input id="ha-n" required minlength="2" maxlength="80" placeholder="যেমন: উথুরা বাজার"></label>
     <label>ধরন *</label><div class="hf-days ha-sub">${subsOf('shop').map(x => `<button type="button" data-hasub="${x[0]}"${x[0] === st.sub ? ' class="on"' : ''}>${x[2]} ${x[1]}</button>`).join('')}</div>
     <label>ইউনিয়ন / পৌরসভা *<select id="ha-u" class="f" required><option value="">— বাছাই করুন —</option>${areas.map(a => `<option value="${esc(a.union_id)}"${my && my.id === a.id ? ' selected' : ''}>${esc(String(a.name).replace(/ পরিষদ$/, ''))}</option>`).join('')}</select></label>
-    <label>গ্রাম / ঠিকানা *<input id="ha-a" required maxlength="120" placeholder="গ্রাম, রাস্তা বা পরিচিত জায়গা"></label>
+    <label>এলাকা / গ্রামের নাম <small class="mut">(ঐচ্ছিক)</small><input id="ha-a" maxlength="120" placeholder="গ্রাম, রাস্তা বা পরিচিত জায়গা"></label>
     <div class="hf ha-days-box"><label>হাটবার * <small class="mut">(কোন কোন দিন হাট বসে)</small></label>
       <div class="hf-days">${DAY_SHORT.map((d, i) => `<button type="button" data-hfd="${i}">${d}</button>`).join('')}</div>
       <label>কখন বসে<select id="ha-t" class="f"><option value="">— জানা নেই —</option>${Object.entries(HAT_TIME).map(([k, x]) => `<option value="${k}">${x[0]}</option>`).join('')}</select></label></div>
     <div class="hf ha-season" hidden><label>মৌসুমি হাটের সময়কাল *</label>
       <div class="bk-row"><label>শুরু<input id="ha-sf" type="date"></label><label>শেষ<input id="ha-st" type="date"></label></div></div>
     <label>কী কী পাওয়া যায়</label><div class="hf-goods">${GOODS.map(g => `<button type="button" data-hfg="${g[0]}">${g[1]} ${g[2]}</button>`).join('')}</div>
-    <label>ইজারাদার বা বাজার কমিটির ফোন <small class="mut">(ঐচ্ছিক)</small><input id="ha-p" inputmode="tel" maxlength="20" pattern="[0-9০-৯+\\- ]{3,20}"></label>
     <label>আরও তথ্য <small class="mut">(ঐচ্ছিক)</small><textarea id="ha-d" rows="3" maxlength="1000" placeholder="কীভাবে যাবেন, কিসের জন্য বিখ্যাত, দোকানের সংখ্যা…"></textarea></label>
     <label>ছবি <small class="mut">(ঐচ্ছিক)</small></label>${pickImgsHtml()}
     ${geoFieldHtml(null)}
@@ -5627,7 +5629,6 @@ function hatAddSheet() {
   };
   sh.querySelector('form').onsubmit = e => {
     e.preventDefault();
-    const toEn = t => t.replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
     const name = $('#ha-n').value.trim(), days = [...sh.querySelectorAll('[data-hfd].on')].map(b => +b.dataset.hfd), uid = +$('#ha-u').value || null;
     if (!uid) return toast('ইউনিয়ন বা পৌরসভা বাছাই করুন');
     if (['weekly', 'cattle'].includes(st.sub) && !days.length) return toast('কোন দিন হাট বসে তা বাছাই করুন');
@@ -5636,7 +5637,7 @@ function hatAddSheet() {
     const dup = (S.svcAll || []).find(x => x.category === 'shop' && bnNorm(x.name) === bnNorm(name));
     const area = (S.svcAll || []).find(x => x.union_id === uid && (x.category === 'union' || x.category === 'pouro'));
     const v = { category: 'shop', subtype: st.sub, name, union_id: uid, address: [$('#ha-a').value.trim(), area ? String(area.name).replace(/^[০-৯0-9]+নং\s*/, '').replace(/ পরিষদ$/, '') : '', 'ভালুকা'].filter(Boolean).join(', '),
-      phone: toEn($('#ha-p').value.trim()), hat_days: st.sub === 'seasonal' ? [] : days, hat_time: st.sub === 'seasonal' ? null : $('#ha-t').value || null,
+      phone: '', hat_days: st.sub === 'seasonal' ? [] : days, hat_time: st.sub === 'seasonal' ? null : $('#ha-t').value || null,
       goods: [...sh.querySelectorAll('[data-hfg].on')].map(b => b.dataset.hfg), season_from: st.sub === 'seasonal' ? $('#ha-sf').value || null : null, season_to: st.sub === 'seasonal' ? $('#ha-st').value || null : null,
       details: $('#ha-d').value.trim() || null, image_url: imgs[0] || null, images: imgs.slice(1), lat: st.geo?.lat ?? null, lng: st.geo?.lng ?? null };
     busy(e.submitter, async () => {

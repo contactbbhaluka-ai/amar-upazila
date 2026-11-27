@@ -144,6 +144,9 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'ব্যানার': 'Banners', 'ডিরেক্টরির ব্যানার': 'Directory banners', 'নতুন ব্যানার': 'New banner', 'শিরোনাম': 'Title', 'নিচের লেখা (ঐচ্ছিক': 'Subtitle (optional', 'রং (ছবি না দিলে': 'Color (without a photo',
+  'চাপলে কোথায় যাবে (ঐচ্ছিক': 'Opens when tapped (optional', 'ব্যানার যোগ হয়েছে': 'Banner added', 'ব্যানার মুছে ফেলা হয়েছে': 'Banner deleted', 'এখনো কোনো ব্যানার নেই': 'No banners yet', 'যোগ করুন': 'Add', 'বন্ধ': 'Close',
+  'এগুলো সেবা ডিরেক্টরির উপরে পালাক্রমে ঘুরবে। উপজেলার সবুজ ব্যানার সবসময় শেষে থাকে। সর্বোচ্চ ১০টি': 'These rotate at the top of the directory. The green upazila banner always stays last. Up to 10',
   'বিপদে আছি': "I'm in danger", 'প্রাথমিক চিকিৎসা': 'First aid', 'বিপদে আছেন': 'In danger', 'লোকেশনসহ SMS পাঠান': 'Send SMS with location', 'WhatsApp-এ লোকেশন পাঠান': 'Send location on WhatsApp',
   '৯৯৯-এ কল করুন (পুলিশ, ফায়ার, অ্যাম্বুলেন্স': 'Call 999 (police, fire, ambulance', '৯৯৯-এ কল করুন': 'Call 999', 'পরিচিতজন বদলান': 'Change contacts', 'পরিচিতজনের নম্বর যোগ করুন': 'Add contact numbers',
   'বিপদের পরিচিতজন': 'Emergency contacts', 'পরিচিতজন সংরক্ষণ হয়েছে': 'Contacts saved', 'লোকেশন খুঁজছি…': 'Finding location…', 'জরুরি অবস্থায় কী করবেন': 'What to do in an emergency', 'সব বিষয়': 'All topics',

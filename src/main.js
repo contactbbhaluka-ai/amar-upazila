@@ -4189,13 +4189,81 @@ document.addEventListener('click', e => {
   const a = e.target.closest('[data-aid]'); if (a && a.closest('#sheet')) return aidSheet(a.dataset.aid);
   if (e.target.closest('[data-sos]')) return sosSheet();
 });
+// ---------- উপরের ব্যানার স্লাইডার (অ্যাডমিনের ব্যানার + শেষে উপজেলার সবুজ ব্যানার)
+const DS_COLORS = { green: 'সবুজ', blue: 'নীল', red: 'লাল', orange: 'কমলা', purple: 'বেগুনি', teal: 'ফিরোজা' };
+function sliderHtml(total, cats) {
+  const hero = `<div class="ds-slide ds-hero"><div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div></div>`;
+  const bs = (S.dirBanners || []).map(b => `<div class="ds-slide ds-c-${esc(b.color || 'green')}${b.image_url ? ' has-img' : ''}" ${b.link ? `data-dlink="${esc(b.link)}" role="button" tabindex="0"` : ''}>
+    ${b.image_url ? `<img src="${esc(b.image_url)}" alt="" loading="lazy" decoding="async">` : ''}<div class="ds-txt">${b.title ? `<b>${esc(b.title)}</b>` : ''}${b.subtitle ? `<small>${esc(b.subtitle)}</small>` : ''}</div>${b.link ? '<span class="ds-go">›</span>' : ''}</div>`);
+  const slides = [...bs, hero];
+  return `<div class="dslider"><div class="ds-track" id="ds-track">${slides.join('')}</div>
+    ${slides.length > 1 ? `<div class="ds-dots">${slides.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}
+    ${me()?.admin ? '<button class="ds-edit" id="ds-edit" aria-label="ব্যানার সাজান">✏️ ব্যানার</button>' : ''}</div>`;
+}
+function startSlider() {
+  clearInterval(S.dsTimer);
+  const tr = $('#ds-track'); if (!tr) return;
+  const n = tr.children.length, dots = [...document.querySelectorAll('.ds-dots i')];
+  const idx = () => Math.round(tr.scrollLeft / Math.max(1, tr.clientWidth));
+  tr.onscroll = () => { const i = idx(); dots.forEach((d, j) => d.classList.toggle('on', j === i)); };
+  let hold = 0;
+  tr.onpointerdown = tr.ontouchstart = () => { hold = Date.now(); };
+  if (n < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  S.dsTimer = setInterval(() => {
+    if (!tr.isConnected) return clearInterval(S.dsTimer);
+    if (S.view !== 'dir' || document.hidden || Date.now() - hold < 6000) return;   // কেউ টানলে একটু থামে
+    const i = (idx() + 1) % n; tr.scrollTo({ left: i * tr.clientWidth, behavior: 'smooth' });
+  }, 4500);
+}
+function dsLink(l) {
+  if (!l) return;
+  if (l.startsWith('cat:')) return openSvcCat(l.slice(4));
+  if (/^(tel:|https?:)/.test(l)) return openUrl(l);
+}
+function parseDsLink(v) {
+  v = v.trim(); if (!v) return '';
+  const d = v.replace(/[০-৯]/g, x => '০১২৩৪৫৬৭৮৯'.indexOf(x));
+  if (/^\+?[\d\s-]{3,16}$/.test(d)) return 'tel:' + d.replace(/[\s-]/g, '');
+  if (/^https?:\/\//i.test(v)) return v;
+  if (/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(v)) return 'https://' + v;
+  const c = svcCats().find(([k, n]) => k === v.toLowerCase() || n === v) || svcSearch([], v).cats[0];
+  return c ? 'cat:' + c[0] : null;
+}
+function dsEditSheet() {
+  const st = {};
+  const list = (S.dirBanners || []).map(b => `<div class="ds-row"><span class="ds-sw ds-c-${esc(b.color)}">${b.image_url ? `<img src="${esc(b.image_url)}" alt="">` : ''}</span><span class="ds-rt"><b>${esc(b.title || '(শিরোনাম নেই)')}</b><small>${esc(b.subtitle || '')}</small></span><button class="link" data-dsdel="${esc(b.id)}" style="color:var(--r)">মুছুন</button></div>`).join('');
+  openSheet(`<h2>🖼️ ডিরেক্টরির ব্যানার</h2><p class="mut" style="margin-top:-4px">এগুলো সেবা ডিরেক্টরির উপরে পালাক্রমে ঘুরবে। উপজেলার সবুজ ব্যানার সবসময় শেষে থাকে। সর্বোচ্চ ১০টি।</p>
+    ${list || '<p class="mut">এখনো কোনো ব্যানার নেই।</p>'}
+    <h3 class="pin-h">নতুন ব্যানার</h3><form id="ds-f">
+    ${photoField('ছবি (ঐচ্ছিক, চওড়া ছবি ভালো দেখায়)', '')}
+    <label for="ds-t">শিরোনাম</label><input id="ds-t" maxlength="80" placeholder="যেমন: বিনামূল্যে রক্তদান ক্যাম্প">
+    <label for="ds-s">নিচের লেখা (ঐচ্ছিক)</label><input id="ds-s" maxlength="140" placeholder="যেমন: শুক্রবার সকাল ১০টা · উপজেলা পরিষদ চত্বর">
+    <label for="ds-c">রং (ছবি না দিলে)</label><select class="f" id="ds-c">${Object.entries(DS_COLORS).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>
+    <label for="ds-l">চাপলে কোথায় যাবে (ঐচ্ছিক)</label><input id="ds-l" maxlength="300" placeholder="ফোন নম্বর, ওয়েব লিংক, বা ক্যাটাগরির নাম (যেমন: হাসপাতাল)">
+    <div class="row" style="margin-top:14px"><button class="btn" style="flex:1">যোগ করুন</button><button class="btn ghost" type="button" data-close>বন্ধ</button></div></form>`);
+  watchPhoto(st, 1200);
+  $('#ds-f').onsubmit = e => {
+    e.preventDefault();
+    const title = $('#ds-t').value.trim(), subtitle = $('#ds-s').value.trim(), link = parseDsLink($('#ds-l').value);
+    if (!title && !st.blob) return toast('শিরোনাম বা ছবি, অন্তত একটা দিন');
+    if (link === null) return toast('"চাপলে কোথায় যাবে" বোঝা যায়নি। ফোন নম্বর, ওয়েব লিংক বা ক্যাটাগরির নাম দিন।');
+    if ((S.dirBanners || []).length >= 10) return toast('সর্বোচ্চ ১০টি ব্যানার রাখা যায়, আগে একটা মুছুন');
+    busy(e.submitter, async () => { await S.api.addDirBanner({ title, subtitle, color: $('#ds-c').value, link, image: st.blob || null }); S.dirBanners = await S.api.dirBanners(); toast('ব্যানার যোগ হয়েছে'); drawDir(); dsEditSheet(); });
+  };
+}
+document.addEventListener('click', e => {
+  const l = e.target.closest('[data-dlink]'); if (l) return dsLink(l.dataset.dlink);
+  if (e.target.closest('#ds-edit')) return dsEditSheet();
+  const d = e.target.closest('[data-dsdel]');
+  if (d) { if (!confirm('এই ব্যানারটি মুছবেন?')) return; S.api.delDirBanner(Number(d.dataset.dsdel) || d.dataset.dsdel).then(async () => { S.dirBanners = await S.api.dirBanners(); toast('ব্যানার মুছে ফেলা হয়েছে'); drawDir(); dsEditSheet(); }).catch(err => toast(errText(err))); }
+});
 function renderSvcGrid(list) {
   const n = k => list.filter(x => x.category === k).length;
   const total = list.length, cats = svcCats(), has = k => k === 'sos' || k === 'aid' || cats.some(c => c[0] === k);
   const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : k === 'aid' ? 'প্রাথমিক চিকিৎসা' : c[1], cnt = k === 'sos' || k === 'aid' || SVC_SPECIAL[k] ? 0 : n(k);
     return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
   const favs = list.filter(x => S.svcFav?.has(x.id));
-  $('#dir').innerHTML = `<div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div>`
+  $('#dir').innerHTML = sliderHtml(total, cats)
     + dayNoticeHtml()
     + `<div class="sos-row2"><button class="sos-btn" data-sos>🆘 বিপদে আছি</button><button class="aid-btn" data-svc="aid">🩹 প্রাথমিক চিকিৎসা</button></div>`
     + timeSuggestHtml()
@@ -4203,6 +4271,7 @@ function renderSvcGrid(list) {
     + `<button class="near-card" data-svc="near">${svcIc('near', 24)}<span><b>আমার কাছের সেবা</b><small>লোকেশন দিলে কাছের হাসপাতাল, ডাক্তার, ব্যাংক দূরত্বসহ দেখাবে</small></span><span class="near-go">›</span></button>`
     + (favs.length ? `<h3 class="svc-sec" style="--c:#e0245e"><i></i>❤️ আমার প্রিয় সেবা <button class="svc-more" data-svc="fav">সব দেখুন</button></h3>${favs.slice(0, 3).map(svcCard).join('')}` : '')
     + SVC_GROUPS.map(([t, col, keys]) => { const ks = keys.filter(has); return ks.length ? `<h3 class="svc-sec" style="--c:${col}"><i></i>${esc(t)}</h3><div class="svc-grid">${ks.map(tile).join('')}</div>` : ''; }).join('');
+  startSlider();
 }
 function dirChips() {
   const c = $('#dchips'), chipX = c.scrollLeft;   // চিপের সারি যেখানে ছিল সেখানেই থাকবে
@@ -4256,17 +4325,18 @@ async function loadDir() {
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }
   if (S.dcat === 'blood') return loadBlood();
   const restore = () => { if (S.dirY != null) { const y = S.dirY; S.dirY = null; requestAnimationFrame(() => window.scrollTo(0, y)); } };
-  if (!S.svcAll) { const c = local.get('svc_cache'); if (c?.list) { S.svcAll = c.list; S.popCats = c.pop || []; S.svcCacheT = c.t; } }   // নেট ছাড়াও: ফোনে জমা রাখা তালিকা
+  if (!S.svcAll) { const c = local.get('svc_cache'); if (c?.list) { S.svcAll = c.list; S.popCats = c.pop || []; S.dirBanners = c.bans || []; S.svcCacheT = c.t; } }   // নেট ছাড়াও: ফোনে জমা রাখা তালিকা
   if (S.svcAll) { drawDir(); restore(); }   // আগের তালিকা সাথে সাথে দেখাই, পরে চুপচাপ হালনাগাদ
   else $('#dir').innerHTML = '<div class="skel"></div>';
   try {
-    const [list, pop] = await Promise.all([S.api.services({}), S.api.popularServiceCats().catch(() => S.popCats || []), ensureSvcFavs()]);
+    const [list, pop, bans] = await Promise.all([S.api.services({}), S.api.popularServiceCats().catch(() => S.popCats || []), S.api.dirBanners().catch(() => S.dirBanners || []), ensureSvcFavs()]);
+    const banChanged = JSON.stringify(bans) !== JSON.stringify(S.dirBanners); S.dirBanners = bans;
     const popChanged = JSON.stringify(pop) !== JSON.stringify(S.popCats); S.popCats = pop;
     const wasOff = !!S.svcOffline; S.svcOffline = null;
-    try { local.set('svc_cache', { t: Date.now(), list, pop }); } catch { /* জায়গা না থাকলে থাক */ }
+    try { local.set('svc_cache', { t: Date.now(), list, pop, bans }); } catch { /* জায়গা না থাকলে থাক */ }
     const changed = JSON.stringify(list) !== JSON.stringify(S.svcAll);
     S.svcAll = list;
-    if (changed || wasOff || (popChanged && !S.dcat && !$('#q').value.trim()) || !$('#dir').children.length || $('#dir .skel')) { const y = window.scrollY; drawDir(); window.scrollTo(0, y); restore(); }
+    if (changed || wasOff || ((popChanged || banChanged) && !S.dcat && !$('#q').value.trim()) || !$('#dir').children.length || $('#dir .skel')) { const y = window.scrollY; drawDir(); window.scrollTo(0, y); restore(); }
   } catch (e) {
     if (!S.svcAll) { $('#dir').innerHTML = `<div class="empty">📴 ইন্টারনেট নেই, আর আগে সেভ করা কোনো তালিকাও নেই। নেট চালু করে একবার খুললে পরের বার নেট ছাড়াও দেখা যাবে।</div>`; return; }
     S.svcOffline = S.svcCacheT || Date.now(); const y = window.scrollY; drawDir(); window.scrollTo(0, y);

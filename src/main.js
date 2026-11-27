@@ -3849,6 +3849,33 @@ function accSwitchSheet() {
     <button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
 }
 
+// ---------- অ্যাপ খুললেই স্বাগতম পাতা (লগইন না থাকলে): অ্যাকাউন্ট খুলুন / লগইন / ঘুরে দেখুন
+const GATE_FEAT = [['users', 'বন্ধু, পোস্ট ও এলাকার খবর', 'পরিচিতদের সাথে যুক্ত থাকুন'], ['message', 'মেসেজ ও গ্রুপ চ্যাট', 'যখন খুশি কথা বলুন'], ['drop', 'ব্লাড ব্যাংক ও জরুরি সাহায্য', 'দরকারে কাছের রক্তদাতা'], ['home', 'উপজেলার সব সেবা এক জায়গায়', 'হাসপাতাল, অফিস, হাট বাজার']];
+function showGate() {
+  if (me() || $('#gate')) return;
+  const accs = accList();
+  const el = document.createElement('div'); el.id = 'gate'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'আমার উপজেলায় স্বাগতম');
+  el.innerHTML = `<div class="gt-in">
+    <div class="gt-top"><div class="au-logo gt-logo"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#006a4e"/><circle cx="256" cy="220" r="104" fill="#e5303f"/><path d="M104 420c40-66 94-96 152-96s112 30 152 96" stroke="#fff" stroke-width="40" fill="none" stroke-linecap="round"/></svg></div>
+      <h1>আমার উপজেলা</h1><p>ভালুকার মানুষের নিজের সামাজিক অ্যাপ</p></div>
+    <div class="gt-feat">${GATE_FEAT.map(([i, t, d], k) => `<div class="gt-f" style="animation-delay:${0.08 * k + 0.1}s"><span class="gt-fi">${ic(i, 22)}</span><div><b>${t}</b><small>${d}</small></div></div>`).join('')}</div>
+    <div class="gt-cta"><p class="gt-msg">অ্যাপের সব সুবিধা পেতে একটি অ্যাকাউন্ট খুলুন</p>
+      <button class="btn wide au-btn gt-ic" data-gate="signup"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.6"/><path d="M2.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M19 8v6M16 11h6"/></svg><span>নতুন অ্যাকাউন্ট খুলুন</span></button>
+      <button class="gt-login gt-ic" data-gate="login">${ic('login', 19)}<span>${accs.length ? 'সেভ করা অ্যাকাউন্টে লগইন করুন' : 'অ্যাকাউন্ট আছে? লগইন করুন'}</span></button>
+      <button class="gt-skip" data-gate="skip">লগইন ছাড়াই ঘুরে দেখুন ${ic('chevR', 16)}</button>
+      ${S.api?.demoLogin ? '<button class="gt-demo" data-gate="demo">ডেমো প্রোফাইল দিয়ে সব ফিচার দেখুন</button>' : ''}</div></div>`;
+  document.body.appendChild(el); document.body.classList.add('gate-on');
+  el.addEventListener('click', e => {
+    const b = e.target.closest('[data-gate]'); if (!b) return;
+    const a = b.dataset.gate;
+    try { sessionStorage.setItem('au_gate', '1'); } catch { /* */ }
+    if (a === 'demo') return busy(b, async () => { await S.api.demoLogin(); hideGate(); afterAuth(); go('home'); toast('ডেমো প্রোফাইলে স্বাগতম'); demoGuide(); });
+    hideGate();
+    if (a === 'skip') return toast('লগইন ছাড়াই উপজেলার সেবা ও খবর দেখতে পারবেন');
+    go('me'); authView(a === 'signup' ? 'signup' : 'login'); window.scrollTo(0, 0);
+  });
+}
+function hideGate() { const g = $('#gate'); if (!g) return; g.classList.add('out'); document.body.classList.remove('gate-on'); setTimeout(() => g.remove(), 260); }
 // ---------- নতুন অ্যাকাউন্ট: ৩ ধাপ
 const SU_ST = [['১', 'আপনার পরিচয়', 'আসল নাম দিন, যাতে বন্ধুরা আপনাকে চিনতে পারেন'], ['২', 'ঠিকানা ও যোগাযোগ', 'আপনার এলাকার খবর আর মানুষ দেখাতে কাজে লাগবে'], ['৩', 'লগইনের তথ্য', 'এই ইমেইল ও পাসওয়ার্ড দিয়ে পরে লগইন করবেন']];
 function pwScore(p) {
@@ -4098,6 +4125,7 @@ document.addEventListener('click', async e => {
   await busy(b, async () => { const pg = await S.api.page(Number(id)); if (!pg.canManage) throw new Error('এই পেইজ চালানোর অনুমতি নেই'); setActAs(pg); });
 });
 function afterAuth() {
+  if (me()) hideGate();
   { const u = me(); if (u && accSaved(u.id)) accUpd(u.id, { name: u.name, ...(u.avatar && !String(u.avatar).startsWith('blob:') ? { avatar: u.avatar } : {}) }); }
   if (!me() && S.scope === 'friends') S.scope = 'area';
   renderComposer(); renderFilters(); listenMessages(); refreshBadges(); loadFeed('home'); renderDemoBar();
@@ -8060,6 +8088,7 @@ function restoreNav() {
     const upP = cachedCall('upazila', () => S.api.upazila()), unP = cachedCall('unions', () => S.api.unions()).then(u => { if (u?.length) S.unions = u; return u; });
     upP.catch(() => {}); unP.catch(() => {});
     await S.api.init(() => afterAuth());
+    try { if (!me() && !sessionStorage.getItem('au_gate') && !/^#(post|page|u|join|svc)-/.test(location.hash)) showGate(); } catch { /* */ }
     S.api.onPasswordRecovery?.(() => recoverySheet());
     S.api.onDeletionCancelled?.(() => deletionCancelledNotice());
     renderNetBar(); renderNotices(); checkForceUpdate();

@@ -2599,3 +2599,27 @@ details.sv[open]>summary{background:color-mix(in srgb,var(--sc) 7%,var(--card))}
 .au-blk select.f{min-height:50px;font-size:15px}
 .au-blk label:not(:first-child):not(.chk){margin-top:14px}.au-blk .chk{margin-top:10px}
 .au-new{display:flex;align-items:center;justify-content:center;gap:8px}
+/* স্বাগতম পাতা (অ্যাপ খুললেই) */
+#gate{position:fixed;inset:0;z-index:300;background:var(--bg);overflow:auto;animation:gtIn .3s ease;padding:calc(var(--st) + 10px) 18px calc(var(--sb) + 18px)}
+#gate.out{opacity:0;transform:scale(1.02);transition:opacity .25s,transform .25s}
+@keyframes gtIn{from{opacity:0}to{opacity:1}}
+body.gate-on{overflow:hidden}
+#gate::before{content:'';position:fixed;left:0;right:0;top:0;height:46vh;background:radial-gradient(120% 90% at 50% 0%,light-dark(#dff2ea,#123328) 0%,transparent 70%);pointer-events:none}
+.gt-in{position:relative;max-width:440px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+.gt-top{text-align:center;padding:28px 0 18px}
+.gt-logo{width:88px;height:88px;border-radius:26px;animation:gtPop .5s cubic-bezier(.2,1.4,.4,1)}
+@keyframes gtPop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+.gt-top h1{margin:12px 0 4px;font-size:30px;font-weight:800;color:var(--g);letter-spacing:-.3px}
+.gt-top p{margin:0;color:var(--mut);font-size:15px}
+.gt-feat{display:flex;flex-direction:column;gap:10px;margin:6px 0 22px}
+.gt-f{display:flex;align-items:center;gap:14px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.04);animation:gtUp .4s both}
+@keyframes gtUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.gt-fi{flex:none;width:44px;height:44px;border-radius:13px;display:grid;place-items:center;background:var(--g2);color:var(--g)}
+.gt-f b{display:block;font-size:15px}.gt-f small{color:var(--mut);font-size:13px}
+.gt-cta{margin-top:auto;padding-top:4px}
+.gt-msg{text-align:center;margin:0 0 4px;font-weight:700;font-size:15px}
+.gt-login{display:block;width:100%;margin-top:10px;min-height:50px;border-radius:14px;border:1.5px solid var(--g);background:var(--card);color:var(--g);font:inherit;font-size:16px;font-weight:800;cursor:pointer}
+.gt-skip{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;margin-top:12px;padding:10px;border:0;background:none;color:var(--mut);font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+.gt-demo{display:block;margin:2px auto 0;border:0;background:none;color:#b07400;font:inherit;font-size:13.5px;font-weight:700;text-decoration:underline;cursor:pointer}
+.gt-ic{display:flex!important;align-items:center;justify-content:center;gap:8px}
+.gt-top{padding:16px 0 14px}.gt-f{padding:10px 14px}.gt-feat{gap:8px;margin-bottom:16px}

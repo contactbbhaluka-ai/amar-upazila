@@ -145,6 +145,7 @@ const PLACES = {
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
   // লগইন ও সাইনআপ
+  "আমার উপজেলায় স্বাগতম": "Welcome to Amar Upazila", "বন্ধু, পোস্ট ও এলাকার খবর": "Friends, posts & local news", "পরিচিতদের সাথে যুক্ত থাকুন": "Stay connected with people you know", "মেসেজ ও গ্রুপ চ্যাট": "Messages & group chats", "যখন খুশি কথা বলুন": "Talk any time", "ব্লাড ব্যাংক ও জরুরি সাহায্য": "Blood bank & emergency help", "দরকারে কাছের রক্তদাতা": "Nearby donors when you need them", "উপজেলার সব সেবা এক জায়গায়": "All upazila services in one place", "হাসপাতাল, অফিস, হাট বাজার": "Hospitals, offices, markets", "অ্যাপের সব সুবিধা পেতে একটি অ্যাকাউন্ট খুলুন": "Create an account to get everything the app offers", "সেভ করা অ্যাকাউন্টে লগইন করুন": "Log in to a saved account", "অ্যাকাউন্ট আছে? লগইন করুন": "Have an account? Log in", "লগইন ছাড়াই ঘুরে দেখুন": "Look around without logging in", "ডেমো প্রোফাইল দিয়ে সব ফিচার দেখুন": "See every feature with the demo profile", "লগইন ছাড়াই উপজেলার সেবা ও খবর দেখতে পারবেন": "You can browse upazila services and news without logging in",
   "নতুন এসেছেন": "New here", "আগে থেকে অ্যাকাউন্ট আছে": "Already have an account", "লগআউট করবেন": "Log out", "পাসওয়ার্ড ভুলে গেছেন": "Forgot password",
   "এই অ্যাকাউন্টটা এই ফোনের তালিকা থেকে সরাবেন": "Remove this account from this phone", "ঠিকানায় পাসওয়ার্ড বদলানোর কোড পাঠাব": "— send a password reset code to this address",
   "ভালুকার মানুষের নিজের সামাজিক অ্যাপ": "The social app of the people of Bhaluka",

@@ -3919,7 +3919,7 @@ function svcDetailSheet(id, opt = {}) {
       <div class="sp-por">${imgs[0] ? `<img src="${esc(imgs[0])}" alt="" data-sdzoom="0" onerror="this.remove()">` : ''}<span>${esc((s.name || '?').replace(/^(ভাষা সৈনিক|অধ্যাপক|ডক্টর|ডা\.?|মেজর)\s*/g, '').charAt(0))}</span></div>
       ${sub ? `<span class="sd-cat">${sub[2]} ${esc(sub[1])}</span>` : ''}<h2>${esc(s.name)}</h2>
       ${s.tagline ? `<p class="sp-tag">${esc(s.tagline)}</p>` : ''}
-      <div class="sp-meta">${s.life ? `<span>🕊️ ${esc(s.life)}</span>` : ''}${s.address ? `<span>📍 ${esc(s.address)}</span>` : ''}</div>
+      <div class="sp-meta">${s.life ? `<span>🕊️ ${esc(s.life)}</span>` : ''}${s.address ? `<span>🏠 জন্মস্থান: ${esc(s.address)}</span>` : ''}</div>
     </div>` : `
     <div class="sd-hero">
       ${imgs.length ? `<div class="sdet-gal">${imgs.map((u, i) => `<img src="${esc(u)}" alt="" data-sdzoom="${i}" ${i ? 'loading="lazy"' : ''} decoding="async" onerror="this.remove()">`).join('')}</div>`
@@ -3934,7 +3934,7 @@ function svcDetailSheet(id, opt = {}) {
     <div class="sd-chips">
       ${s.rating_count ? `<button class="sd-chip rate" data-sdgo="sd-rev">★ ${bnNum1(s.rating_avg)} <span>(${bn(s.rating_count)})</span></button>` : ''}
       ${s.verified ? '<span class="sd-chip ok">✔ যাচাইকৃত</span>' : ''}
-      ${d != null ? `<span class="sd-chip">📍 ${fmtDist(d)} দূরে</span>` : ''}
+      ${d != null && !person ? `<span class="sd-chip">📍 ${fmtDist(d)} দূরে</span>` : ''}
       ${s.hours ? `<span class="sd-chip">🕘 ${esc(s.hours)}</span>` : ''}
       ${words ? `<span class="sd-chip">📖 ${bn(mins)} মিনিটে পড়ুন</span>` : ''}
       ${s.videos?.length ? `<button class="sd-chip vid" data-sdgo="sd-vid">▶ ${bn(s.videos.length)}টি ভিডিও</button>` : ''}
@@ -3961,7 +3961,7 @@ function svcDetailSheet(id, opt = {}) {
     <div class="sd-sec" id="sd-rev"><h3>${person ? 'স্মৃতিচারণ ও মন্তব্য' : 'রেটিং ও রিভিউ'}</h3><div class="sd-revbox"><div class="skel" style="height:90px"></div></div></div>
     ${near.length && !person ? `<div class="sd-sec"><h3>কাছাকাছি যা আছে</h3><div class="sd-near">${near.map(({ x, km }) => `<button data-sdrel="${esc(x.id)}" style="--c:${svcColor(x.category)}"><span class="sn-ic">${svcIc(x.category, 18)}</span><span class="sn-t"><b>${esc(x.name)}</b><small>${esc(catName(x.category) || '')}</small></span><span class="sn-km">${fmtDist(km)}</span></button>`).join('')}</div></div>` : ''}
     ${rel.length ? `<div class="sd-sec"><h3>আরও ${esc(cname)}</h3><div class="sd-rel">${rel.map(x => `<button class="sd-rc" data-sdrel="${esc(x.id)}">${x.image_url || x.images?.[0] ? `<img src="${esc(x.image_url || x.images[0])}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sd-rph'}))">` : '<span class="sd-rph"></span>'}<b>${esc(x.name)}</b>${x.rating_count ? `<small>★ ${bnNum1(x.rating_avg)}</small>` : ''}</button>`).join('')}</div></div>` : ''}
-    <div class="sd-foot"><button class="link" data-sdreport>⚠️ ভুল তথ্য জানান</button>${admin ? `<button class="link" data-sdedit>✏️ সম্পাদনা</button><button class="link" data-svcloc="${esc(s.id)}">📍 ${s.lat != null ? 'অবস্থান বদলান' : 'অবস্থান দিন'}</button>` : ''}</div>
+    <div class="sd-foot"><button class="link" data-sdreport>⚠️ ভুল তথ্য জানান</button>${admin ? `<button class="link" data-sdedit>✏️ সম্পাদনা</button>${person ? '' : `<button class="link" data-svcloc="${esc(s.id)}">📍 ${s.lat != null ? 'অবস্থান বদলান' : 'অবস্থান দিন'}</button>`}` : ''}</div>
   </div>`);
   const sh = $('#sheet'); sh.classList.add('tall'); sh.scrollTop = 0;
   const g = sh.querySelector('.sdet-gal'), cnt = sh.querySelector('.sd-count b');

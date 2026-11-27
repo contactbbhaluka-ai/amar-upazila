@@ -2598,3 +2598,4 @@ details.sv[open]>summary{background:color-mix(in srgb,var(--sc) 7%,var(--card))}
 .au-blk label.chk svg{display:none}
 .au-blk select.f{min-height:50px;font-size:15px}
 .au-blk label:not(:first-child):not(.chk){margin-top:14px}.au-blk .chk{margin-top:10px}
+.au-new{display:flex;align-items:center;justify-content:center;gap:8px}

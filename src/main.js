@@ -3774,7 +3774,7 @@ function authView(mode = 'login', pre = '') {
     ${tiles ? `<div class="au-card"><h2>আবার স্বাগতম</h2><p class="au-sub">আপনার অ্যাকাউন্টে চাপলেই ঢুকে যাবেন</p>
       <div class="au-accs">${accs.map(a => `<div class="au-acc" role="button" tabindex="0" data-acc="${esc(a.id)}"><button class="au-acc-x" data-accx="${esc(a.id)}" aria-label="${esc(a.name)} তালিকা থেকে সরান">✕</button>${av(a, 'au-acc-av')}<b>${esc(a.name)}</b><small>${a.rt ? 'এক চাপে লগইন' : 'পাসওয়ার্ড লাগবে'}</small></div>`).join('')}
       <div class="au-acc au-acc-add" role="button" tabindex="0" data-accadd><span class="au-plus">${ic('plus', 26)}</span><b>অন্য অ্যাকাউন্ট</b><small>নতুন করে লগইন</small></div></div>
-      <div class="au-or"><span>নতুন এসেছেন?</span></div><button class="au-new" data-auswap="signup">নতুন অ্যাকাউন্ট খুলুন</button></div>`
+      <div class="au-or"><span>নতুন এসেছেন?</span></div><button class="au-new" data-auswap="signup"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.6"/><path d="M2.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M19 8v6M16 11h6"/></svg><span>নতুন অ্যাকাউন্ট খুলুন</span></button></div>`
     : `<div class="au-card"><h2>লগইন করুন</h2><p class="au-sub">বন্ধু, পোস্ট আর মেসেজে ফিরে যান</p>
       <form id="aform" novalidate>
         ${auF('ae', ic('user', 18), 'ইমেইল, মোবাইল নম্বর বা ইউজারনেম', `autocomplete="username" autocapitalize="none" spellcheck="false" value="${esc(pre)}"`)}
@@ -3782,7 +3782,7 @@ function authView(mode = 'login', pre = '') {
         <div class="au-row"><label class="au-chk"><input type="checkbox" id="au-rem" checked><span>এই ফোনে মনে রাখুন</span></label><button type="button" class="link" id="login-forgot">পাসওয়ার্ড ভুলে গেছেন?</button></div>
         <button class="btn wide au-btn">লগইন</button></form>
       <div class="au-or"><span>অথবা</span></div>
-      <button class="au-new" data-auswap="signup">নতুন অ্যাকাউন্ট খুলুন</button>
+      <button class="au-new" data-auswap="signup"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.6"/><path d="M2.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M19 8v6M16 11h6"/></svg><span>নতুন অ্যাকাউন্ট খুলুন</span></button>
       ${accs.length ? '<button class="link au-back" data-auswap="login">← সেভ করা অ্যাকাউন্টগুলো</button>' : ''}</div>`}
     ${S.api?.demoLogin ? `<div class="au-demo">${demoCard()}</div>` : ''}
     <p class="au-foot"><a class="link" href="./privacy.html">গোপনীয়তা নীতি</a> · পোস্ট, বন্ধু ও মেসেজের জন্য অ্যাকাউন্ট লাগবে। সেবা ডিরেক্টরি লগইন ছাড়াই দেখা যায়।</p></div>`;

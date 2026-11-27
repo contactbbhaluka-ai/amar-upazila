@@ -4335,6 +4335,7 @@ function dirChips() {
 // আগে আনা সব সেবা থেকে এখানেই ছেঁকে দেখাই (খোঁজা, ধরন, প্রিয়)
 function drawDir() {
   const list = S.svcAll || [], q = $('#q').value.trim();
+  document.body.classList.toggle('dir-cat', !!S.dcat);   // হেডার কার্ড শুধু প্রথম পাতায়
   renderDirHead(list);
   dirChips();
   $('#svc-off')?.remove();
@@ -4374,6 +4375,7 @@ async function loadDir() {
   document.body.classList.toggle('dir-sub', !landing);
   if (landing) S.dirSub = false;
   if (!S.svcAll) { const c = local.get('svc_cache'); if (c?.list) { S.svcAll = c.list; S.popCats = c.pop || []; S.dirBanners = c.bans || []; S.svcCacheT = c.t; } }
+  document.body.classList.toggle('dir-cat', !!S.dcat);
   renderDirHead(S.svcAll || []);
   dirChips();
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }

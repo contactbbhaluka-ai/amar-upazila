@@ -4201,15 +4201,15 @@ function wxMsg(w) {
   if (w.min <= 12) return `🥶 আজ শীত বেশি (${bn(w.min)}°), গরম কাপড় পরুন`;
   if (c === 45 || c === 48) return '🌫️ কুয়াশা আছে, সাবধানে গাড়ি চালান';
   if (w.rain != null && w.rain >= 30) return '🌦️ বৃষ্টি হতে পারে, বের হলে ছাতা সাথে রাখতে পারেন';
-  return '🌤️ আজকের আবহাওয়া ভালো, বাইরে যাওয়ার জন্য উপযুক্ত দিন';
+  return '';   // স্বাভাবিক দিনে আলাদা বার্তা নয়, জায়গা বাঁচে
 }
 function dirHeroWx(w) {
   const el = $('#dh-wx'); if (!el) return;
   if (!w) { el.hidden = !S.wxErr; el.innerHTML = S.wxErr ? '<div class="dh-wxerr">🌥️ আবহাওয়ার তথ্য এখন আনা যায়নি</div>' : ''; return; }
   const [ico, name] = WX[w.code] || ['🌡️', ''], msg = wxMsg(w);
   el.hidden = false;
-  el.innerHTML = `<div class="dh-wxmain"><span class="dh-ico">${ico}</span><span class="dh-temp">${bn(w.temp)}<sup>°সে</sup></span>
-      <span class="dh-wxt"><b>${esc(name)}</b><span class="dh-chips">${w.rain != null ? `<span>☔ ${bn(w.rain)}%</span>` : ''}<span>↑ ${bn(w.max)}°</span><span>↓ ${bn(w.min)}°</span></span></span><span class="dh-more" aria-hidden="true">›</span></div>
+  el.innerHTML = `<div class="dh-wxmain"><span class="dh-ico">${ico}</span><span class="dh-temp">${bn(w.temp)}°</span><b class="dh-wname">${esc(name)}</b>
+      <span class="dh-chips">${w.rain != null ? `<span>☔ ${bn(w.rain)}%</span>` : ''}<span>${bn(w.max)}°/${bn(w.min)}°</span></span><span class="dh-more" aria-hidden="true">›</span></div>
     ${msg ? `<div class="dh-msg">${esc(msg)}</div>` : ''}`;
 }
 // সময় অনুযায়ী শুভেচ্ছা, অ্যাকাউন্ট থাকলে নামসহ, না থাকলে "ভালুকাবাসী"
@@ -4306,8 +4306,7 @@ function renderSvcGrid(list) {
   const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : k === 'aid' ? 'প্রাথমিক চিকিৎসা' : c[1], cnt = k === 'sos' || k === 'aid' || SVC_SPECIAL[k] ? 0 : n(k);
     return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
   const favs = list.filter(x => S.svcFav?.has(x.id));
-  $('#dir').innerHTML = `<div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div>`
-    + sliderHtml(total, cats)
+  $('#dir').innerHTML = sliderHtml(total, cats)
     + dayNoticeHtml()
     + `<div class="sos-row2"><button class="sos-btn" data-sos>🆘 বিপদে আছি</button><button class="aid-btn" data-svc="aid">🩹 প্রাথমিক চিকিৎসা</button></div>`
     + timeSuggestHtml()

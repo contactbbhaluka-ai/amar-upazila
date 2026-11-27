@@ -1793,3 +1793,9 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .dir-hero .dh-msg{margin:9px 0 0!important;padding:7px 0 0!important;background:none!important;border-top:1px dashed rgba(255,255,255,.3);border-radius:0!important;font-size:13px;line-height:1.45;display:block}
 .dh-wxerr{font-size:13px;opacity:.95}
 .dh-chips{flex-wrap:nowrap;gap:4px}.dh-chips span{font-size:11.5px;padding:1px 6px}.dir-hero .dh-temp{font-size:28px}.dir-hero .dh-ico{font-size:32px}.dh-wxmain{gap:8px}
+
+.dir-hero .dh-wx{margin-top:10px;padding:6px 10px;border-radius:14px}
+.dir-hero .dh-wxmain{gap:6px}.dir-hero .dh-ico{font-size:22px}.dir-hero .dh-temp{font-size:19px;letter-spacing:0}
+.dir-hero .dh-wname{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dir-hero .dh-chips span{font-size:11.5px}.dir-hero .dh-more{font-size:20px}
+.dir-hero .dh-msg{margin:6px 0 0!important;padding:5px 0 0!important;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

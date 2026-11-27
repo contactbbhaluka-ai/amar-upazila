@@ -3845,6 +3845,25 @@ const svcCard = s => `<div class="card svc${s.image_url ? ' has-img' : ''}">
   ${s.phone ? `<a class="call" data-svccall="${esc(s.id)}" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a>` : ''}
   ${svcHasDet(s) ? `<button class="svc-web" data-svcdet="${esc(s.id)}">📖 বিস্তারিত</button>` : ''}</div></div>`;
 const svcHasDet = s => !!(s.details || s.images?.length);
+// ছবি ও বিস্তারিত থাকা সেবার বড় কার্ড (দর্শনীয় স্থান ইত্যাদি)
+const svcExcerpt = t => { const p = String(t || '').split(/\n+/).map(x => x.trim()).find(x => x && !x.startsWith('### ') && !/^[•\-*]\s/.test(x)) || ''; return p.length > 150 ? p.slice(0, 150).replace(/\s+\S*$/, '') + '…' : p; };
+const svcRichCard = s => {
+  const n = new Set([s.image_url, ...(s.images || [])].filter(Boolean)).size, fav = S.svcFav?.has(s.id), d = svcDist(s);
+  const mins = Math.max(1, Math.round(String(s.details || '').split(/\s+/).filter(Boolean).length / 180));
+  return `<article class="card svc svc-rich" style="--sc:${svcColor(s.category)};--i:${TI()}">
+  <div class="sr-img" data-svcdet="${esc(s.id)}"><img src="${esc(s.image_url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()"><span class="sr-ph">${svcIc(s.category, 40)}</span>
+    ${n > 1 ? `<span class="sr-n">🖼️ ${bn(n)}</span>` : ''}${d != null ? `<span class="sr-km">📍 ${fmtDist(d)}</span>` : ''}</div>
+  <button class="sr-fav svc-fav${fav ? ' on' : ''}" data-svcfav="${esc(s.id)}" aria-pressed="${!!fav}" aria-label="${fav ? 'প্রিয় থেকে সরান' : 'প্রিয় সেবায় রাখুন'}">${fav ? '❤️' : '🤍'}</button>
+  <div class="sr-body" data-svcdet="${esc(s.id)}">
+    <h3>${esc(s.name)}${s.verified ? ' <span class="sr-ver" title="যাচাইকৃত">✔</span>' : ''}</h3>
+    ${s.address ? `<div class="sr-addr">📍 ${esc(s.address)}</div>` : ''}
+    ${s.details ? `<p class="sr-ex">${esc(svcExcerpt(s.details))}</p>` : ''}
+    <div class="sr-foot"><span class="sr-meta">${s.details ? `📖 ${bn(mins)} মিনিট` : ''}</span><span class="sr-go">বিস্তারিত দেখুন <b>→</b></span></div>
+  </div>
+  ${me()?.admin ? `<div class="sr-admin">${s.verified ? '' : `<button class="link" data-verify="${esc(s.id)}">যাচাই করুন</button>`}<button class="link svc-setloc" data-svcloc="${esc(s.id)}">${s.lat != null ? '📍 অবস্থান বদলান' : '📍 অবস্থান দিন'}</button></div>` : ''}
+</article>`;
+};
+const svcAnyCard = s => (s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
 // বিস্তারিত লেখা: ### শিরোনাম, • তালিকা, ফাঁকা লাইনে অনুচ্ছেদ
 function detHtml(t) {
   const out = []; let ul = [];
@@ -4434,7 +4453,7 @@ function drawDir() {
   const catHtml = cats.length ? `<div class="svc-grid svc-qcats">${cats.slice(0, 8).map(([k, n]) => `<button class="svc-tile" data-svc="${k}" style="--c:${svcColor(k)};--i:${TI()}">${svcIc(k, 22)}<span class="st-n">${esc(n)}</span></button>`).join('')}</div>` : '';
   const empty = S.dcat === 'fav' ? 'এখনো কোনো প্রিয় সেবা নেই। যেকোনো সেবার কার্ডে 🤍 চাপলে এখানে থাকবে।'
     : cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।';
-  $('#dir').innerHTML = head + catHtml + (base.length ? base.map(svcCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
+  $('#dir').innerHTML = head + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
 }
 function drawNear(list, q) {
   const located = list.filter(x => x.lat != null && (!S.nearCat || x.category === S.nearCat) && (!q || svcSearch([x], q).hits.length));

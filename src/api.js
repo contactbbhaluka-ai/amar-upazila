@@ -945,6 +945,16 @@ async function supabaseApi() {
     async voteIssue(id, on) { if (on) ok(await sb.from('area_issue_votes').upsert({ issue_id: id, user_id: me.id }, { onConflict: 'issue_id,user_id', ignoreDuplicates: true })); else ok(await sb.from('area_issue_votes').delete().eq('issue_id', id).eq('user_id', me.id)); },
     async setIssueStatus(id, status) { ok(await sb.from('area_issues').update({ status }).eq('id', id)); },
     async delIssue(id) { ok(await sb.from('area_issues').delete().eq('id', id)); },
+    async hatExtras() {
+      const t = new Date(Date.now() + 6 * 36e5).toISOString().slice(0, 10);
+      const [n, p] = await Promise.all([
+        sb.from('hat_notices').select('id,service_id,user_id,kind,on_date,new_date,note,created_at').or(`on_date.gte.${t},new_date.gte.${t}`).order('on_date').limit(300),
+        sb.from('hat_prices').select('id,service_id,item,price,created_at').gte('created_at', new Date(Date.now() - 7 * 864e5).toISOString()).order('created_at', { ascending: false }).limit(2000)]);
+      return { notices: ok(n).map(r => ({ ...r, mine: r.user_id === me?.id })), prices: ok(p) };
+    },
+    async addHatNotice(v) { ok(await sb.from('hat_notices').insert({ ...v, user_id: me.id })); },
+    async delHatNotice(id) { ok(await sb.from('hat_notices').delete().eq('id', id)); },
+    async hatPriceAdd(sid, items) { return ok(await sb.rpc('hat_price_add', { p_service: sid, p_items: items })); },
     async uploadServiceImage(blob) { return upload(blob, 'svc'); },
     async myTributes() { if (!me) return []; return ok(await sb.from('service_tributes').select('service_id').eq('user_id', me.id)).map(r => r.service_id); },
     async setTribute(id, on) { if (on) ok(await sb.from('service_tributes').upsert({ service_id: id, user_id: me.id }, { onConflict: 'service_id,user_id', ignoreDuplicates: true })); else ok(await sb.from('service_tributes').delete().eq('service_id', id).eq('user_id', me.id)); },
@@ -1071,7 +1081,7 @@ function demoApi() {
   db.services = db.services.filter((x, i, a) => a.findIndex(y => y.id === x.id) === i);
   // অফিস ও কাজী অফিসের পুরনো ডেমো এন্ট্রি (সরানো হয়েছে) আগের ডিভাইস-সেভ থেকেও মুছে ফেলা
   db.services = db.services.filter(x => ![970, 971, 972, 975, 976].includes(Number(x.id)));
-  db.svcReports = get('svcReports', []); db.tributes = get('tributes', []); db.suggs = get('suggs', []); db.quiz = get('quiz', null); db.issues = get('issues', []);
+  db.svcReports = get('svcReports', []); db.tributes = get('tributes', []); db.suggs = get('suggs', []); db.quiz = get('quiz', null); db.issues = get('issues', []); db.hatNotices = get('hatNotices', []); db.hatPrices = get('hatPrices', []);
   db.svcReviews = get('svcReviews', [
     { id: 1, service_id: 901, user_id: 'd3', rating: 5, body: 'শালবনের ভেতর হাঁটতে দারুণ লাগে, ওয়াচ টাওয়ার থেকে পুরো বন দেখা যায়।', created_at: ago(30) },
     { id: 2, service_id: 901, user_id: 'd4', rating: 4, body: 'সুন্দর জায়গা, তবে খাবার সাথে নিয়ে যাবেন।', created_at: ago(80) },
@@ -1080,7 +1090,7 @@ function demoApi() {
   const svcRate = id => { const rs = db.svcReviews.filter(r => r.service_id === id), s = db.services.find(x => x.id === id); if (s) { s.rating_count = rs.length; s.rating_avg = rs.length ? Math.round(rs.reduce((a, r) => a + r.rating, 0) / rs.length * 10) / 10 : 0; } };
   [...new Set(db.svcReviews.map(r => r.service_id))].forEach(svcRate);
   let meId = get('me', null);
-  const save = () => { for (const k of ['issues', 'tributes', 'suggs', 'quiz', 'svcReports', 'svcReviews', 'dirBanners', 'svcCatVisits', 'svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['hatNotices', 'hatPrices', 'issues', 'tributes', 'suggs', 'quiz', 'svcReports', 'svcReviews', 'dirBanners', 'svcCatVisits', 'svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone', gone: !!p.deleteAt && p.id !== meId }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -2144,6 +2154,10 @@ function demoApi() {
     async voteIssue(id, on) { const r = (db.issues || []).find(x => x.id === id); if (r) { r.votes = (r.votes || []).filter(u => u !== meId); if (on) r.votes.push(meId); save(); } return wait(); },
     async setIssueStatus(id, status) { const r = (db.issues || []).find(x => x.id === id); if (r) { r.status = status; r.resolved_at = status === 'resolved' ? new Date().toISOString() : null; save(); } return wait(); },
     async delIssue(id) { db.issues = (db.issues || []).filter(x => x.id !== id); save(); return wait(); },
+    async hatExtras() { db.hatNotices ||= []; db.hatPrices ||= []; const t = new Date(Date.now() + 6 * 36e5).toISOString().slice(0, 10); return wait({ notices: db.hatNotices.filter(r => r.on_date >= t || (r.new_date && r.new_date >= t)).map(r => ({ ...r, mine: r.user_id === meId })), prices: db.hatPrices.filter(r => Date.now() - new Date(r.created_at) < 7 * 864e5) }); },
+    async addHatNotice(v) { db.hatNotices ||= []; db.hatNotices.push({ ...v, id: Date.now(), user_id: meId, created_at: new Date().toISOString() }); save(); return wait(); },
+    async delHatNotice(id) { db.hatNotices = (db.hatNotices || []).filter(r => r.id !== id); save(); return wait(); },
+    async hatPriceAdd(sid, items) { db.hatPrices ||= []; let n = 0; for (const it of items) { const pr = +it.price; if (!(pr > 0)) continue; db.hatPrices.unshift({ id: Date.now() + n, service_id: sid, user_id: meId, item: it.item, price: pr, created_at: new Date().toISOString() }); n++; } save(); return wait({ saved: n, coins: n ? 2 : 0 }); },
     async uploadServiceImage(blob) { return toBlobUrl(blob); },
     async myTributes() { return wait([...(db.tributes || [])]); },
     async setTribute(id, on) { db.tributes ||= []; const s = db.services.find(x => x.id === id); const had = db.tributes.includes(id);

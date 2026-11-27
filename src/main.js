@@ -3990,6 +3990,7 @@ const bnNum1 = n => bn((Math.round(n * 10) / 10).toFixed(1));
 const waNum = p => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('0')) d = '88' + d; else if (d.length === 10 && d.startsWith('1')) d = '880' + d; return d; };
 function svcDetailSheet(id, opt = {}) {
   const s = (S.svcAll || []).find(x => String(x.id) === String(id)); if (!s) return;
+  if (s.category === 'shop' && !S.hatX) return void loadHatX().then(() => svcDetailSheet(id, opt));
   S.sdId = s.id;
   const imgs = [...new Set([s.image_url, ...(s.images || [])].filter(Boolean))];
   const fav = S.svcFav?.has(s.id), tel = s.phone ? String(s.phone).replace(/[^\d+]/g, '') : '';
@@ -4059,7 +4060,11 @@ function svcDetailSheet(id, opt = {}) {
         ${days.length ? weekStrip(days, dhakaParts(new Date()).wd) + `<p class="sd-hatp">প্রতি ${esc(days.length > 1 ? days.slice(0, -1).map(d => BN_DAYS[d]).join(', ') + ' ও ' + BN_DAYS[days[days.length - 1]] : BN_DAYS[days[0]])}${HAT_TIME[s.hat_time] ? ` · ${HAT_TIME[s.hat_time][0]}` : ''}</p>` : ''}
         ${s.subtype === 'seasonal' && (s.season_from || s.season_to) ? `<p class="sd-hatp">🕌 মৌসুম: ${hatDate(s.season_from)}${s.season_to ? ` – ${hatDate(s.season_to)}` : ''}</p>` : ''}
         ${u ? `<button class="sd-hatu" data-sdrel="${esc(u.id)}">📍 ${esc(u.name)} ›</button>` : ''}</div></div>
-        ${g.length ? `<div class="sd-sec"><h3>যা পাওয়া যায়</h3><div class="sd-amen">${g.map(x => `<span><i>${x[1]}</i>${esc(x[2])}</span>`).join('')}</div></div>` : ''}`; })() : ''}
+        ${g.length ? `<div class="sd-sec"><h3>যা পাওয়া যায়</h3><div class="sd-amen">${g.map(x => `<span><i>${x[1]}</i>${esc(x[2])}</span>`).join('')}</div></div>` : ''}
+        <div class="sd-sec"><h3>নোটিশ</h3><div class="hn-box">${hatNotices(s.id).length ? hatNotices(s.id).map(n => `<div class="ht-notice ${n.kind}">${n.kind === 'closed' ? '⚠️' : '↪️'} <span>${esc(noticeText(n))}${n.note ? `<small>${esc(n.note)}</small>` : ''}</span>${n.mine || admin ? `<button class="link" data-hndel="${esc(n.id)}">মুছুন</button>` : ''}</div>`).join('') : '<p class="mut">কোনো নোটিশ নেই — হাট নিয়মিত বসছে।</p>'}
+          <button class="hn-add" data-hnadd>⚠️ হাট বন্ধ বা দিন বদলের খবর দিন</button></div></div>
+        <div class="sd-sec"><h3>আজকের দাম</h3>${(() => { const ps = priceStats(s.id); return ps.length ? `<div class="hp-grid">${ps.map(p => `<div class="${p.old ? 'old' : ''}"><span>${p.ic}</span><b>${esc(p.name)}</b><em>৳${bn(p.price)}<small>/${esc(p.unit)}</small></em><small>${p.old ? 'পুরনো · ' : ''}${bnWhen(p.at, 1)}${p.n > 1 ? ` · ${bn(p.n)} জনের তথ্য` : ''}</small></div>`).join('')}</div>` : '<p class="mut">এখনো কেউ দাম জানাননি। হাটে থাকলে প্রথম দামটি আপনিই জানান।</p>'; })()}
+          ${s.verified === false ? '' : '<button class="hp-add" data-hpadd>💰 আজকের দাম জানান <small>সঠিক দাম জানালে কয়েন</small></button>'}</div>`; })() : ''}
     ${s.amenities?.length ? `<div class="sd-sec"><h3>সুবিধাসমূহ</h3><div class="sd-amen">${s.amenities.filter(k => AMEN[k]).map(k => `<span><i>${AMEN[k][0]}</i>${AMEN[k][1]}</span>`).join('')}</div></div>` : ''}
     ${s.how_to_go ? `<div class="sd-sec"><h3>কীভাবে যাবেন</h3><div class="sd-go"><div class="sdet-body">${detHtml(s.how_to_go)}</div>
       <a class="sd-gomap" href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ভালুকা')}`}" target="_blank" rel="noopener">🧭 ম্যাপে পথ দেখুন</a></div></div>` : ''}
@@ -4129,6 +4134,9 @@ function svcDetailSheet(id, opt = {}) {
     const z = e.target.closest('[data-sdzoom]'); if (z) { if (g) return sdZoom([...g.querySelectorAll('img')].map(i => i.src), [...g.querySelectorAll('img')].indexOf(z)); return sdZoom(imgs, +z.dataset.sdzoom || 0); }
     const yb = e.target.closest('[data-yt]'); if (yb) { const w = document.createElement('div'); w.className = 'yt on'; w.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yb.dataset.yt)}?autoplay=1&rel=0&playsinline=1" title="ভিডিও" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>`; yb.replaceWith(w); return; }
     const r = e.target.closest('[data-sdrel]'); if (r) return svcDetailSheet(r.dataset.sdrel);
+    if (e.target.closest('[data-hnadd]')) return hatNoticeSheet(s);
+    if (e.target.closest('[data-hpadd]')) return hatPriceSheet(s);
+    const hnd = e.target.closest('[data-hndel]'); if (hnd) { if (!await confirmSheet('নোটিশটি মুছে ফেলবেন?', 'মুছুন', true)) return svcDetailSheet(s.id); await S.api.delHatNotice(+hnd.dataset.hndel); await loadHatX(true); if (S.dcat === 'shop') drawDir(); return svcDetailSheet(s.id); }
     if (e.target.closest('[data-isadd]')) return issueSheet(s);
     const iv = e.target.closest('[data-isvote]'); if (iv) { if (!needUser()) return; const r = issues.find(x => String(x.id) === iv.dataset.isvote); if (!r) return; r.voted = !r.voted; r.support_count = (r.support_count || 0) + (r.voted ? 1 : -1); drawIssues(); try { await S.api.voteIssue(r.id, r.voted); } catch { toast('সমর্থন জানানো যায়নি'); } return; }
     const ir = e.target.closest('[data-isres]'); if (ir) { const r = issues.find(x => String(x.id) === ir.dataset.isres); if (!r) return; await busy(ir, async () => { r.status = r.status === 'resolved' ? 'open' : 'resolved'; await S.api.setIssueStatus(r.id, r.status); drawIssues(); }); return; }
@@ -4179,17 +4187,37 @@ const hatDaysOf = x => (x.hat_days?.length ? [...new Set(x.hat_days.map(Number))
 const seasonOn = (x, ahead = 0) => { if (x.subtype !== 'seasonal') return true; if (!x.season_from && !x.season_to) return false; return (!x.season_to || x.season_to >= dhakaYmd()) && (!x.season_from || x.season_from <= dhakaYmd(ahead)); };
 const hatDate = ymd => { if (!ymd) return ''; const [, m, d] = ymd.split('-').map(Number); return `${bn(d)} ${MON_BN[m - 1]}`; };
 // পরের হাট: {k: 'today'|'tomorrow'|'later'|'daily', label}
-function nextHat(x) {
-  const days = hatDaysOf(x), t = dhakaParts(new Date()), tm = HAT_TIME[x.hat_time];
-  if (!days.length) return x.subtype === 'daily' || x.hat_time ? { k: 'daily', label: 'প্রতিদিন' + (tm ? ` · ${tm[0]}` : '') } : null;
-  for (let i = 0; i < 7; i++) {
-    const d = (t.wd + i) % 7; if (!days.includes(d)) continue;
-    if (i === 0) { if (tm && t.h >= tm[2]) continue; return { k: 'today', label: tm && t.h >= tm[1] ? 'আজ হাট · এখন চলছে' : `আজ হাট${tm ? ` · ${tm[0]}` : ''}`, live: !!(tm && t.h >= tm[1]) }; }
-    if (i === 1) return { k: 'tomorrow', label: `আগামীকাল ${BN_DAYS[d]}` };
-    return { k: 'later', label: `${bn(i)} দিন পর · ${BN_DAYS[d]}` };
+// হাটের নোটিশ (বন্ধ/দিন বদল) ও দাম — S.hatX = { notices, prices }
+const hatNotices = sid => (S.hatX?.notices || []).filter(n => String(n.service_id) === String(sid));
+const PRICE_ITEMS = [['rice_coarse', 'চাল (মোটা)', 'কেজি', '🍚'], ['rice_fine', 'চাল (চিকন)', 'কেজি', '🍚'], ['paddy', 'ধান', 'মণ', '🌾'], ['potato', 'আলু', 'কেজি', '🥔'], ['onion', 'পেঁয়াজ', 'কেজি', '🧅'], ['garlic', 'রসুন', 'কেজি', '🧄'], ['chili', 'কাঁচা মরিচ', 'কেজি', '🌶️'], ['lentil', 'মসুর ডাল', 'কেজি', '🫘'], ['oil', 'সয়াবিন তেল', 'লিটার', '🛢️'], ['egg', 'ডিম', 'হালি', '🥚'], ['broiler', 'ব্রয়লার মুরগি', 'কেজি', '🐔'], ['rui', 'রুই মাছ', 'কেজি', '🐟'], ['beef', 'গরুর মাংস', 'কেজি', '🥩']];
+// প্রতিটি জিনিসের দাম: গত ২ দিনের তথ্যের মাঝামাঝি (মিডিয়ান); না থাকলে ৭ দিনের মধ্যে সবশেষ
+function priceStats(sid) {
+  const rows = (S.hatX?.prices || []).filter(r => sid == null || String(r.service_id) === String(sid)), out = [];
+  for (const [k, name, unit, ic] of PRICE_ITEMS) {
+    const all = rows.filter(r => r.item === k); if (!all.length) continue;
+    const fresh = all.filter(r => Date.now() - new Date(r.created_at) < 2 * 864e5), use = fresh.length ? fresh : [all[0]];
+    const v = use.map(r => +r.price).sort((a, b) => a - b), mid = v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+    out.push({ k, name, unit, ic, price: Math.round(mid), n: use.length, at: use[0].created_at, old: !fresh.length });
   }
-  return { k: 'later', label: `পরের ${BN_DAYS[days[0]]}` };
+  return out;
 }
+// পরের হাট: {k: 'today'|'tomorrow'|'later'|'daily', label} — নোটিশে বন্ধ থাকলে বাদ, দিন বদলালে নতুন দিন
+function nextHat(x) {
+  const days = hatDaysOf(x), t = dhakaParts(new Date()), tm = HAT_TIME[x.hat_time], ns = hatNotices(x.id);
+  if (!days.length && !ns.some(n => n.kind === 'moved')) return x.subtype === 'daily' || x.hat_time ? { k: 'daily', label: 'প্রতিদিন' + (tm ? ` · ${tm[0]}` : '') } : null;
+  for (let i = 0; i < 21; i++) {
+    const ymd = dhakaYmd(i), d = (t.wd + i) % 7;
+    const off = ns.some(n => n.on_date === ymd), extra = ns.some(n => n.kind === 'moved' && n.new_date === ymd);
+    if (!(days.includes(d) && !off) && !extra) continue;
+    const tag = extra ? ' (বদলানো দিন)' : '';
+    if (i === 0) { if (tm && t.h >= tm[2]) continue; return { k: 'today', d, label: (tm && t.h >= tm[1] ? 'আজ হাট · এখন চলছে' : `আজ হাট${tm ? ` · ${tm[0]}` : ''}`) + tag, live: !!(tm && t.h >= tm[1]) }; }
+    if (i === 1) return { k: 'tomorrow', d, label: `আগামীকাল ${BN_DAYS[d]}${tag}` };
+    return { k: 'later', d, label: `${bn(i)} দিন পর · ${BN_DAYS[d]}${tag}` };
+  }
+  return days.length ? { k: 'later', d: days[0], label: `পরের ${BN_DAYS[days[0]]}` } : null;
+}
+const noticeText = n => n.kind === 'closed' ? `${hatDate(n.on_date)} (${BN_DAYS[new Date(n.on_date + 'T00:00:00Z').getUTCDay()]}) হাট বন্ধ থাকবে` : `${hatDate(n.on_date)}-এর হাট বসবে ${hatDate(n.new_date)} (${BN_DAYS[new Date(n.new_date + 'T00:00:00Z').getUTCDay()]})`;
+async function loadHatX(force) { if (S.hatX && !force) return; try { S.hatX = await S.api.hatExtras(); } catch { S.hatX = { notices: [], prices: [] }; } }
 const hatUnion = x => (S.svcAll || []).find(u => u.category === 'union' && inArea(x, u)) || ((S.svcAll || []).find(u => u.category === 'pouro' && inArea(x, u)));
 function myAreaRow() { const u = me()?.unionId; return u ? (S.svcAll || []).find(x => (x.category === 'union' || x.category === 'pouro') && x.union_id === u) : null; }
 const weekStrip = (days, today) => `<div class="hw">${DAY_SHORT.map((d, i) => `<span class="${days.includes(i) ? 'on' : ''}${i === today ? ' td' : ''}">${d}</span>`).join('')}</div>`;
@@ -4200,6 +4228,7 @@ const svcHatCard = s => {
     <div class="ht-h">${s.image_url ? `<img class="ht-img" src="${esc(s.image_url)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="ht-ic">${sub ? sub[2] : '🛒'}</span>`}
       <div class="ht-t"><h3>${esc(s.name)}</h3><p>${u ? `<b>${esc(areaCore(u))}${u.category === 'pouro' ? '' : ' ইউনিয়ন'}</b> · ` : ''}${esc(s.address || '')}</p>${sub ? `<small>${esc(sub[1])}</small>` : ''}</div></div>
     ${nh ? `<div class="ht-next ${nh.k}${nh.live ? ' live' : ''}">${nh.k === 'today' ? '🛒' : nh.k === 'daily' ? '🔁' : '📅'} ${esc(nh.label)}</div>` : ''}
+    ${hatNotices(s.id).filter(n => n.on_date <= dhakaYmd(10) || (n.new_date && n.new_date <= dhakaYmd(10))).map(n => `<div class="ht-notice ${n.kind}">${n.kind === 'closed' ? '⚠️' : '↪️'} ${esc(noticeText(n))}</div>`).join('')}
     ${s.subtype === 'seasonal' && (s.season_from || s.season_to) ? `<div class="ht-next season">🕌 ${hatDate(s.season_from)}${s.season_to ? ` – ${hatDate(s.season_to)}` : ''}</div>` : ''}
     ${days.length ? weekStrip(days, wd) : ''}
     ${g.length ? `<div class="ht-goods">${g.map(x => `<span>${x[1]} ${esc(x[2])}</span>`).join('')}</div>` : ''}
@@ -4208,13 +4237,14 @@ const svcHatCard = s => {
 };
 // হাট বাজার ক্যাটাগরির উপরের অংশ: আজকের হাট, মৌসুমি হাট, পণ্য ও এলাকা ফিল্টার
 function hatTop(all) {
-  const t = dhakaParts(new Date()), today = all.filter(x => seasonOn(x) && hatDaysOf(x).includes(t.wd) && x.subtype !== 'daily');
+  const t = dhakaParts(new Date()), ymd0 = dhakaYmd(), today = all.filter(x => seasonOn(x) && x.subtype !== 'daily' && ((hatDaysOf(x).includes(t.wd) && !hatNotices(x.id).some(n => n.on_date === ymd0)) || hatNotices(x.id).some(n => n.kind === 'moved' && n.new_date === ymd0)));
   const season = all.filter(x => x.subtype === 'seasonal' && seasonOn(x, 30));
   const areas = [...new Map(all.map(x => hatUnion(x)).filter(Boolean).map(u => [u.id, u])).values()].sort((a, b) => (a.category === 'pouro' ? -1 : unionNo(a)) - (b.category === 'pouro' ? -1 : unionNo(b)));
   const my = myAreaRow(), goods = GOODS.filter(g => all.some(x => (x.goods || []).includes(g[0])));
   return `<div class="ht-today"><div class="ht-th"><span>🛒</span><div><b>আজ ${BN_DAYS[t.wd]} যেসব হাট বসছে</b><small>${today.length ? `${bn(today.length)}টি হাট` : 'আজ কোনো সাপ্তাহিক হাট নেই'}</small></div></div>
       ${today.length ? `<div class="ht-tl">${today.map(x => { const nh = nextHat(x), u = hatUnion(x); return `<button data-svcdet="${esc(x.id)}"><b>${esc(x.name)}</b><small>${u ? esc(areaCore(u)) + ' · ' : ''}${nh?.k === 'today' ? esc(nh.label.replace('আজ হাট · ', '').replace('আজ হাট', 'আজ')) : 'আজকের হাট শেষ'}</small>${nh?.live ? '<i>এখন</i>' : ''}</button>`; }).join('')}</div>` : ''}
       <div class="ht-wk">${DAY_SHORT.map((d, i) => { const n = all.filter(x => seasonOn(x) && x.subtype !== 'daily' && hatDaysOf(x).includes(i)).length; return `<span class="${i === t.wd ? 'td' : ''}"><small>${d}</small><b>${n ? bn(n) : '–'}</b></span>`; }).join('')}</div></div>
+    ${(() => { const ps = priceStats(null).filter(p => !p.old); return ps.length ? `<div class="hp-sum"><b>💰 আজকের বাজারদর <small>· সব হাট মিলিয়ে</small></b><div>${ps.map(p => `<span>${p.ic} ${esc(p.name)} <em>৳${bn(p.price)}</em><small>/${esc(p.unit)}</small></span>`).join('')}</div></div>` : ''; })()}
     ${season.length ? `<div class="ht-season"><b>🕌 মৌসুমি পশুর হাট</b>${season.map(x => `<button data-svcdet="${esc(x.id)}"><span>${esc(x.name)}</span><small>${hatDate(x.season_from)}${x.season_to ? ` – ${hatDate(x.season_to)}` : ''}${x.season_from > dhakaYmd() ? ' · শীঘ্রই' : ' · চলছে'}</small></button>`).join('')}</div>` : ''}
     <button class="ht-add" data-hatadd>＋ আপনার এলাকার হাটের তথ্য দিন<small>হাটবার, কী পাওয়া যায়, ঠিকানা — যেকোনো অ্যাকাউন্টধারী যোগ করতে পারবেন</small></button>
     ${goods.length ? `<div class="sub-chips ht-gf"><button data-hgood=""${S.hgood ? '' : ' class="on"'}>কী খুঁজছেন?</button>${goods.map(g => `<button data-hgood="${g[0]}"${S.hgood === g[0] ? ' class="on"' : ''}>${g[1]} ${esc(g[2])}</button>`).join('')}</div>` : ''}
@@ -5403,6 +5433,7 @@ function drawDir() {
   const subHtml = subs.length > 1 ? `<div class="sub-chips"><button data-dsub=""${S.dsub ? '' : ' class="on"'}>সব <small>${bn(base.length)}</small></button>${subs.map(x => `<button data-dsub="${x[0]}"${S.dsub === x[0] ? ' class="on"' : ''}>${x[2]} ${x[1]} <small>${bn(base.filter(b => b.subtype === x[0]).length)}</small></button>`).join('')}</div>` : '';
   if (S.dsub) base = base.filter(b => b.subtype === S.dsub);
   let hatHtml = '';
+  if (S.dcat === 'shop' && !S.hatX) loadHatX().then(() => { if (S.dcat === 'shop') drawDir(); });
   if (S.dcat === 'shop') {
     if (!q) hatHtml = hatTop(list.filter(x => x.category === 'shop'));
     base = base.filter(x => x.subtype !== 'seasonal' || seasonOn(x, 30));
@@ -5600,6 +5631,51 @@ $('#dir').addEventListener('click', e => {
   const b = e.target.closest('[data-verify]');
   if (b) busy(b, async () => { await S.api.verifyService(Number(b.dataset.verify)); await loadDir(); toast('যাচাইকৃত হিসেবে চিহ্নিত হয়েছে'); });
 });
+// হাট বন্ধ / দিন বদলের নোটিশ
+function hatNoticeSheet(s) {
+  if (!needUser()) return;
+  const nh = nextHat(s), next = nh && nh.k !== 'daily' ? dhakaYmd(['today', 'tomorrow'].includes(nh.k) ? (nh.k === 'today' ? 0 : 1) : (() => { for (let i = 0; i < 14; i++) if ((dhakaParts(new Date()).wd + i) % 7 === nh.d) return i; return 0; })()) : dhakaYmd();
+  let kind = 'closed';
+  openSheet(`<form class="rvf sde"><h2>⚠️ হাটের নোটিশ</h2><p class="mut" style="margin:-4px 0 8px">${esc(s.name)} — কোনো দিন হাট না বসলে বা দিন বদলালে সবাইকে জানান।</p>
+    <div class="hf-days"><button type="button" data-hnk="closed" class="on">⚠️ বন্ধ থাকবে</button><button type="button" data-hnk="moved">↪️ দিন বদল</button></div>
+    <label>কোন দিনের হাট *<input id="hn-d" type="date" required min="${dhakaYmd()}" max="${dhakaYmd(60)}" value="${next}"></label>
+    <label class="hn-new" hidden>নতুন দিন *<input id="hn-n" type="date" min="${dhakaYmd()}" max="${dhakaYmd(60)}"></label>
+    <label>কারণ <small class="mut">(ঐচ্ছিক)</small><input id="hn-note" maxlength="200" placeholder="যেমন: ঈদের জন্য, বন্যার কারণে"></label>
+    <button class="btn" style="width:100%;margin-top:14px">নোটিশ দিন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-sback>ফিরে যান</button></form>`);
+  const sh = $('#sheet');
+  sh.onclick = e => { const k = e.target.closest('[data-hnk]'); if (k) { kind = k.dataset.hnk; sh.querySelectorAll('[data-hnk]').forEach(x => x.classList.toggle('on', x === k)); sh.querySelector('.hn-new').hidden = kind !== 'moved'; return; } if (e.target.closest('[data-sback]')) svcDetailSheet(s.id); };
+  sh.querySelector('form').onsubmit = e => { e.preventDefault();
+    const d = $('#hn-d').value, nd = $('#hn-n').value;
+    if (kind === 'moved' && !nd) return toast('নতুন দিন বাছাই করুন');
+    if (kind === 'moved' && nd === d) return toast('নতুন দিন আগের দিনের চেয়ে আলাদা হতে হবে');
+    busy(e.submitter, async () => {
+      try { await S.api.addHatNotice({ service_id: s.id, kind, on_date: d, new_date: kind === 'moved' ? nd : null, note: $('#hn-note').value.trim() || null }); }
+      catch (er) { return toast(/৫টি/.test(er?.message || '') ? 'দিনে সর্বোচ্চ ৫টি নোটিশ দেওয়া যায়' : errText(er)); }
+      await loadHatX(true); if (S.dcat === 'shop') drawDir(); toast('নোটিশ দেওয়া হয়েছে, সবাই দেখতে পাবে'); svcDetailSheet(s.id);
+    });
+  };
+}
+// আজকের দাম জানানো
+function hatPriceSheet(s) {
+  if (!needUser()) return;
+  const cur = Object.fromEntries(priceStats(s.id).map(p => [p.k, p.price]));
+  openSheet(`<form class="rvf sde hpf"><h2>💰 আজকের দাম</h2><p class="mut" style="margin:-4px 0 8px">${esc(s.name)} — আজ যেসব জিনিসের দাম জানেন শুধু সেগুলো লিখুন, বাকিগুলো খালি রাখুন।</p>
+    ${PRICE_ITEMS.map(([k, n, u, ic]) => `<label class="hp-row"><span>${ic}</span><b>${esc(n)}<small>প্রতি ${esc(u)}${cur[k] ? ` · এখন ৳${bn(cur[k])}` : ''}</small></b><i>৳</i><input type="number" inputmode="decimal" min="1" max="999999" step="any" data-hp="${k}" placeholder="—"></label>`).join('')}
+    <p class="mut" style="font-size:12px;margin-top:8px">দিনে প্রথম ৩ বার দাম জানালে প্রতিবার ২ কয়েন। একই জিনিসের দাম ৩ ঘণ্টায় একবার নেওয়া হয়।</p>
+    <button class="btn" style="width:100%;margin-top:10px">জমা দিন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-sback>ফিরে যান</button></form>`);
+  const sh = $('#sheet'); sh.classList.add('tall');
+  sh.onclick = e => { if (e.target.closest('[data-sback]')) svcDetailSheet(s.id); };
+  sh.querySelector('form').onsubmit = e => { e.preventDefault();
+    const items = [...sh.querySelectorAll('[data-hp]')].filter(i => +i.value > 0).map(i => ({ item: i.dataset.hp, price: +i.value }));
+    if (!items.length) return toast('অন্তত একটি জিনিসের দাম লিখুন');
+    busy(e.submitter, async () => {
+      let r; try { r = await S.api.hatPriceAdd(s.id, items); } catch (er) { return toast(errText(er)); }
+      await loadHatX(true); if (S.dcat === 'shop') drawDir();
+      toast(r?.saved ? `ধন্যবাদ! ${bn(r.saved)}টি দাম যোগ হয়েছে${r.coins ? ` · +${bn(r.coins)} কয়েন` : ''}` : 'এই দামগুলো কিছুক্ষণ আগেই জানিয়েছেন');
+      svcDetailSheet(s.id);
+    });
+  };
+}
 // হাট বাজার: যেকোনো অ্যাকাউন্টধারী হাটের তথ্য যোগ করতে পারবেন (অ্যাডমিন যাচাইয়ের পর সবাই দেখবে)
 function hatAddSheet() {
   if (!needUser()) return;

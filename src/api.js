@@ -40,6 +40,7 @@ export const PAGE = 20;
 const DHAKA_MD = iso => new Date(new Date(iso).getTime() + 6 * 36e5).toISOString().slice(5, 10);
 
 // ================================================================ Supabase
+const toEnD = x => String(x || '').replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
 async function supabaseApi() {
   const { createClient } = await import('@supabase/supabase-js');
   const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -47,6 +48,7 @@ async function supabaseApi() {
   });
   const ok = ({ data, error, count }) => { if (error) throw error; return count ?? data; };
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
+  let tokCb = null;
   let recoveryPending = false, recoveryCb = null, delCancelled = false, delCb = null; const delChecked = new Set();
   const PROFILE = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,friend_req_from,delete_requested_at,unions!profiles_union_id_fkey(name)';
   const toUser = p => p && ({
@@ -147,6 +149,7 @@ async function supabaseApi() {
       const { data } = await sb.auth.getSession();
       await loadMe(data.session);
       sb.auth.onAuthStateChange((event, session) => {
+        if (session) tokCb?.(session.user.id, session.refresh_token);
         if (event === 'TOKEN_REFRESHED') return;
         if (event === 'PASSWORD_RECOVERY') { recoveryPending = true; setTimeout(() => recoveryCb?.(), 0); }
         setTimeout(async () => { try { await loadMe(session); } catch { me = null; } onAuth?.(me); }, 0);
@@ -164,10 +167,32 @@ async function supabaseApi() {
     // ---------- অ্যাকাউন্ট
     async signUp({ email, password, name, district, upazila, unionId, phone, bloodGroup, lastDonated, gender, birthDate }) {
       const data = ok(await sb.auth.signUp({ email, password, options: { data: { name, district, upazila, union_id: unionId ? String(unionId) : '', phone, blood_group: bloodGroup || '', last_donated: lastDonated || '', gender: gender || '', birth_date: birthDate || '' } } }));
+      if (data.user && Array.isArray(data.user.identities) && !data.user.identities.length) throw new Error('User already registered');
       if (!data.session) return { needsConfirm: true };
       await loadMe(data.session); return { user: me };
     },
-    async signIn({ email, password }) { return loadMe(ok(await sb.auth.signInWithPassword({ email, password })).session); },
+    // ইমেইল, মোবাইল নম্বর বা ইউজারনেম; শেষের দুটোয় পাসওয়ার্ড মিললে তবেই সার্ভার ইমেইল জানায়
+    async signIn({ email, ident, password }) {
+      let em = String(email || ident || '').trim();
+      if (!em.includes('@')) {
+        const r = await sb.rpc('login_lookup', { p_ident: em, p_pw: password });
+        if (r.error) throw new Error(/too_many/.test(r.error.message) ? 'too_many_attempts' : r.error.message);
+        if (!r.data) throw new Error('Invalid login credentials');
+        em = r.data;
+      }
+      const r = await sb.auth.signInWithPassword({ email: em, password });
+      if (r.error) { const e = new Error(r.error.message); e.email = em; throw e; }
+      return loadMe(r.data.session);
+    },
+    async verifyCode(email, token, type) { return loadMe(ok(await sb.auth.verifyOtp({ email, token, type })).session); },
+    async resendCode(email, type) { if (type === 'recovery') return this.sendPasswordReset(email); ok(await sb.auth.resend({ type: 'signup', email })); },
+    onTokens(cb) { tokCb = cb; },
+    async currentToken() { return (await sb.auth.getSession()).data.session?.refresh_token || ''; },
+    async switchTo(rt) { const r = await sb.auth.refreshSession({ refresh_token: rt }); if (r.error || !r.data.session) throw new Error('session expired'); return loadMe(r.data.session); },
+    // সার্ভারে সেশন বাতিল না করে শুধু এই ফোন থেকে সরানো (সেভ করা অ্যাকাউন্টে আবার এক চাপে ঢোকার জন্য)
+    async detach() { sb.auth.stopAutoRefresh?.(); if (sb.auth._removeSession) await sb.auth._removeSession(); else { localStorage.removeItem(sb.auth.storageKey); } me = null; sb.auth.startAutoRefresh?.(); },
+    async sessions() { return ok(await sb.rpc('my_sessions')).map(r => ({ id: r.id, createdAt: r.created_at, lastAt: r.last_at, ua: r.user_agent, current: r.current })); },
+    async endSession(id) { ok(await sb.rpc('end_session', { p_id: id })); },
     async signOut(all) { await sb.auth.signOut(all ? { scope: 'global' } : undefined); me = null; },
     // আমার কার্যকলাপ: রিয়্যাক্ট, মন্তব্য, শেয়ার (সবচেয়ে নতুন আগে)
     async myActivity() {
@@ -1275,6 +1300,7 @@ function demoApi() {
       ntm('d6', 'announce', 0.3, { text: 'আগামীকাল সকাল ৯টা থেকে বিকেল ৩টা পর্যন্ত ভালুকা পৌরসভা ও আশেপাশে বিদ্যুৎ থাকবে না। প্রয়োজনীয় কাজ আগেই সেরে নিন।' });
       ntm('d2', 'birthday', 0.5, { count: 1, names: ['সুমি আক্তার'] });
       ntm('d1', 'friend_anniv', 0.6, { years: 2 });
+      ntm(id, 'login_alert', 5, { ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36' });
       ntm('d4', 'area_alert', 1.4, { cat: 'হারানো-প্রাপ্তি', union: 'হবিরবাড়ী ইউনিয়ন' }, p1.id);
       ntm(id, 'milestone', 3, { kind: 'reacts', n: 10 }, p1.id, true); }
     nt('d6', 'follow', 20, null, null, true); nt('d2', 'friend_accept', 40, null, null, true); nt('d3', 'group_approved', 45, null, 1, true);
@@ -1295,11 +1321,23 @@ function demoApi() {
       const u = { id: 'u' + Date.now(), email, password, name, gender: gender || '', birthDate: birthDate || '', birthYear: birthDate ? Number(birthDate.slice(0, 4)) : 0, district, upazila, unionId: unionId ? Number(unionId) : null, phone: phone || '', bloodGroup: bloodGroup || '', lastDonated: (bloodGroup && lastDonated) || '', donorVisible: true, avatar: '', bio: '' };
       db.users.push(u); meId = u.id; seedFor(u.id); save(); return { user: meUser() };
     },
-    async signIn({ email, password }) {
-      const u = db.users.find(x => x.email === email && x.password === password);
+    async signIn({ email, ident, password }) {
+      const k = String(email || ident || '').trim().toLowerCase().replace(/^@/, ''), ph = toEnD(k).replace(/\D/g, '').replace(/^88(?=01)/, '');
+      const u = db.users.find(x => (x.email?.toLowerCase() === k || (x.username && x.username.toLowerCase() === k) || (ph.length === 11 && toEnD(x.phone || '').replace(/\D/g, '').slice(-11) === ph)) && x.password === password);
       if (!u) throw new Error('Invalid login credentials');
       meId = u.id; if (u.deleteAt) { delete u.deleteAt; this._delCancelled = true; setTimeout(() => this._delCb?.(), 0); } save(); return meUser();
     },
+    async verifyCode() { return meUser(); },
+    async resendCode() {},
+    onTokens() {},
+    async currentToken() { return meId || ''; },
+    async switchTo(rt) { if (!person(rt)) throw new Error('session expired'); meId = rt; save(); return meUser(); },
+    async detach() { meId = null; save(); },
+    async sessions() {
+      if (!db.sessions) { db.sessions = [{ id: 's2', createdAt: new Date(Date.now() - 12 * 864e5).toISOString(), lastAt: new Date(Date.now() - 3 * 36e5).toISOString(), ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36' }]; save(); }
+      return [{ id: 's1', createdAt: new Date(Date.now() - 2 * 864e5).toISOString(), lastAt: new Date().toISOString(), ua: navigator.userAgent, current: true }, ...db.sessions];
+    },
+    async endSession(id) { db.sessions = (db.sessions || []).filter(x => x.id !== id); save(); },
     onDeletionCancelled(cb) { this._delCb = cb; if (this._delCancelled) setTimeout(cb, 0); },
     async requestAccountDeletion(password) { const p = person(meId); if (p.password !== password) throw new Error('wrong password'); p.deleteAt = new Date(Date.now() + 30 * 864e5).toISOString(); meId = null; save(); return wait(p.deleteAt); },
     async signOut() { meId = null; save(); },

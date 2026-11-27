@@ -4185,37 +4185,38 @@ function nextHat(x) {
   for (let i = 0; i < 7; i++) {
     const d = (t.wd + i) % 7; if (!days.includes(d)) continue;
     if (i === 0) { if (tm && t.h >= tm[2]) continue; return { k: 'today', label: tm && t.h >= tm[1] ? 'আজ হাট · এখন চলছে' : `আজ হাট${tm ? ` · ${tm[0]}` : ''}`, live: !!(tm && t.h >= tm[1]) }; }
-    if (i === 1) return { k: 'tomorrow', d, label: `আগামীকাল ${BN_DAYS[d]}` };
-    return { k: 'later', d, label: `${bn(i)} দিন পর · ${BN_DAYS[d]}` };
+    if (i === 1) return { k: 'tomorrow', label: `আগামীকাল ${BN_DAYS[d]}` };
+    return { k: 'later', label: `${bn(i)} দিন পর · ${BN_DAYS[d]}` };
   }
-  return { k: 'later', d: t.wd, label: `পরের ${BN_DAYS[t.wd]}` };
+  return { k: 'later', label: `পরের ${BN_DAYS[days[0]]}` };
 }
 const hatUnion = x => (S.svcAll || []).find(u => u.category === 'union' && inArea(x, u)) || ((S.svcAll || []).find(u => u.category === 'pouro' && inArea(x, u)));
 function myAreaRow() { const u = me()?.unionId; return u ? (S.svcAll || []).find(x => (x.category === 'union' || x.category === 'pouro') && x.union_id === u) : null; }
 const weekStrip = (days, today) => `<div class="hw">${DAY_SHORT.map((d, i) => `<span class="${days.includes(i) ? 'on' : ''}${i === today ? ' td' : ''}">${d}</span>`).join('')}</div>`;
 const svcHatCard = s => {
-  const nh = nextHat(s), days = hatDaysOf(s), u = hatUnion(s), tm = HAT_TIME[s.hat_time];
+  const sub = subsOf('shop').find(x => x[0] === s.subtype), nh = nextHat(s), days = hatDaysOf(s), u = hatUnion(s), wd = dhakaParts(new Date()).wd, ph = phoneList(s);
   const g = (s.goods || []).map(k => GOODS.find(x => x[0] === k)).filter(Boolean);
-  const badge = s.subtype === 'seasonal' ? ['🕌', 'মৌসুমি'] : !nh ? ['🛒', ''] : nh.k === 'today' ? [nh.live ? 'এখন' : 'আজ', ''] : nh.k === 'tomorrow' ? ['কাল', DAY_SHORT[nh.d]] : nh.k === 'daily' ? ['রোজ', ''] : [DAY_SHORT[nh.d], ''];
-  const when = s.subtype === 'seasonal' ? `${hatDate(s.season_from)}${s.season_to ? ` – ${hatDate(s.season_to)}` : ''}` : days.length ? days.map(d => DAY_SHORT[d]).join(', ') : nh?.k === 'daily' ? 'প্রতিদিন' : '';
-  return `<article class="card svc svc-hat k-${nh?.k || 'none'}${nh?.live ? ' live' : ''}" style="--sc:${svcColor(s.category)};--i:${TI()}" data-svcdet="${esc(s.id)}">
-    <span class="hb-day"><b>${esc(badge[0])}</b>${badge[1] ? `<small>${esc(badge[1])}</small>` : ''}</span>
-    <div class="hb-t"><h3>${esc(s.name)}</h3>
-      <p>${[u ? areaCore(u) + (u.category === 'pouro' ? ' পৌরসভা' : '') : '', when, tm ? tm[0] : ''].filter(Boolean).map(esc).join(' · ')}</p>
-      ${g.length ? `<div class="hb-g">${g.map(x => `<span title="${esc(x[2])}">${x[1]}</span>`).join('')}</div>` : ''}</div>
-    <i class="hb-go">›</i></article>`;
+  return `<article class="card svc svc-hat${nh?.k === 'today' ? ' today' : ''}" style="--sc:${svcColor(s.category)};--i:${TI()}" data-svcdet="${esc(s.id)}">
+    <div class="ht-h">${s.image_url ? `<img class="ht-img" src="${esc(s.image_url)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="ht-ic">${sub ? sub[2] : '🛒'}</span>`}
+      <div class="ht-t"><h3>${esc(s.name)}</h3><p>${u ? `<b>${esc(areaCore(u))}${u.category === 'pouro' ? '' : ' ইউনিয়ন'}</b> · ` : ''}${esc(s.address || '')}</p>${sub ? `<small>${esc(sub[1])}</small>` : ''}</div></div>
+    ${nh ? `<div class="ht-next ${nh.k}${nh.live ? ' live' : ''}">${nh.k === 'today' ? '🛒' : nh.k === 'daily' ? '🔁' : '📅'} ${esc(nh.label)}</div>` : ''}
+    ${s.subtype === 'seasonal' && (s.season_from || s.season_to) ? `<div class="ht-next season">🕌 ${hatDate(s.season_from)}${s.season_to ? ` – ${hatDate(s.season_to)}` : ''}</div>` : ''}
+    ${days.length ? weekStrip(days, wd) : ''}
+    ${g.length ? `<div class="ht-goods">${g.map(x => `<span>${x[1]} ${esc(x[2])}</span>`).join('')}</div>` : ''}
+    <div class="of-foot ht-foot">${ph[0] ? `<a class="of-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞</a>` : ''}<a class="of-map" href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ' + (s.address || 'ভালুকা'))}`}" target="_blank" rel="noopener" aria-label="পথ">🧭</a></div></article>`;
 };
 // হাট বাজার ক্যাটাগরির উপরের অংশ: আজকের হাট, মৌসুমি হাট, পণ্য ও এলাকা ফিল্টার
 function hatTop(all) {
-  const t = dhakaParts(new Date()), today = all.filter(x => seasonOn(x) && x.subtype !== 'daily' && hatDaysOf(x).includes(t.wd));
+  const t = dhakaParts(new Date()), today = all.filter(x => seasonOn(x) && hatDaysOf(x).includes(t.wd) && x.subtype !== 'daily');
   const season = all.filter(x => x.subtype === 'seasonal' && seasonOn(x, 30));
   const areas = [...new Map(all.map(x => hatUnion(x)).filter(Boolean).map(u => [u.id, u])).values()].sort((a, b) => (a.category === 'pouro' ? -1 : unionNo(a)) - (b.category === 'pouro' ? -1 : unionNo(b)));
   const my = myAreaRow(), goods = GOODS.filter(g => all.some(x => (x.goods || []).includes(g[0])));
-  return `<div class="hx-today"><div class="hx-h"><b>আজ ${BN_DAYS[t.wd]}</b><span>${today.length ? `${bn(today.length)}টি হাট বসছে` : 'আজ কোনো সাপ্তাহিক হাট নেই'}</span></div>
-      ${today.length ? today.map(x => { const nh = nextHat(x), u = hatUnion(x); return `<button class="hx-row" data-svcdet="${esc(x.id)}"><i class="${nh?.live ? 'live' : nh?.k === 'today' ? 'soon' : 'done'}"></i><b>${esc(x.name)}</b><small>${u ? esc(areaCore(u)) : ''}${nh?.live ? ' · এখন চলছে' : nh?.k === 'today' ? (HAT_TIME[x.hat_time] ? ' · ' + HAT_TIME[x.hat_time][0] : '') : ' · শেষ'}</small></button>`; }).join('') : ''}</div>
-    ${season.length ? season.map(x => `<button class="hx-season" data-svcdet="${esc(x.id)}">🕌 <b>${esc(x.name)}</b><small>${hatDate(x.season_from)}${x.season_to ? ` – ${hatDate(x.season_to)}` : ''}</small></button>`).join('') : ''}
-    ${areas.length > 1 || goods.length ? `<div class="hx-f">${areas.length > 1 ? `<select class="f" data-hsel="area"><option value="">📍 সব এলাকা</option>${my && areas.some(a => a.id === my.id) ? `<option value="${esc(my.id)}"${String(S.harea) === String(my.id) ? ' selected' : ''}>⭐ আমার এলাকা</option>` : ''}${areas.map(a => `<option value="${esc(a.id)}"${String(S.harea) === String(a.id) ? ' selected' : ''}>${a.category === 'pouro' ? 'পৌরসভা' : esc(areaCore(a))}</option>`).join('')}</select>` : ''}
-      ${goods.length ? `<select class="f" data-hsel="good"><option value="">🛍️ সব পণ্য</option>${goods.map(g => `<option value="${g[0]}"${S.hgood === g[0] ? ' selected' : ''}>${g[1]} ${esc(g[2])}</option>`).join('')}</select>` : ''}</div>` : ''}`;
+  return `<div class="ht-today"><div class="ht-th"><span>🛒</span><div><b>আজ ${BN_DAYS[t.wd]} যেসব হাট বসছে</b><small>${today.length ? `${bn(today.length)}টি হাট` : 'আজ কোনো সাপ্তাহিক হাট নেই'}</small></div></div>
+      ${today.length ? `<div class="ht-tl">${today.map(x => { const nh = nextHat(x), u = hatUnion(x); return `<button data-svcdet="${esc(x.id)}"><b>${esc(x.name)}</b><small>${u ? esc(areaCore(u)) + ' · ' : ''}${nh?.k === 'today' ? esc(nh.label.replace('আজ হাট · ', '').replace('আজ হাট', 'আজ')) : 'আজকের হাট শেষ'}</small>${nh?.live ? '<i>এখন</i>' : ''}</button>`; }).join('')}</div>` : ''}
+      <div class="ht-wk">${DAY_SHORT.map((d, i) => { const n = all.filter(x => seasonOn(x) && x.subtype !== 'daily' && hatDaysOf(x).includes(i)).length; return `<span class="${i === t.wd ? 'td' : ''}"><small>${d}</small><b>${n ? bn(n) : '–'}</b></span>`; }).join('')}</div></div>
+    ${season.length ? `<div class="ht-season"><b>🕌 মৌসুমি পশুর হাট</b>${season.map(x => `<button data-svcdet="${esc(x.id)}"><span>${esc(x.name)}</span><small>${hatDate(x.season_from)}${x.season_to ? ` – ${hatDate(x.season_to)}` : ''}${x.season_from > dhakaYmd() ? ' · শীঘ্রই' : ' · চলছে'}</small></button>`).join('')}</div>` : ''}
+    ${goods.length ? `<div class="sub-chips ht-gf"><button data-hgood=""${S.hgood ? '' : ' class="on"'}>কী খুঁজছেন?</button>${goods.map(g => `<button data-hgood="${g[0]}"${S.hgood === g[0] ? ' class="on"' : ''}>${g[1]} ${esc(g[2])}</button>`).join('')}</div>` : ''}
+    ${areas.length > 1 ? `<div class="sub-chips ht-af"><button data-harea=""${S.harea ? '' : ' class="on"'}>সব এলাকা</button>${my && areas.some(a => a.id === my.id) ? `<button data-harea="${esc(my.id)}"${String(S.harea) === String(my.id) ? ' class="on"' : ''}>⭐ আমার এলাকা</button>` : ''}${areas.filter(a => !my || a.id !== my.id).map(a => `<button data-harea="${esc(a.id)}"${String(S.harea) === String(a.id) ? ' class="on"' : ''}>${a.category === 'pouro' ? 'পৌরসভা' : esc(areaCore(a))}</button>`).join('')}</div>` : ''}`;
 }
 const hatDays = t => [...new Set((String(t || '').match(/রবি|সোম|মঙ্গল|বুধ|বৃহস্পতি|শুক্র|শনি/g) || []).map(dayIdx).filter(i => i >= 0))].sort();
 // ইউনিয়নের হাট: সম্পাদনায় লেখা হাট + "হাট বাজার" ক্যাটাগরির যেসব বাজারের ঠিকানা এই ইউনিয়নে মেলে
@@ -5422,6 +5423,7 @@ function drawDir() {
   const subX = $('#dir .sub-chips')?.scrollLeft || 0;
   $('#dir').innerHTML = head + famHtml + hatHtml + emgHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
   const sc = $('#dir .sub-chips'); if (sc) { sc.scrollLeft = subX; chipCenter(sc); }
+  document.querySelectorAll('#dir .ht-gf, #dir .ht-af').forEach(chipCenter);
 }
 function drawNear(list, q) {
   const located = list.filter(x => x.lat != null && (!S.nearCat || x.category === S.nearCat) && (!q || svcSearch([x], q).hits.length));
@@ -5494,6 +5496,8 @@ document.addEventListener('click', e => {
   const ipr = e.target.closest('[data-iprep]'); if (ipr) { const x = (S.svcAll || []).find(y => String(y.id) === ipr.dataset.iprep); return x && svcReportSheet(x); }
   const ipz = e.target.closest('[data-ipzoom]'); if (ipz) return sdZoom([ipz.src], 0);
   const ds = e.target.closest('[data-dsub]'); if (ds) { S.dsub = ds.dataset.dsub || null; return drawDir(); }
+  const hg = e.target.closest('[data-hgood]'); if (hg) { S.hgood = hg.dataset.hgood || ''; return drawDir(); }
+  const ha = e.target.closest('[data-harea]'); if (ha) { S.harea = ha.dataset.harea || ''; return drawDir(); }
   const sa = e.target.closest('[data-svcadd]'); if (sa) return svcEditSheet(null, sa.dataset.svcadd);
   if (e.target.closest('[data-famquiz]')) return famQuizSheet();
   if (e.target.closest('[data-famsugg]')) return famSuggestSheet();
@@ -5555,7 +5559,7 @@ $('#dir').addEventListener('click', e => {
   const g = e.target.closest('[data-bg]'); if (g) { S.bgroup = g.dataset.bg; loadBlood(); return; }
   const sc = e.target.closest('[data-bscope]'); if (sc) { S.bscope = sc.dataset.bscope; loadBlood(); }
 });
-$('#dir').addEventListener('change', e => { if (e.target.id === 'bready') { S.bready = e.target.checked; loadBlood(); } const hs = e.target.closest('[data-hsel]'); if (hs) { if (hs.dataset.hsel === 'area') S.harea = hs.value; else S.hgood = hs.value; drawDir(); } });
+$('#dir').addEventListener('change', e => { if (e.target.id === 'bready') { S.bready = e.target.checked; loadBlood(); } });
 async function loadBlood() {
   const box = $('#dir');
   box.innerHTML = '<div class="skel"></div>';

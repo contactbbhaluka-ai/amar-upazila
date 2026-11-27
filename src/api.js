@@ -1069,6 +1069,8 @@ function demoApi() {
   // পুরোনো ডেমো ডেটাতেও নতুন দর্শনীয় স্থানগুলো বসাই
   for (const t of DEMO_TOURS) { const i = db.services.findIndex(x => x.id === t.id); if (i < 0) db.services.unshift({ ...t }); else db.services[i] = { ...db.services[i], ...t, lat: db.services[i].lat, lng: db.services[i].lng }; }
   db.services = db.services.filter((x, i, a) => a.findIndex(y => y.id === x.id) === i);
+  // অফিস ও কাজী অফিসের পুরনো ডেমো এন্ট্রি (সরানো হয়েছে) আগের ডিভাইস-সেভ থেকেও মুছে ফেলা
+  db.services = db.services.filter(x => ![970, 971, 972, 975, 976].includes(Number(x.id)));
   db.svcReports = get('svcReports', []); db.tributes = get('tributes', []); db.suggs = get('suggs', []); db.quiz = get('quiz', null); db.issues = get('issues', []);
   db.svcReviews = get('svcReviews', [
     { id: 1, service_id: 901, user_id: 'd3', rating: 5, body: 'শালবনের ভেতর হাঁটতে দারুণ লাগে, ওয়াচ টাওয়ার থেকে পুরো বন দেখা যায়।', created_at: ago(30) },

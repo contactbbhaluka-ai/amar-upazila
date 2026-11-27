@@ -144,6 +144,10 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'বঙ্গাব্দ': 'Bangabda', 'আজকের আবহাওয়া ভালো · সর্বোচ্চ {x}°, সর্বনিম্ন {x}°': 'Good weather today · high {x}°, low {x}°', 'আজ বৃষ্টির সম্ভাবনা {x}%, ছাতা সাথে রাখুন': '{x}% chance of rain today, carry an umbrella',
+  'আজ গরম বেশি ({x}°), বেশি করে পানি খান, রোদে কম থাকুন': 'Hot today ({x}°), drink plenty of water and stay out of the sun', 'আজ শীত বেশি ({x}°), গরম কাপড় পরুন': 'Cold today ({x}°), wear warm clothes',
+  'কুয়াশা আছে, সাবধানে গাড়ি চালান': 'Foggy, drive carefully', 'বজ্রঝড়ের সম্ভাবনা, খোলা মাঠ বা গাছের নিচে থাকবেন না': 'Thunderstorms likely, avoid open fields and trees',
+  'বৃষ্টি হতে পারে ({x}%) · সর্বোচ্চ {x}°, সর্বনিম্ন {x}°': 'Rain possible ({x}%) · high {x}°, low {x}°', 'আবহাওয়ার তথ্য এখন আনা যায়নি': "Couldn't load the weather right now", 'ডিরেক্টরিতে ব্যানার যোগ করুন': 'Add a banner to the directory',
   'ব্যানার': 'Banners', 'ডিরেক্টরির ব্যানার': 'Directory banners', 'নতুন ব্যানার': 'New banner', 'শিরোনাম': 'Title', 'নিচের লেখা (ঐচ্ছিক': 'Subtitle (optional', 'রং (ছবি না দিলে': 'Color (without a photo',
   'চাপলে কোথায় যাবে (ঐচ্ছিক': 'Opens when tapped (optional', 'ব্যানার যোগ হয়েছে': 'Banner added', 'ব্যানার মুছে ফেলা হয়েছে': 'Banner deleted', 'এখনো কোনো ব্যানার নেই': 'No banners yet', 'যোগ করুন': 'Add', 'বন্ধ': 'Close',
   'এগুলো সেবা ডিরেক্টরির উপরে পালাক্রমে ঘুরবে। উপজেলার সবুজ ব্যানার সবসময় শেষে থাকে। সর্বোচ্চ ১০টি': 'These rotate at the top of the directory. The green upazila banner always stays last. Up to 10',

@@ -4191,11 +4191,38 @@ document.addEventListener('click', e => {
 });
 // ---------- উপরের ব্যানার স্লাইডার (অ্যাডমিনের ব্যানার + শেষে উপজেলার সবুজ ব্যানার)
 const DS_COLORS = { green: 'সবুজ', blue: 'নীল', red: 'লাল', orange: 'কমলা', purple: 'বেগুনি', teal: 'ফিরোজা' };
+// উপরের সবুজ কার্ড: বার, বাংলা ও ইংরেজি তারিখ, আবহাওয়ার বার্তা, আর সব সেবার হিসাব
+function wxMsg(w) {
+  if (!w) return '';
+  const c = w.code;
+  if (c >= 95) return '⛈️ বজ্রঝড়ের সম্ভাবনা, খোলা মাঠ বা গাছের নিচে থাকবেন না';
+  if (w.rain != null && w.rain >= 60) return `☔ আজ বৃষ্টির সম্ভাবনা ${bn(w.rain)}%, ছাতা সাথে রাখুন`;
+  if (w.max >= 35) return `🥵 আজ গরম বেশি (${bn(w.max)}°), বেশি করে পানি খান, রোদে কম থাকুন`;
+  if (w.min <= 12) return `🥶 আজ শীত বেশি (${bn(w.min)}°), গরম কাপড় পরুন`;
+  if (c === 45 || c === 48) return '🌫️ কুয়াশা আছে, সাবধানে গাড়ি চালান';
+  if (w.rain != null && w.rain >= 30) return `🌦️ বৃষ্টি হতে পারে (${bn(w.rain)}%) · সর্বোচ্চ ${bn(w.max)}°, সর্বনিম্ন ${bn(w.min)}°`;
+  return `🌤️ আজকের আবহাওয়া ভালো · সর্বোচ্চ ${bn(w.max)}°, সর্বনিম্ন ${bn(w.min)}°`;
+}
+function dirHeroWx(w) {
+  const el = $('#dh-wx'), msg = $('#dh-msg'); if (!el) return;
+  if (!w) { el.innerHTML = ''; msg.textContent = S.wxErr ? 'আবহাওয়ার তথ্য এখন আনা যায়নি' : ''; msg.hidden = !msg.textContent; return; }
+  const [ico, name] = WX[w.code] || ['🌡️', ''];
+  el.innerHTML = `<span class="dh-ico">${ico}</span><span class="dh-temp">${bn(w.temp)}°</span><small>${esc(name)}</small>`;
+  msg.textContent = wxMsg(w); msg.hidden = !msg.textContent;
+}
+function dirHeroHtml(total, cats) {
+  const now = new Date(), t = dhakaParts(now), bd = banglaDate(t);
+  const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)} বঙ্গাব্দ`;
+  return `<div class="dir-hero" id="dir-hero"><div class="dh-top"><div class="dh-date"><b>${esc(BN_WD[t.wd])}</b><span>${esc(son)}</span><small>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</small></div>
+      <button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ"></button></div>
+    <div class="dh-msg" id="dh-msg" hidden></div>
+    <div class="dh-bot"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div></div>`;
+}
 function sliderHtml(total, cats) {
-  const hero = `<div class="ds-slide ds-hero"><div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div></div>`;
   const bs = (S.dirBanners || []).map(b => `<div class="ds-slide ds-c-${esc(b.color || 'green')}${b.image_url ? ' has-img' : ''}" ${b.link ? `data-dlink="${esc(b.link)}" role="button" tabindex="0"` : ''}>
     ${b.image_url ? `<img src="${esc(b.image_url)}" alt="" loading="lazy" decoding="async">` : ''}<div class="ds-txt">${b.title ? `<b>${esc(b.title)}</b>` : ''}${b.subtitle ? `<small>${esc(b.subtitle)}</small>` : ''}</div>${b.link ? '<span class="ds-go">›</span>' : ''}</div>`);
-  const slides = [...bs, hero];
+  const slides = bs;
+  if (!slides.length) return me()?.admin ? '<button class="ds-add" id="ds-edit">🖼️ ডিরেক্টরিতে ব্যানার যোগ করুন</button>' : '';
   return `<div class="dslider"><div class="ds-track" id="ds-track">${slides.join('')}</div>
     ${slides.length > 1 ? `<div class="ds-dots">${slides.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}
     ${me()?.admin ? '<button class="ds-edit" id="ds-edit" aria-label="ব্যানার সাজান">✏️ ব্যানার</button>' : ''}</div>`;
@@ -4254,6 +4281,7 @@ function dsEditSheet() {
 document.addEventListener('click', e => {
   const l = e.target.closest('[data-dlink]'); if (l) return dsLink(l.dataset.dlink);
   if (e.target.closest('#ds-edit')) return dsEditSheet();
+  if (e.target.closest('#dh-wx')) return prayerWeatherSheet();
   const d = e.target.closest('[data-dsdel]');
   if (d) { if (!confirm('এই ব্যানারটি মুছবেন?')) return; S.api.delDirBanner(Number(d.dataset.dsdel) || d.dataset.dsdel).then(async () => { S.dirBanners = await S.api.dirBanners(); toast('ব্যানার মুছে ফেলা হয়েছে'); drawDir(); dsEditSheet(); }).catch(err => toast(errText(err))); }
 });
@@ -4263,7 +4291,7 @@ function renderSvcGrid(list) {
   const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : k === 'aid' ? 'প্রাথমিক চিকিৎসা' : c[1], cnt = k === 'sos' || k === 'aid' || SVC_SPECIAL[k] ? 0 : n(k);
     return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
   const favs = list.filter(x => S.svcFav?.has(x.id));
-  $('#dir').innerHTML = sliderHtml(total, cats)
+  $('#dir').innerHTML = dirHeroHtml(total, cats) + sliderHtml(total, cats)
     + dayNoticeHtml()
     + `<div class="sos-row2"><button class="sos-btn" data-sos>🆘 বিপদে আছি</button><button class="aid-btn" data-svc="aid">🩹 প্রাথমিক চিকিৎসা</button></div>`
     + timeSuggestHtml()
@@ -4272,6 +4300,7 @@ function renderSvcGrid(list) {
     + (favs.length ? `<h3 class="svc-sec" style="--c:#e0245e"><i></i>❤️ আমার প্রিয় সেবা <button class="svc-more" data-svc="fav">সব দেখুন</button></h3>${favs.slice(0, 3).map(svcCard).join('')}` : '')
     + SVC_GROUPS.map(([t, col, keys]) => { const ks = keys.filter(has); return ks.length ? `<h3 class="svc-sec" style="--c:${col}"><i></i>${esc(t)}</h3><div class="svc-grid">${ks.map(tile).join('')}</div>` : ''; }).join('');
   startSlider();
+  { const c = local.get('wx'); if (c?.v) dirHeroWx(c.v); loadWeather().then(dirHeroWx); }
 }
 function dirChips() {
   const c = $('#dchips'), chipX = c.scrollLeft;   // চিপের সারি যেখানে ছিল সেখানেই থাকবে

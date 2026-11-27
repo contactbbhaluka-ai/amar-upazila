@@ -2101,3 +2101,41 @@ body:has(#modal.on) .totop{display:none}
 .lnk-svc .lnk-go{display:block;margin-top:4px;font-size:13px;font-weight:700;color:var(--g)}
 .lnk-svc img{object-position:center 25%}
 .svc-share{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--mut);display:grid;place-items:center;cursor:pointer}
+/* তথ্য কার্ড (উপজেলা/পৌরসভা/ইউনিয়ন/প্রশাসন) */
+.card.svc.svc-info{display:block;padding:14px;border-radius:16px;cursor:pointer;border-left:4px solid var(--sc);animation:srIn .4s ease both;animation-delay:calc(min(var(--i,0),8) * 40ms)}
+.si-top{display:flex;gap:12px;align-items:center}
+.si-no{flex:0 0 52px;height:52px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,var(--sc),color-mix(in srgb,var(--sc) 60%,#000));color:#fff;font-weight:800;font-size:15px}
+.si-ic{flex:0 0 46px;height:46px;border-radius:13px;display:grid;place-items:center;color:var(--sc);background:color-mix(in srgb,var(--sc) 12%,var(--card))}
+.si-t{min-width:0;flex:1}.si-t h3{margin:0;font-size:1.05rem;line-height:1.35}.si-t p{margin:3px 0 0;font-size:12.5px;color:var(--mut)}
+.si-ex{margin:10px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink);opacity:.85;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.si-acts{display:flex;align-items:center;gap:8px;margin-top:11px;flex-wrap:wrap}
+.si-call{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;background:color-mix(in srgb,#16a34a 12%,var(--card));color:#15803d;text-decoration:none;font-size:13.5px;border:1px solid color-mix(in srgb,#16a34a 30%,var(--line))}
+.si-mail{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);text-decoration:none}
+.si-more{font-size:12px;color:var(--mut)}
+.si-go{margin-left:auto;font-size:13px;font-weight:700;color:var(--sc)}
+/* জরুরি কার্ড (থানা/ফায়ার/এম্বুলেন্স) */
+.emg-strip{display:flex;align-items:center;gap:12px;padding:12px 14px;margin:0 0 10px;border-radius:16px;background:linear-gradient(120deg,#dc2626,#b91c1c);color:#fff;text-decoration:none;box-shadow:0 6px 18px rgba(220,38,38,.25)}
+.emg-strip.fire{background:linear-gradient(120deg,#ea580c,#c2410c);box-shadow:0 6px 18px rgba(234,88,12,.25)}
+.emg-strip>span{font-size:26px}.emg-strip div{flex:1;display:flex;flex-direction:column}.emg-strip b{font-size:15px}.emg-strip small{font-size:12px;opacity:.9}
+.emg-strip i{font-style:normal;font-weight:800;padding:7px 14px;border-radius:20px;background:#fff;color:#b91c1c}
+.emg-strip.fire i{color:#c2410c}
+.card.svc.svc-emg{display:block;padding:14px;border-radius:16px;cursor:pointer;border-top:4px solid var(--sc);animation:srIn .4s ease both;animation-delay:calc(min(var(--i,0),8) * 40ms)}
+.svc-emg.hearse{border-top-color:#475569}
+.se-h{display:flex;gap:11px;align-items:center}
+.se-ic{flex:0 0 44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;color:var(--sc);background:color-mix(in srgb,var(--sc) 12%,var(--card))}
+.se-t{flex:1;min-width:0}.se-t h3{margin:0;font-size:1.02rem;line-height:1.35}.se-t p{margin:2px 0 0;font-size:12.5px;color:var(--mut)}
+.se-24{flex:0 0 auto;padding:3px 9px;border-radius:12px;background:color-mix(in srgb,#16a34a 14%,var(--card));color:#15803d;font-size:11.5px;font-weight:700}
+.se-nums{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.se-num{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--sc) 6%,var(--card));border:1px solid color-mix(in srgb,var(--sc) 18%,var(--line));text-decoration:none;color:var(--ink)}
+.se-num span{flex:1;font-size:13px;color:var(--mut);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.se-num b{font-size:15px;letter-spacing:.3px}
+.se-num i{font-style:normal;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#16a34a;color:#fff;font-size:15px}
+.se-more{margin-top:8px;font-size:12.5px;color:var(--sc);font-weight:700}
+/* বিস্তারিত: সব নম্বর */
+.sd-tag{font-size:13.5px;opacity:.92;margin-bottom:2px}
+.sd-phones{display:flex;flex-direction:column;gap:6px}
+.sd-ph{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-top:6px}
+.sd-phones .sd-ph{margin-top:0}
+.sd-ph>div{flex:1;min-width:0}.sd-ph small{display:block;color:var(--mut);font-size:12px}.sd-ph b{font-size:15px;word-break:break-all}
+.sd-phc{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer}
+.sd-phk{padding:7px 12px;border-radius:18px;background:#16a34a;color:#fff;text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap}

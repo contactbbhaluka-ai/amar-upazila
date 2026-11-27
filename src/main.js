@@ -3882,7 +3882,30 @@ const svcPersonCard = s => {
     ${annivOf(s) ? `<span class="sp-rib ${annivOf(s)}">${annivOf(s) === 'born' ? '🎂 আজ জন্মদিন' : '🕯️ আজ মৃত্যুবার্ষিকী'}</span>` : s.videos?.length ? '<span class="sp-vid">▶ ভিডিও</span>' : ''}${sub ? `<span class="sp-sub">${sub[2]} ${sub[1]}</span>` : ''}</div>
   <div class="sp-body"><h3>${esc(s.name)}${s.family_verified ? ' <span class="sr-ver" title="পরিবার কর্তৃক যাচাইকৃত">✔</span>' : ''}</h3>${s.tagline ? `<p>${esc(s.tagline)}</p>` : ''}${s.life ? `<small>${esc(s.life)}</small>` : ''}</div></article>`;
 };
-const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
+// উপজেলা/পৌরসভা/ইউনিয়ন/প্রশাসন — তথ্য কার্ড; থানা/ফায়ার/এম্বুলেন্স — জরুরি কার্ড
+const EMG_CATS = new Set(['police', 'fire', 'amb']), INFO_CATS = new Set(['upz', 'pouro', 'union', 'gov']);
+const telOf = n => enDigits(String(n || '')).replace(/[^\d+]/g, '');
+const phoneList = s => (s.phones?.length ? s.phones : s.phone ? [{ l: 'ফোন', n: s.phone }] : []).filter(p => telOf(p.n));
+const unionNo = s => { const m = String(s.name || '').match(/^([০-৯0-9]+)নং/); return m ? +enDigits(m[1]) : 99; };
+const svcInfoCard = s => {
+  const ph = phoneList(s), p0 = ph[0], no = s.category === 'union' && unionNo(s) < 99 ? String(s.name).match(/^([০-৯0-9]+নং)/)[1] : '';
+  return `<article class="card svc svc-info" style="--sc:${svcColor(s.category)};--i:${TI()}" data-svcdet="${esc(s.id)}">
+  <div class="si-top">${no ? `<span class="si-no">${esc(no)}</span>` : `<span class="si-ic">${svcIc(s.category, 22)}</span>`}
+    <div class="si-t"><h3>${esc(no ? String(s.name).replace(/^[০-৯0-9]+নং\s*/, '') : s.name)}${s.verified ? ' <span class="sr-ver" title="যাচাইকৃত">✔</span>' : ''}</h3>${s.tagline ? `<p>${esc(s.tagline)}</p>` : s.address ? `<p>📍 ${esc(s.address)}</p>` : ''}</div></div>
+  ${s.details ? `<p class="si-ex">${esc(svcExcerpt(s.details.replace(/^### .*$/gm, '').replace(/^• /gm, '')))}</p>` : ''}
+  <div class="si-acts">${p0 ? `<a class="si-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(p0.n))}">📞 <b>${esc(bn(p0.n))}</b></a>` : ''}
+    ${s.email ? `<a class="si-mail" href="mailto:${esc(s.email)}" aria-label="ইমেইল">✉️</a>` : ''}${ph.length > 1 ? `<span class="si-more">+${bn(ph.length - 1)}টি নম্বর</span>` : ''}
+    <span class="si-go">বিস্তারিত →</span></div></article>`;
+};
+const svcEmgCard = s => {
+  const ph = phoneList(s), sub = subsOf(s.category).find(x => x[0] === s.subtype);
+  return `<article class="card svc svc-emg${s.subtype === 'hearse' ? ' hearse' : ''}" style="--sc:${svcColor(s.category)};--i:${TI()}" data-svcdet="${esc(s.id)}">
+  <div class="se-h"><span class="se-ic">${sub ? sub[2] : svcIc(s.category, 22)}</span><div class="se-t"><h3>${esc(s.name)}</h3>${s.tagline ? `<p>${esc(s.tagline)}</p>` : ''}</div>${/২৪|24/.test(s.hours || '') ? '<span class="se-24">২৪ ঘণ্টা</span>' : ''}</div>
+  <div class="se-nums">${ph.slice(0, 3).map(p => `<a class="se-num" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(p.n))}"><span>${esc(p.l)}</span><b>${esc(bn(p.n))}</b><i>📞</i></a>`).join('')}</div>
+  ${ph.length > 3 ? `<div class="se-more">আরও ${bn(ph.length - 3)}টি নম্বর · বিস্তারিত →</div>` : ''}</article>`;
+};
+const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : EMG_CATS.has(s.category) && phoneList(s).length ? svcEmgCard(s)
+  : INFO_CATS.has(s.category) && !s.image_url ? svcInfoCard(s) : s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
 // বিস্তারিত লেখা: ### শিরোনাম, • তালিকা, ফাঁকা লাইনে অনুচ্ছেদ
 function detHtml(t) {
   const out = []; let ul = [];
@@ -3896,6 +3919,7 @@ function detHtml(t) {
   flush(); return out.join('');
 }
 const SUBS = {
+  amb: [['ambulance', 'এম্বুলেন্স', '🚑'], ['hearse', 'লাশবাহী গাড়ি', '⚰️'], ['helpline', 'হেল্পলাইন', '☎️']],
   tour: [['resort', 'রিসোর্ট', '🏡'], ['park', 'পার্ক', '🎡'], ['nature', 'প্রকৃতি ও বন', '🌳'], ['history', 'ঐতিহাসিক', '🏛️'], ['other', 'অন্যান্য', '📍']],
   famous: [['language', 'ভাষা সৈনিক', '🗣️'], ['freedom', 'মুক্তিযোদ্ধা', '🎖️'], ['politics', 'রাজনীতিবিদ', '🏛️'], ['doctor', 'চিকিৎসক', '🩺'], ['education', 'শিক্ষাবিদ', '🎓'], ['culture', 'সাহিত্য ও সংস্কৃতি', '🎭'], ['sports', 'খেলাধুলা', '🏅'], ['other', 'অন্যান্য', '⭐']],
 };
@@ -3936,7 +3960,7 @@ function svcDetailSheet(id, opt = {}) {
       <button class="sd-x" data-close aria-label="বন্ধ করুন">✕</button>
       ${admin ? `<button class="sd-edit" data-sdedit>✏️ সম্পাদনা</button>` : imgs.length > 1 ? `<span class="sd-count"><b>১</b>/${bn(imgs.length)}</span>` : ''}
       <div class="sd-title"><span class="sd-cat">${sub ? sub[2] : svcIc(s.category, 14)} ${esc(sub ? sub[1] : cname)}</span><h2>${esc(s.name)}</h2>
-        ${s.address ? `<div class="sd-addr">📍 ${esc(s.address)}</div>` : ''}</div>
+        ${s.tagline ? `<div class="sd-tag">${esc(s.tagline)}</div>` : ''}${s.address ? `<div class="sd-addr">📍 ${esc(s.address)}</div>` : ''}</div>
     </div>`}
     ${imgs.length > 1 && !person ? `<div class="sd-thumbs">${imgs.map((u, i) => `<button data-sdthumb="${i}"${i ? '' : ' class="on"'}><img src="${esc(u)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></button>`).join('')}</div>` : ''}
     <div class="sd-chips">
@@ -3949,15 +3973,17 @@ function svcDetailSheet(id, opt = {}) {
     </div>
     <div class="sd-acts">
       ${tel ? act('a', '📞', 'কল করুন', `data-svccall="${esc(s.id)}" href="tel:${esc(tel)}"`) : ''}
-      ${tel ? act('button', '🗓️', 'বুকিং', 'data-sdbook="1"') : ''}
+      ${tel && ['tour', 'hotel', 'food', 'rentcar', 'event'].includes(s.category) ? act('button', '🗓️', 'বুকিং', 'data-sdbook="1"') : ''}
       ${person ? '' : act('a', '🧭', 'পথ দেখুন', `href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ভালুকা')}`}" target="_blank" rel="noopener"`)}
       ${person ? `<button class="sd-act sd-trib${S.tribSet?.has(s.id) ? ' on' : ''}" data-sdtrib><span class="sd-aic">🌹</span><small>শ্রদ্ধা${s.tribute_count ? ` · ${bn(s.tribute_count)}` : ''}</small></button>` : ''}
       ${person && s.details ? act('button', '🔊', 'শুনুন', 'data-sdtts') : ''}
       ${person && s.videos?.length ? act('button', '▶️', 'ভিডিও', 'data-sdgo="sd-vid"') : ''}
       ${person && imgs.length > 1 ? act('button', '🖼️', 'ছবি', 'data-sdzoom="0"') : ''}
       <button class="sd-act sd-fav${fav ? ' on' : ''}" data-sdfav="${esc(s.id)}" aria-pressed="${!!fav}"><span class="sd-aic">${fav ? '❤️' : '🤍'}</span><small>${fav ? 'প্রিয়তে আছে' : 'প্রিয়তে রাখুন'}</small></button>
+      ${s.email ? act('a', '✉️', 'ইমেইল', `href="mailto:${esc(s.email)}"`) : ''}
       ${act('button', '↗️', 'শেয়ার', 'data-svcshare="1"')}
     </div>
+    ${(() => { const ph = phoneList(s); return ph.length > 1 || (ph.length && ph[0].l !== 'ফোন') ? `<div class="sd-sec"><h3>যোগাযোগের নম্বর</h3><div class="sd-phones">${ph.map(p => `<div class="sd-ph"><div><small>${esc(p.l)}</small><b>${esc(bn(p.n))}</b></div><button class="sd-phc" data-copy="${esc(p.n)}" aria-label="কপি">⧉</button><a class="sd-phk" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(p.n))}">📞 কল</a></div>`).join('')}</div>${s.email ? `<div class="sd-ph"><div><small>ইমেইল</small><b>${esc(s.email)}</b></div><button class="sd-phc" data-copy="${esc(s.email)}" aria-label="কপি">⧉</button><a class="sd-phk" href="mailto:${esc(s.email)}">✉️ লিখুন</a></div>` : ''}</div>` : ''; })()}
     ${admin ? '<div class="sd-reps"></div>' : ''}
     ${s.best_time ? `<div class="sd-best"><span>🌤️</span><div><b>যাওয়ার ভালো সময়</b>${esc(s.best_time)}</div></div>` : ''}
     ${person && s.quote ? `<blockquote class="sp-quote"><p>${esc(s.quote)}</p><cite>— ${esc(s.name)}</cite></blockquote>` : ''}
@@ -4023,6 +4049,7 @@ function svcDetailSheet(id, opt = {}) {
     const r = e.target.closest('[data-sdrel]'); if (r) return svcDetailSheet(r.dataset.sdrel);
     const gt = e.target.closest('[data-sdgo]'); if (gt) return sh.querySelector('#' + gt.dataset.sdgo)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     const ro = e.target.closest('[data-repok]'); if (ro) { await busy(ro, async () => { await S.api.resolveReport(+ro.dataset.repok); drawReps((sh.querySelector('.sd-reps')._reps || []).filter(x => String(x.id) !== ro.dataset.repok)); }); return; }
+    const cp = e.target.closest('[data-copy]'); if (cp) { try { await navigator.clipboard.writeText(cp.dataset.copy); toast('কপি হয়েছে'); } catch { toast(cp.dataset.copy); } return; }
     if (e.target.closest('[data-sdedit]')) return svcEditSheet(s);
     if (e.target.closest('[data-sdmedia]')) return famMediaSheet(s);
     if (e.target.closest('[data-sdfamily]')) return famFamilySheet(s);
@@ -4111,6 +4138,8 @@ function svcEditSheet(s, category) {
     ${F.tag ? inp('se-tag', 'পরিচিতি (এক লাইনে)', v.tagline, 'maxlength="120" placeholder="যেমন: বীর মুক্তিযোদ্ধা, আফসার বাহিনীর প্রতিষ্ঠাতা"') : ''}
     ${F.life ? inp('se-life', 'জীবনকাল', v.life, 'maxlength="80" placeholder="যেমন: ১৯৩৫ – ২০০৯ বা জন্ম ১৯৪০"') : ''}
     ${inp('se-addr', F.addr, v.address, 'maxlength="200"')}
+    ${!person ? `<label>সব যোগাযোগ নম্বর <small class="mut">(প্রতি লাইনে "পদবি/নাম: নম্বর" — প্রথমটি প্রধান)</small><textarea id="se-phones" rows="3" placeholder="ডিউটি অফিসার: 01320103300&#10;ওসি: 01320103295">${esc((v.phones || []).map(p => `${p.l}: ${p.n}`).join('\n'))}</textarea></label>
+    <label>ইমেইল<input id="se-email" type="email" maxlength="120" value="${esc(v.email || '')}"></label>` : ''}
     ${F.phone ? `<div class="bk-row">${inp('se-phone', 'ফোন', v.phone, 'maxlength="40" inputmode="tel"')}${F.hours ? inp('se-hours', 'খোলার সময়', v.hours, 'maxlength="80" placeholder="যেমন সকাল ৯টা–সন্ধ্যা ৬টা"') : ''}</div>` : ''}
     <label>${F.imgs} <small class="mut">· সর্বোচ্চ ১৩টি</small></label>
     <div class="se-imgs"></div>
@@ -4160,6 +4189,11 @@ function svcEditSheet(s, category) {
     if (has('#se-sub')) p.subtype = val('#se-sub');
     if (has('#se-phone')) p.phone = val('#se-phone') || ''; else if (!s) p.phone = '';
     if (has('#se-hours')) p.hours = val('#se-hours');
+    if (has('#se-phones')) {
+      p.phones = $('#se-phones').value.split('\n').map(x => x.trim()).filter(Boolean).map(l => { const m = l.match(/^(.*?)[:：]\s*([+০-৯0-9][০-৯0-9\s-]{1,})$/); return m ? { l: m[1].trim() || 'ফোন', n: enDigits(m[2]).trim() } : /^[+০-৯0-9][০-৯0-9\s-]+$/.test(l) ? { l: 'ফোন', n: enDigits(l) } : null; }).filter(Boolean).slice(0, 30);
+      if (p.phones.length && !p.phone) p.phone = p.phones[0].n;
+      p.email = val('#se-email');
+    }
     if (has('#se-tag')) p.tagline = val('#se-tag');
     if (has('#se-life')) p.life = val('#se-life');
     if (has('#se-go')) p.how_to_go = val('#se-go');
@@ -4978,6 +5012,9 @@ function drawDir() {
   if (S.dsub && base.length && !subs.some(x => x[0] === S.dsub)) S.dsub = null;
   const subHtml = subs.length > 1 ? `<div class="sub-chips"><button data-dsub=""${S.dsub ? '' : ' class="on"'}>সব <small>${bn(base.length)}</small></button>${subs.map(x => `<button data-dsub="${x[0]}"${S.dsub === x[0] ? ' class="on"' : ''}>${x[2]} ${x[1]} <small>${bn(base.filter(b => b.subtype === x[0]).length)}</small></button>`).join('')}</div>` : '';
   if (S.dsub) base = base.filter(b => b.subtype === S.dsub);
+  if (S.dcat === 'union') base = [...base].sort((a, b) => unionNo(a) - unionNo(b));
+  if (S.dcat === 'police') base = [...base].sort((a, b) => phoneList(b).length - phoneList(a).length);
+  if (S.dcat === 'amb') { const ord = k => { const i = subsOf('amb').findIndex(x => x[0] === k); return i < 0 ? 9 : i; }; base = [...base].sort((a, b) => ord(a.subtype) - ord(b.subtype)); }
   const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(base.length)}টি</span>${me()?.admin && cat[0] !== 'fav' ? `<button class="svc-addbtn" data-svcadd="${esc(cat[0])}">＋ যোগ করুন</button>` : ''}</div>${subHtml}`
     : `<div class="svc-head"><b>"${esc(q)}"</b><span class="mut">${bn(base.length)}টি সেবা</span></div>`;
   const catHtml = cats.length ? `<div class="svc-grid svc-qcats">${cats.slice(0, 8).map(([k, n]) => `<button class="svc-tile" data-svc="${k}" style="--c:${svcColor(k)};--i:${TI()}">${svcIc(k, 22)}<span class="st-n">${esc(n)}</span></button>`).join('')}</div>` : '';
@@ -4985,7 +5022,8 @@ function drawDir() {
     : cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।';
   const famHtml = S.dcat === 'famous' && !q ? annivHtml(list) + `<div class="fam-acts"><button data-famquiz><span>🧠</span><b>আজকের কুইজ</b><small>সঠিক উত্তরে কয়েন</small></button><button data-famsugg><span>📝</span><b>নাম প্রস্তাব করুন</b><small>কৃতী কাউকে চেনেন?</small></button>${me()?.admin ? `<button data-famadmin class="adm"><span>📋</span><b>প্রস্তাব দেখুন</b><small class="fam-pend">…</small></button>` : ''}</div>` : '';
   if (famHtml && me()?.admin) S.api.pendingSuggestions('famous').then(n => { const el = $('.fam-pend'); if (el) el.textContent = n ? `${bn(n)}টি অপেক্ষায়` : 'নতুন কিছু নেই'; }).catch(() => {});
-  $('#dir').innerHTML = head + famHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
+  const emgHtml = EMG_CATS.has(S.dcat) && !q ? `<a class="emg-strip" href="tel:999"><span>🚨</span><div><b>জীবন-মৃত্যুর জরুরি অবস্থায় ৯৯৯</b><small>পুলিশ, ফায়ার সার্ভিস ও এম্বুলেন্স — বিনা খরচে, ২৪ ঘণ্টা</small></div><i>কল</i></a>${S.dcat === 'fire' ? '<a class="emg-strip fire" href="tel:102"><span>🚒</span><div><b>ফায়ার সার্ভিস হটলাইন ১০২</b><small>আগুন ও উদ্ধারকাজে সরাসরি</small></div><i>কল</i></a>' : ''}` : '';
+  $('#dir').innerHTML = head + famHtml + emgHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
 }
 function drawNear(list, q) {
   const located = list.filter(x => x.lat != null && (!S.nearCat || x.category === S.nearCat) && (!q || svcSearch([x], q).hits.length));

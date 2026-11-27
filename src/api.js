@@ -906,7 +906,7 @@ async function supabaseApi() {
 
     // ---------- সেবা ডিরেক্টরি ও রিপোর্ট
     async services({ category, q }) {
-      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng,url,image_url,details,images,subtype,amenities,how_to_go,best_time,rating_avg,rating_count,videos,tagline,life,timeline,facts,honors,quote,born_md,died_md,burial,burial_lat,burial_lng,related,family_verified,tribute_count')
+      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng,url,image_url,details,images,subtype,amenities,how_to_go,best_time,rating_avg,rating_count,videos,tagline,life,timeline,facts,honors,quote,born_md,died_md,burial,burial_lat,burial_lng,related,family_verified,tribute_count,phones,email')
         .eq('upazila_id', UPAZILA_ID).order('verified', { ascending: false }).order('name').limit(500);
       if (category) s = s.eq('category', category);
       const term = (q || '').replace(/[,%()*\\]/g, ' ').trim();
@@ -1056,6 +1056,7 @@ function demoApi() {
   };
   // পুরোনো ডেমো ডেটাতেও নতুন দর্শনীয় স্থানগুলো বসাই
   for (const t of DEMO_TOURS) { const i = db.services.findIndex(x => x.id === t.id); if (i < 0) db.services.unshift({ ...t }); else db.services[i] = { ...db.services[i], ...t, lat: db.services[i].lat, lng: db.services[i].lng }; }
+  db.services = db.services.filter((x, i, a) => a.findIndex(y => y.id === x.id) === i);
   db.svcReports = get('svcReports', []); db.tributes = get('tributes', []); db.suggs = get('suggs', []); db.quiz = get('quiz', null);
   db.svcReviews = get('svcReviews', [
     { id: 1, service_id: 901, user_id: 'd3', rating: 5, body: 'শালবনের ভেতর হাঁটতে দারুণ লাগে, ওয়াচ টাওয়ার থেকে পুরো বন দেখা যায়।', created_at: ago(30) },

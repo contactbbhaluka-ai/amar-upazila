@@ -91,6 +91,7 @@ const rxEmoji = k => rxIcon(k, 18);
 const rxName = k => (REACTIONS.find(r => r[0] === k) || REACTIONS[0])[2];
 const FB_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-7.5h2.6l.4-3h-3V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4a21 21 0 0 0-2.4-.1c-2.3 0-3.9 1.4-3.9 4v2.2H7.7v3h2.6V21z"/></svg>';
 const postLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#post-${id}`;
+const svcLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#svc-${id}`;
 const profileLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#u-${id}`;
 const pageLink = id => `${(PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '')}#page-${id}`;
 // মেসেজে লিংক থাকলে চাপা যায়; অ্যাপের পোস্টের লিংক অ্যাপের ভেতরেই খোলে
@@ -1337,6 +1338,8 @@ const RESOLVE = { 'সাহায্য চাই': ['✅ সমাধান �
 const localDT = d => { const z = new Date(d.getTime() - d.getTimezoneOffset() * 6e4); return z.toISOString().slice(0, 16); };
 function linkCardHtml(l, rm) {
   if (!l?.url || !/^https?:\/\//i.test(l.url)) return '';
+  if (l.svc) { const img = l.image && /^(https:|data:)/i.test(l.image) ? `<img src="${esc(l.image)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : '';
+    return `<div class="lnk-wrap"><a class="lnk lnk-svc" href="${esc(l.url)}" data-svcopen="${esc(l.svc)}">${img}<span class="lnk-b"><span class="lnk-site">${esc(l.site || 'আমার উপজেলা')}</span><b>${esc(l.title || '')}</b>${l.desc ? `<span class="lnk-d">${esc(l.desc)}</span>` : ''}<span class="lnk-go">বিস্তারিত দেখুন →</span></span></a></div>`; }
   const img = l.image && /^https:\/\//i.test(l.image) ? `<img src="${esc(l.image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
   return `<div class="lnk-wrap">${rm ? `<button type="button" class="lnk-x" data-rmlink aria-label="লিংকের প্রিভিউ বাদ দিন">${ic('close', 14)}</button>` : ''}<a class="lnk" href="${esc(l.url)}" target="_blank" rel="noopener nofollow ugc">${img}<span class="lnk-b"><span class="lnk-site">${esc(l.site || '')}</span><b>${esc(l.title || l.url)}</b>${l.desc ? `<span class="lnk-d">${esc(l.desc)}</span>` : ''}</span></a></div>`;
 }
@@ -3849,7 +3852,8 @@ const svcCard = s => `<div class="card svc${s.image_url ? ' has-img' : ''}">
 </div>
   <div class="svc-act"><button class="svc-fav${S.svcFav?.has(s.id) ? ' on' : ''}" data-svcfav="${esc(s.id)}" aria-pressed="${!!S.svcFav?.has(s.id)}" aria-label="${S.svcFav?.has(s.id) ? 'প্রিয় থেকে সরান' : 'প্রিয় সেবায় রাখুন'}">${S.svcFav?.has(s.id) ? '❤️' : '🤍'}</button>
   ${s.phone ? `<a class="call" data-svccall="${esc(s.id)}" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a>` : ''}
-  ${svcHasDet(s) ? `<button class="svc-web" data-svcdet="${esc(s.id)}">📖 বিস্তারিত</button>` : ''}</div></div>`;
+  ${svcHasDet(s) ? `<button class="svc-web" data-svcdet="${esc(s.id)}">📖 বিস্তারিত</button>` : ''}
+  <button class="svc-share" data-svcsh="${esc(s.id)}" aria-label="শেয়ার করুন">${ic('share', 16)}</button></div></div>`;
 const svcHasDet = s => !!(s.details || s.images?.length);
 // ছবি ও বিস্তারিত থাকা সেবার বড় কার্ড (দর্শনীয় স্থান ইত্যাদি)
 const svcExcerpt = t => { const p = String(t || '').split(/\n+/).map(x => x.trim()).find(x => x && !x.startsWith('### ') && !/^[•\-*]\s/.test(x)) || ''; return p.length > 150 ? p.slice(0, 150).replace(/\s+\S*$/, '') + '…' : p; };
@@ -4379,7 +4383,51 @@ async function svcCardImage(s) {
   ctx.font = F(400, 26); ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillText(person ? 'ভালুকার কৃতী সন্তান' : (catName(s.category) || 'সেবা ডিরেক্টরি'), W / 2, H - 22);
   return new Promise(res => cv.toBlob(b => res(b), 'image/jpeg', 0.9));
 }
-async function svcShareSheet(s) {
+// নিউজফিডের মতো শেয়ার: নিজের প্রোফাইলে, মেসেজে, Facebook, WhatsApp, Messenger, লিংক, ছবি কার্ড, অন্য অ্যাপ
+const svcShareText = s => `${s.name}${s.tagline ? '\n' + s.tagline : ''}${s.address ? '\n📍 ' + s.address : ''}${s.phone ? '\n📞 ' + s.phone : ''}`;
+const svcLinkObj = s => ({ url: svcLink(s.id), svc: s.id, title: s.name, desc: (s.tagline || svcExcerpt(s.details) || s.address || '').slice(0, 200), image: s.image_url || s.images?.[0] || '', site: `আমার উপজেলা · ${catName(s.category) || 'সেবা'}` });
+function svcShareSheet(s) {
+  const link = svcLink(s.id), text = svcShareText(s) + '\n— আমার উপজেলা অ্যাপ';
+  openSheet(`<h2>শেয়ার করুন</h2><div class="share-grid">
+    <button data-sh="profile"><span class="sh-ic">${ic('share', 22)}</span>নিজের প্রোফাইলে</button>
+    <button data-sh="msg"><span class="sh-ic">${ic('message', 22)}</span>মেসেজে পাঠান</button>
+    <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}" target="_blank" rel="noopener" data-sh="fb"><span class="sh-ic fb">${FB_ICON}</span>Facebook</a>
+    <a href="https://wa.me/?text=${encodeURIComponent(text + '\n' + link)}" target="_blank" rel="noopener" data-sh="wa"><span class="sh-ic wa">${WA_ICON}</span>WhatsApp</a>
+    <a href="fb-messenger://share/?link=${encodeURIComponent(link)}" data-sh="ms"><span class="sh-ic ms">${ic('message', 22)}</span>Messenger</a>
+    <button data-sh="card"><span class="sh-ic">🖼️</span>ছবি কার্ড</button>
+    <button data-sh="copy"><span class="sh-ic">${ic('link', 22)}</span>লিংক কপি</button>
+    ${navigator.share ? `<button data-sh="more"><span class="sh-ic">${ic('dots', 22)}</span>অন্য অ্যাপে</button>` : ''}
+  </div><button class="btn ghost wide" data-sback style="margin-top:14px">ফিরে যান</button>`);
+  $('#sheet').onclick = async e => {
+    if (e.target.closest('[data-sback]')) return svcDetailSheet(s.id);
+    const a = e.target.closest('[data-sh]')?.dataset.sh; if (!a) return;
+    if (a === 'fb' || a === 'wa' || a === 'ms') return;
+    if (a === 'card') return svcCardSheet(s);
+    if (a === 'more') { try { await navigator.share({ title: s.name, text, url: link }); } catch { /* বাতিল */ } return; }
+    if (a === 'copy') { try { await navigator.clipboard.writeText(link); toast('লিংক কপি হয়েছে'); } catch { toast('কপি করা যায়নি: ' + link); } return; }
+    if (!needUser()) return;
+    if (a === 'profile') return svcShareToProfile(s);
+    if (a === 'msg') return shareInMessage({ author: s.name, body: '' }, link, `"${s.name}" — আমার উপজেলা অ্যাপে দেখুন:\n${svcShareText(s)}\n${link}`);
+  };
+}
+function svcShareToProfile(s) {
+  const l = svcLinkObj(s);
+  openSheet(`<h2>নিজের প্রোফাইলে শেয়ার</h2><form id="spform">
+    <textarea id="sp-text" maxlength="1000" placeholder="এ বিষয়ে কিছু লিখুন (ঐচ্ছিক)…"></textarea>
+    ${linkCardHtml(l)}
+    <div class="row" style="margin-top:14px"><button class="btn" style="flex:1">এখনই শেয়ার করুন</button><button class="btn ghost" type="button" data-sback>ফিরে যান</button></div></form>`);
+  $('#sheet').onclick = e => { if (e.target.closest('[data-sback]')) svcShareSheet(s); if (e.target.closest('.lnk')) e.preventDefault(); };
+  $('#spform').onsubmit = e => {
+    e.preventDefault();
+    const cat = s.category === 'tour' ? 'ভ্রমণ' : s.category === 'famous' ? 'খবর' : s.category === 'health' ? 'স্বাস্থ্য' : 'খবর';
+    busy(e.submitter, async () => {
+      await S.api.createPost({ body: $('#sp-text').value.trim(), category: cat, link: l });
+      closeSheet(); toast('আপনার প্রোফাইলে শেয়ার হয়েছে');
+      try { loadFeed('home'); } catch { /* পরে হালনাগাদ হবে */ }
+    });
+  };
+}
+async function svcCardSheet(s) {
   const text = `${s.name}${s.tagline ? '\n' + s.tagline : ''}${s.address ? '\n📍 ' + s.address : ''}${s.phone ? '\n📞 ' + s.phone : ''}\n\n— আমার উপজেলা অ্যাপ`;
   openSheet(`<div class="shc"><h2>↗️ শেয়ার করুন</h2><div class="shc-prev"><div class="skel" style="height:100%"></div></div>
     <button class="btn" data-shimg style="width:100%;margin-top:12px" disabled>🖼️ ছবি কার্ড শেয়ার করুন</button>
@@ -4392,7 +4440,7 @@ async function svcShareSheet(s) {
   const fname = `${String(s.name).replace(/[\\/:*?"<>|]+/g, '').slice(0, 40) || 'card'}.jpg`;
   const dl = () => { const a = document.createElement('a'); a.href = url; a.download = fname; document.body.append(a); a.click(); a.remove(); toast('ছবি ডাউনলোড হয়েছে'); };
   sh.onclick = async e => {
-    if (e.target.closest('[data-sback]')) { if (url) URL.revokeObjectURL(url); return svcDetailSheet(s.id); }
+    if (e.target.closest('[data-sback]')) { if (url) URL.revokeObjectURL(url); return svcShareSheet(s); }
     if (e.target.closest('[data-shtxt]')) { try { if (navigator.share) await navigator.share({ title: s.name, text }); else { await navigator.clipboard.writeText(text); toast('কপি হয়েছে'); } } catch { /* বাতিল */ } return; }
     if (e.target.closest('[data-shdl]') && blob) return dl();
     if (e.target.closest('[data-shimg]') && blob) {
@@ -5002,6 +5050,7 @@ document.addEventListener('click', e => {
   const f = e.target.closest('[data-svcfav]'); if (f) { e.preventDefault(); return toggleSvcFav(Number(f.dataset.svcfav) || f.dataset.svcfav); }
   const c = e.target.closest('[data-svccall]'); if (c) S.api.serviceCalled(Number(c.dataset.svccall) || c.dataset.svccall).catch(() => {});
   const lo = e.target.closest('[data-svcloc]'); if (lo) return svcLocSheet(lo.dataset.svcloc);
+  const shb = e.target.closest('[data-svcsh]'); if (shb) { const x = (S.svcAll || []).find(y => String(y.id) === shb.dataset.svcsh); if (x) { S.sdId = x.id; return svcShareSheet(x); } return; }
   const dt = e.target.closest('[data-svcdet]'); if (dt) return svcDetailSheet(dt.dataset.svcdet);
   const ds = e.target.closest('[data-dsub]'); if (ds) { S.dsub = ds.dataset.dsub || null; return drawDir(); }
   const sa = e.target.closest('[data-svcadd]'); if (sa) return svcEditSheet(null, sa.dataset.svcadd);
@@ -5545,7 +5594,7 @@ function shareToProfile(orig) {
     });
   };
 }
-async function shareInMessage(orig, link) {
+async function shareInMessage(orig, link, msgText) {
   openSheet(`<h2>মেসেজে পাঠান</h2><input type="search" id="sm-q" placeholder="নাম দিয়ে খুঁজুন…" aria-label="খুঁজুন"><div id="sm-list" style="margin-top:8px"><div class="mut">লোড হচ্ছে…</div></div><button class="btn ghost wide" data-close style="margin-top:12px">বন্ধ করুন</button>`);
   const [convs, friends] = await Promise.all([S.api.conversations().catch(() => []), S.api.friends().catch(() => [])]);
   const seen = new Set(), people = [];
@@ -5559,7 +5608,7 @@ async function shareInMessage(orig, link) {
   draw(); $('#sm-q').oninput = draw;
   $('#sheet').onclick = e => {
     const b = e.target.closest('[data-smsend]'); if (!b || b.disabled) return;
-    busy(b, async () => { await S.api.sendMessage(b.dataset.smsend, `${orig.author}-এর একটি পোস্ট শেয়ার করেছি:\n${(orig.body || '').slice(0, 120)}\n${link}`); });
+    busy(b, async () => { await S.api.sendMessage(b.dataset.smsend, msgText || `${orig.author}-এর একটি পোস্ট শেয়ার করেছি:\n${(orig.body || '').slice(0, 120)}\n${link}`); });
     setTimeout(() => { if (b.isConnected) { b.textContent = 'পাঠানো হয়েছে ✓'; b.disabled = true; } }, 400);
   };
 }
@@ -7011,7 +7060,15 @@ function onPop() {
   RELOAD[prev]?.();
 }
 window.addEventListener('popstate', onPop);
+// ডিরেক্টরির কোনো কিছু (শেয়ার করা পোস্ট বা লিংক থেকে) যেকোনো পাতা থেকে খোলা
+async function svcOpenAnywhere(id) {
+  if (!S.svcAll) { const c = local.get('svc_cache'); if (c?.list) S.svcAll = c.list; }
+  if (!(S.svcAll || []).some(x => String(x.id) === String(id))) { try { S.svcAll = await S.api.services({}); } catch { /* নেট নেই */ } }
+  if (!(S.svcAll || []).some(x => String(x.id) === String(id))) return toast('এটি আর পাওয়া যাচ্ছে না');
+  svcDetailSheet(id);
+}
 document.addEventListener('click', e => {
+  const so = e.target.closest('a[data-svcopen]'); if (so && !so.closest('#spform')) { e.preventDefault(); return svcOpenAnywhere(so.dataset.svcopen); }
   const op = e.target.closest('a[data-openpost]'); if (op) { e.preventDefault(); return openPost(op.dataset.openpost); }
   if (e.target.closest('[data-back]')) return back();
   const t = e.target.closest('[data-v]'); if (t && !t.closest('#modal')) go(t.dataset.v);
@@ -7158,11 +7215,11 @@ function restoreNav() {
     renderComposer(); renderFilters(); listenMessages(); refreshBadges();
     refreshSettings(); setTimeout(checkLiveUpdate, 8000);
     const homeP = loadFeed('home');
-    if (!/^#(post|page|u|join)-/.test(location.hash)) restoreNav();   // রিফ্রেশের আগে যে পাতায় ছিলেন সেখানেই
+    if (!/^#(post|page|u|join|svc)-/.test(location.hash)) restoreNav();   // রিফ্রেশের আগে যে পাতায় ছিলেন সেখানেই
     document.documentElement.classList.remove('nav-restore');
     await homeP;
     setInterval(() => { if (document.visibilityState === 'visible') refreshBadges(); }, 60000);
-    const deep = () => { const jn = location.hash.match(/^#join-([a-f0-9]{6,20})$/); if (jn) joinSheet(jn[1]); const m = location.hash.match(/^#post-(\d+)$/), pm = location.hash.match(/^#page-(\d+)$/), um = location.hash.match(/^#u-([\w-]{2,40})$/); if (um && !(S.view === 'user' && S.userId === um[1])) openUser(um[1]); if (m && !(S.view === 'post' && String(S.postId) === m[1])) openPost(m[1]); if (pm && !(S.view === 'page' && String(S.pageId) === pm[1])) openPage(pm[1]); };
+    const deep = () => { const jn = location.hash.match(/^#join-([a-f0-9]{6,20})$/); if (jn) joinSheet(jn[1]); const sv = location.hash.match(/^#svc-(\d+)$/); if (sv && !(S.sdId && String(S.sdId) === sv[1] && $('#modal').classList.contains('on'))) svcOpenAnywhere(sv[1]); const m = location.hash.match(/^#post-(\d+)$/), pm = location.hash.match(/^#page-(\d+)$/), um = location.hash.match(/^#u-([\w-]{2,40})$/); if (um && !(S.view === 'user' && S.userId === um[1])) openUser(um[1]); if (m && !(S.view === 'post' && String(S.postId) === m[1])) openPost(m[1]); if (pm && !(S.view === 'page' && String(S.pageId) === pm[1])) openPage(pm[1]); };
     deep(); window.addEventListener('hashchange', deep);
   } catch (e) {
     document.documentElement.classList.remove('nav-restore');

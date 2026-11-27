@@ -2098,3 +2098,6 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 body:has(#modal.on) .totop{display:none}
 .shc-prev{aspect-ratio:4/5;border-radius:16px;overflow:hidden;background:var(--line);max-height:58vh;margin:0 auto}
 .shc-prev img{width:100%;height:100%;object-fit:contain;display:block}
+.lnk-svc .lnk-go{display:block;margin-top:4px;font-size:13px;font-weight:700;color:var(--g)}
+.lnk-svc img{object-position:center 25%}
+.svc-share{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--mut);display:grid;place-items:center;cursor:pointer}

@@ -2241,3 +2241,6 @@ details.dacc>summary i{font-style:normal;font-size:18px;color:var(--mut);transit
 details.dacc[open]>summary i{transform:rotate(180deg)}
 details.dacc[open]>summary{border-bottom:1px solid var(--line)}
 .dacc-b{padding:4px 16px 14px}
+.up .cn{margin-top:4px}.cn-cap{padding:10px 12px 0;font-weight:700;font-size:14px}
+.up .dacc .cn{border:1px solid var(--line);border-radius:14px}
+.up .ip-links{padding:0 2px}

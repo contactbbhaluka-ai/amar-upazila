@@ -3916,7 +3916,7 @@ const svcEmgCard = s => {
   <div class="se-nums">${ph.slice(0, 3).map(p => `<a class="se-num" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(p.n))}"><span>${esc(p.l)}</span><b>${esc(bn(p.n))}</b><i>📞</i></a>`).join('')}</div>
   ${ph.length > 3 ? `<div class="se-more">আরও ${bn(ph.length - 3)}টি নম্বর · বিস্তারিত →</div>` : ''}</article>`;
 };
-const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : EMG_CATS.has(s.category) && phoneList(s).length ? svcEmgCard(s)
+const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : s.category === 'shop' ? svcHatCard(s) : EMG_CATS.has(s.category) && phoneList(s).length ? svcEmgCard(s)
   : s.category === 'union' ? svcUnionCard(s) : INFO_CATS.has(s.category) && !s.image_url ? svcInfoCard(s) : s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
 // বিস্তারিত লেখা: ### শিরোনাম, • তালিকা, ফাঁকা লাইনে অনুচ্ছেদ
 // বিস্তারিত লেখা: "## " প্রধান অংশ, "### " তার ভেতরের উপ-অংশ, "• " তালিকা
@@ -3978,6 +3978,7 @@ function svcInlinePage(s) {
 const SUBS = {
   amb: [['ambulance', 'এম্বুলেন্স', '🚑'], ['hearse', 'লাশবাহী গাড়ি', '⚰️'], ['helpline', 'হেল্পলাইন', '☎️']],
   tour: [['resort', 'রিসোর্ট', '🏡'], ['park', 'পার্ক', '🎡'], ['nature', 'প্রকৃতি ও বন', '🌳'], ['history', 'ঐতিহাসিক', '🏛️'], ['other', 'অন্যান্য', '📍']],
+  shop: [['weekly', 'সাপ্তাহিক হাট', '📅'], ['daily', 'দৈনিক বাজার', '🛒'], ['cattle', 'গরুর হাট', '🐄'], ['fish', 'মাছের আড়ত', '🐟'], ['seasonal', 'মৌসুমি পশুর হাট', '🕌']],
   famous: [['language', 'ভাষা সৈনিক', '🗣️'], ['freedom', 'মুক্তিযোদ্ধা', '🎖️'], ['politics', 'রাজনীতিবিদ', '🏛️'], ['doctor', 'চিকিৎসক', '🩺'], ['education', 'শিক্ষাবিদ', '🎓'], ['culture', 'সাহিত্য ও সংস্কৃতি', '🎭'], ['sports', 'খেলাধুলা', '🏅'], ['other', 'অন্যান্য', '⭐']],
 };
 const subsOf = cat => SUBS[cat] || [];
@@ -4053,6 +4054,12 @@ function svcDetailSheet(id, opt = {}) {
     <div class="sd-sec"><h3>${person ? 'জীবনী' : 'সম্পর্কে'}</h3>
       <div class="sdet-body${long ? ' clamp' : ''}">${detHtml(s.category === 'union' && s.facts?.length ? String(s.details || '').replace(/## এক নজরে[\s\S]*?(?=\n## |$)/, '') : s.details) || '<p class="mut">এখনো বিস্তারিত তথ্য যোগ করা হয়নি।</p>'}</div>
       ${long ? '<button class="sd-more" data-sdmore>আরও পড়ুন ⌄</button>' : ''}</div>
+    ${s.category === 'shop' ? (() => { const nh = nextHat(s), days = hatDaysOf(s), g = (s.goods || []).map(k => GOODS.find(x => x[0] === k)).filter(Boolean), u = hatUnion(s);
+      return `<div class="sd-sec"><h3>হাটবার</h3><div class="sd-hat">${nh ? `<div class="ht-next ${nh.k}${nh.live ? ' live' : ''}">${nh.k === 'today' ? '🛒' : nh.k === 'daily' ? '🔁' : '📅'} ${esc(nh.label)}</div>` : '<p class="mut">হাটবার এখনো যোগ হয়নি।</p>'}
+        ${days.length ? weekStrip(days, dhakaParts(new Date()).wd) + `<p class="sd-hatp">প্রতি ${esc(days.length > 1 ? days.slice(0, -1).map(d => BN_DAYS[d]).join(', ') + ' ও ' + BN_DAYS[days[days.length - 1]] : BN_DAYS[days[0]])}${HAT_TIME[s.hat_time] ? ` · ${HAT_TIME[s.hat_time][0]}` : ''}</p>` : ''}
+        ${s.subtype === 'seasonal' && (s.season_from || s.season_to) ? `<p class="sd-hatp">🕌 মৌসুম: ${hatDate(s.season_from)}${s.season_to ? ` – ${hatDate(s.season_to)}` : ''}</p>` : ''}
+        ${u ? `<button class="sd-hatu" data-sdrel="${esc(u.id)}">📍 ${esc(u.name)} ›</button>` : ''}</div></div>
+        ${g.length ? `<div class="sd-sec"><h3>যা পাওয়া যায়</h3><div class="sd-amen">${g.map(x => `<span><i>${x[1]}</i>${esc(x[2])}</span>`).join('')}</div></div>` : ''}`; })() : ''}
     ${s.amenities?.length ? `<div class="sd-sec"><h3>সুবিধাসমূহ</h3><div class="sd-amen">${s.amenities.filter(k => AMEN[k]).map(k => `<span><i>${AMEN[k][0]}</i>${AMEN[k][1]}</span>`).join('')}</div></div>` : ''}
     ${s.how_to_go ? `<div class="sd-sec"><h3>কীভাবে যাবেন</h3><div class="sd-go"><div class="sdet-body">${detHtml(s.how_to_go)}</div>
       <a class="sd-gomap" href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ভালুকা')}`}" target="_blank" rel="noopener">🧭 ম্যাপে পথ দেখুন</a></div></div>` : ''}
@@ -4162,13 +4169,63 @@ function svcDetailSheet(id, opt = {}) {
 const BN_DAYS = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
 const dayIdx = t => { const k = String(t || '').trim().replace(/বার$/, ''); return k ? BN_DAYS.findIndex(d => d.startsWith(k)) : -1; };
 const numOf = v => { const m = enDigits(String(v || '')).replace(/,/g, '').match(/\d+(?:\.\d+)?/); return m ? +m[0] : null; };
+// হাট বাজার: হাটবার, সময়, পণ্য, মৌসুমি হাট
+const GOODS = [['cattle', '🐄', 'গরু-ছাগল'], ['fish', '🐟', 'মাছ'], ['veg', '🥬', 'সবজি'], ['rice', '🌾', 'ধান-চাল'], ['poultry', '🐔', 'হাঁস-মুরগি'], ['fruit', '🍌', 'ফলমূল'], ['grocery', '🧂', 'মুদি'], ['cloth', '👕', 'কাপড়'], ['tools', '🔨', 'কৃষি সরঞ্জাম']];
+const HAT_TIME = { morning: ['সকালে', 6, 12], afternoon: ['দুপুর থেকে বিকেলে', 12, 18], evening: ['বিকেল থেকে রাতে', 15, 21], allday: ['সারাদিন', 7, 20] };
+const DAY_SHORT = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
+const dhakaYmd = (plus = 0) => new Date(Date.now() + 6 * 36e5 + plus * 864e5).toISOString().slice(0, 10);
+const hatDaysOf = x => (x.hat_days?.length ? [...new Set(x.hat_days.map(Number))].sort((a, b) => a - b) : hatDays(x.hours));
+// মৌসুমি হাট শুধু তার সময়কালে (ahead দিন আগে থেকে "আসছে")
+const seasonOn = (x, ahead = 0) => { if (x.subtype !== 'seasonal') return true; if (!x.season_from && !x.season_to) return false; return (!x.season_to || x.season_to >= dhakaYmd()) && (!x.season_from || x.season_from <= dhakaYmd(ahead)); };
+const hatDate = ymd => { if (!ymd) return ''; const [, m, d] = ymd.split('-').map(Number); return `${bn(d)} ${MON_BN[m - 1]}`; };
+// পরের হাট: {k: 'today'|'tomorrow'|'later'|'daily', label}
+function nextHat(x) {
+  const days = hatDaysOf(x), t = dhakaParts(new Date()), tm = HAT_TIME[x.hat_time];
+  if (!days.length) return x.subtype === 'daily' || x.hat_time ? { k: 'daily', label: 'প্রতিদিন' + (tm ? ` · ${tm[0]}` : '') } : null;
+  for (let i = 0; i < 7; i++) {
+    const d = (t.wd + i) % 7; if (!days.includes(d)) continue;
+    if (i === 0) { if (tm && t.h >= tm[2]) continue; return { k: 'today', label: tm && t.h >= tm[1] ? 'আজ হাট · এখন চলছে' : `আজ হাট${tm ? ` · ${tm[0]}` : ''}`, live: !!(tm && t.h >= tm[1]) }; }
+    if (i === 1) return { k: 'tomorrow', label: `আগামীকাল ${BN_DAYS[d]}` };
+    return { k: 'later', label: `${bn(i)} দিন পর · ${BN_DAYS[d]}` };
+  }
+  return { k: 'later', label: `পরের ${BN_DAYS[days[0]]}` };
+}
+const hatUnion = x => (S.svcAll || []).find(u => u.category === 'union' && inArea(x, u)) || ((S.svcAll || []).find(u => u.category === 'pouro' && inArea(x, u)));
+function myAreaRow() { const u = me()?.unionId; return u ? (S.svcAll || []).find(x => (x.category === 'union' || x.category === 'pouro') && x.union_id === u) : null; }
+const weekStrip = (days, today) => `<div class="hw">${DAY_SHORT.map((d, i) => `<span class="${days.includes(i) ? 'on' : ''}${i === today ? ' td' : ''}">${d}</span>`).join('')}</div>`;
+const svcHatCard = s => {
+  const sub = subsOf('shop').find(x => x[0] === s.subtype), nh = nextHat(s), days = hatDaysOf(s), u = hatUnion(s), wd = dhakaParts(new Date()).wd, ph = phoneList(s);
+  const g = (s.goods || []).map(k => GOODS.find(x => x[0] === k)).filter(Boolean);
+  return `<article class="card svc svc-hat${nh?.k === 'today' ? ' today' : ''}" style="--sc:${svcColor(s.category)};--i:${TI()}" data-svcdet="${esc(s.id)}">
+    <div class="ht-h">${s.image_url ? `<img class="ht-img" src="${esc(s.image_url)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="ht-ic">${sub ? sub[2] : '🛒'}</span>`}
+      <div class="ht-t"><h3>${esc(s.name)}</h3><p>${u ? `<b>${esc(areaCore(u))}${u.category === 'pouro' ? '' : ' ইউনিয়ন'}</b> · ` : ''}${esc(s.address || '')}</p>${sub ? `<small>${esc(sub[1])}</small>` : ''}</div></div>
+    ${nh ? `<div class="ht-next ${nh.k}${nh.live ? ' live' : ''}">${nh.k === 'today' ? '🛒' : nh.k === 'daily' ? '🔁' : '📅'} ${esc(nh.label)}</div>` : ''}
+    ${s.subtype === 'seasonal' && (s.season_from || s.season_to) ? `<div class="ht-next season">🕌 ${hatDate(s.season_from)}${s.season_to ? ` – ${hatDate(s.season_to)}` : ''}</div>` : ''}
+    ${days.length ? weekStrip(days, wd) : ''}
+    ${g.length ? `<div class="ht-goods">${g.map(x => `<span>${x[1]} ${esc(x[2])}</span>`).join('')}</div>` : ''}
+    <div class="of-foot ht-foot">${ph[0] ? `<a class="of-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞</a>` : ''}<a class="of-map" href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ' + (s.address || 'ভালুকা'))}`}" target="_blank" rel="noopener" aria-label="পথ">🧭</a></div></article>`;
+};
+// হাট বাজার ক্যাটাগরির উপরের অংশ: আজকের হাট, মৌসুমি হাট, পণ্য ও এলাকা ফিল্টার
+function hatTop(all) {
+  const t = dhakaParts(new Date()), today = all.filter(x => seasonOn(x) && hatDaysOf(x).includes(t.wd) && x.subtype !== 'daily');
+  const season = all.filter(x => x.subtype === 'seasonal' && seasonOn(x, 30));
+  const areas = [...new Map(all.map(x => hatUnion(x)).filter(Boolean).map(u => [u.id, u])).values()].sort((a, b) => (a.category === 'pouro' ? -1 : unionNo(a)) - (b.category === 'pouro' ? -1 : unionNo(b)));
+  const my = myAreaRow(), goods = GOODS.filter(g => all.some(x => (x.goods || []).includes(g[0])));
+  return `<div class="ht-today"><div class="ht-th"><span>🛒</span><div><b>আজ ${BN_DAYS[t.wd]} যেসব হাট বসছে</b><small>${today.length ? `${bn(today.length)}টি হাট` : 'আজ কোনো সাপ্তাহিক হাট নেই'}</small></div></div>
+      ${today.length ? `<div class="ht-tl">${today.map(x => { const nh = nextHat(x), u = hatUnion(x); return `<button data-svcdet="${esc(x.id)}"><b>${esc(x.name)}</b><small>${u ? esc(areaCore(u)) + ' · ' : ''}${nh?.k === 'today' ? esc(nh.label.replace('আজ হাট · ', '').replace('আজ হাট', 'আজ')) : 'আজকের হাট শেষ'}</small>${nh?.live ? '<i>এখন</i>' : ''}</button>`; }).join('')}</div>` : ''}
+      <div class="ht-wk">${DAY_SHORT.map((d, i) => { const n = all.filter(x => seasonOn(x) && x.subtype !== 'daily' && hatDaysOf(x).includes(i)).length; return `<span class="${i === t.wd ? 'td' : ''}"><small>${d}</small><b>${n ? bn(n) : '–'}</b></span>`; }).join('')}</div></div>
+    ${season.length ? `<div class="ht-season"><b>🕌 মৌসুমি পশুর হাট</b>${season.map(x => `<button data-svcdet="${esc(x.id)}"><span>${esc(x.name)}</span><small>${hatDate(x.season_from)}${x.season_to ? ` – ${hatDate(x.season_to)}` : ''}${x.season_from > dhakaYmd() ? ' · শীঘ্রই' : ' · চলছে'}</small></button>`).join('')}</div>` : ''}
+    ${goods.length ? `<div class="sub-chips ht-gf"><button data-hgood=""${S.hgood ? '' : ' class="on"'}>কী খুঁজছেন?</button>${goods.map(g => `<button data-hgood="${g[0]}"${S.hgood === g[0] ? ' class="on"' : ''}>${g[1]} ${esc(g[2])}</button>`).join('')}</div>` : ''}
+    ${areas.length > 1 ? `<div class="sub-chips ht-af"><button data-harea=""${S.harea ? '' : ' class="on"'}>সব এলাকা</button>${my && areas.some(a => a.id === my.id) ? `<button data-harea="${esc(my.id)}"${String(S.harea) === String(my.id) ? ' class="on"' : ''}>⭐ আমার এলাকা</button>` : ''}${areas.filter(a => !my || a.id !== my.id).map(a => `<button data-harea="${esc(a.id)}"${String(S.harea) === String(a.id) ? ' class="on"' : ''}>${a.category === 'pouro' ? 'পৌরসভা' : esc(areaCore(a))}</button>`).join('')}</div>` : ''}`;
+}
 const hatDays = t => [...new Set((String(t || '').match(/রবি|সোম|মঙ্গল|বুধ|বৃহস্পতি|শুক্র|শনি/g) || []).map(dayIdx).filter(i => i >= 0))].sort();
 // ইউনিয়নের হাট: সম্পাদনায় লেখা হাট + "হাট বাজার" ক্যাটাগরির যেসব বাজারের ঠিকানা এই ইউনিয়নে মেলে
 function unionHats(u) {
   const own = (u.hats || []).filter(h => h.n).map(h => ({ ...h }));
-  for (const x of (S.svcAll || []).filter(x => x.category === 'shop' && inArea(x, u))) {
-    const d = hatDays(x.hours), t = [x.hours, x.address].filter(Boolean).join(' · '), same = own.find(h => bnNorm(h.n) === bnNorm(x.name));
-    if (same) { same.id = x.id; if (d.length) same.d = d; same.t = t || same.t; }   // ক্যাটাগরির বাজারের তথ্যই আগে else own.push({ n: x.name, d, t, id: x.id });
+  for (const x of (S.svcAll || []).filter(x => x.category === 'shop' && inArea(x, u) && seasonOn(x))) {
+    const d = hatDaysOf(x), t = [HAT_TIME[x.hat_time]?.[0], x.hours, x.address].filter(Boolean).join(' · '), same = own.find(h => bnNorm(h.n) === bnNorm(x.name));
+    // ক্যাটাগরির বাজারের তথ্যই আগে
+    if (same) { same.id = x.id; if (d.length) same.d = d; same.t = t || same.t; } else own.push({ n: x.name, d, t, id: x.id });
   }
   return own;
 }
@@ -4444,6 +4501,12 @@ function svcEditSheet(s, category) {
     <label>ইমেইল<input id="se-email" type="email" maxlength="120" value="${esc(v.email || '')}"></label>
     ${INFO_CATS.has(cat) ? `<label>ওয়েবসাইট<input id="se-url" type="url" maxlength="300" placeholder="https://" value="${esc(/beautifulbhaluka/.test(v.url || '') ? '' : v.url || '')}"></label>` : ''}` : ''}
     ${F.phone ? `<div class="bk-row">${inp('se-phone', 'ফোন', v.phone, 'maxlength="40" inputmode="tel"')}${F.hours ? inp('se-hours', 'খোলার সময়', v.hours, 'maxlength="80" placeholder="যেমন সকাল ৯টা–সন্ধ্যা ৬টা"') : ''}</div>` : ''}
+    ${cat === 'shop' ? `<div class="hf"><label>হাটবার <small class="mut">(কোন দিন হাট বসে · দৈনিক বাজার হলে কোনোটাই বাছবেন না)</small></label>
+      <div class="hf-days">${DAY_SHORT.map((d, i) => `<button type="button" data-hfd="${i}"${hatDaysOf(v).includes(i) ? ' class="on"' : ''}>${d}</button>`).join('')}</div>
+      <label>কখন বসে<select id="se-htime" class="f"><option value="">—</option>${Object.entries(HAT_TIME).map(([k, x]) => `<option value="${k}"${v.hat_time === k ? ' selected' : ''}>${x[0]}</option>`).join('')}</select></label>
+      <label>কী কী পাওয়া যায়</label><div class="hf-goods">${GOODS.map(g => `<button type="button" data-hfg="${g[0]}"${(v.goods || []).includes(g[0]) ? ' class="on"' : ''}>${g[1]} ${g[2]}</button>`).join('')}</div>
+      <div class="bk-row hf-season"><label>মৌসুমি হাট শুরু<input id="se-sfrom" type="date" value="${esc(v.season_from || '')}"></label><label>শেষ<input id="se-sto" type="date" value="${esc(v.season_to || '')}"></label></div>
+      <small class="mut">মৌসুমি পশুর হাট (ধরন: মৌসুমি) শুধু এই তারিখের মধ্যে দেখাবে, ৩০ দিন আগে থেকে "শীঘ্রই" লেখা থাকবে।</small></div>` : ''}
     <label>${F.imgs} <small class="mut">· সর্বোচ্চ ১৩টি</small></label>
     <div class="se-imgs"></div>
     <label>${F.det} <small class="mut">(### দিয়ে শিরোনাম, • দিয়ে তালিকা)</small><textarea id="se-det" rows="8" maxlength="20000"${person ? ' placeholder="### প্রারম্ভিক জীবন&#10;...&#10;&#10;### কর্মজীবন&#10;...&#10;&#10;### অবদান ও সম্মাননা&#10;• ..."' : ''}>${esc(v.details || '')}</textarea></label>
@@ -4484,6 +4547,7 @@ function svcEditSheet(s, category) {
   sh.onclick = e => {
     const ra = e.target.closest('[data-reladd]'); if (ra) { if (rel.length < 20) rel.push(+ra.dataset.reladd); sh.querySelector('#se-relq').value = ''; sh.querySelector('.se-relres').innerHTML = ''; return drawRel(); }
     const rd = e.target.closest('[data-reldel]'); if (rd) { rel.splice(rel.indexOf(+rd.dataset.reldel), 1); return drawRel(); }
+    const hf = e.target.closest('[data-hfd], [data-hfg]'); if (hf) { hf.classList.toggle('on'); return; }
     const a = e.target.closest('[data-am]'); if (a) { a.classList.toggle('on'); am[a.classList.contains('on') ? 'add' : 'delete'](a.dataset.am); return; }
     const d = e.target.closest('[data-imdel]'); if (d) { imgs.splice(+d.dataset.imdel, 1); return drawImgs(); }
     const cv = e.target.closest('[data-imcover]'); if (cv) { imgs.unshift(...imgs.splice(+cv.dataset.imcover, 1)); return drawImgs(); }
@@ -4497,6 +4561,7 @@ function svcEditSheet(s, category) {
     if (has('#se-area')) p.union_id = val('#se-area') ? +val('#se-area') : null;
     if (has('#se-phone')) p.phone = val('#se-phone') || ''; else if (!s) p.phone = '';
     if (has('#se-hours')) p.hours = val('#se-hours');
+    if (has('#se-htime')) { p.hat_days = [...sh.querySelectorAll('[data-hfd].on')].map(b => +b.dataset.hfd); p.hat_time = val('#se-htime') || null; p.goods = [...sh.querySelectorAll('[data-hfg].on')].map(b => b.dataset.hfg); p.season_from = val('#se-sfrom') || null; p.season_to = val('#se-sto') || null; }
     if (has('#se-phones')) {
       p.phones = $('#se-phones').value.split('\n').map(x => x.trim()).filter(Boolean).map(l => { const m = l.match(/^(.*?)[:：]\s*([+০-৯0-9][০-৯0-9\s-]{1,})$/); return m ? { l: m[1].trim() || 'ফোন', n: enDigits(m[2]).trim() } : /^[+০-৯0-9][০-৯0-9\s-]+$/.test(l) ? { l: 'ফোন', n: enDigits(l) } : null; }).filter(Boolean).slice(0, 30);
       if (p.phones.length && !p.phone) p.phone = p.phones[0].n;
@@ -5332,6 +5397,15 @@ function drawDir() {
   if (S.dsub && base.length && !subs.some(x => x[0] === S.dsub)) S.dsub = null;
   const subHtml = subs.length > 1 ? `<div class="sub-chips"><button data-dsub=""${S.dsub ? '' : ' class="on"'}>সব <small>${bn(base.length)}</small></button>${subs.map(x => `<button data-dsub="${x[0]}"${S.dsub === x[0] ? ' class="on"' : ''}>${x[2]} ${x[1]} <small>${bn(base.filter(b => b.subtype === x[0]).length)}</small></button>`).join('')}</div>` : '';
   if (S.dsub) base = base.filter(b => b.subtype === S.dsub);
+  let hatHtml = '';
+  if (S.dcat === 'shop') {
+    if (!q) hatHtml = hatTop(list.filter(x => x.category === 'shop'));
+    base = base.filter(x => x.subtype !== 'seasonal' || seasonOn(x, 30));
+    if (S.hgood) base = base.filter(x => (x.goods || []).includes(S.hgood));
+    if (S.harea) base = base.filter(x => String(hatUnion(x)?.id) === String(S.harea));
+    const my = myAreaRow(), rank = x => { const n = nextHat(x); return n?.k === 'today' ? 0 : n?.k === 'tomorrow' ? 1 : n?.k === 'later' ? 2 : 3; };
+    if (!S.myLoc) base = [...base].sort((a, b) => (my ? (hatUnion(b)?.id === my.id) - (hatUnion(a)?.id === my.id) : 0) || rank(a) - rank(b));
+  }
   if (S.dcat === 'union') base = [...base].sort((a, b) => unionNo(a) - unionNo(b));
   if (S.dcat === 'police') base = [...base].sort((a, b) => phoneList(b).length - phoneList(a).length);
   if (S.dcat === 'amb') { const ord = k => { const i = subsOf('amb').findIndex(x => x[0] === k); return i < 0 ? 9 : i; }; base = [...base].sort((a, b) => ord(a.subtype) - ord(b.subtype)); }
@@ -5347,8 +5421,9 @@ function drawDir() {
   const emgHtml = (unionMap || '') + (EMG_CATS.has(S.dcat) && !q ? `<a class="emg-strip" href="tel:999"><span>🚨</span><div><b>জীবন-মৃত্যুর জরুরি অবস্থায় ৯৯৯</b><small>পুলিশ, ফায়ার সার্ভিস ও এম্বুলেন্স — বিনা খরচে, ২৪ ঘণ্টা</small></div><i>কল</i></a>${S.dcat === 'fire' ? '<a class="emg-strip fire" href="tel:102"><span>🚒</span><div><b>ফায়ার সার্ভিস হটলাইন ১০২</b><small>আগুন ও উদ্ধারকাজে সরাসরি</small></div><i>কল</i></a>' : ''}` : '');
   if (['upz', 'pouro'].includes(S.dcat) && !q && !S.dsub && base.length === 1 && base[0].details) { $('#dir').innerHTML = head + svcInlinePage(base[0]); return; }
   const subX = $('#dir .sub-chips')?.scrollLeft || 0;
-  $('#dir').innerHTML = head + famHtml + emgHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
+  $('#dir').innerHTML = head + famHtml + hatHtml + emgHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
   const sc = $('#dir .sub-chips'); if (sc) { sc.scrollLeft = subX; chipCenter(sc); }
+  document.querySelectorAll('#dir .ht-gf, #dir .ht-af').forEach(chipCenter);
 }
 function drawNear(list, q) {
   const located = list.filter(x => x.lat != null && (!S.nearCat || x.category === S.nearCat) && (!q || svcSearch([x], q).hits.length));
@@ -5421,6 +5496,8 @@ document.addEventListener('click', e => {
   const ipr = e.target.closest('[data-iprep]'); if (ipr) { const x = (S.svcAll || []).find(y => String(y.id) === ipr.dataset.iprep); return x && svcReportSheet(x); }
   const ipz = e.target.closest('[data-ipzoom]'); if (ipz) return sdZoom([ipz.src], 0);
   const ds = e.target.closest('[data-dsub]'); if (ds) { S.dsub = ds.dataset.dsub || null; return drawDir(); }
+  const hg = e.target.closest('[data-hgood]'); if (hg) { S.hgood = hg.dataset.hgood || ''; return drawDir(); }
+  const ha = e.target.closest('[data-harea]'); if (ha) { S.harea = ha.dataset.harea || ''; return drawDir(); }
   const sa = e.target.closest('[data-svcadd]'); if (sa) return svcEditSheet(null, sa.dataset.svcadd);
   if (e.target.closest('[data-famquiz]')) return famQuizSheet();
   if (e.target.closest('[data-famsugg]')) return famSuggestSheet();

@@ -5407,6 +5407,14 @@ drop trigger if exists area_issues_resolved on public.area_issues;
 create trigger area_issues_resolved before update on public.area_issues for each row execute function public.area_issue_resolved_at();
 alter function public.area_issue_resolved_at() set search_path = public;
 
+-- হাট বাজার: হাটবার, হাটের সময়, কী পাওয়া যায়, মৌসুমি হাটের সময়কাল
+alter table public.services add column if not exists hat_days smallint[] not null default '{}';
+alter table public.services add column if not exists hat_time text check (hat_time in ('morning','afternoon','evening','allday'));
+alter table public.services add column if not exists goods text[] not null default '{}';
+alter table public.services add column if not exists season_from date;
+alter table public.services add column if not exists season_to date;
+comment on column public.services.hat_days is 'হাটবার: ০=রবিবার … ৬=শনিবার; খালি = প্রতিদিন';
+
 -- =====================================================================
 --  নিজেকে অ্যাডমিন বানাতে: অ্যাপে প্রথমে সাইনআপ করুন, তারপর নিচের লাইনে
 --  নিজের ইমেইল বসিয়ে আলাদাভাবে চালান:

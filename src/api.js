@@ -906,7 +906,7 @@ async function supabaseApi() {
 
     // ---------- সেবা ডিরেক্টরি ও রিপোর্ট
     async services({ category, q }) {
-      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng,url,image_url,details,images,subtype,amenities,how_to_go,best_time,rating_avg,rating_count,videos,tagline,life,timeline,facts,honors,quote,born_md,died_md,burial,burial_lat,burial_lng,related,family_verified,tribute_count,phones,email,council,hats')
+      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng,url,image_url,details,images,subtype,amenities,how_to_go,best_time,rating_avg,rating_count,videos,tagline,life,timeline,facts,honors,quote,born_md,died_md,burial,burial_lat,burial_lng,related,family_verified,tribute_count,phones,email,council,hats,hat_days,hat_time,goods,season_from,season_to')
         .eq('upazila_id', UPAZILA_ID).order('verified', { ascending: false }).order('name').limit(500);
       if (category) s = s.eq('category', category);
       const term = (q || '').replace(/[,%()*\\]/g, ' ').trim();

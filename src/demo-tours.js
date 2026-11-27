@@ -102,7 +102,10 @@ DEMO_TOURS.push(
   S_({ id: 948, union_id: 12, category: 'union', name: '১০নং হবিরবাড়ী ইউনিয়ন পরিষদ', tagline: '১০নং ইউনিয়ন · জনসংখ্যা ১,৮৬,৪২৫ (২০২২)',
     facts: [{ k: 'জনসংখ্যা (২০২২)', v: '১,৮৬,৪২৫ জন' }, { k: 'গ্রাম', v: '১১টি' }, { k: 'শিক্ষার হার', v: '৮৩%' }],
     details: 'হবিরবাড়ী ময়মনসিংহ জেলার সর্বদক্ষিণের ইউনিয়ন, শিল্পাঞ্চল হিসেবে পরিচিত।\n\n## দর্শনীয় স্থান\n\n• হবিরবাড়ী বন\n\n• গ্রিন অরণ্য পার্ক' }),
-  S_({ id: 960, category: 'shop', name: 'উথুরা বাজার', address: 'উথুরা ইউনিয়ন, ভালুকা', hours: 'হাটবার: শনি ও মঙ্গলবার' }),
-  S_({ id: 961, category: 'shop', name: 'চামিয়াদী সাপ্তাহিক হাট', address: 'চামিয়াদী, উথুরা', hours: 'প্রতি শনিবার বিকেলে' }),
+  S_({ id: 960, category: 'shop', subtype: 'weekly', name: 'উথুরা বাজার', address: 'উথুরা ইউনিয়ন, ভালুকা', hat_days: [6, 2], hat_time: 'afternoon', goods: ['veg', 'fish', 'rice', 'poultry'] }),
+  S_({ id: 961, category: 'shop', subtype: 'cattle', name: 'চামিয়াদী গরুর হাট', address: 'চামিয়াদী, উথুরা', hat_days: [6], hat_time: 'morning', goods: ['cattle'] }),
+  S_({ id: 962, category: 'shop', subtype: 'daily', name: 'ভালুকা কাঁচাবাজার', address: 'ভালুকা পৌরসভা, পশ্চিম বাজার', hat_time: 'allday', goods: ['veg', 'fish', 'grocery', 'fruit'] }),
+  S_({ id: 963, category: 'shop', subtype: 'weekly', name: 'মেদুয়ারী বাঘসাতরা হাট', address: 'মেদুয়ারী ইউনিয়ন, ভালুকা', hat_days: [0, 3], hat_time: 'afternoon', goods: ['veg', 'rice', 'cloth'] }),
+  S_({ id: 964, category: 'shop', subtype: 'seasonal', name: 'ভালুকা কোরবানির পশুর হাট', address: 'ভালুকা পৌরসভা', season_from: new Date(Date.now() + 10 * 864e5).toISOString().slice(0, 10), season_to: new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10), goods: ['cattle'] }),
   S_({ id: 949, union_id: 7, category: 'union', name: '৩নং ভরাডোবা ইউনিয়ন পরিষদ', tagline: '৩নং ইউনিয়ন · জনসংখ্যা ৩৪,১৪৮ (২০২২)', details: '## হাট-বাজার\n\n• ভরাডোবা বাসস্ট্যান্ড হাট\n\n• পুরুড়া হাট' }),
 );

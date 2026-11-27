@@ -4217,6 +4217,13 @@ function dirHeroHtml(total, cats) {
     <div class="dh-wxrow"><button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ"></button><div class="dh-msg" id="dh-msg" hidden></div></div>
     <div class="dh-bot"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div></div>`;
 }
+// সবুজ কার্ডটা পুরো ডিরেক্টরির হেডার: সব পাতায় একদম উপরে থাকে
+function renderDirHead(list) {
+  const box = $('#dir-head'); if (!box) return;
+  const cats = svcCats(), key = `${list.length}|${cats.length}|${dkKey(new Date())}|${EN}`;
+  if (box.dataset.k !== key || !box.children.length) { box.innerHTML = dirHeroHtml(list.length, cats); box.dataset.k = key; const c = local.get('wx'); if (c?.v) dirHeroWx(c.v); else dirHeroWx(null); }
+  if (!S.wxT || Date.now() - S.wxT > 6e4) { S.wxT = Date.now(); loadWeather().then(dirHeroWx); }
+}
 function sliderHtml(total, cats) {
   const bs = (S.dirBanners || []).map(b => `<div class="ds-slide ds-c-${esc(b.color || 'green')}${b.image_url ? ' has-img' : ''}" ${b.link ? `data-dlink="${esc(b.link)}" role="button" tabindex="0"` : ''}>
     ${b.image_url ? `<img src="${esc(b.image_url)}" alt="" loading="lazy" decoding="async">` : ''}<div class="ds-txt">${b.title ? `<b>${esc(b.title)}</b>` : ''}${b.subtitle ? `<small>${esc(b.subtitle)}</small>` : ''}</div>${b.link ? '<span class="ds-go">›</span>' : ''}</div>`);
@@ -4290,7 +4297,7 @@ function renderSvcGrid(list) {
   const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : k === 'aid' ? 'প্রাথমিক চিকিৎসা' : c[1], cnt = k === 'sos' || k === 'aid' || SVC_SPECIAL[k] ? 0 : n(k);
     return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
   const favs = list.filter(x => S.svcFav?.has(x.id));
-  $('#dir').innerHTML = dirHeroHtml(total, cats) + sliderHtml(total, cats)
+  $('#dir').innerHTML = sliderHtml(total, cats)
     + dayNoticeHtml()
     + `<div class="sos-row2"><button class="sos-btn" data-sos>🆘 বিপদে আছি</button><button class="aid-btn" data-svc="aid">🩹 প্রাথমিক চিকিৎসা</button></div>`
     + timeSuggestHtml()
@@ -4299,7 +4306,6 @@ function renderSvcGrid(list) {
     + (favs.length ? `<h3 class="svc-sec" style="--c:#e0245e"><i></i>❤️ আমার প্রিয় সেবা <button class="svc-more" data-svc="fav">সব দেখুন</button></h3>${favs.slice(0, 3).map(svcCard).join('')}` : '')
     + SVC_GROUPS.map(([t, col, keys]) => { const ks = keys.filter(has); return ks.length ? `<h3 class="svc-sec" style="--c:${col}"><i></i>${esc(t)}</h3><div class="svc-grid">${ks.map(tile).join('')}</div>` : ''; }).join('');
   startSlider();
-  { const c = local.get('wx'); if (c?.v) dirHeroWx(c.v); loadWeather().then(dirHeroWx); }
 }
 function dirChips() {
   const c = $('#dchips'), chipX = c.scrollLeft;   // চিপের সারি যেখানে ছিল সেখানেই থাকবে
@@ -4312,6 +4318,7 @@ function dirChips() {
 // আগে আনা সব সেবা থেকে এখানেই ছেঁকে দেখাই (খোঁজা, ধরন, প্রিয়)
 function drawDir() {
   const list = S.svcAll || [], q = $('#q').value.trim();
+  renderDirHead(list);
   dirChips();
   $('#svc-off')?.remove();
   if (S.svcOffline) $('#dir').insertAdjacentHTML('beforebegin', `<div id="svc-off" class="svc-off">📴 ইন্টারনেট নেই · ${esc(dateBn(S.svcOffline))} তারিখে সেভ করা তালিকা দেখাচ্ছেন। কল করা যাবে।</div>`);
@@ -4349,13 +4356,15 @@ async function loadDir() {
   const q = $('#q').value.trim(), landing = !S.dcat && !q;
   document.body.classList.toggle('dir-sub', !landing);
   if (landing) S.dirSub = false;
+  if (!S.svcAll) { const c = local.get('svc_cache'); if (c?.list) { S.svcAll = c.list; S.popCats = c.pop || []; S.dirBanners = c.bans || []; S.svcCacheT = c.t; } }
+  renderDirHead(S.svcAll || []);
   dirChips();
   if (S.dcat === 'sos') { $('#dir').innerHTML = emergencyHtml(); return; }
   if (S.dcat === 'blood') return loadBlood();
   const restore = () => { if (S.dirY != null) { const y = S.dirY; S.dirY = null; requestAnimationFrame(() => window.scrollTo(0, y)); } };
   if (!S.svcAll) { const c = local.get('svc_cache'); if (c?.list) { S.svcAll = c.list; S.popCats = c.pop || []; S.dirBanners = c.bans || []; S.svcCacheT = c.t; } }   // নেট ছাড়াও: ফোনে জমা রাখা তালিকা
   if (S.svcAll) { drawDir(); restore(); }   // আগের তালিকা সাথে সাথে দেখাই, পরে চুপচাপ হালনাগাদ
-  else $('#dir').innerHTML = '<div class="skel"></div>';
+  else { renderDirHead([]); $('#dir').innerHTML = '<div class="skel"></div>'; }
   try {
     const [list, pop, bans] = await Promise.all([S.api.services({}), S.api.popularServiceCats().catch(() => S.popCats || []), S.api.dirBanners().catch(() => S.dirBanners || []), ensureSvcFavs()]);
     const banChanged = JSON.stringify(bans) !== JSON.stringify(S.dirBanners); S.dirBanners = bans;

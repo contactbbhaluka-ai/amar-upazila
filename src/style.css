@@ -1763,3 +1763,4 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .dir-hero .dh-date b{font-size:1.12em}.dir-hero .dh-date span{font-weight:600;font-size:1em}.dir-hero .dh-date i{font-style:normal;opacity:.7}
 .dh-wxrow{display:flex;align-items:stretch;gap:8px;margin-top:10px}.dh-wxrow .dh-wx{flex-direction:row;gap:6px;align-items:center;padding:8px 10px;min-width:0}
 .dh-wxrow .dh-wx small{white-space:nowrap}.dh-wxrow .dh-msg{flex:1;margin:0;display:flex;align-items:center}
+#dir-head .dir-hero{margin:0 0 12px}.upz-root:not(.dir-sub) #v-dir .bar{display:none}

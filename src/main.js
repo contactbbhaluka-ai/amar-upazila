@@ -4034,10 +4034,7 @@ function svcDetailSheet(id, opt = {}) {
     const rd = e.target.closest('[data-rvdel]'); if (rd) { if (!confirm('রিভিউটি মুছে ফেলবেন?')) return; await busy(rd, async () => { await S.api.delReview(+rd.dataset.rvdel); revs = revs.filter(x => String(x.id) !== rd.dataset.rvdel); drawRev(); toast('রিভিউ মুছে ফেলা হয়েছে'); }); return; }
     const f = e.target.closest('[data-sdfav]'); if (f) { await toggleSvcFav(s.id); const on = S.svcFav?.has(s.id); f.classList.toggle('on', on); f.setAttribute('aria-pressed', on); f.innerHTML = `<span class="sd-aic">${on ? '❤️' : '🤍'}</span><small>${on ? 'প্রিয়তে আছে' : 'প্রিয়তে রাখুন'}</small>`; if (on) f.querySelector('.sd-aic').classList.add('pop'); return; }
     const m = e.target.closest('[data-sdmore]'); if (m) { sh.querySelector('.sdet-body').classList.remove('clamp'); m.remove(); return; }
-    if (e.target.closest('[data-svcshare]')) {
-      const text = `${s.name}${s.address ? '\n📍 ' + s.address : ''}${s.phone ? '\n📞 ' + s.phone : ''}\n\n— আমার উপজেলা অ্যাপ`;
-      try { if (navigator.share) await navigator.share({ title: s.name, text }); else { await navigator.clipboard.writeText(text); toast('কপি হয়েছে'); } } catch {}
-    }
+    if (e.target.closest('[data-svcshare]')) return svcShareSheet(s);
   };
 }
 // রেটিং ও রিভিউ লেখা
@@ -4332,6 +4329,76 @@ async function famQuizSheet() {
         <div class="qz-rev">${qs.map((q, k) => { const ok = pick[k] === res.answers[k], right = q.options.find(x => x.id === res.answers[k]); return `<div class="${ok ? 'ok' : 'no'}"><span>${ok ? '✔' : '✘'}</span><div><small>${esc(q.q)}</small><b data-svcdet="${esc(res.answers[k])}">${esc(right?.name || '')}</b></div></div>`; }).join('')}</div></div>
         <button class="btn ghost" data-close style="width:100%;margin-top:10px">বন্ধ করুন</button>`;
     });
+  };
+}
+// ================= শেয়ার কার্ড: ছবি, নাম ও পরিচিতিসহ একটি ছবি (ফেসবুক/WhatsApp-এ দেওয়ার মতো)
+const loadImgSafe = src => new Promise(res => { if (!src) return res(null); const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+function wrapText(ctx, text, maxW, maxLines) {
+  const words = String(text || '').split(/\s+/), lines = []; let cur = '';
+  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; if (lines.length === maxLines) break; } else cur = t; }
+  if (lines.length < maxLines && cur) lines.push(cur);
+  if (lines.length === maxLines && words.join(' ').length > lines.join(' ').length) lines[maxLines - 1] = lines[maxLines - 1].replace(/\s*\S*$/, '') + '…';
+  return lines;
+}
+async function svcCardImage(s) {
+  try { await document.fonts?.ready; } catch { /* থাক */ }
+  const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d'), person = s.category === 'famous', col = svcColor(s.category) || '#0a6b4f';
+  const F = (w, px) => `${w} ${px}px "Hind Siliguri","Noto Sans Bengali",sans-serif`;
+  const img = await loadImgSafe(s.image_url || s.images?.[0]);
+  const cover = (im, x, y, w, h, fy = 0.5) => { const r = Math.max(w / im.width, h / im.height), iw = im.width * r, ih = im.height * r; ctx.drawImage(im, x + (w - iw) / 2, y + (h - ih) * fy, iw, ih); };
+  const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+  // পটভূমি
+  const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#0f172a'); g.addColorStop(1, col); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (img) { ctx.save(); ctx.globalAlpha = 0.35; ctx.filter = 'blur(40px)'; cover(img, -80, -80, W + 160, H + 160); ctx.restore(); }
+  const shade = ctx.createLinearGradient(0, 0, 0, H); shade.addColorStop(0, 'rgba(0,0,0,.15)'); shade.addColorStop(1, 'rgba(0,0,0,.7)'); ctx.fillStyle = shade; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+  let y;
+  if (person) {   // প্রতিকৃতি
+    const pw = 500, ph = 620, px = (W - pw) / 2, py = 150;
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 50; rr(px, py, pw, ph, 40); ctx.fillStyle = '#334155'; ctx.fill(); ctx.restore();
+    ctx.save(); rr(px, py, pw, ph, 40); ctx.clip(); if (img) cover(img, px, py, pw, ph, 0.2); else { ctx.fillStyle = col; ctx.fillRect(px, py, pw, ph); ctx.fillStyle = '#fff'; ctx.font = F(700, 200); ctx.fillText((s.name || '?').charAt(0), W / 2, py + ph / 2 + 70); } ctx.restore();
+    ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(255,255,255,.9)'; rr(px, py, pw, ph, 40); ctx.stroke();
+    y = py + ph + 110;
+    const an = annivOf(s); if (an) { ctx.font = F(700, 40); const t = an === 'born' ? '🎂 আজ জন্মদিন' : '🕯️ আজ মৃত্যুবার্ষিকী', tw = ctx.measureText(t).width + 60;
+      ctx.fillStyle = an === 'born' ? '#db2777' : 'rgba(255,255,255,.2)'; rr((W - tw) / 2, py - 90, tw, 66, 33); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(t, W / 2, py - 44); }
+  } else {   // স্থান/সেবা: উপরে বড় ছবি
+    const ih = 700; ctx.save(); rr(60, 80, W - 120, ih, 40); ctx.clip(); if (img) cover(img, 60, 80, W - 120, ih); else { ctx.fillStyle = col; ctx.fillRect(60, 80, W - 120, ih); } ctx.restore();
+    y = 80 + ih + 110;
+  }
+  ctx.fillStyle = '#fff'; ctx.font = F(700, 72);
+  for (const l of wrapText(ctx, s.name, W - 140, 2)) { ctx.fillText(l, W / 2, y); y += 88; }
+  const sub = person ? s.tagline : s.tagline || svcExcerpt(s.details);
+  if (sub) { ctx.font = F(500, 40); ctx.fillStyle = 'rgba(255,255,255,.88)'; for (const l of wrapText(ctx, sub, W - 180, 2)) { ctx.fillText(l, W / 2, y); y += 56; } }
+  const meta = person ? [s.life && '🕊️ ' + s.life, s.address && '🏠 ' + s.address].filter(Boolean) : [s.address && '📍 ' + s.address].filter(Boolean);
+  if (meta.length) { y += 16; ctx.font = F(500, 34); const t = meta.join('   ·   '), tw = Math.min(W - 120, ctx.measureText(t).width + 60);
+    ctx.fillStyle = 'rgba(255,255,255,.16)'; rr((W - tw) / 2, y - 46, tw, 64, 32); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(wrapText(ctx, t, tw - 40, 1)[0] || '', W / 2, y); }
+  // নিচে অ্যাপের নাম
+  ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(0, H - 110, W, 110);
+  ctx.font = F(700, 38); ctx.fillStyle = '#fff'; ctx.fillText('আমার উপজেলা · ভালুকা', W / 2, H - 58);
+  ctx.font = F(400, 26); ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillText(person ? 'ভালুকার কৃতী সন্তান' : (catName(s.category) || 'সেবা ডিরেক্টরি'), W / 2, H - 22);
+  return new Promise(res => cv.toBlob(b => res(b), 'image/jpeg', 0.9));
+}
+async function svcShareSheet(s) {
+  const text = `${s.name}${s.tagline ? '\n' + s.tagline : ''}${s.address ? '\n📍 ' + s.address : ''}${s.phone ? '\n📞 ' + s.phone : ''}\n\n— আমার উপজেলা অ্যাপ`;
+  openSheet(`<div class="shc"><h2>↗️ শেয়ার করুন</h2><div class="shc-prev"><div class="skel" style="height:100%"></div></div>
+    <button class="btn" data-shimg style="width:100%;margin-top:12px" disabled>🖼️ ছবি কার্ড শেয়ার করুন</button>
+    <div class="row" style="margin-top:8px;gap:8px"><button class="btn ghost" data-shdl style="flex:1" disabled>⬇️ ডাউনলোড</button><button class="btn ghost" data-shtxt style="flex:1">🔗 লেখা শেয়ার</button></div>
+    <button class="btn ghost" data-sback style="width:100%;margin-top:8px">ফিরে যান</button></div>`);
+  const sh = $('#sheet'); let blob = null, url = '';
+  svcCardImage(s).then(b => { if (!b || !sh.querySelector('.shc')) return; blob = b; url = URL.createObjectURL(b);
+    sh.querySelector('.shc-prev').innerHTML = `<img src="${url}" alt="শেয়ার কার্ড">`; sh.querySelectorAll('[data-shimg],[data-shdl]').forEach(x => { x.disabled = false; }); })
+    .catch(() => { const p = sh.querySelector('.shc-prev'); if (p) p.innerHTML = '<p class="mut" style="padding:20px;text-align:center">ছবি কার্ড তৈরি করা যায়নি। লেখা শেয়ার করুন।</p>'; });
+  const fname = `${String(s.name).replace(/[\\/:*?"<>|]+/g, '').slice(0, 40) || 'card'}.jpg`;
+  const dl = () => { const a = document.createElement('a'); a.href = url; a.download = fname; document.body.append(a); a.click(); a.remove(); toast('ছবি ডাউনলোড হয়েছে'); };
+  sh.onclick = async e => {
+    if (e.target.closest('[data-sback]')) { if (url) URL.revokeObjectURL(url); return svcDetailSheet(s.id); }
+    if (e.target.closest('[data-shtxt]')) { try { if (navigator.share) await navigator.share({ title: s.name, text }); else { await navigator.clipboard.writeText(text); toast('কপি হয়েছে'); } } catch { /* বাতিল */ } return; }
+    if (e.target.closest('[data-shdl]') && blob) return dl();
+    if (e.target.closest('[data-shimg]') && blob) {
+      const file = new File([blob], fname, { type: 'image/jpeg' });
+      try { if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: s.name, text }); else { dl(); toast('ছবিটি ডাউনলোড হয়েছে — ফেসবুক/WhatsApp-এ দিন'); } } catch { /* বাতিল */ }
+    }
   };
 }
 // ছবি বড় করে দেখা (পুরো স্ক্রিন, সোয়াইপ)

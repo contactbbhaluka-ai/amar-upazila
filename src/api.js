@@ -2133,12 +2133,13 @@ function demoApi() {
     async pendingSuggestions(category) { return wait((db.suggs || []).filter(x => x.category === category).length); },
     async setSuggestion(id) { db.suggs = (db.suggs || []).filter(x => x.id !== id); save(); return wait(); },
     async quizStart() {
+      const coreName = n => String(n).replace(/^((ভাষা সৈনিক|বীর মুক্তিযোদ্ধা|মুক্তিযোদ্ধা|অধ্যাপক|অধ্যাপিকা|ডক্টর|ডা|মেজর|কর্নেল|ক্যাপ্টেন|মরহুম|মরহুমা|শহীদ|আলহাজ্ব|এডভোকেট|অ্যাডভোকেট)[.:ঃ]?\s+)+/u, '').trim();
       const day = new Date().toISOString().slice(0, 10); if (db.quiz?.day === day && db.quiz.score != null) return wait({ done: true, score: db.quiz.score, total: db.quiz.answers.length });
       const fam = db.services.filter(x => x.category === 'famous' && (x.tagline || x.address)).sort(() => Math.random() - 0.5).slice(0, 5);
       if (fam.length < 3) return wait({ error: 'কুইজের জন্য যথেষ্ট তথ্য নেই' });
       const all = db.services.filter(x => x.category === 'famous');
       const questions = fam.map(r => ({ q: r.tagline && (!r.address || Math.random() < 0.6) ? `কার পরিচিতি: “${r.tagline}”?` : `কার জন্মস্থান ${r.address}?`,
-        options: [r, ...all.filter(x => x.id !== r.id).sort(() => Math.random() - 0.5).slice(0, 3)].sort(() => Math.random() - 0.5).map(x => ({ id: x.id, name: x.name })) }));
+        options: [r, ...all.filter(x => x.id !== r.id).sort(() => Math.random() - 0.5).slice(0, 3)].sort(() => Math.random() - 0.5).map(x => ({ id: x.id, name: coreName(x.name) })) }));
       db.quiz = { day, answers: fam.map(x => x.id), score: null }; save(); return wait({ questions });
     },
     async quizSubmit(ans) { const q = db.quiz; if (!q) throw new Error('আগে কুইজ শুরু করুন'); if (q.score != null) return wait({ score: q.score, total: q.answers.length, coins: 0, answers: q.answers });

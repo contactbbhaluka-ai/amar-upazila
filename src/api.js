@@ -906,7 +906,7 @@ async function supabaseApi() {
 
     // ---------- সেবা ডিরেক্টরি ও রিপোর্ট
     async services({ category, q }) {
-      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng,url,image_url,details,images,subtype,amenities,how_to_go,best_time,rating_avg,rating_count,videos,tagline,life')
+      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng,url,image_url,details,images,subtype,amenities,how_to_go,best_time,rating_avg,rating_count,videos,tagline,life,timeline,facts,honors,quote,born_md,died_md,burial,burial_lat,burial_lng,related,family_verified,tribute_count')
         .eq('upazila_id', UPAZILA_ID).order('verified', { ascending: false }).order('name').limit(500);
       if (category) s = s.eq('category', category);
       const term = (q || '').replace(/[,%()*\\]/g, ' ').trim();
@@ -934,6 +934,18 @@ async function supabaseApi() {
     async saveReview(id, rating, body) { ok(await sb.from('service_reviews').upsert({ service_id: id, user_id: me.id, rating, body: body || null }, { onConflict: 'service_id,user_id' })); },
     async delReview(rid) { ok(await sb.from('service_reviews').delete().eq('id', rid)); },
     async uploadServiceImage(blob) { return upload(blob, 'svc'); },
+    async myTributes() { if (!me) return []; return ok(await sb.from('service_tributes').select('service_id').eq('user_id', me.id)).map(r => r.service_id); },
+    async setTribute(id, on) { if (on) ok(await sb.from('service_tributes').upsert({ service_id: id, user_id: me.id }, { onConflict: 'service_id,user_id', ignoreDuplicates: true })); else ok(await sb.from('service_tributes').delete().eq('service_id', id).eq('user_id', me.id)); },
+    async suggest(kind, v) { ok(await sb.from('service_suggestions').insert({ user_id: me.id, kind, service_id: v.service_id || null, category: v.category || 'famous', payload: v.payload || {}, images: v.images || [] })); },
+    async suggestions(category) {
+      const rows = ok(await sb.from('service_suggestions').select('id,user_id,kind,service_id,category,payload,images,created_at').eq('status', 'pending').eq('category', category).order('created_at', { ascending: false }).limit(50));
+      const ids = [...new Set(rows.map(r => r.user_id))], ps = ids.length ? ok(await sb.from('profiles').select('id,name').in('id', ids)) : [];
+      const pm = new Map(ps.map(p => [p.id, p.name])); return rows.map(r => ({ ...r, by: pm.get(r.user_id) || 'সদস্য' }));
+    },
+    async pendingSuggestions(category) { return ok(await sb.from('service_suggestions').select('id', { count: 'exact', head: true }).eq('status', 'pending').eq('category', category)) || 0; },
+    async setSuggestion(id, status) { ok(await sb.from('service_suggestions').update({ status }).eq('id', id)); },
+    async quizStart() { return ok(await sb.rpc('famous_quiz_start')); },
+    async quizSubmit(answers) { return ok(await sb.rpc('famous_quiz_submit', { p_answers: answers })); },
     async serviceReports(id) { return ok(await sb.from('reports').select('id,reason,created_at').eq('target_type', 'service').eq('target_id', String(id)).eq('resolved', false).order('created_at', { ascending: false }).limit(20)); },
     async resolveReport(rid) { ok(await sb.from('reports').update({ resolved: true }).eq('id', rid)); },
     async saveService(id, v) {
@@ -1044,7 +1056,7 @@ function demoApi() {
   };
   // পুরোনো ডেমো ডেটাতেও নতুন দর্শনীয় স্থানগুলো বসাই
   for (const t of DEMO_TOURS) { const i = db.services.findIndex(x => x.id === t.id); if (i < 0) db.services.unshift({ ...t }); else db.services[i] = { ...db.services[i], ...t, lat: db.services[i].lat, lng: db.services[i].lng }; }
-  db.svcReports = get('svcReports', []);
+  db.svcReports = get('svcReports', []); db.tributes = get('tributes', []); db.suggs = get('suggs', []); db.quiz = get('quiz', null);
   db.svcReviews = get('svcReviews', [
     { id: 1, service_id: 901, user_id: 'd3', rating: 5, body: 'শালবনের ভেতর হাঁটতে দারুণ লাগে, ওয়াচ টাওয়ার থেকে পুরো বন দেখা যায়।', created_at: ago(30) },
     { id: 2, service_id: 901, user_id: 'd4', rating: 4, body: 'সুন্দর জায়গা, তবে খাবার সাথে নিয়ে যাবেন।', created_at: ago(80) },
@@ -1053,7 +1065,7 @@ function demoApi() {
   const svcRate = id => { const rs = db.svcReviews.filter(r => r.service_id === id), s = db.services.find(x => x.id === id); if (s) { s.rating_count = rs.length; s.rating_avg = rs.length ? Math.round(rs.reduce((a, r) => a + r.rating, 0) / rs.length * 10) / 10 : 0; } };
   [...new Set(db.svcReviews.map(r => r.service_id))].forEach(svcRate);
   let meId = get('me', null);
-  const save = () => { for (const k of ['svcReports', 'svcReviews', 'dirBanners', 'svcCatVisits', 'svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['tributes', 'suggs', 'quiz', 'svcReports', 'svcReviews', 'dirBanners', 'svcCatVisits', 'svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone', gone: !!p.deleteAt && p.id !== meId }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -2113,6 +2125,24 @@ function demoApi() {
     },
     async delReview(rid) { const r = (db.svcReviews || []).find(x => x.id === rid); db.svcReviews = (db.svcReviews || []).filter(x => x.id !== rid); if (r) svcRate(r.service_id); save(); return wait(); },
     async uploadServiceImage(blob) { return toBlobUrl(blob); },
+    async myTributes() { return wait([...(db.tributes || [])]); },
+    async setTribute(id, on) { db.tributes ||= []; const s = db.services.find(x => x.id === id); const had = db.tributes.includes(id);
+      if (on && !had) { db.tributes.push(id); if (s) s.tribute_count = (s.tribute_count || 0) + 1; } if (!on && had) { db.tributes = db.tributes.filter(x => x !== id); if (s) s.tribute_count = Math.max(0, (s.tribute_count || 1) - 1); } save(); return wait(); },
+    async suggest(kind, v) { db.suggs ||= []; db.suggs.unshift({ id: Date.now(), user_id: meId, by: person(meId)?.name || 'আপনি', kind, service_id: v.service_id || null, category: v.category || 'famous', payload: v.payload || {}, images: v.images || [], created_at: new Date().toISOString() }); save(); return wait(); },
+    async suggestions(category) { return wait((db.suggs || []).filter(x => x.category === category)); },
+    async pendingSuggestions(category) { return wait((db.suggs || []).filter(x => x.category === category).length); },
+    async setSuggestion(id) { db.suggs = (db.suggs || []).filter(x => x.id !== id); save(); return wait(); },
+    async quizStart() {
+      const day = new Date().toISOString().slice(0, 10); if (db.quiz?.day === day && db.quiz.score != null) return wait({ done: true, score: db.quiz.score, total: db.quiz.answers.length });
+      const fam = db.services.filter(x => x.category === 'famous' && (x.tagline || x.address)).sort(() => Math.random() - 0.5).slice(0, 5);
+      if (fam.length < 3) return wait({ error: 'কুইজের জন্য যথেষ্ট তথ্য নেই' });
+      const all = db.services.filter(x => x.category === 'famous');
+      const questions = fam.map(r => ({ q: r.tagline && (!r.address || Math.random() < 0.6) ? `কার পরিচিতি: “${r.tagline}”?` : `কার জন্মস্থান ${r.address}?`,
+        options: [r, ...all.filter(x => x.id !== r.id).sort(() => Math.random() - 0.5).slice(0, 3)].sort(() => Math.random() - 0.5).map(x => ({ id: x.id, name: x.name })) }));
+      db.quiz = { day, answers: fam.map(x => x.id), score: null }; save(); return wait({ questions });
+    },
+    async quizSubmit(ans) { const q = db.quiz; if (!q) throw new Error('আগে কুইজ শুরু করুন'); if (q.score != null) return wait({ score: q.score, total: q.answers.length, coins: 0, answers: q.answers });
+      q.score = q.answers.filter((x, i) => x === ans[i]).length; const coins = q.score * 2; if (coins) addCoins(coins, 'quiz', 'famous:' + q.day); save(); return wait({ score: q.score, total: q.answers.length, coins, answers: q.answers }); },
     async saveService(id, v) {
       if (id) { const s = db.services.find(x => x.id === id); if (s) Object.assign(s, v); save(); return wait(id); }
       const nidv = nid(db.services); db.services.unshift({ ...v, id: nidv, verified: true }); save(); return wait(nidv);

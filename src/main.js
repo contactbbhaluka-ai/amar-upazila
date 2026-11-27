@@ -210,6 +210,7 @@ function toast(m) { const t = $('#toast'); t.setAttribute('translate', DIR_BN ? 
 let sheetHist = false;
 function openSheet(html) { if (!sheetHist && !$('#modal').classList.contains('on')) sheetHist = pushNav(); const s = $('#sheet'); s.setAttribute('translate', DIR_BN ? 'no' : 'yes'); s.onclick = null; s.onchange = null; s.classList.remove('tall'); s.innerHTML = html; $('#modal').classList.add('on'); s.querySelector('input,textarea,select,button')?.focus(); }
 function closeSheet(fromPop) {
+  try { if (window.speechSynthesis?.speaking) speechSynthesis.cancel(); } catch { /* না থাকলে থাক */ }
   document.querySelector('.sd-lbx')?.remove(); $('#modal').classList.remove('on'); $('#sheet').classList.remove('tall'); $('#sheet').innerHTML = '';
   if (sheetHist) { sheetHist = false; if (!fromPop) { S.skipPop = (S.skipPop || 0) + 1; S.hd = Math.max(0, (S.hd || 0) - 1); try { history.back(); } catch { S.skipPop--; S.hd++; } } }   // বোতামে বন্ধ করলে শিটের ধাপটাও সরাই
 }
@@ -3874,8 +3875,8 @@ const svcPersonCard = s => {
   const sub = subsOf('famous').find(x => x[0] === s.subtype);
   return `<article class="card svc svc-person" style="--sc:${svcColor(s.category)};--i:${TI()}" data-svcdet="${esc(s.id)}">
   <div class="sp-img">${s.image_url ? `<img src="${esc(s.image_url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}<span class="sp-ph">${esc((s.name || '?').replace(/^(ভাষা সৈনিক|অধ্যাপক|ডক্টর|ডা\.?|মেজর)\s*/g, '').charAt(0))}</span>
-    ${s.videos?.length ? '<span class="sp-vid">▶ ভিডিও</span>' : ''}${sub ? `<span class="sp-sub">${sub[2]} ${sub[1]}</span>` : ''}</div>
-  <div class="sp-body"><h3>${esc(s.name)}</h3>${s.tagline ? `<p>${esc(s.tagline)}</p>` : ''}${s.life ? `<small>${esc(s.life)}</small>` : ''}</div></article>`;
+    ${annivOf(s) ? `<span class="sp-rib ${annivOf(s)}">${annivOf(s) === 'born' ? '🎂 আজ জন্মদিন' : '🕯️ আজ মৃত্যুবার্ষিকী'}</span>` : s.videos?.length ? '<span class="sp-vid">▶ ভিডিও</span>' : ''}${sub ? `<span class="sp-sub">${sub[2]} ${sub[1]}</span>` : ''}</div>
+  <div class="sp-body"><h3>${esc(s.name)}${s.family_verified ? ' <span class="sr-ver" title="পরিবার কর্তৃক যাচাইকৃত">✔</span>' : ''}</h3>${s.tagline ? `<p>${esc(s.tagline)}</p>` : ''}${s.life ? `<small>${esc(s.life)}</small>` : ''}</div></article>`;
 };
 const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
 // বিস্তারিত লেখা: ### শিরোনাম, • তালিকা, ফাঁকা লাইনে অনুচ্ছেদ
@@ -3918,9 +3919,12 @@ function svcDetailSheet(id, opt = {}) {
       <button class="sd-x" data-close aria-label="বন্ধ করুন">✕</button>${admin ? '<button class="sd-edit" data-sdedit>✏️ সম্পাদনা</button>' : ''}
       <div class="sp-por">${imgs[0] ? `<img src="${esc(imgs[0])}" alt="" data-sdzoom="0" onerror="this.remove()">` : ''}<span>${esc((s.name || '?').replace(/^(ভাষা সৈনিক|অধ্যাপক|ডক্টর|ডা\.?|মেজর)\s*/g, '').charAt(0))}</span></div>
       ${sub ? `<span class="sd-cat">${sub[2]} ${esc(sub[1])}</span>` : ''}<h2>${esc(s.name)}</h2>
+      ${s.family_verified ? `<div class="sp-fam">✔ পরিবার কর্তৃক যাচাইকৃত <small>(${esc(s.family_verified)})</small></div>` : ''}
       ${s.tagline ? `<p class="sp-tag">${esc(s.tagline)}</p>` : ''}
       <div class="sp-meta">${s.life ? `<span>🕊️ ${esc(s.life)}</span>` : ''}${s.address ? `<span>🏠 জন্মস্থান: ${esc(s.address)}</span>` : ''}</div>
-    </div>` : `
+      ${annivOf(s) ? `<div class="sp-anniv ${annivOf(s)}">${annivOf(s) === 'born' ? '🎂 আজ তাঁর জন্মদিন' : '🕯️ আজ তাঁর মৃত্যুবার্ষিকী'}</div>` : ''}
+    </div>
+    ${s.honors?.length ? `<div class="sp-honors">${s.honors.map(h => `<span>🎖️ ${esc(h)}</span>`).join('')}</div>` : ''}` : `
     <div class="sd-hero">
       ${imgs.length ? `<div class="sdet-gal">${imgs.map((u, i) => `<img src="${esc(u)}" alt="" data-sdzoom="${i}" ${i ? 'loading="lazy"' : ''} decoding="async" onerror="this.remove()">`).join('')}</div>`
         : `<div class="sd-noimg">${svcIc(s.category, 64)}</div>`}
@@ -3943,13 +3947,21 @@ function svcDetailSheet(id, opt = {}) {
       ${tel ? act('a', '📞', 'কল করুন', `data-svccall="${esc(s.id)}" href="tel:${esc(tel)}"`) : ''}
       ${tel ? act('button', '🗓️', 'বুকিং', 'data-sdbook="1"') : ''}
       ${person ? '' : act('a', '🧭', 'পথ দেখুন', `href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ভালুকা')}`}" target="_blank" rel="noopener"`)}
-      ${person && s.videos?.length ? act('button', '▶️', 'ভিডিও দেখুন', 'data-sdgo="sd-vid"') : ''}
+      ${person ? `<button class="sd-act sd-trib${S.tribSet?.has(s.id) ? ' on' : ''}" data-sdtrib><span class="sd-aic">🌹</span><small>শ্রদ্ধা${s.tribute_count ? ` · ${bn(s.tribute_count)}` : ''}</small></button>` : ''}
+      ${person && s.details ? act('button', '🔊', 'শুনুন', 'data-sdtts') : ''}
+      ${person && s.videos?.length ? act('button', '▶️', 'ভিডিও', 'data-sdgo="sd-vid"') : ''}
       ${person && imgs.length > 1 ? act('button', '🖼️', 'ছবি', 'data-sdzoom="0"') : ''}
       <button class="sd-act sd-fav${fav ? ' on' : ''}" data-sdfav="${esc(s.id)}" aria-pressed="${!!fav}"><span class="sd-aic">${fav ? '❤️' : '🤍'}</span><small>${fav ? 'প্রিয়তে আছে' : 'প্রিয়তে রাখুন'}</small></button>
       ${act('button', '↗️', 'শেয়ার', 'data-svcshare="1"')}
     </div>
     ${admin ? '<div class="sd-reps"></div>' : ''}
     ${s.best_time ? `<div class="sd-best"><span>🌤️</span><div><b>যাওয়ার ভালো সময়</b>${esc(s.best_time)}</div></div>` : ''}
+    ${person && s.quote ? `<blockquote class="sp-quote"><p>${esc(s.quote)}</p><cite>— ${esc(s.name)}</cite></blockquote>` : ''}
+    ${person ? (() => { const rows = [s.born_md || s.life ? ['জন্ম', [s.born_md ? mdBn(s.born_md) : '', (s.life || '').match(/[০-৯0-9]{4}/)?.[0] || ''].filter(Boolean).join(', ')] : null,
+        s.died_md ? ['মৃত্যু', [mdBn(s.died_md), ((s.life || '').match(/[০-৯0-9]{4}/g) || [])[1] || ''].filter(Boolean).join(', ')] : null,
+        s.address ? ['জন্মস্থান', s.address] : null, ...(s.facts || []).map(f => [f.k, f.v])].filter(r => r && r[1]);
+      return rows.length ? `<div class="sd-sec"><h3>এক নজরে</h3><div class="sp-facts">${rows.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div></div>` : ''; })() : ''}
+    ${person && s.timeline?.length ? `<div class="sd-sec"><h3>জীবনের টাইমলাইন</h3><ol class="sp-tl">${s.timeline.map(t => `<li><b>${esc(t.y)}</b><span>${esc(t.t)}</span></li>`).join('')}</ol></div>` : ''}
     <div class="sd-sec"><h3>${person ? 'জীবনী' : 'সম্পর্কে'}</h3>
       <div class="sdet-body${long ? ' clamp' : ''}">${detHtml(s.details) || '<p class="mut">এখনো বিস্তারিত তথ্য যোগ করা হয়নি।</p>'}</div>
       ${long ? '<button class="sd-more" data-sdmore>আরও পড়ুন ⌄</button>' : ''}</div>
@@ -3958,9 +3970,12 @@ function svcDetailSheet(id, opt = {}) {
       <a class="sd-gomap" href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ভালুকা')}`}" target="_blank" rel="noopener">🧭 ম্যাপে পথ দেখুন</a></div></div>` : ''}
     ${s.videos?.length ? `<div class="sd-sec" id="sd-vid"><h3>ভিডিও</h3><div class="yt-list">${s.videos.map(ytLite).join('')}</div></div>` : ''}
     ${person && imgs.length > 1 ? `<div class="sd-sec"><h3>ছবি</h3><div class="sp-gal">${imgs.map((u, i) => `<img src="${esc(u)}" alt="" loading="lazy" data-sdzoom="${i}" onerror="this.remove()">`).join('')}</div></div>` : ''}
+    ${person && s.burial ? `<div class="sd-sec"><h3>সমাধি ও স্মৃতিচিহ্ন</h3><div class="sd-go"><div class="sdet-body"><p>🕌 ${esc(s.burial)}</p></div>${s.burial_lat != null ? `<a class="sd-gomap" href="https://www.google.com/maps/dir/?api=1&destination=${s.burial_lat},${s.burial_lng}" target="_blank" rel="noopener">🧭 পথ দেখুন</a>` : ''}</div></div>` : ''}
+    ${(() => { const rl = (s.related || []).map(id => (S.svcAll || []).find(x => x.id === id)).filter(Boolean); return rl.length ? `<div class="sd-sec"><h3>সম্পর্কিত</h3><div class="sd-near">${rl.map(x => `<button data-sdrel="${esc(x.id)}" style="--c:${svcColor(x.category)}"><span class="sn-ic">${x.image_url ? `<img src="${esc(x.image_url)}" alt="">` : svcIc(x.category, 18)}</span><span class="sn-t"><b>${esc(x.name)}</b><small>${esc(x.tagline || catName(x.category) || '')}</small></span><span class="sn-km">›</span></button>`).join('')}</div></div>` : ''; })()}
     <div class="sd-sec" id="sd-rev"><h3>${person ? 'স্মৃতিচারণ ও মন্তব্য' : 'রেটিং ও রিভিউ'}</h3><div class="sd-revbox"><div class="skel" style="height:90px"></div></div></div>
     ${near.length && !person ? `<div class="sd-sec"><h3>কাছাকাছি যা আছে</h3><div class="sd-near">${near.map(({ x, km }) => `<button data-sdrel="${esc(x.id)}" style="--c:${svcColor(x.category)}"><span class="sn-ic">${svcIc(x.category, 18)}</span><span class="sn-t"><b>${esc(x.name)}</b><small>${esc(catName(x.category) || '')}</small></span><span class="sn-km">${fmtDist(km)}</span></button>`).join('')}</div></div>` : ''}
     ${rel.length ? `<div class="sd-sec"><h3>আরও ${esc(cname)}</h3><div class="sd-rel">${rel.map(x => `<button class="sd-rc" data-sdrel="${esc(x.id)}">${x.image_url || x.images?.[0] ? `<img src="${esc(x.image_url || x.images[0])}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sd-rph'}))">` : '<span class="sd-rph"></span>'}<b>${esc(x.name)}</b>${x.rating_count ? `<small>★ ${bnNum1(x.rating_avg)}</small>` : ''}</button>`).join('')}</div></div>` : ''}
+    ${person ? `<div class="sp-help"><button data-sdmedia>📷 ছবি বা তথ্য পাঠান</button>${s.family_verified ? '' : '<button data-sdfamily>👪 পরিবারের সদস্য? যাচাই করুন</button>'}</div>` : ''}
     <div class="sd-foot"><button class="link" data-sdreport>⚠️ ভুল তথ্য জানান</button>${admin ? `<button class="link" data-sdedit>✏️ সম্পাদনা</button>${person ? '' : `<button class="link" data-svcloc="${esc(s.id)}">📍 ${s.lat != null ? 'অবস্থান বদলান' : 'অবস্থান দিন'}</button>`}` : ''}</div>
   </div>`);
   const sh = $('#sheet'); sh.classList.add('tall'); sh.scrollTop = 0;
@@ -3995,6 +4010,7 @@ function svcDetailSheet(id, opt = {}) {
   };
   const drawReps = reps => { const box = sh.querySelector('.sd-reps'); if (!box) return; box.innerHTML = reps.length ? `<div class="sd-repbox"><b>⚠️ ${bn(reps.length)}টি ভুল তথ্যের রিপোর্ট</b>${reps.map(r => `<div><span>${esc(r.reason)} <small class="mut">· ${ago(r.created_at)}</small></span><button class="link" data-repok="${esc(r.id)}">✔ ঠিক করেছি</button></div>`).join('')}</div>` : ''; box._reps = reps; };
   if (admin) S.api.serviceReports(s.id).then(drawReps).catch(() => {});
+  if (person && me()) ensureTributes().then(() => sh.querySelector('[data-sdtrib]')?.classList.toggle('on', !!S.tribSet?.has(s.id)));
   S.api.serviceReviews(s.id).then(r => { revs = r; drawRev(); if (opt.toRev) sh.querySelector('#sd-rev')?.scrollIntoView({ block: 'start' }); }).catch(() => { const b = sh.querySelector('.sd-revbox'); if (b) b.innerHTML = '<p class="mut">রিভিউ লোড করা যায়নি।</p>'; });
   sh.onclick = async e => {
     const t = e.target.closest('[data-sdthumb]'); if (t) return goImg(+t.dataset.sdthumb);
@@ -4004,6 +4020,13 @@ function svcDetailSheet(id, opt = {}) {
     const gt = e.target.closest('[data-sdgo]'); if (gt) return sh.querySelector('#' + gt.dataset.sdgo)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     const ro = e.target.closest('[data-repok]'); if (ro) { await busy(ro, async () => { await S.api.resolveReport(+ro.dataset.repok); drawReps((sh.querySelector('.sd-reps')._reps || []).filter(x => String(x.id) !== ro.dataset.repok)); }); return; }
     if (e.target.closest('[data-sdedit]')) return svcEditSheet(s);
+    if (e.target.closest('[data-sdmedia]')) return famMediaSheet(s);
+    if (e.target.closest('[data-sdfamily]')) return famFamilySheet(s);
+    const tts = e.target.closest('[data-sdtts]'); if (tts) return svcSpeak(s, tts);
+    const tb = e.target.closest('[data-sdtrib]'); if (tb) { if (!needUser()) return; await ensureTributes(); const on = !S.tribSet.has(s.id);
+      on ? S.tribSet.add(s.id) : S.tribSet.delete(s.id); s.tribute_count = Math.max(0, (s.tribute_count || 0) + (on ? 1 : -1));
+      tb.classList.toggle('on', on); tb.querySelector('small').textContent = `শ্রদ্ধা${s.tribute_count ? ` · ${bn(s.tribute_count)}` : ''}`; if (on) { tb.querySelector('.sd-aic').classList.add('pop'); toast('🌹 শ্রদ্ধা জানানো হয়েছে'); }
+      try { await S.api.setTribute(s.id, on); } catch (er) { toast(errText(er)); } return; }
     if (e.target.closest('[data-sdreport]')) return svcReportSheet(s);
     if (e.target.closest('[data-sdbook]')) return svcBookSheet(s);
     if (e.target.closest('[data-sdrev]')) { if (!needUser()) return; return svcReviewSheet(s, revs.find(x => x.mine)); }
@@ -4091,6 +4114,16 @@ function svcEditSheet(s, category) {
     <label>${F.imgs} <small class="mut">· সর্বোচ্চ ১৩টি</small></label>
     <div class="se-imgs"></div>
     <label>${F.det} <small class="mut">(### দিয়ে শিরোনাম, • দিয়ে তালিকা)</small><textarea id="se-det" rows="8" maxlength="20000"${person ? ' placeholder="### প্রারম্ভিক জীবন&#10;...&#10;&#10;### কর্মজীবন&#10;...&#10;&#10;### অবদান ও সম্মাননা&#10;• ..."' : ''}>${esc(v.details || '')}</textarea></label>
+    ${person ? `<label>বিখ্যাত উক্তি<textarea id="se-quote" rows="2" maxlength="500" placeholder="তাঁর কোনো কথা বা বক্তব্যের অংশ">${esc(v.quote || '')}</textarea></label>
+    <label>সম্মাননা ও পদক <small class="mut">(প্রতি লাইনে একটি)</small><textarea id="se-hon" rows="2" placeholder="একুশে পদক (১৯৯০)&#10;বীর প্রতীক">${esc((v.honors || []).join('\n'))}</textarea></label>
+    <div class="bk-row"><label>জন্মের তারিখ<input type="date" id="se-bd" value="${v.born_md ? '2000-' + v.born_md : ''}"></label><label>মৃত্যুর তারিখ<input type="date" id="se-dd" value="${v.died_md ? '2000-' + v.died_md : ''}"></label></div>
+    <p class="mut" style="font-size:12px;margin:2px 0 0">শুধু দিন ও মাস নেওয়া হয় (বার্ষিকী মনে করাতে); সাল "জীবনকাল"-এ লিখুন।</p>
+    <label>এক নজরে তথ্য <small class="mut">(প্রতি লাইনে "বিষয়: তথ্য")</small><textarea id="se-facts" rows="4" placeholder="পিতা: …&#10;মাতা: …&#10;শিক্ষা: …&#10;পেশা: …">${esc((v.facts || []).map(f => `${f.k}: ${f.v}`).join('\n'))}</textarea></label>
+    <label>জীবনের টাইমলাইন <small class="mut">(প্রতি লাইনে "সাল – ঘটনা")</small><textarea id="se-tl" rows="5" placeholder="১৯৩৪ – জন্ম&#10;১৯৫২ – ভাষা আন্দোলনে অংশগ্রহণ">${esc((v.timeline || []).map(t => `${t.y} – ${t.t}`).join('\n'))}</textarea></label>
+    <label>সমাধি / স্মৃতিচিহ্ন<input id="se-bur" maxlength="300" placeholder="যেমন: নিজ গ্রামের পারিবারিক কবরস্থান; তাঁর নামে … স্কুল" value="${esc(v.burial || '')}"></label>
+    <label>সমাধির ম্যাপ লিংক <small class="mut">(Google Maps থেকে কপি)</small><input id="se-burmap" placeholder="https://maps.google.com/…" value="${v.burial_lat != null ? `${v.burial_lat},${v.burial_lng}` : ''}"></label>
+    <label>সম্পর্কিত ব্যক্তি / প্রতিষ্ঠান</label><div class="se-rel"></div><input id="se-relq" placeholder="নাম লিখে খুঁজুন…" autocomplete="off"><div class="se-relres"></div>
+    ${me()?.admin ? `<label>পরিবার কর্তৃক যাচাই <small class="mut">(যিনি যাচাই করেছেন, খালি রাখলে চিহ্ন দেখাবে না)</small><input id="se-fam" maxlength="120" placeholder="যেমন: পুত্র" value="${esc(v.family_verified || '')}"></label>` : ''}` : ''}
     ${F.vid ? `<label>YouTube ভিডিও <small class="mut">(লিংক, প্রতি লাইনে একটি)</small><textarea id="se-vid" rows="2" placeholder="https://youtu.be/...">${esc((v.videos || []).map(x => 'https://youtu.be/' + x).join('\n'))}</textarea></label>` : ''}
     ${F.go ? `<label>কীভাবে যাবেন<textarea id="se-go" rows="3" maxlength="3000" placeholder="ঢাকা/ময়মনসিংহ/ভালুকা সদর থেকে কোন বাস, ভাড়া কত">${esc(v.how_to_go || '')}</textarea></label>` : ''}
     ${F.best ? inp('se-best', 'যাওয়ার ভালো সময়', v.best_time, 'maxlength="300" placeholder="যেমন শীতকাল, বিকেলে"') : ''}
@@ -4098,6 +4131,11 @@ function svcEditSheet(s, category) {
     <button class="btn" style="width:100%;margin-top:14px">সেভ করুন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-sback>বাতিল</button>
     ${s && F.loc ? `<button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-svcloc="${esc(s.id)}">📍 ম্যাপে ${s.lat != null ? 'অবস্থান বদলান' : 'অবস্থান দিন'}</button>` : ''}</form>`);
   const sh = $('#sheet'); sh.classList.add('tall');
+  const rel = [...(v.related || [])];
+  const drawRel = () => { const box = sh.querySelector('.se-rel'); if (!box) return; box.innerHTML = rel.map(id => { const x = (S.svcAll || []).find(y => y.id === id); return x ? `<span class="se-chip">${esc(x.name)}<button type="button" data-reldel="${id}">✕</button></span>` : ''; }).join(''); };
+  drawRel();
+  sh.querySelector('#se-relq')?.addEventListener('input', e => { const t = e.target.value.trim(); const res = sh.querySelector('.se-relres');
+    res.innerHTML = t.length < 2 ? '' : (S.svcAll || []).filter(x => x.id !== v.id && !rel.includes(x.id) && x.name.includes(t)).slice(0, 6).map(x => `<button type="button" data-reladd="${x.id}">${svcIc(x.category, 14)} ${esc(x.name)} <small class="mut">· ${esc(catName(x.category) || '')}</small></button>`).join(''); });
   const drawImgs = () => { sh.querySelector('.se-imgs').innerHTML = imgs.map((u, i) => `<div class="se-im"><img src="${esc(u)}" alt="">${i ? `<button type="button" data-imcover="${i}" title="প্রচ্ছদ বানান">★</button>` : '<span>প্রচ্ছদ</span>'}<button type="button" class="x" data-imdel="${i}" aria-label="সরান">✕</button></div>`).join('')
     + (imgs.length < 13 ? `<label class="se-add">＋<small>ছবি</small><input type="file" accept="image/*" multiple hidden id="se-file"></label>` : ''); };
   drawImgs();
@@ -4108,6 +4146,8 @@ function svcEditSheet(s, category) {
     for (const f of files) { try { const b = await compress(f, 1600, 0.8); imgs.push(await S.api.uploadServiceImage(b)); drawImgs(); } catch (er) { toast(errText(er)); } }
   });
   sh.onclick = e => {
+    const ra = e.target.closest('[data-reladd]'); if (ra) { if (rel.length < 20) rel.push(+ra.dataset.reladd); sh.querySelector('#se-relq').value = ''; sh.querySelector('.se-relres').innerHTML = ''; return drawRel(); }
+    const rd = e.target.closest('[data-reldel]'); if (rd) { rel.splice(rel.indexOf(+rd.dataset.reldel), 1); return drawRel(); }
     const a = e.target.closest('[data-am]'); if (a) { a.classList.toggle('on'); am[a.classList.contains('on') ? 'add' : 'delete'](a.dataset.am); return; }
     const d = e.target.closest('[data-imdel]'); if (d) { imgs.splice(+d.dataset.imdel, 1); return drawImgs(); }
     const cv = e.target.closest('[data-imcover]'); if (cv) { imgs.unshift(...imgs.splice(+cv.dataset.imcover, 1)); return drawImgs(); }
@@ -4124,11 +4164,173 @@ function svcEditSheet(s, category) {
     if (has('#se-go')) p.how_to_go = val('#se-go');
     if (has('#se-best')) p.best_time = val('#se-best');
     if (F.amen) p.amenities = [...am].filter(k => AMEN[k]);
+    if (person) {
+      const md = id => { const x = $(id).value; return x ? x.slice(5) : null; };
+      const lines = id => $(id).value.split('\n').map(x => x.trim()).filter(Boolean);
+      p.quote = val('#se-quote'); p.honors = lines('#se-hon').slice(0, 20); p.born_md = md('#se-bd'); p.died_md = md('#se-dd');
+      p.facts = lines('#se-facts').map(l => { const i = l.search(/[:：]/); return i > 0 ? { k: l.slice(0, i).trim(), v: l.slice(i + 1).trim() } : { k: 'তথ্য', v: l }; }).filter(f => f.v).slice(0, 20);
+      p.timeline = lines('#se-tl').map(l => { const m = l.match(/^(.{1,20}?)\s*[–—\-:]\s*(.+)$/); return m ? { y: m[1].trim(), t: m[2].trim() } : { y: '', t: l }; }).slice(0, 40);
+      p.burial = val('#se-bur'); const bm = $('#se-burmap').value.trim(), bc = bm ? coordsFrom(bm) : null;
+      if (bm && !bc) return toast('সমাধির ম্যাপ লিংক থেকে অবস্থান বোঝা যায়নি'); p.burial_lat = bc?.lat ?? null; p.burial_lng = bc?.lng ?? null;
+      p.related = rel.slice(0, 20); if (has('#se-fam')) p.family_verified = val('#se-fam');
+    }
     if (has('#se-vid')) { p.videos = [...new Set($('#se-vid').value.split(/\s+/).map(ytId).filter(Boolean))].slice(0, 10); if ($('#se-vid').value.trim() && !p.videos.length) return toast('YouTube লিংক বোঝা যায়নি'); }
     busy(e.submitter, async () => {
       const id = await S.api.saveService(s?.id || null, p);
       S.svcAll = await S.api.services({}); try { local.set('svc_cache', { ...(local.get('svc_cache') || {}), t: Date.now(), list: S.svcAll }); } catch {}
       toast('সেভ হয়েছে'); if (S.view === 'dir') drawDir(); svcDetailSheet(id);
+    });
+  };
+}
+// ================= প্রসিদ্ধ ব্যক্তি: বার্ষিকী, শ্রদ্ধাঞ্জলি, প্রস্তাব, কুইজ, শোনা
+const mdNow = () => { const p = dhakaParts(new Date()); return `${String(p.mon + 1).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`; };
+const mdBn = md => { if (!md) return ''; const [m, d] = md.split('-').map(Number); return `${bn(d)} ${MON_BN[m - 1]}`; };
+const annivOf = s => { const md = mdNow(); return s.born_md === md ? 'born' : s.died_md === md ? 'died' : null; };
+const annivList = list => (list || []).filter(x => x.category === 'famous' && annivOf(x));
+function annivHtml(list) {
+  const a = annivList(list); if (!a.length) return '';
+  return `<div class="anniv">${a.map(s => `<button class="anniv-c ${annivOf(s)}" data-svcdet="${esc(s.id)}">
+    ${s.image_url ? `<img src="${esc(s.image_url)}" alt="" loading="lazy" onerror="this.remove()">` : '<span class="anniv-ph">⭐</span>'}
+    <span><small>${annivOf(s) === 'born' ? '🎂 আজ জন্মদিন' : '🕯️ আজ মৃত্যুবার্ষিকী'}</small><b>${esc(s.name)}</b>${s.tagline ? `<i>${esc(s.tagline)}</i>` : ''}</span></button>`).join('')}</div>`;
+}
+async function ensureTributes() {
+  const who = me()?.id || ''; if (S.tribSet && S.tribFor === who) return; S.tribFor = who;
+  try { S.tribSet = new Set(who ? await S.api.myTributes() : []); } catch { S.tribSet = new Set(); }
+}
+// শিরোনাম/তালিকা চিহ্ন বাদ দিয়ে পড়ার লেখা
+const plainDet = t => String(t || '').replace(/^###\s*/gm, '').replace(/^[•\-*]\s*/gm, '');
+function svcSpeak(s, btn) {
+  const ss = window.speechSynthesis; if (!ss) return toast('আপনার ফোনে পড়ে শোনানোর সুবিধা নেই');
+  if (ss.speaking) { ss.cancel(); btn?.classList.remove('on'); return; }
+  const txt = [s.name, s.tagline, s.life, plainDet(s.details)].filter(Boolean).join('। ');
+  const voices = ss.getVoices(), v = voices.find(x => /^bn/i.test(x.lang));
+  if (voices.length && !v) toast('ফোনে বাংলা কণ্ঠ পাওয়া যায়নি; সেটিংস → ভাষা → টেক্সট-টু-স্পিচে বাংলা যোগ করুন');
+  // লম্বা লেখা ছোট ছোট অংশে (কিছু ফোনে লম্বা লেখা মাঝপথে থেমে যায়)
+  const parts = txt.match(/[^।!?\n]{1,220}[।!?\n]?/g) || [txt];
+  parts.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p); u.lang = 'bn-BD'; if (v) u.voice = v; u.rate = 0.95; if (i === parts.length - 1) u.onend = () => btn?.classList.remove('on'); ss.speak(u); });
+  btn?.classList.add('on'); toast('🔊 পড়ে শোনানো হচ্ছে… আবার চাপলে থামবে');
+}
+// ছবি বাছাই ও আপলোড (প্রস্তাব/তথ্য পাঠানোর জন্য)
+function pickImgsHtml() { return '<div class="se-imgs pk-imgs"></div>'; }
+function bindPickImgs(sh, arr, max) {
+  const draw = () => { sh.querySelector('.pk-imgs').innerHTML = arr.map((u, i) => `<div class="se-im"><img src="${esc(u)}" alt=""><button type="button" class="x" data-pkdel="${i}">✕</button></div>`).join('')
+    + (arr.length < max ? `<label class="se-add">＋<small>ছবি</small><input type="file" accept="image/*" multiple hidden class="pk-file"></label>` : ''); };
+  draw();
+  sh.addEventListener('change', async e => { if (!e.target.classList.contains('pk-file')) return; const fs = [...e.target.files].slice(0, max - arr.length); if (!fs.length) return; toast('ছবি আপলোড হচ্ছে…');
+    for (const f of fs) { try { arr.push(await S.api.uploadServiceImage(await compress(f, 1600, 0.8))); draw(); } catch (er) { toast(errText(er)); } } });
+  sh.addEventListener('click', e => { const d = e.target.closest('[data-pkdel]'); if (d) { arr.splice(+d.dataset.pkdel, 1); draw(); } });
+}
+// 📝 নতুন প্রসিদ্ধ ব্যক্তির নাম প্রস্তাব
+function famSuggestSheet() {
+  if (!needUser()) return;
+  const imgs = [];
+  openSheet(`<form class="rvf sde"><h2>📝 নাম প্রস্তাব করুন</h2><p class="mut" style="margin:-4px 0 6px">ভালুকার কোনো কৃতী মানুষের কথা জানেন? তথ্য দিন — অ্যাডমিন যাচাই করে যোগ করবেন।</p>
+    <label>পূর্ণ নাম *<input id="fs-name" required maxlength="120"></label>
+    <label>পরিচিতি (এক লাইনে) *<input id="fs-tag" required maxlength="120" placeholder="যেমন: বীর মুক্তিযোদ্ধা, শিক্ষক, লেখক"></label>
+    <div class="bk-row"><label>জীবনকাল<input id="fs-life" maxlength="80" placeholder="১৯৪০ – ২০১০"></label><label>জন্মস্থান / গ্রাম<input id="fs-addr" maxlength="200"></label></div>
+    <label>তাঁর সম্পর্কে যা জানেন *<textarea id="fs-det" rows="6" required maxlength="8000" placeholder="জীবন, কাজ, অবদান, সম্মাননা…"></textarea></label>
+    <label>ছবি (থাকলে)</label>${pickImgsHtml()}
+    <label>YouTube ভিডিও লিংক (থাকলে)<input id="fs-vid" placeholder="https://youtu.be/..."></label>
+    <label>তথ্যের সূত্র<input id="fs-src" maxlength="300" placeholder="যেমন: পরিবার, বই, সংবাদপত্র, নিজে চিনি"></label>
+    <button class="btn" style="width:100%;margin-top:14px">প্রস্তাব পাঠান</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-close>বাতিল</button></form>`);
+  const sh = $('#sheet'); sh.classList.add('tall'); bindPickImgs(sh, imgs, 6);
+  sh.querySelector('form').onsubmit = e => { e.preventDefault(); const g = id => $(id).value.trim();
+    busy(e.submitter, async () => { await S.api.suggest('new', { category: 'famous', images: imgs, payload: { name: g('#fs-name'), tagline: g('#fs-tag'), life: g('#fs-life'), address: g('#fs-addr'), details: g('#fs-det'), video: ytId(g('#fs-vid')) || '', source: g('#fs-src') } });
+      closeSheet(); toast('ধন্যবাদ! প্রস্তাব পাঠানো হয়েছে, অ্যাডমিন যাচাই করবেন'); }); };
+}
+// 📷 ছবি বা তথ্য পাঠানো
+function famMediaSheet(s) {
+  if (!needUser()) return;
+  const imgs = [];
+  openSheet(`<form class="rvf sde"><h2>📷 ছবি বা তথ্য পাঠান</h2><p class="mut" style="margin:-4px 0 6px">${esc(s.name)} — পুরোনো ছবি, নথি, ভিডিও বা নতুন তথ্য। অ্যাডমিন অনুমোদন দিলে যোগ হবে।</p>
+    <label>ছবি / নথির ছবি</label>${pickImgsHtml()}
+    <label>YouTube ভিডিও লিংক<input id="fm-vid" placeholder="https://youtu.be/..."></label>
+    <label>তথ্য বা সংশোধন<textarea id="fm-note" rows="4" maxlength="4000" placeholder="যেমন: তিনি ১৯৮৫ সালে একুশে পদক পান…"></textarea></label>
+    <label>তথ্যের সূত্র<input id="fm-src" maxlength="300" placeholder="পরিবার, বই, সংবাদপত্র…"></label>
+    <button class="btn" style="width:100%;margin-top:14px">পাঠান</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-sback>ফিরে যান</button></form>`);
+  const sh = $('#sheet'); sh.classList.add('tall'); bindPickImgs(sh, imgs, 8);
+  sh.onclick = e => { if (e.target.closest('[data-sback]')) svcDetailSheet(s.id); };
+  sh.querySelector('form').onsubmit = e => { e.preventDefault(); const vid = ytId($('#fm-vid').value.trim()), note = $('#fm-note').value.trim();
+    if (!imgs.length && !vid && !note) return toast('ছবি, ভিডিও বা তথ্য — অন্তত একটা দিন');
+    busy(e.submitter, async () => { await S.api.suggest('media', { service_id: s.id, category: s.category, images: imgs, payload: { video: vid || '', note, source: $('#fm-src').value.trim() } }); toast('ধন্যবাদ! অ্যাডমিন দেখে যোগ করবেন'); svcDetailSheet(s.id); }); };
+}
+// 👪 পরিবারের সদস্য হিসেবে যাচাই
+function famFamilySheet(s) {
+  if (!needUser()) return;
+  openSheet(`<form class="rvf sde"><h2>👪 পরিবারের সদস্য?</h2><p class="mut" style="margin:-4px 0 6px">${esc(s.name)}-এর পরিবারের সদস্য হলে তথ্যগুলো যাচাই করে দিন। অ্যাডমিন আপনার সঙ্গে যোগাযোগ করে নিশ্চিত হলে পাতায় "✔ পরিবার কর্তৃক যাচাইকৃত" দেখাবে।</p>
+    <label>তাঁর সঙ্গে আপনার সম্পর্ক *<input id="ff-rel" required maxlength="60" placeholder="যেমন: পুত্র, নাতি, ভাতিজা"></label>
+    <label>যোগাযোগের নম্বর *<input id="ff-phone" required maxlength="20" inputmode="tel"></label>
+    <label>পাতার তথ্য সব ঠিক আছে?<select class="f" id="ff-ok"><option value="yes">হ্যাঁ, সব ঠিক আছে</option><option value="fix">কিছু সংশোধন দরকার</option></select></label>
+    <label>সংশোধন (থাকলে)<textarea id="ff-note" rows="3" maxlength="3000"></textarea></label>
+    <button class="btn" style="width:100%;margin-top:14px">পাঠান</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-sback>ফিরে যান</button></form>`);
+  const sh = $('#sheet');
+  sh.onclick = e => { if (e.target.closest('[data-sback]')) svcDetailSheet(s.id); };
+  sh.querySelector('form').onsubmit = e => { e.preventDefault();
+    busy(e.submitter, async () => { await S.api.suggest('family', { service_id: s.id, category: s.category, payload: { relation: $('#ff-rel').value.trim(), phone: $('#ff-phone').value.trim(), ok: $('#ff-ok').value, note: $('#ff-note').value.trim(), name: me()?.name || '' } }); toast('ধন্যবাদ! অ্যাডমিন যোগাযোগ করবেন'); svcDetailSheet(s.id); }); };
+}
+// 📋 অ্যাডমিন: প্রস্তাবগুলো দেখা ও অনুমোদন
+async function famSuggAdminSheet(category = 'famous') {
+  openSheet('<h2>📋 প্রস্তাব ও পাঠানো তথ্য</h2><div class="skel" style="height:120px"></div>');
+  let rows; try { rows = await S.api.suggestions(category); } catch (e) { $('#sheet').innerHTML = `<h2>📋 প্রস্তাব</h2><p class="mut">${esc(errText(e))}</p>`; return; }
+  const name = id => (S.svcAll || []).find(x => x.id === id)?.name || 'মুছে ফেলা';
+  const K = { new: '📝 নতুন নাম', media: '📷 ছবি/তথ্য', family: '👪 পরিবারের যাচাই' };
+  $('#sheet').classList.add('tall');
+  $('#sheet').innerHTML = `<h2>📋 প্রস্তাব ও পাঠানো তথ্য</h2>${rows.length ? rows.map(r => { const p = r.payload || {};
+    return `<div class="sg" data-sg="${esc(r.id)}"><div class="sg-h"><b>${K[r.kind]}</b><small class="mut">${esc(r.by)} · ${ago(r.created_at)}</small></div>
+      ${r.kind === 'new' ? `<div class="sg-b"><b>${esc(p.name)}</b> — ${esc(p.tagline || '')}${p.life ? ` · ${esc(p.life)}` : ''}${p.address ? ` · ${esc(p.address)}` : ''}<p>${esc(p.details || '')}</p></div>`
+        : `<div class="sg-b">বিষয়: <b>${esc(name(r.service_id))}</b>${p.relation ? `<p>সম্পর্ক: ${esc(p.relation)} · ফোন: <a href="tel:${esc(p.phone)}">${esc(p.phone)}</a> · ${p.ok === 'yes' ? 'সব তথ্য ঠিক আছে বলেছেন' : 'সংশোধন চেয়েছেন'}</p>` : ''}${p.note ? `<p>${esc(p.note)}</p>` : ''}</div>`}
+      ${r.images?.length ? `<div class="sg-imgs">${r.images.map(u => `<img src="${esc(u)}" alt="" loading="lazy">`).join('')}</div>` : ''}
+      ${p.video ? `<div class="mut" style="font-size:13px">▶ ভিডিও: youtu.be/${esc(p.video)}</div>` : ''}${p.source ? `<div class="mut" style="font-size:13px">সূত্র: ${esc(p.source)}</div>` : ''}
+      <div class="sg-act"><button class="btn" data-sgok="${esc(r.id)}">${r.kind === 'new' ? '✔ যোগ করুন' : r.kind === 'family' ? '✔ যাচাই চিহ্ন দিন' : '✔ ছবি/ভিডিও যোগ করুন'}</button><button class="btn ghost" data-sgno="${esc(r.id)}">বাতিল</button></div></div>`; }).join('')
+    : '<p class="mut">এখন কোনো অপেক্ষমাণ প্রস্তাব নেই।</p>'}<button class="btn ghost" style="width:100%;margin-top:12px" data-close>বন্ধ করুন</button>`;
+  $('#sheet').onclick = async e => {
+    const no = e.target.closest('[data-sgno]'); if (no) return busy(no, async () => { await S.api.setSuggestion(+no.dataset.sgno, 'rejected'); no.closest('.sg').remove(); toast('বাতিল করা হয়েছে'); });
+    const okb = e.target.closest('[data-sgok]'); if (!okb) return;
+    const r = rows.find(x => String(x.id) === okb.dataset.sgok), p = r.payload || {};
+    busy(okb, async () => {
+      let openId = null;
+      if (r.kind === 'new') {
+        openId = await S.api.saveService(null, { category: r.category, name: p.name, tagline: p.tagline || null, life: p.life || null, address: p.address || '', phone: '', details: p.details || null, image_url: r.images[0] || null, images: r.images.slice(1), videos: p.video ? [p.video] : [] });
+      } else {
+        const s = (S.svcAll || []).find(x => x.id === r.service_id); if (!s) throw new Error('সেবাটি আর নেই');
+        if (r.kind === 'family') await S.api.saveService(s.id, { family_verified: (p.relation || 'পরিবার').slice(0, 60) });
+        else { const cover = s.image_url || r.images[0] || null;
+          await S.api.saveService(s.id, { image_url: cover, images: [...new Set([...(s.images || []), ...r.images])].filter(u => u && u !== cover).slice(0, 12), videos: [...new Set([...(s.videos || []), ...(p.video ? [p.video] : [])])].slice(0, 10) }); }
+        openId = s.id;
+      }
+      await S.api.setSuggestion(r.id, 'approved');
+      S.svcAll = await S.api.services({}); if (S.view === 'dir') drawDir();
+      toast(r.kind === 'media' && p.note ? 'যোগ হয়েছে। পাঠানো লেখাটি দেখে সম্পাদনা থেকে বসিয়ে দিন' : 'যোগ হয়েছে'); svcDetailSheet(openId);
+    });
+  };
+}
+// 🧠 কুইজ
+async function famQuizSheet() {
+  if (!needUser()) return;
+  openSheet('<h2>🧠 আজকের কুইজ</h2><div class="skel" style="height:140px"></div>');
+  let r; try { r = await S.api.quizStart(); } catch (e) { $('#sheet').innerHTML = `<h2>🧠 কুইজ</h2><p class="mut">${esc(errText(e))}</p><button class="btn ghost" data-close style="width:100%">বন্ধ করুন</button>`; return; }
+  if (r.error) { $('#sheet').innerHTML = `<h2>🧠 কুইজ</h2><p class="mut">${esc(r.error)}</p><button class="btn ghost" data-close style="width:100%">বন্ধ করুন</button>`; return; }
+  if (r.done) { $('#sheet').innerHTML = `<div class="qz-done"><div class="qz-big">${bn(r.score)}/${bn(r.total)}</div><p>আজকের কুইজ দিয়েছেন। কাল নতুন প্রশ্ন আসবে!</p></div><button class="btn ghost" data-close style="width:100%">বন্ধ করুন</button>`; return; }
+  const qs = r.questions, pick = Array(qs.length).fill(null); let i = 0;
+  const draw = () => {
+    const q = qs[i];
+    $('#sheet').innerHTML = `<div class="qz"><div class="qz-top"><b>🧠 ভালুকার কৃতী সন্তান</b><span>${bn(i + 1)}/${bn(qs.length)}</span></div><div class="qz-bar"><i style="width:${(i + 1) / qs.length * 100}%"></i></div>
+      <h3>${esc(q.q)}</h3><div class="qz-opts">${q.options.map(o => `<button data-qo="${esc(o.id)}" class="${pick[i] === o.id ? 'on' : ''}">${esc(o.name)}</button>`).join('')}</div>
+      <div class="qz-nav">${i ? '<button class="btn ghost" data-qprev>← আগের</button>' : '<span></span>'}<button class="btn" data-qnext ${pick[i] == null ? 'disabled' : ''}>${i === qs.length - 1 ? 'জমা দিন ✔' : 'পরের →'}</button></div>
+      <p class="mut" style="font-size:12px;text-align:center;margin:10px 0 0">প্রতিটি সঠিক উত্তরে ২ কয়েন · দিনে একবার</p></div>`;
+  };
+  draw();
+  $('#sheet').onclick = async e => {
+    const o = e.target.closest('[data-qo]'); if (o) { pick[i] = +o.dataset.qo; return draw(); }
+    if (e.target.closest('[data-qprev]')) { i--; return draw(); }
+    const nx = e.target.closest('[data-qnext]'); if (!nx) return;
+    if (i < qs.length - 1) { i++; return draw(); }
+    busy(nx, async () => {
+      const res = await S.api.quizSubmit(pick);
+      $('#sheet').innerHTML = `<div class="qz-done"><div class="qz-big">${bn(res.score)}/${bn(res.total)}</div><p>${res.score === res.total ? '🎉 অসাধারণ! সবগুলো সঠিক' : res.score ? 'ভালো হয়েছে!' : 'আরও জানুন, কাল আবার চেষ্টা করুন'}</p>
+        ${res.coins ? `<p class="qz-coin">🪙 +${bn(res.coins)} কয়েন পেয়েছেন</p>` : ''}
+        <div class="qz-rev">${qs.map((q, k) => { const ok = pick[k] === res.answers[k], right = q.options.find(x => x.id === res.answers[k]); return `<div class="${ok ? 'ok' : 'no'}"><span>${ok ? '✔' : '✘'}</span><div><small>${esc(q.q)}</small><b data-svcdet="${esc(res.answers[k])}">${esc(right?.name || '')}</b></div></div>`; }).join('')}</div></div>
+        <button class="btn ghost" data-close style="width:100%;margin-top:10px">বন্ধ করুন</button>`;
     });
   };
 }
@@ -4624,6 +4826,7 @@ function renderSvcGrid(list) {
   $('#dir').classList.toggle('anim', anim);
   $('#dir').innerHTML = sliderHtml(total, cats)
     + dayNoticeHtml()
+    + annivHtml(list)
     + `<div class="sos-row2"><button class="sos-btn" data-sos>🆘 বিপদে আছি</button><button class="aid-btn" data-svc="aid">🩹 প্রাথমিক চিকিৎসা</button></div>`
     + timeSuggestHtml()
     + popCatsHtml()
@@ -4665,7 +4868,9 @@ function drawDir() {
   const catHtml = cats.length ? `<div class="svc-grid svc-qcats">${cats.slice(0, 8).map(([k, n]) => `<button class="svc-tile" data-svc="${k}" style="--c:${svcColor(k)};--i:${TI()}">${svcIc(k, 22)}<span class="st-n">${esc(n)}</span></button>`).join('')}</div>` : '';
   const empty = S.dcat === 'fav' ? 'এখনো কোনো প্রিয় সেবা নেই। যেকোনো সেবার কার্ডে 🤍 চাপলে এখানে থাকবে।'
     : cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।';
-  $('#dir').innerHTML = head + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
+  const famHtml = S.dcat === 'famous' && !q ? annivHtml(list) + `<div class="fam-acts"><button data-famquiz><span>🧠</span><b>আজকের কুইজ</b><small>সঠিক উত্তরে কয়েন</small></button><button data-famsugg><span>📝</span><b>নাম প্রস্তাব করুন</b><small>কৃতী কাউকে চেনেন?</small></button>${me()?.admin ? `<button data-famadmin class="adm"><span>📋</span><b>প্রস্তাব দেখুন</b><small class="fam-pend">…</small></button>` : ''}</div>` : '';
+  if (famHtml && me()?.admin) S.api.pendingSuggestions('famous').then(n => { const el = $('.fam-pend'); if (el) el.textContent = n ? `${bn(n)}টি অপেক্ষায়` : 'নতুন কিছু নেই'; }).catch(() => {});
+  $('#dir').innerHTML = head + famHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
 }
 function drawNear(list, q) {
   const located = list.filter(x => x.lat != null && (!S.nearCat || x.category === S.nearCat) && (!q || svcSearch([x], q).hits.length));
@@ -4733,6 +4938,9 @@ document.addEventListener('click', e => {
   const dt = e.target.closest('[data-svcdet]'); if (dt) return svcDetailSheet(dt.dataset.svcdet);
   const ds = e.target.closest('[data-dsub]'); if (ds) { S.dsub = ds.dataset.dsub || null; return drawDir(); }
   const sa = e.target.closest('[data-svcadd]'); if (sa) return svcEditSheet(null, sa.dataset.svcadd);
+  if (e.target.closest('[data-famquiz]')) return famQuizSheet();
+  if (e.target.closest('[data-famsugg]')) return famSuggestSheet();
+  if (e.target.closest('[data-famadmin]')) return famSuggAdminSheet('famous');
   const cd = e.target.closest('#dir .card.svc'); if (cd && !e.target.closest('a,button')) { const b = cd.querySelector('[data-svcdet]'); if (b) return svcDetailSheet(b.dataset.svcdet); }
   const nc = e.target.closest('[data-nearcat]'); if (nc) { S.nearCat = nc.dataset.nearcat; return drawDir(); }
   if (e.target.closest('[data-nearref]')) { S.myLoc = null; return openNear(); }
@@ -5788,7 +5996,7 @@ function appFaqSheet() {
 
 // ================================================================ কয়েন ও ভেরিফাইড ব্যাজ
 const COIN_RULES = [['earnPost', 'পোস্ট করলে'], ['earnComment', 'মন্তব্য করলে'], ['earnLike', 'লাইক/রিয়্যাক্ট দিলে'], ['earnShare', 'শেয়ার করলে'], ['earnCap', 'দিনে সর্বোচ্চ আয়'], ['badgePrice', 'ব্যাজের দাম (কয়েন)'], ['badgeDays', 'ব্যাজের মেয়াদ (দিন)'], ['boostPrice', 'বুস্টের দাম (প্রতিদিন)']];
-const COIN_WHY = { post: 'পোস্ট করেছেন', comment: 'মন্তব্য করেছেন', like: 'রিয়্যাক্ট দিয়েছেন', share: 'শেয়ার করেছেন', badge: 'ভেরিফাইড ব্যাজ', boost: 'পোস্ট বুস্ট', refund: 'কয়েন ফেরত', admin: 'অ্যাডমিন দিয়েছেন' };
+const COIN_WHY = { post: 'পোস্ট করেছেন', comment: 'মন্তব্য করেছেন', like: 'রিয়্যাক্ট দিয়েছেন', share: 'শেয়ার করেছেন', badge: 'ভেরিফাইড ব্যাজ', boost: 'পোস্ট বুস্ট', refund: 'কয়েন ফেরত', admin: 'অ্যাডমিন দিয়েছেন', quiz: 'কুইজে সঠিক উত্তর' };
 const VCATS = ['জনপ্রতিনিধি', 'রাজনীতিবিদ', 'সরকারি কর্মকর্তা', 'সাংবাদিক', 'শিল্পী / লেখক', 'খেলোয়াড়', 'ব্যবসায়ী / প্রতিষ্ঠান', 'শিক্ষক / চিকিৎসক', 'সমাজকর্মী', 'অন্যান্য'];
 const coin = n => `🪙 ${bn(n)}`;
 const setN = k => Number(S.settings[k] ?? SETTING_KEYS[k][1]) || 0;

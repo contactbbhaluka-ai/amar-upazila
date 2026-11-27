@@ -209,12 +209,18 @@ const me = () => S.api?.me();
 function toast(m) { const t = $('#toast'); t.setAttribute('translate', DIR_BN ? 'no' : 'yes'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2600); }
 // শিটেরও নিজের Back-ধাপ থাকে: Back চাপলে শুধু শিট বন্ধ হয়, পেছনের পাতার ধাপ খরচ হয় না
 let sheetHist = false;
-function openSheet(html) { if (!sheetHist && !$('#modal').classList.contains('on')) sheetHist = pushNav(); const s = $('#sheet'); s.setAttribute('translate', DIR_BN ? 'no' : 'yes'); s.onclick = null; s.onchange = null; s.classList.remove('tall'); s.innerHTML = html; $('#modal').classList.add('on'); s.querySelector('input,textarea,select,button')?.focus(); }
+// বিস্তারিত পাতা থেকে খোলা উপ-শিট (সম্পাদনা, দাম, রিভিউ…) নিজের একটা Back-ধাপ পায়, যাতে Back চাপলে বিস্তারিতে ফেরে
+function dropSubHist() { if (!S.subHist) return; S.subHist = false; S.skipPop = (S.skipPop || 0) + 1; S.hd = Math.max(0, (S.hd || 0) - 1); try { history.back(); } catch { S.skipPop--; S.hd++; } }
+function openSheet(html) {
+  const on = $('#modal').classList.contains('on');
+  if (!sheetHist && !on) sheetHist = pushNav();
+  else if (on && S.sdSheetId != null && !S.subHist && $('#sheet').querySelector('.sdet, .ip.up') && !/^\s*<div class="(sdet|ip up)/.test(html)) S.subHist = pushNav(); const s = $('#sheet'); s.setAttribute('translate', DIR_BN ? 'no' : 'yes'); s.onclick = null; s.onchange = null; s.classList.remove('tall'); s.innerHTML = html; $('#modal').classList.add('on'); s.querySelector('input,textarea,select,button')?.focus(); }
 function closeSheet(fromPop) {
   try { if (window.speechSynthesis?.speaking) speechSynthesis.cancel(); } catch { /* না থাকলে থাক */ }
   S.sdSheetId = null;
   document.querySelector('.sd-lbx')?.remove(); $('#modal').classList.remove('on'); $('#sheet').classList.remove('tall'); $('#sheet').innerHTML = '';
-  if (sheetHist) { sheetHist = false; if (!fromPop) { S.skipPop = (S.skipPop || 0) + 1; S.hd = Math.max(0, (S.hd || 0) - 1); try { history.back(); } catch { S.skipPop--; S.hd++; } } }   // বোতামে বন্ধ করলে শিটের ধাপটাও সরাই
+  const n = (sheetHist && !fromPop ? 1 : 0) + (S.subHist ? 1 : 0); sheetHist = false; S.subHist = false;
+  if (n) { S.skipPop = (S.skipPop || 0) + 1; S.hd = Math.max(0, (S.hd || 0) - n); try { history.go(-n); } catch { S.skipPop--; S.hd += n; } }   // বোতামে বন্ধ করলে শিটের ধাপগুলোও সরাই   // বোতামে বন্ধ করলে শিটের ধাপটাও সরাই
 }
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' || e.target.closest('[data-close]')) closeSheet(); });
 function confirmSheet(text, okLabel, danger) {
@@ -4002,7 +4008,7 @@ function svcDetailSheet(id, opt = {}) {
   const long = String(s.details || '').length > 700, sub = subsOf(s.category).find(x => x[0] === s.subtype);
   const cname = catName(s.category) || 'সেবা', person = s.category === 'famous';
   const act = (k, icon, label, attrs) => `<${k} class="sd-act" ${attrs}><span class="sd-aic">${icon}</span><small>${label}</small></${k}>`;
-  S.sdSheetId = s.id;
+  dropSubHist(); S.sdSheetId = s.id;
   openSheet(s.category === 'union' ? unionPage(s, imgs, admin) : `<div class="sdet${person ? ' sd-person' : ''}" style="--sc:${c}">
     ${person ? `<div class="sp-hero">${imgs[0] ? `<div class="sp-bg" style="background-image:url('${esc(imgs[0])}')"></div>` : ''}
       <button class="sd-x" data-close aria-label="বন্ধ করুন">✕</button>${admin ? '<button class="sd-edit" data-sdedit>✏️ সম্পাদনা</button>' : ''}
@@ -7629,8 +7635,8 @@ function onPop() {
   S.hd = Math.max(0, (S.hd || 0) - 1);
   if (S.viewerOpen) return closeViewer();
   if ($('#modal').classList.contains('on')) {
-    // বিস্তারিত থেকে খোলা সম্পাদনা, দাম, রিভিউ ইত্যাদি থেকে Back → আবার সেই বিস্তারিতে
-    if (S.sdSheetId != null && !$('#sheet').querySelector('.sdet, .ip.up')) { const id = S.sdSheetId; try { history.pushState({ au: 1 }, ''); S.hd = (S.hd || 0) + 1; } catch { /* sandbox */ } return svcDetailSheet(id); }
+    // উপ-শিট থেকে Back → আবার সেই বিস্তারিতে
+    if (S.subHist) { S.subHist = false; if (S.sdSheetId != null) return svcDetailSheet(S.sdSheetId); }
     return closeSheet(true);
   }
   if (S.view === 'dir' && S.dirSub) { S.dirSub = false; S.dcat = ''; if ($('#q')) $('#q').value = ''; S.dirY = S.dirBackY || 0; loadDir(); return; }   // যেখান থেকে ঢুকেছিলেন সেখানেই ফেরা

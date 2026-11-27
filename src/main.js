@@ -4217,8 +4217,9 @@ function dirHeroHtml(total, cats) {
   const now = new Date(), t = dhakaParts(now), bd = banglaDate(t);
   const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)}`;
   return `<div class="dir-hero" id="dir-hero"><div class="dh-date"><b>${esc(BN_WD[t.wd])}</b><i>·</i><span>${esc(son)}</span><i>·</i><span>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</span></div>
+    <div class="dh-greet">${esc(greetText())}</div>
     <div class="dh-wxrow"><button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ"></button><div class="dh-msg" id="dh-msg" hidden></div></div>
-    <div class="dh-bot"><div><b class="dh-greet">${esc(greetText())}</b><small>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায় · ${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা</small></div></div></div>`;
+    <div class="dh-bot"><small>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায় · ${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা</small></div></div>`;
 }
 // সবুজ কার্ডটা পুরো ডিরেক্টরির হেডার: সব পাতায় একদম উপরে থাকে
 function renderDirHead(list) {

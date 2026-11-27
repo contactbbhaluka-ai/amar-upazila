@@ -4210,17 +4210,20 @@ function dirHeroWx(w) {
   el.innerHTML = `<span class="dh-ico">${ico}</span><span class="dh-temp">${bn(w.temp)}°</span><small>${esc(name)}</small>`; $('#dir-hero .dh-wxrow').hidden = false;
   msg.textContent = wxMsg(w); msg.hidden = !msg.textContent;
 }
+// সময় অনুযায়ী শুভেচ্ছা, অ্যাকাউন্ট থাকলে নামসহ, না থাকলে "ভালুকাবাসী"
+function greetPart() { const h = dhakaParts(new Date()).h; return h >= 5 && h < 12 ? ['শুভ সকাল', '🌅'] : h < 15 && h >= 12 ? ['শুভ দুপুর', '☀️'] : h < 18 && h >= 15 ? ['শুভ বিকাল', '🌤️'] : h < 20 && h >= 18 ? ['শুভ সন্ধ্যা', '🌆'] : ['শুভ রাত্রি', '🌙']; }
+function greetText() { const [g, e] = greetPart(), n = me()?.name?.trim(); return `${e} ${g}, ${n || HOME_UPAZILA + 'বাসী'}!`; }
 function dirHeroHtml(total, cats) {
   const now = new Date(), t = dhakaParts(now), bd = banglaDate(t);
   const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)}`;
   return `<div class="dir-hero" id="dir-hero"><div class="dh-date"><b>${esc(BN_WD[t.wd])}</b><i>·</i><span>${esc(son)}</span><i>·</i><span>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</span></div>
     <div class="dh-wxrow"><button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ"></button><div class="dh-msg" id="dh-msg" hidden></div></div>
-    <div class="dh-bot"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div></div>`;
+    <div class="dh-bot"><div><b class="dh-greet">${esc(greetText())}</b><small>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায় · ${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা</small></div></div></div>`;
 }
 // সবুজ কার্ডটা পুরো ডিরেক্টরির হেডার: সব পাতায় একদম উপরে থাকে
 function renderDirHead(list) {
   const box = $('#dir-head'); if (!box) return;
-  const cats = svcCats(), key = `${list.length}|${cats.length}|${dkKey(new Date())}|${EN}`;
+  const cats = svcCats(), key = `${list.length}|${cats.length}|${dkKey(new Date())}|${EN}|${greetPart()[0]}|${me()?.name || ''}`;
   if (box.dataset.k !== key || !box.children.length) { box.innerHTML = dirHeroHtml(list.length, cats); box.dataset.k = key; const c = local.get('wx'); if (c?.v) dirHeroWx(c.v); else dirHeroWx(null); }
   if (!S.wxT || Date.now() - S.wxT > 6e4) { S.wxT = Date.now(); loadWeather().then(dirHeroWx); }
 }

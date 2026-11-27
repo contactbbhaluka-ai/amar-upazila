@@ -1764,3 +1764,4 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .dh-wxrow{display:flex;align-items:stretch;gap:8px;margin-top:10px}.dh-wxrow .dh-wx{flex-direction:row;gap:6px;align-items:center;padding:8px 10px;min-width:0}
 .dh-wxrow .dh-wx small{white-space:nowrap}.dh-wxrow .dh-msg{flex:1;margin:0;display:flex;align-items:center}
 #dir-head .dir-hero{margin:0 0 12px}.upz-root:not(.dir-sub) #v-dir .bar{display:none}
+.dh-greet{font-size:16px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dh-bot small{margin-top:2px}

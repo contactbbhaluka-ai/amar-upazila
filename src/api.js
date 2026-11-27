@@ -933,6 +933,18 @@ async function supabaseApi() {
     },
     async saveReview(id, rating, body) { ok(await sb.from('service_reviews').upsert({ service_id: id, user_id: me.id, rating, body: body || null }, { onConflict: 'service_id,user_id' })); },
     async delReview(rid) { ok(await sb.from('service_reviews').delete().eq('id', rid)); },
+    async areaIssues(sid) {
+      const rows = ok(await sb.from('area_issues').select('id,service_id,user_id,kind,title,body,place,image_url,lat,lng,status,support_count,created_at,resolved_at').eq('service_id', sid).order('created_at', { ascending: false }).limit(60));
+      const ids = [...new Set(rows.map(r => r.user_id))];
+      const ps = ids.length ? ok(await sb.from('profiles').select('id,name,avatar_url').in('id', ids)) : [];
+      const pm = new Map(ps.map(p => [p.id, p]));
+      const mine = me && rows.length ? new Set(ok(await sb.from('area_issue_votes').select('issue_id').eq('user_id', me.id).in('issue_id', rows.map(r => r.id))).map(v => v.issue_id)) : new Set();
+      return rows.filter(r => !blocked.has(r.user_id)).map(r => ({ ...r, name: pm.get(r.user_id)?.name || 'একজন ব্যবহারকারী', avatar: pm.get(r.user_id)?.avatar_url || '', mine: r.user_id === me?.id, voted: mine.has(r.id) }));
+    },
+    async addIssue(v) { ok(await sb.from('area_issues').insert({ ...v, user_id: me.id })); },
+    async voteIssue(id, on) { if (on) ok(await sb.from('area_issue_votes').upsert({ issue_id: id, user_id: me.id }, { onConflict: 'issue_id,user_id', ignoreDuplicates: true })); else ok(await sb.from('area_issue_votes').delete().eq('issue_id', id).eq('user_id', me.id)); },
+    async setIssueStatus(id, status) { ok(await sb.from('area_issues').update({ status }).eq('id', id)); },
+    async delIssue(id) { ok(await sb.from('area_issues').delete().eq('id', id)); },
     async uploadServiceImage(blob) { return upload(blob, 'svc'); },
     async myTributes() { if (!me) return []; return ok(await sb.from('service_tributes').select('service_id').eq('user_id', me.id)).map(r => r.service_id); },
     async setTribute(id, on) { if (on) ok(await sb.from('service_tributes').upsert({ service_id: id, user_id: me.id }, { onConflict: 'service_id,user_id', ignoreDuplicates: true })); else ok(await sb.from('service_tributes').delete().eq('service_id', id).eq('user_id', me.id)); },
@@ -1057,7 +1069,7 @@ function demoApi() {
   // পুরোনো ডেমো ডেটাতেও নতুন দর্শনীয় স্থানগুলো বসাই
   for (const t of DEMO_TOURS) { const i = db.services.findIndex(x => x.id === t.id); if (i < 0) db.services.unshift({ ...t }); else db.services[i] = { ...db.services[i], ...t, lat: db.services[i].lat, lng: db.services[i].lng }; }
   db.services = db.services.filter((x, i, a) => a.findIndex(y => y.id === x.id) === i);
-  db.svcReports = get('svcReports', []); db.tributes = get('tributes', []); db.suggs = get('suggs', []); db.quiz = get('quiz', null);
+  db.svcReports = get('svcReports', []); db.tributes = get('tributes', []); db.suggs = get('suggs', []); db.quiz = get('quiz', null); db.issues = get('issues', []);
   db.svcReviews = get('svcReviews', [
     { id: 1, service_id: 901, user_id: 'd3', rating: 5, body: 'শালবনের ভেতর হাঁটতে দারুণ লাগে, ওয়াচ টাওয়ার থেকে পুরো বন দেখা যায়।', created_at: ago(30) },
     { id: 2, service_id: 901, user_id: 'd4', rating: 4, body: 'সুন্দর জায়গা, তবে খাবার সাথে নিয়ে যাবেন।', created_at: ago(80) },
@@ -1066,7 +1078,7 @@ function demoApi() {
   const svcRate = id => { const rs = db.svcReviews.filter(r => r.service_id === id), s = db.services.find(x => x.id === id); if (s) { s.rating_count = rs.length; s.rating_avg = rs.length ? Math.round(rs.reduce((a, r) => a + r.rating, 0) / rs.length * 10) / 10 : 0; } };
   [...new Set(db.svcReviews.map(r => r.service_id))].forEach(svcRate);
   let meId = get('me', null);
-  const save = () => { for (const k of ['tributes', 'suggs', 'quiz', 'svcReports', 'svcReviews', 'dirBanners', 'svcCatVisits', 'svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
+  const save = () => { for (const k of ['issues', 'tributes', 'suggs', 'quiz', 'svcReports', 'svcReviews', 'dirBanners', 'svcCatVisits', 'svcFavs', 'chats', 'convSet', 'votes', 'going', 'stories', 'storyViews', 'pageAdmins', 'boosts', 'wallet', 'vreqs', 'albums', 'users', 'posts', 'likes', 'reacts', 'friendships', 'follows', 'blocks', 'messages', 'notifs', 'saved', 'settings', 'manual', 'pages', 'pageFollows', 'groups', 'members', 'services', 'msgSaved', 'shared', 'friendMarks', 'friendLists', 'sugHidden', 'notifMutes', 'notifOff', 'annc', 'announcers']) if (db[k] !== undefined) set(k, db[k]); set('me', meId); };
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone', gone: !!p.deleteAt && p.id !== meId }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
@@ -2125,6 +2137,11 @@ function demoApi() {
       svcRate(id); save(); return wait();
     },
     async delReview(rid) { const r = (db.svcReviews || []).find(x => x.id === rid); db.svcReviews = (db.svcReviews || []).filter(x => x.id !== rid); if (r) svcRate(r.service_id); save(); return wait(); },
+    async areaIssues(sid) { db.issues ||= []; return wait(db.issues.filter(r => String(r.service_id) === String(sid)).map(r => ({ ...r, name: person(r.user_id)?.name || 'আপনি', avatar: '', mine: r.user_id === meId, voted: (r.votes || []).includes(meId), support_count: (r.votes || []).length }))); },
+    async addIssue(v) { db.issues ||= []; db.issues.unshift({ ...v, id: Date.now(), user_id: meId, status: 'open', votes: [], created_at: new Date().toISOString() }); save(); return wait(); },
+    async voteIssue(id, on) { const r = (db.issues || []).find(x => x.id === id); if (r) { r.votes = (r.votes || []).filter(u => u !== meId); if (on) r.votes.push(meId); save(); } return wait(); },
+    async setIssueStatus(id, status) { const r = (db.issues || []).find(x => x.id === id); if (r) { r.status = status; r.resolved_at = status === 'resolved' ? new Date().toISOString() : null; save(); } return wait(); },
+    async delIssue(id) { db.issues = (db.issues || []).filter(x => x.id !== id); save(); return wait(); },
     async uploadServiceImage(blob) { return toBlobUrl(blob); },
     async myTributes() { return wait([...(db.tributes || [])]); },
     async setTribute(id, on) { db.tributes ||= []; const s = db.services.find(x => x.id === id); const had = db.tributes.includes(id);

@@ -4203,6 +4203,7 @@ const svcHatCard = s => {
     ${s.subtype === 'seasonal' && (s.season_from || s.season_to) ? `<div class="ht-next season">🕌 ${hatDate(s.season_from)}${s.season_to ? ` – ${hatDate(s.season_to)}` : ''}</div>` : ''}
     ${days.length ? weekStrip(days, wd) : ''}
     ${g.length ? `<div class="ht-goods">${g.map(x => `<span>${x[1]} ${esc(x[2])}</span>`).join('')}</div>` : ''}
+    ${s.verified === false ? `<div class="ht-pend">⏳ যাচাইয়ের অপেক্ষায়${me()?.admin ? `<button class="btn sm" data-verify="${esc(s.id)}">✔ যাচাই করুন</button>` : ' · শুধু আপনি দেখছেন'}</div>` : ''}
     <div class="of-foot ht-foot">${ph[0] ? `<a class="of-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞</a>` : ''}<a class="of-map" href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ' + (s.address || 'ভালুকা'))}`}" target="_blank" rel="noopener" aria-label="পথ">🧭</a></div></article>`;
 };
 // হাট বাজার ক্যাটাগরির উপরের অংশ: আজকের হাট, মৌসুমি হাট, পণ্য ও এলাকা ফিল্টার
@@ -4215,6 +4216,7 @@ function hatTop(all) {
       ${today.length ? `<div class="ht-tl">${today.map(x => { const nh = nextHat(x), u = hatUnion(x); return `<button data-svcdet="${esc(x.id)}"><b>${esc(x.name)}</b><small>${u ? esc(areaCore(u)) + ' · ' : ''}${nh?.k === 'today' ? esc(nh.label.replace('আজ হাট · ', '').replace('আজ হাট', 'আজ')) : 'আজকের হাট শেষ'}</small>${nh?.live ? '<i>এখন</i>' : ''}</button>`; }).join('')}</div>` : ''}
       <div class="ht-wk">${DAY_SHORT.map((d, i) => { const n = all.filter(x => seasonOn(x) && x.subtype !== 'daily' && hatDaysOf(x).includes(i)).length; return `<span class="${i === t.wd ? 'td' : ''}"><small>${d}</small><b>${n ? bn(n) : '–'}</b></span>`; }).join('')}</div></div>
     ${season.length ? `<div class="ht-season"><b>🕌 মৌসুমি পশুর হাট</b>${season.map(x => `<button data-svcdet="${esc(x.id)}"><span>${esc(x.name)}</span><small>${hatDate(x.season_from)}${x.season_to ? ` – ${hatDate(x.season_to)}` : ''}${x.season_from > dhakaYmd() ? ' · শীঘ্রই' : ' · চলছে'}</small></button>`).join('')}</div>` : ''}
+    <button class="ht-add" data-hatadd>＋ আপনার এলাকার হাটের তথ্য দিন<small>হাটবার, কী পাওয়া যায়, ঠিকানা — যেকোনো অ্যাকাউন্টধারী যোগ করতে পারবেন</small></button>
     ${goods.length ? `<div class="sub-chips ht-gf"><button data-hgood=""${S.hgood ? '' : ' class="on"'}>কী খুঁজছেন?</button>${goods.map(g => `<button data-hgood="${g[0]}"${S.hgood === g[0] ? ' class="on"' : ''}>${g[1]} ${esc(g[2])}</button>`).join('')}</div>` : ''}
     ${areas.length > 1 ? `<div class="sub-chips ht-af"><button data-harea=""${S.harea ? '' : ' class="on"'}>সব এলাকা</button>${my && areas.some(a => a.id === my.id) ? `<button data-harea="${esc(my.id)}"${String(S.harea) === String(my.id) ? ' class="on"' : ''}>⭐ আমার এলাকা</button>` : ''}${areas.filter(a => !my || a.id !== my.id).map(a => `<button data-harea="${esc(a.id)}"${String(S.harea) === String(a.id) ? ' class="on"' : ''}>${a.category === 'pouro' ? 'পৌরসভা' : esc(areaCore(a))}</button>`).join('')}</div>` : ''}`;
 }
@@ -5421,6 +5423,7 @@ function drawDir() {
   const emgHtml = (unionMap || '') + (EMG_CATS.has(S.dcat) && !q ? `<a class="emg-strip" href="tel:999"><span>🚨</span><div><b>জীবন-মৃত্যুর জরুরি অবস্থায় ৯৯৯</b><small>পুলিশ, ফায়ার সার্ভিস ও এম্বুলেন্স — বিনা খরচে, ২৪ ঘণ্টা</small></div><i>কল</i></a>${S.dcat === 'fire' ? '<a class="emg-strip fire" href="tel:102"><span>🚒</span><div><b>ফায়ার সার্ভিস হটলাইন ১০২</b><small>আগুন ও উদ্ধারকাজে সরাসরি</small></div><i>কল</i></a>' : ''}` : '');
   if (['upz', 'pouro'].includes(S.dcat) && !q && !S.dsub && base.length === 1 && base[0].details) { $('#dir').innerHTML = head + svcInlinePage(base[0]); return; }
   const subX = $('#dir .sub-chips')?.scrollLeft || 0;
+  const ab = $('#addsvc'); if (ab) ab.textContent = S.dcat === 'shop' ? '+ হাট-বাজারের তথ্য যোগ করুন' : '+ নতুন সেবা/প্রতিষ্ঠান যোগ করুন';
   $('#dir').innerHTML = head + famHtml + hatHtml + emgHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
   const sc = $('#dir .sub-chips'); if (sc) { sc.scrollLeft = subX; chipCenter(sc); }
   document.querySelectorAll('#dir .ht-gf, #dir .ht-af').forEach(chipCenter);
@@ -5489,13 +5492,14 @@ document.addEventListener('click', e => {
   const c = e.target.closest('[data-svccall]'); if (c) S.api.serviceCalled(Number(c.dataset.svccall) || c.dataset.svccall).catch(() => {});
   const lo = e.target.closest('[data-svcloc]'); if (lo) return svcLocSheet(lo.dataset.svcloc);
   const shb = e.target.closest('[data-svcsh]'); if (shb) { const x = (S.svcAll || []).find(y => String(y.id) === shb.dataset.svcsh); if (x) { S.sdId = x.id; return svcShareSheet(x); } return; }
-  const dt = e.target.closest('[data-svcdet]'); if (dt) { const ln = e.target.closest('a[href]'); if (ln && ln !== dt && dt.contains(ln)) return; return svcDetailSheet(dt.dataset.svcdet); }
+  const dt = e.target.closest('[data-svcdet]'); if (dt && e.target.closest('[data-verify]')) return; if (dt) { const ln = e.target.closest('a[href]'); if (ln && ln !== dt && dt.contains(ln)) return; return svcDetailSheet(dt.dataset.svcdet); }
   const tc = e.target.closest('[data-iptoc]'); if (tc) { const el = document.getElementById('ip-sec-' + tc.dataset.iptoc); if (el?.tagName === 'DETAILS') el.open = true; return el?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   const ipc = e.target.closest('[data-ipcat]'); if (ipc) return openSvcCat(ipc.dataset.ipcat);
   const ipe = e.target.closest('[data-ipedit]'); if (ipe) { const x = (S.svcAll || []).find(y => String(y.id) === ipe.dataset.ipedit); return x && svcEditSheet(x); }
   const ipr = e.target.closest('[data-iprep]'); if (ipr) { const x = (S.svcAll || []).find(y => String(y.id) === ipr.dataset.iprep); return x && svcReportSheet(x); }
   const ipz = e.target.closest('[data-ipzoom]'); if (ipz) return sdZoom([ipz.src], 0);
   const ds = e.target.closest('[data-dsub]'); if (ds) { S.dsub = ds.dataset.dsub || null; return drawDir(); }
+  if (e.target.closest('[data-hatadd]')) return hatAddSheet();
   const hg = e.target.closest('[data-hgood]'); if (hg) { S.hgood = hg.dataset.hgood || ''; return drawDir(); }
   const ha = e.target.closest('[data-harea]'); if (ha) { S.harea = ha.dataset.harea || ''; return drawDir(); }
   const sa = e.target.closest('[data-svcadd]'); if (sa) return svcEditSheet(null, sa.dataset.svcadd);
@@ -5593,8 +5597,58 @@ $('#dir').addEventListener('click', e => {
   const b = e.target.closest('[data-verify]');
   if (b) busy(b, async () => { await S.api.verifyService(Number(b.dataset.verify)); await loadDir(); toast('যাচাইকৃত হিসেবে চিহ্নিত হয়েছে'); });
 });
+// হাট বাজার: যেকোনো অ্যাকাউন্টধারী হাটের তথ্য যোগ করতে পারবেন (অ্যাডমিন যাচাইয়ের পর সবাই দেখবে)
+function hatAddSheet() {
+  if (!needUser()) return;
+  const areas = (S.svcAll || []).filter(x => (x.category === 'union' || x.category === 'pouro') && x.union_id).sort((a, b) => (a.category === 'pouro' ? -1 : unionNo(a)) - (b.category === 'pouro' ? -1 : unionNo(b)));
+  const my = myAreaRow(), imgs = [], st = { geo: null, sub: 'weekly' };
+  openSheet(`<form class="rvf sde hta"><h2>🛒 হাট-বাজারের তথ্য যোগ করুন</h2>
+    <p class="mut" style="margin:-4px 0 8px">আপনার এলাকার হাট বা বাজারের তথ্য দিন। অ্যাডমিন যাচাই করার পর সবাই দেখতে পাবে।</p>
+    <label>হাট/বাজারের নাম *<input id="ha-n" required minlength="2" maxlength="80" placeholder="যেমন: উথুরা বাজার"></label>
+    <label>ধরন *</label><div class="hf-days ha-sub">${subsOf('shop').map(x => `<button type="button" data-hasub="${x[0]}"${x[0] === st.sub ? ' class="on"' : ''}>${x[2]} ${x[1]}</button>`).join('')}</div>
+    <label>ইউনিয়ন / পৌরসভা *<select id="ha-u" class="f" required><option value="">— বাছাই করুন —</option>${areas.map(a => `<option value="${esc(a.union_id)}"${my && my.id === a.id ? ' selected' : ''}>${esc(String(a.name).replace(/ পরিষদ$/, ''))}</option>`).join('')}</select></label>
+    <label>গ্রাম / ঠিকানা *<input id="ha-a" required maxlength="120" placeholder="গ্রাম, রাস্তা বা পরিচিত জায়গা"></label>
+    <div class="hf ha-days-box"><label>হাটবার * <small class="mut">(কোন কোন দিন হাট বসে)</small></label>
+      <div class="hf-days">${DAY_SHORT.map((d, i) => `<button type="button" data-hfd="${i}">${d}</button>`).join('')}</div>
+      <label>কখন বসে<select id="ha-t" class="f"><option value="">— জানা নেই —</option>${Object.entries(HAT_TIME).map(([k, x]) => `<option value="${k}">${x[0]}</option>`).join('')}</select></label></div>
+    <div class="hf ha-season" hidden><label>মৌসুমি হাটের সময়কাল *</label>
+      <div class="bk-row"><label>শুরু<input id="ha-sf" type="date"></label><label>শেষ<input id="ha-st" type="date"></label></div></div>
+    <label>কী কী পাওয়া যায়</label><div class="hf-goods">${GOODS.map(g => `<button type="button" data-hfg="${g[0]}">${g[1]} ${g[2]}</button>`).join('')}</div>
+    <label>ইজারাদার বা বাজার কমিটির ফোন <small class="mut">(ঐচ্ছিক)</small><input id="ha-p" inputmode="tel" maxlength="20" pattern="[0-9০-৯+\\- ]{3,20}"></label>
+    <label>আরও তথ্য <small class="mut">(ঐচ্ছিক)</small><textarea id="ha-d" rows="3" maxlength="1000" placeholder="কীভাবে যাবেন, কিসের জন্য বিখ্যাত, দোকানের সংখ্যা…"></textarea></label>
+    <label>ছবি <small class="mut">(ঐচ্ছিক)</small></label>${pickImgsHtml()}
+    ${geoFieldHtml(null)}
+    <button class="btn" style="width:100%;margin-top:14px">জমা দিন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-close>বাতিল</button></form>`);
+  const sh = $('#sheet'); sh.classList.add('tall'); bindPickImgs(sh, imgs, 3); bindGeoField(st);
+  const sync = () => { sh.querySelector('.ha-days-box').hidden = st.sub === 'seasonal'; sh.querySelector('.ha-season').hidden = st.sub !== 'seasonal'; };
+  sh.onclick = e => {
+    const sb = e.target.closest('[data-hasub]'); if (sb) { st.sub = sb.dataset.hasub; sh.querySelectorAll('[data-hasub]').forEach(x => x.classList.toggle('on', x === sb)); return sync(); }
+    const hf = e.target.closest('[data-hfd], [data-hfg]'); if (hf) hf.classList.toggle('on');
+  };
+  sh.querySelector('form').onsubmit = e => {
+    e.preventDefault();
+    const toEn = t => t.replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
+    const name = $('#ha-n').value.trim(), days = [...sh.querySelectorAll('[data-hfd].on')].map(b => +b.dataset.hfd), uid = +$('#ha-u').value || null;
+    if (!uid) return toast('ইউনিয়ন বা পৌরসভা বাছাই করুন');
+    if (['weekly', 'cattle'].includes(st.sub) && !days.length) return toast('কোন দিন হাট বসে তা বাছাই করুন');
+    if (st.sub === 'seasonal' && !$('#ha-sf').value) return toast('মৌসুমি হাট কবে শুরু হবে তা দিন');
+    if ($('#geo-link').value.trim() && !coordsFrom($('#geo-link').value)) return toast('ম্যাপের লিংক থেকে লোকেশন বোঝা যায়নি');
+    const dup = (S.svcAll || []).find(x => x.category === 'shop' && bnNorm(x.name) === bnNorm(name));
+    const area = (S.svcAll || []).find(x => x.union_id === uid && (x.category === 'union' || x.category === 'pouro'));
+    const v = { category: 'shop', subtype: st.sub, name, union_id: uid, address: [$('#ha-a').value.trim(), area ? String(area.name).replace(/^[০-৯0-9]+নং\s*/, '').replace(/ পরিষদ$/, '') : '', 'ভালুকা'].filter(Boolean).join(', '),
+      phone: toEn($('#ha-p').value.trim()), hat_days: st.sub === 'seasonal' ? [] : days, hat_time: st.sub === 'seasonal' ? null : $('#ha-t').value || null,
+      goods: [...sh.querySelectorAll('[data-hfg].on')].map(b => b.dataset.hfg), season_from: st.sub === 'seasonal' ? $('#ha-sf').value || null : null, season_to: st.sub === 'seasonal' ? $('#ha-st').value || null : null,
+      details: $('#ha-d').value.trim() || null, image_url: imgs[0] || null, images: imgs.slice(1), lat: st.geo?.lat ?? null, lng: st.geo?.lng ?? null };
+    busy(e.submitter, async () => {
+      if (dup && !await confirmSheet(`"${dup.name}" নামে একটি হাট আগেই আছে। তবুও নতুন হিসেবে জমা দেবেন?`, 'জমা দিন')) return hatAddSheet();
+      try { await S.api.addService(v); } catch (er) { return toast(errText(er)); }
+      closeSheet(); await loadDir(); toast('ধন্যবাদ! জমা হয়েছে, অ্যাডমিন যাচাইয়ের পর সবাই দেখতে পাবে');
+    });
+  };
+}
 $('#addsvc').addEventListener('click', () => {
   if (!needUser()) return;
+  if (S.dcat === 'shop') return hatAddSheet();
   openSheet(`<h2>নতুন সেবা যোগ করুন</h2><form id="sform">
     <label for="sn">নাম</label><input id="sn" required minlength="2" maxlength="80">
     <label for="sc">ধরন</label><select class="f" id="sc">${SERVICE_CATS.filter(c => !SVC_SPECIAL[c[0]]).map(c => `<option value="${c[0]}" ${c[0] === S.dcat ? 'selected' : ''}>${c[2]} ${esc(c[1])}</option>`).join('')}</select>

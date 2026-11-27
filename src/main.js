@@ -206,8 +206,13 @@ const me = () => S.api?.me();
 
 // ================================================================ UI টুকরো
 function toast(m) { const t = $('#toast'); t.setAttribute('translate', DIR_BN ? 'no' : 'yes'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2600); }
-function openSheet(html) { const s = $('#sheet'); s.setAttribute('translate', DIR_BN ? 'no' : 'yes'); s.onclick = null; s.onchange = null; s.classList.remove('tall'); s.innerHTML = html; $('#modal').classList.add('on'); s.querySelector('input,textarea,select,button')?.focus(); }
-function closeSheet() { document.querySelector('.sd-lbx')?.remove(); $('#modal').classList.remove('on'); $('#sheet').classList.remove('tall'); $('#sheet').innerHTML = ''; }
+// শিটেরও নিজের Back-ধাপ থাকে: Back চাপলে শুধু শিট বন্ধ হয়, পেছনের পাতার ধাপ খরচ হয় না
+let sheetHist = false;
+function openSheet(html) { if (!sheetHist && !$('#modal').classList.contains('on')) sheetHist = pushNav(); const s = $('#sheet'); s.setAttribute('translate', DIR_BN ? 'no' : 'yes'); s.onclick = null; s.onchange = null; s.classList.remove('tall'); s.innerHTML = html; $('#modal').classList.add('on'); s.querySelector('input,textarea,select,button')?.focus(); }
+function closeSheet(fromPop) {
+  document.querySelector('.sd-lbx')?.remove(); $('#modal').classList.remove('on'); $('#sheet').classList.remove('tall'); $('#sheet').innerHTML = '';
+  if (sheetHist) { sheetHist = false; if (!fromPop) { S.skipPop = (S.skipPop || 0) + 1; try { history.back(); } catch { S.skipPop--; } } }   // বোতামে বন্ধ করলে শিটের ধাপটাও সরাই
+}
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' || e.target.closest('[data-close]')) closeSheet(); });
 function confirmSheet(text, okLabel, danger) {
   return new Promise(res => {
@@ -3983,10 +3988,10 @@ function svcReviewSheet(s, mine) {
   openSheet(`<form class="rvf" style="--sc:${svcColor(s.category)}"><h2>${esc(s.name)}</h2><p class="mut" style="margin:-4px 0 12px">আপনার অভিজ্ঞতা কেমন ছিল?</p>
     <div class="rvf-stars">${[1, 2, 3, 4, 5].map(i => `<button type="button" data-st="${i}" aria-label="${bn(i)} তারা">★</button>`).join('')}</div><div class="rvf-l mut">&nbsp;</div>
     <textarea id="rvf-b" rows="4" maxlength="1000" placeholder="কী ভালো লেগেছে, কী উন্নতি দরকার — লিখুন (ঐচ্ছিক)">${esc(mine?.body || '')}</textarea>
-    <button class="btn" style="width:100%;margin-top:12px">জমা দিন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-back>ফিরে যান</button></form>`);
+    <button class="btn" style="width:100%;margin-top:12px">জমা দিন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-sback>ফিরে যান</button></form>`);
   const sh = $('#sheet'), paint = () => { sh.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('on', +b.dataset.st <= rate)); sh.querySelector('.rvf-l').textContent = rate ? lbl[rate] : ' '; };
   paint();
-  sh.onclick = e => { const b = e.target.closest('[data-st]'); if (b) { rate = +b.dataset.st; paint(); } if (e.target.closest('[data-back]')) svcDetailSheet(s.id, { toRev: true }); };
+  sh.onclick = e => { const b = e.target.closest('[data-st]'); if (b) { rate = +b.dataset.st; paint(); } if (e.target.closest('[data-sback]')) svcDetailSheet(s.id, { toRev: true }); };
   sh.querySelector('form').onsubmit = e => { e.preventDefault(); if (!rate) return toast('তারা বেছে নিন'); busy(e.submitter, async () => { await S.api.saveReview(s.id, rate, $('#rvf-b').value.trim()); toast('ধন্যবাদ! রিভিউ জমা হয়েছে'); svcDetailSheet(s.id, { toRev: true }); }); };
 }
 // ভুল তথ্য জানানো
@@ -3996,9 +4001,9 @@ function svcReportSheet(s) {
   openSheet(`<form class="rvf"><h2>⚠️ ভুল তথ্য জানান</h2><p class="mut" style="margin:-4px 0 12px">${esc(s.name)} — কোন তথ্যটি ভুল?</p>
     <div class="rp-opts">${opts.map((o, i) => `<label><input type="radio" name="rp" value="${esc(o)}"${i ? '' : ' checked'}> ${esc(o)}</label>`).join('')}</div>
     <textarea id="rp-b" rows="3" maxlength="240" placeholder="সঠিক তথ্যটি জানা থাকলে লিখুন (যেমন নতুন নম্বর)"></textarea>
-    <button class="btn" style="width:100%;margin-top:12px">পাঠান</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-back>ফিরে যান</button></form>`);
+    <button class="btn" style="width:100%;margin-top:12px">পাঠান</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-sback>ফিরে যান</button></form>`);
   const sh = $('#sheet');
-  sh.onclick = e => { if (e.target.closest('[data-back]')) svcDetailSheet(s.id); };
+  sh.onclick = e => { if (e.target.closest('[data-sback]')) svcDetailSheet(s.id); };
   sh.querySelector('form').onsubmit = e => { e.preventDefault(); const r = sh.querySelector('[name=rp]:checked').value, b = $('#rp-b').value.trim();
     busy(e.submitter, async () => {
       try { await S.api.report('service', s.id, (r + (b ? ': ' + b : '')).slice(0, 300)); toast('ধন্যবাদ! অ্যাডমিন যাচাই করে ঠিক করবেন'); }
@@ -4018,9 +4023,9 @@ function svcBookSheet(s) {
     <button class="btn wa" data-bk="wa" style="width:100%;margin-top:12px">💬 WhatsApp-এ পাঠান</button>
     <button class="btn ghost" data-bk="sms" style="width:100%;margin-top:8px">✉️ SMS-এ পাঠান</button>
     <p class="mut" style="font-size:12px;margin:10px 0 0">বুকিং ও দাম সরাসরি প্রতিষ্ঠানের সঙ্গে ঠিক করবেন। অ্যাপ শুধু বার্তাটি তৈরি করে দেয়।</p>
-    <button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-back>ফিরে যান</button></form>`);
+    <button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-sback>ফিরে যান</button></form>`);
   const sh = $('#sheet');
-  sh.onclick = e => { if (e.target.closest('[data-back]')) svcDetailSheet(s.id); };
+  sh.onclick = e => { if (e.target.closest('[data-sback]')) svcDetailSheet(s.id); };
   sh.querySelector('form').onsubmit = e => { e.preventDefault();
     const dd = $('#bk-d').value, dt = dd ? (p => `${bn(+p[2])} ${MON_BN[+p[1] - 1]} ${bn(p[0])}`)(dd.split('-')) : '';
     const msg = `আসসালামু আলাইকুম। "আমার উপজেলা" অ্যাপে ${s.name}-এর তথ্য দেখে যোগাযোগ করছি।\n\nধরন: ${$('#bk-t').value}\nতারিখ: ${dt}\nজন: ${bn($('#bk-n').value || 1)}\nনাম: ${$('#bk-name').value.trim()}${$('#bk-x').value.trim() ? '\n' + $('#bk-x').value.trim() : ''}\n\nখরচ ও খালি আছে কিনা জানাবেন। ধন্যবাদ।`;
@@ -4045,7 +4050,7 @@ function svcEditSheet(s, category) {
     <label>কীভাবে যাবেন<textarea id="se-go" rows="3" maxlength="3000" placeholder="ঢাকা/ময়মনসিংহ/ভালুকা সদর থেকে কোন বাস, ভাড়া কত">${esc(v.how_to_go || '')}</textarea></label>
     <label>যাওয়ার ভালো সময়<input id="se-best" maxlength="300" placeholder="যেমন শীতকাল, বিকেলে" value="${esc(v.best_time || '')}"></label>
     <label>সুবিধাসমূহ</label><div class="se-amen">${Object.entries(AMEN).map(([k, [i, n]]) => `<button type="button" data-am="${k}" class="${am.has(k) ? 'on' : ''}">${i} ${n}</button>`).join('')}</div>
-    <button class="btn" style="width:100%;margin-top:14px">সেভ করুন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-back>বাতিল</button>
+    <button class="btn" style="width:100%;margin-top:14px">সেভ করুন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-sback>বাতিল</button>
     ${s ? `<button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-svcloc="${esc(s.id)}">📍 ম্যাপে ${s.lat != null ? 'অবস্থান বদলান' : 'অবস্থান দিন'}</button>` : ''}</form>`);
   const sh = $('#sheet'); sh.classList.add('tall');
   const drawImgs = () => { sh.querySelector('.se-imgs').innerHTML = imgs.map((u, i) => `<div class="se-im"><img src="${esc(u)}" alt="">${i ? `<button type="button" data-imcover="${i}" title="প্রচ্ছদ বানান">★</button>` : '<span>প্রচ্ছদ</span>'}<button type="button" class="x" data-imdel="${i}" aria-label="সরান">✕</button></div>`).join('')
@@ -4061,7 +4066,7 @@ function svcEditSheet(s, category) {
     const a = e.target.closest('[data-am]'); if (a) { a.classList.toggle('on'); am[a.classList.contains('on') ? 'add' : 'delete'](a.dataset.am); return; }
     const d = e.target.closest('[data-imdel]'); if (d) { imgs.splice(+d.dataset.imdel, 1); return drawImgs(); }
     const cv = e.target.closest('[data-imcover]'); if (cv) { imgs.unshift(...imgs.splice(+cv.dataset.imcover, 1)); return drawImgs(); }
-    if (e.target.closest('[data-back]')) return s ? svcDetailSheet(s.id) : closeSheet();
+    if (e.target.closest('[data-sback]')) return s ? svcDetailSheet(s.id) : closeSheet();
   };
   sh.querySelector('form').onsubmit = e => { e.preventDefault();
     const val = id => $(id).value.trim() || null;
@@ -4666,7 +4671,7 @@ function openSvcCat(k, sub = null) {
   if (k === 'near') { S.dcat = ''; return openNear(); }
   S.dcat = k; S.dsub = sub; loadDir(); window.scrollTo(0, 0);
 }
-$('#q').addEventListener('input', () => { showQPanel(); clearTimeout(svcTimer); svcTimer = setTimeout(() => (S.svcAll ? drawDir() : loadDir()), 200); document.body.classList.toggle('dir-sub', !!(S.dcat || $('#q').value.trim())); });
+$('#q').addEventListener('input', () => { if (S.view === 'dir' && !S.dcat && !S.dirSub && $('#q').value.trim()) { S.dirSub = true; S.dirBackY = window.scrollY; pushNav(); } showQPanel(); clearTimeout(svcTimer); svcTimer = setTimeout(() => (S.svcAll ? drawDir() : loadDir()), 200); document.body.classList.toggle('dir-sub', !!(S.dcat || $('#q').value.trim())); });
 $('#dchips').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (b) openSvcCat(b.dataset.d); });
 document.addEventListener('click', e => {
   const f = e.target.closest('[data-svcfav]'); if (f) { e.preventDefault(); return toggleSvcFav(Number(f.dataset.svcfav) || f.dataset.svcfav); }
@@ -4702,7 +4707,7 @@ function voiceDone(text) {
   $('#qmic').classList.remove('on'); $('#q').placeholder = 'খুঁজুন: হাসপাতাল, doctor, bidyut…';
   text = (text || '').trim().replace(/[।.?!]+$/, '');
   if (!text) return toast('কিছু শোনা যায়নি, আবার চেষ্টা করুন');
-  $('#q').value = text; $('#qpanel').hidden = true; document.body.classList.add('dir-sub'); S.svcAll ? drawDir() : loadDir();
+  if (S.view === 'dir' && !S.dcat && !S.dirSub) { S.dirSub = true; S.dirBackY = window.scrollY; pushNav(); } $('#q').value = text; $('#qpanel').hidden = true; document.body.classList.add('dir-sub'); S.svcAll ? drawDir() : loadDir();
 }
 $('#qmic')?.addEventListener('click', async () => {
   const btn = $('#qmic'); if (btn.classList.contains('on')) { try { S.rec?.stop(); } catch { /* ignore */ } return; }
@@ -6613,7 +6618,10 @@ const RELOAD = {
   pages: () => loadPages(), groups: () => loadGroups(), saved: () => loadFeed('saved'), dir: () => loadDir(),
   page: () => openPage(S.pageId, true), group: () => openGroup(S.groupId, true), user: () => openUser(S.userId, true), admin: () => loadAdmin(), post: () => { renderFeed('post'); loadComments(); },
 };
-function pushNav() { try { history.pushState({ au: 1 }, ''); } catch { /* sandbox */ } }
+function pushNav() {
+  if (S.skipPop) { S.pendPush = (S.pendPush || 0) + 1; return true; }   // শিটের ধাপ সরানো শেষ হলে তারপর নতুন ধাপ
+  try { history.pushState({ au: 1 }, ''); return true; } catch { return false; /* sandbox */ }
+}
 function show(v) {
   DIR_BN = v === 'dir';
   if (v !== 'dir') S.dirAnimDone = false;
@@ -6651,8 +6659,9 @@ function go(v) {
 function open(v) { closeSheet(); if (S.view !== v) S.stack.push(S.view); pushNav(); show(v); }
 function back() { try { history.back(); } catch { onPop(); } }
 function onPop() {
+  if (S.skipPop) { if (--S.skipPop === 0) while (S.pendPush > 0) { S.pendPush--; try { history.pushState({ au: 1 }, ''); } catch { /* sandbox */ } } return; }
   if (S.viewerOpen) return closeViewer();
-  if ($('#modal').classList.contains('on')) return closeSheet();
+  if ($('#modal').classList.contains('on')) return closeSheet(true);
   if (S.view === 'dir' && S.dirSub) { S.dirSub = false; S.dcat = ''; if ($('#q')) $('#q').value = ''; S.dirY = S.dirBackY || 0; loadDir(); return; }   // যেখান থেকে ঢুকেছিলেন সেখানেই ফেরা
   if (!S.stack.length) return;
   const prev = S.stack.pop(); show(prev);

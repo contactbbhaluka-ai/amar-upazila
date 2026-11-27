@@ -4307,7 +4307,7 @@ function renderSvcGrid(list) {
   const n = k => list.filter(x => x.category === k).length;
   const total = list.length, cats = svcCats(), has = k => k === 'sos' || k === 'aid' || cats.some(c => c[0] === k);
   const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : k === 'aid' ? 'প্রাথমিক চিকিৎসা' : c[1], cnt = k === 'sos' || k === 'aid' || SVC_SPECIAL[k] ? 0 : n(k);
-    return `<button class="svc-tile" data-svc="${k}" style="--c:${svcColor(k)};--i:${TI()}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
+    return `<button class="svc-tile" data-svc="${k}" style="--c:${svcColor(k)};--i:${TI()}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span></button>`; };
   const favs = list.filter(x => S.svcFav?.has(x.id));
   $('#dir').classList.toggle('anim', anim);
   $('#dir').innerHTML = sliderHtml(total, cats)

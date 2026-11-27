@@ -4230,8 +4230,7 @@ const svcHatCard = s => {
     ${nh ? `<div class="ht-next ${nh.k}${nh.live ? ' live' : ''}">${nh.k === 'today' ? '🛒' : nh.k === 'daily' ? '🔁' : '📅'} ${esc(nh.label)}</div>` : ''}
     ${hatNotices(s.id).filter(n => n.on_date <= dhakaYmd(10) || (n.new_date && n.new_date <= dhakaYmd(10))).map(n => `<div class="ht-notice ${n.kind}">${n.kind === 'closed' ? '⚠️' : '↪️'} ${esc(noticeText(n))}</div>`).join('')}
     ${s.subtype === 'seasonal' && (s.season_from || s.season_to) ? `<div class="ht-next season">🕌 ${hatDate(s.season_from)}${s.season_to ? ` – ${hatDate(s.season_to)}` : ''}</div>` : ''}
-    ${days.length ? weekStrip(days, wd) : ''}
-    ${g.length ? `<div class="ht-goods">${g.map(x => `<span>${x[1]} ${esc(x[2])}</span>`).join('')}</div>` : ''}
+    ${days.length ? `<div class="ht-days"><small>হাটবার</small>${days.map(d => `<span${d === wd ? ' class="td"' : ''}>${DAY_SHORT[d]}</span>`).join('')}</div>` : ''}
     ${s.verified === false ? `<div class="ht-pend">⏳ যাচাইয়ের অপেক্ষায়${me()?.admin ? `<button class="btn sm" data-verify="${esc(s.id)}">✔ যাচাই করুন</button>` : ' · শুধু আপনি দেখছেন'}</div>` : ''}
     <div class="of-foot ht-foot">${ph[0] ? `<a class="of-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞</a>` : ''}<a class="of-map" href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ' + (s.address || 'ভালুকা'))}`}" target="_blank" rel="noopener" aria-label="পথ">🧭</a></div></article>`;
 };

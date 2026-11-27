@@ -4074,24 +4074,29 @@ function svcBookSheet(s) {
 function svcEditSheet(s, category) {
   const v = s || { category: category || 'tour', amenities: [], images: [] };
   const imgs = [...new Set([v.image_url, ...(v.images || [])].filter(Boolean))], am = new Set(v.amenities || []);
-  const cats = SERVICE_CATS.filter(c => !SVC_SPECIAL[c[0]] && c[0] !== 'sos');
-  openSheet(`<form class="rvf sde"><h2>${s ? '✏️ তথ্য সম্পাদনা' : '＋ নতুন যোগ করুন'}</h2>
-    <label>নাম *<input id="se-name" required maxlength="120" value="${esc(v.name || '')}"></label>
-    <div class="bk-row"><label>ক্যাটাগরি<select class="f" id="se-cat">${cats.map(c => `<option value="${c[0]}"${c[0] === v.category ? ' selected' : ''}>${esc(c[1])}</option>`).join('')}</select></label>
-      <label>ধরন<select class="f" id="se-sub"><option value="">—</option>${subsOf(v.category).map(x => `<option value="${x[0]}"${x[0] === v.subtype ? ' selected' : ''}>${x[2]} ${x[1]}</option>`).join('')}</select></label></div>
-    ${v.category === 'famous' ? `<label>পরিচিতি (এক লাইনে)<input id="se-tag" maxlength="120" placeholder="যেমন: ভাষা সৈনিক ও আইনজীবী" value="${esc(v.tagline || '')}"></label>
-    <label>জীবনকাল<input id="se-life" maxlength="80" placeholder="যেমন: ১৯৩৫ – ২০০৯" value="${esc(v.life || '')}"></label>` : ''}
-    <label>${v.category === 'famous' ? 'জন্মস্থান / গ্রাম' : 'ঠিকানা'}<input id="se-addr" maxlength="200" value="${esc(v.address || '')}"></label>
-    <div class="bk-row"><label>ফোন<input id="se-phone" maxlength="40" inputmode="tel" value="${esc(v.phone || '')}"></label><label>খোলার সময়<input id="se-hours" maxlength="80" placeholder="যেমন সকাল ৯টা–সন্ধ্যা ৬টা" value="${esc(v.hours || '')}"></label></div>
-    <label>ছবি <small class="mut">(প্রথমটি প্রচ্ছদ · সর্বোচ্চ ১৩টি)</small></label>
+  // যে ক্যাটাগরিতে আছেন শুধু সেই ক্যাটাগরির দরকারি ঘরগুলো
+  const cat = v.category, person = cat === 'famous', place = cat === 'tour', subs = subsOf(cat), cname = catName(cat) || 'সেবা';
+  const F = person ? { tag: 1, life: 1, addr: 'জন্মস্থান / গ্রাম', det: 'জীবনী', vid: 1, imgs: 'ছবি (প্রথমটি প্রতিকৃতি)' }
+    : place ? { addr: 'ঠিকানা', phone: 1, hours: 1, det: 'বিস্তারিত বিবরণ', vid: 1, go: 1, best: 1, amen: 1, loc: 1, imgs: 'ছবি (প্রথমটি প্রচ্ছদ)' }
+    : { addr: 'ঠিকানা / এলাকা', phone: 1, hours: 1, det: 'বিস্তারিত (ঐচ্ছিক)', loc: 1, imgs: 'ছবি (ঐচ্ছিক)' };
+  const inp = (id, label, val, attrs = '') => `<label>${label}<input id="${id}" ${attrs} value="${esc(val || '')}"></label>`;
+  openSheet(`<form class="rvf sde"><h2>${s ? '✏️ তথ্য সম্পাদনা' : `＋ নতুন ${esc(person ? 'প্রসিদ্ধ ব্যক্তি' : cname)}`}</h2>
+    <p class="mut" style="margin:-4px 0 6px">${svcIc(cat, 14)} ${esc(cname)}</p>
+    ${inp('se-name', person ? 'পূর্ণ নাম *' : 'নাম *', v.name, `required maxlength="120"${person ? ' placeholder="যেমন: ভাষা সৈনিক মোস্তফা এম,এ মতিন"' : ''}`)}
+    ${subs.length ? `<label>${person ? 'পরিচয়ের ধরন' : 'ধরন'}<select class="f" id="se-sub"><option value="">—</option>${subs.map(x => `<option value="${x[0]}"${x[0] === v.subtype ? ' selected' : ''}>${x[2]} ${x[1]}</option>`).join('')}</select></label>` : ''}
+    ${F.tag ? inp('se-tag', 'পরিচিতি (এক লাইনে)', v.tagline, 'maxlength="120" placeholder="যেমন: বীর মুক্তিযোদ্ধা, আফসার বাহিনীর প্রতিষ্ঠাতা"') : ''}
+    ${F.life ? inp('se-life', 'জীবনকাল', v.life, 'maxlength="80" placeholder="যেমন: ১৯৩৫ – ২০০৯ বা জন্ম ১৯৪০"') : ''}
+    ${inp('se-addr', F.addr, v.address, 'maxlength="200"')}
+    ${F.phone ? `<div class="bk-row">${inp('se-phone', 'ফোন', v.phone, 'maxlength="40" inputmode="tel"')}${F.hours ? inp('se-hours', 'খোলার সময়', v.hours, 'maxlength="80" placeholder="যেমন সকাল ৯টা–সন্ধ্যা ৬টা"') : ''}</div>` : ''}
+    <label>${F.imgs} <small class="mut">· সর্বোচ্চ ১৩টি</small></label>
     <div class="se-imgs"></div>
-    <label>বিস্তারিত লেখা <small class="mut">(### দিয়ে শিরোনাম, • দিয়ে তালিকা)</small><textarea id="se-det" rows="8" maxlength="20000">${esc(v.details || '')}</textarea></label>
-    <label>YouTube ভিডিও <small class="mut">(লিংক, প্রতি লাইনে একটি)</small><textarea id="se-vid" rows="2" placeholder="https://youtu.be/...">${esc((v.videos || []).map(x => 'https://youtu.be/' + x).join('\n'))}</textarea></label>
-    <label>কীভাবে যাবেন<textarea id="se-go" rows="3" maxlength="3000" placeholder="ঢাকা/ময়মনসিংহ/ভালুকা সদর থেকে কোন বাস, ভাড়া কত">${esc(v.how_to_go || '')}</textarea></label>
-    <label>যাওয়ার ভালো সময়<input id="se-best" maxlength="300" placeholder="যেমন শীতকাল, বিকেলে" value="${esc(v.best_time || '')}"></label>
-    <label>সুবিধাসমূহ</label><div class="se-amen">${Object.entries(AMEN).map(([k, [i, n]]) => `<button type="button" data-am="${k}" class="${am.has(k) ? 'on' : ''}">${i} ${n}</button>`).join('')}</div>
+    <label>${F.det} <small class="mut">(### দিয়ে শিরোনাম, • দিয়ে তালিকা)</small><textarea id="se-det" rows="8" maxlength="20000"${person ? ' placeholder="### প্রারম্ভিক জীবন&#10;...&#10;&#10;### কর্মজীবন&#10;...&#10;&#10;### অবদান ও সম্মাননা&#10;• ..."' : ''}>${esc(v.details || '')}</textarea></label>
+    ${F.vid ? `<label>YouTube ভিডিও <small class="mut">(লিংক, প্রতি লাইনে একটি)</small><textarea id="se-vid" rows="2" placeholder="https://youtu.be/...">${esc((v.videos || []).map(x => 'https://youtu.be/' + x).join('\n'))}</textarea></label>` : ''}
+    ${F.go ? `<label>কীভাবে যাবেন<textarea id="se-go" rows="3" maxlength="3000" placeholder="ঢাকা/ময়মনসিংহ/ভালুকা সদর থেকে কোন বাস, ভাড়া কত">${esc(v.how_to_go || '')}</textarea></label>` : ''}
+    ${F.best ? inp('se-best', 'যাওয়ার ভালো সময়', v.best_time, 'maxlength="300" placeholder="যেমন শীতকাল, বিকেলে"') : ''}
+    ${F.amen ? `<label>সুবিধাসমূহ</label><div class="se-amen">${Object.entries(AMEN).map(([k, [i, n]]) => `<button type="button" data-am="${k}" class="${am.has(k) ? 'on' : ''}">${i} ${n}</button>`).join('')}</div>` : ''}
     <button class="btn" style="width:100%;margin-top:14px">সেভ করুন</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-sback>বাতিল</button>
-    ${s ? `<button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-svcloc="${esc(s.id)}">📍 ম্যাপে ${s.lat != null ? 'অবস্থান বদলান' : 'অবস্থান দিন'}</button>` : ''}</form>`);
+    ${s && F.loc ? `<button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-svcloc="${esc(s.id)}">📍 ম্যাপে ${s.lat != null ? 'অবস্থান বদলান' : 'অবস্থান দিন'}</button>` : ''}</form>`);
   const sh = $('#sheet'); sh.classList.add('tall');
   const drawImgs = () => { sh.querySelector('.se-imgs').innerHTML = imgs.map((u, i) => `<div class="se-im"><img src="${esc(u)}" alt="">${i ? `<button type="button" data-imcover="${i}" title="প্রচ্ছদ বানান">★</button>` : '<span>প্রচ্ছদ</span>'}<button type="button" class="x" data-imdel="${i}" aria-label="সরান">✕</button></div>`).join('')
     + (imgs.length < 13 ? `<label class="se-add">＋<small>ছবি</small><input type="file" accept="image/*" multiple hidden id="se-file"></label>` : ''); };
@@ -4109,12 +4114,17 @@ function svcEditSheet(s, category) {
     if (e.target.closest('[data-sback]')) return s ? svcDetailSheet(s.id) : closeSheet();
   };
   sh.querySelector('form').onsubmit = e => { e.preventDefault();
-    const val = id => $(id).value.trim() || null;
-    const p = { name: $('#se-name').value.trim(), category: $('#se-cat').value, subtype: val('#se-sub'), address: val('#se-addr') || '', phone: val('#se-phone') || '', hours: val('#se-hours'),
-      details: val('#se-det'), how_to_go: val('#se-go'), best_time: val('#se-best'), amenities: [...am].filter(k => AMEN[k]), image_url: imgs[0] || null, images: imgs.slice(1, 13),
-      videos: [...new Set($('#se-vid').value.split(/\s+/).map(ytId).filter(Boolean))].slice(0, 10) };
-    if ($('#se-tag')) { p.tagline = val('#se-tag'); p.life = val('#se-life'); }
-    if ($('#se-vid').value.trim() && !p.videos.length) return toast('YouTube লিংক বোঝা যায়নি');
+    const val = id => ($(id)?.value.trim() || null), has = id => !!$(id);
+    const p = { name: $('#se-name').value.trim(), category: cat, address: val('#se-addr') || '', details: val('#se-det'), image_url: imgs[0] || null, images: imgs.slice(1, 13) };
+    if (has('#se-sub')) p.subtype = val('#se-sub');
+    if (has('#se-phone')) p.phone = val('#se-phone') || ''; else if (!s) p.phone = '';
+    if (has('#se-hours')) p.hours = val('#se-hours');
+    if (has('#se-tag')) p.tagline = val('#se-tag');
+    if (has('#se-life')) p.life = val('#se-life');
+    if (has('#se-go')) p.how_to_go = val('#se-go');
+    if (has('#se-best')) p.best_time = val('#se-best');
+    if (F.amen) p.amenities = [...am].filter(k => AMEN[k]);
+    if (has('#se-vid')) { p.videos = [...new Set($('#se-vid').value.split(/\s+/).map(ytId).filter(Boolean))].slice(0, 10); if ($('#se-vid').value.trim() && !p.videos.length) return toast('YouTube লিংক বোঝা যায়নি'); }
     busy(e.submitter, async () => {
       const id = await S.api.saveService(s?.id || null, p);
       S.svcAll = await S.api.services({}); try { local.set('svc_cache', { ...(local.get('svc_cache') || {}), t: Date.now(), list: S.svcAll }); } catch {}

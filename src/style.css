@@ -1986,3 +1986,42 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .sd-repbox>b{display:block;color:#dc2626;font-size:14px;margin-bottom:4px}
 .sd-repbox>div{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px dashed color-mix(in srgb,#dc2626 25%,var(--line));font-size:13.5px}
 .sd-repbox .link{white-space:nowrap;font-size:12.5px}
+/* প্রসিদ্ধ ব্যক্তি */
+#dir:has(.svc-person){display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+#dir:has(.svc-person)>:not(.svc-person){grid-column:1/-1}
+@media (min-width:640px){#dir:has(.svc-person){grid-template-columns:repeat(3,1fr)}}
+.card.svc.svc-person{display:block;padding:0;margin:0;overflow:hidden;border-radius:16px;cursor:pointer;box-shadow:0 3px 14px rgba(0,0,0,.07);animation:srIn .45s ease both;animation-delay:calc(min(var(--i,0),8) * 50ms)}
+.sp-img{position:relative;aspect-ratio:4/5;background:linear-gradient(160deg,color-mix(in srgb,var(--sc) 25%,var(--card)),color-mix(in srgb,var(--sc) 55%,var(--card)))}
+.sp-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 20%;z-index:1;transition:transform .5s}
+.svc-person:active .sp-img img{transform:scale(1.04)}
+.sp-ph{position:absolute;inset:0;display:grid;place-items:center;font-size:44px;font-weight:700;color:#fff;opacity:.85}
+.sp-img::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.45))}
+.sp-vid{position:absolute;z-index:2;top:8px;right:8px;padding:3px 8px;border-radius:12px;background:#e00;color:#fff;font-size:11px;font-weight:700}
+.sp-sub{position:absolute;z-index:2;left:8px;bottom:8px;padding:3px 8px;border-radius:12px;background:rgba(255,255,255,.92);color:#222;font-size:11px;font-weight:700}
+.sp-body{padding:10px 11px 12px}
+.sp-body h3{margin:0;font-size:.98rem;line-height:1.35}
+.sp-body p{margin:4px 0 0;font-size:12.5px;line-height:1.5;color:var(--mut);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sp-body small{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;background:color-mix(in srgb,var(--sc) 10%,var(--card));color:var(--sc);font-size:11.5px;font-weight:700}
+.sp-hero{position:relative;margin:-18px -16px 0;padding:56px 16px 20px;text-align:center;overflow:hidden;border-radius:18px 18px 0 0;background:linear-gradient(160deg,color-mix(in srgb,var(--sc) 35%,#111),color-mix(in srgb,var(--sc) 70%,#000));color:#fff}
+.sp-bg{position:absolute;inset:-30px;background-size:cover;background-position:center;filter:blur(26px) brightness(.55) saturate(1.2);transform:scale(1.1)}
+.sp-hero>*:not(.sp-bg){position:relative}
+.sp-hero .sd-x{position:absolute;top:12px;left:12px}
+.sp-hero .sd-edit{position:absolute;top:13px;right:12px}
+.sp-por{width:132px;height:160px;margin:0 auto 12px;border-radius:18px;overflow:hidden;border:3px solid rgba(255,255,255,.9);box-shadow:0 10px 30px rgba(0,0,0,.4);background:color-mix(in srgb,var(--sc) 50%,#333);display:grid;place-items:center;position:relative}
+.sp-por img{z-index:1;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 20%;cursor:zoom-in}
+.sp-por span{font-size:48px;font-weight:700;opacity:.8}
+.sp-hero h2{margin:8px 0 4px;font-size:1.45rem;line-height:1.3;color:#fff}
+.sp-tag{margin:0 auto;max-width:320px;font-size:14px;line-height:1.55;opacity:.92}
+.sp-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:12px}
+.sp-meta span{padding:4px 10px;border-radius:20px;background:rgba(255,255,255,.16);font-size:12.5px;backdrop-filter:blur(4px)}
+.sd-chip.vid{border:1px solid #fbb;background:#fff0f0;color:#c00;font-weight:700;font-family:inherit;cursor:pointer}
+[data-theme=dark] .sd-chip.vid{background:#3a1515;color:#ff8080;border-color:#6b2525}
+.yt-list{display:flex;flex-direction:column;gap:10px}
+.yt{position:relative;display:block;width:100%;aspect-ratio:16/9;padding:0;border:0;border-radius:14px;overflow:hidden;background:#000;cursor:pointer}
+.yt img{width:100%;height:100%;object-fit:cover;display:block;opacity:.92}
+.yt-play{position:absolute;inset:0;display:grid;place-items:center;transition:transform .15s}
+.yt:hover .yt-play{transform:scale(1.08)}
+.yt iframe{width:100%;height:100%;border:0;display:block}
+.sp-gal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.sp-gal img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;cursor:zoom-in}
+.sdet.sd-person .sd-chips{justify-content:center}

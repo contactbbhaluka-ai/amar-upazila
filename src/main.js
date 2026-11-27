@@ -3843,7 +3843,47 @@ const svcCard = s => `<div class="card svc${s.image_url ? ' has-img' : ''}">
     ${me()?.admin ? `<button class="link svc-setloc" data-svcloc="${esc(s.id)}">${s.lat != null ? '📍 অবস্থান বদলান' : '📍 অবস্থান দিন'}</button>` : ''}</div>
   <div class="svc-act"><button class="svc-fav${S.svcFav?.has(s.id) ? ' on' : ''}" data-svcfav="${esc(s.id)}" aria-pressed="${!!S.svcFav?.has(s.id)}" aria-label="${S.svcFav?.has(s.id) ? 'প্রিয় থেকে সরান' : 'প্রিয় সেবায় রাখুন'}">${S.svcFav?.has(s.id) ? '❤️' : '🤍'}</button>
   ${s.phone ? `<a class="call" data-svccall="${esc(s.id)}" href="tel:${esc(String(s.phone).replace(/[^\d+]/g, ''))}">কল<b>${esc(bn(s.phone))}</b></a>` : ''}
-  ${s.url ? `<a class="svc-web" href="${esc(s.url)}" target="_blank" rel="noopener">🌐 বিস্তারিত</a>` : ''}</div></div>`;
+  ${svcHasDet(s) ? `<button class="svc-web" data-svcdet="${esc(s.id)}">📖 বিস্তারিত</button>` : ''}</div></div>`;
+const svcHasDet = s => !!(s.details || s.images?.length);
+// বিস্তারিত লেখা: ### শিরোনাম, • তালিকা, ফাঁকা লাইনে অনুচ্ছেদ
+function detHtml(t) {
+  const out = []; let ul = [];
+  const flush = () => { if (ul.length) out.push(`<ul>${ul.join('')}</ul>`); ul = []; };
+  for (const raw of String(t || '').split(/\n+/)) {
+    const l = raw.trim(); if (!l) continue;
+    if (l.startsWith('### ')) { flush(); out.push(`<h4>${esc(l.slice(4))}</h4>`); }
+    else if (/^[•\-*]\s/.test(l)) ul.push(`<li>${esc(l.replace(/^[•\-*]\s+/, ''))}</li>`);
+    else { flush(); out.push(`<p>${esc(l)}</p>`); }
+  }
+  flush(); return out.join('');
+}
+function svcDetailSheet(id) {
+  const s = (S.svcAll || []).find(x => String(x.id) === String(id)); if (!s) return;
+  const imgs = [...new Set([s.image_url, ...(s.images || [])].filter(Boolean))];
+  const fav = S.svcFav?.has(s.id), tel = s.phone ? String(s.phone).replace(/[^\d+]/g, '') : '';
+  openSheet(`<div class="sdet">
+    ${imgs.length ? `<div class="sdet-gal">${imgs.map((u, i) => `<img src="${esc(u)}" alt="" ${i ? 'loading="lazy"' : ''} decoding="async" onerror="this.remove()">`).join('')}</div>${imgs.length > 1 ? `<div class="sdet-dots">${imgs.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</div>` : ''}` : ''}
+    <h2>${esc(s.name)}</h2>
+    ${s.address ? `<div class="meta">📍 ${esc(s.address)}</div>` : ''}${s.hours ? `<div class="meta">🕘 ${esc(s.hours)}</div>` : ''}
+    <div class="sdet-act">
+      ${tel ? `<a class="btn" data-svccall="${esc(s.id)}" href="tel:${esc(tel)}">📞 কল</a>` : ''}
+      ${s.lat != null ? `<a class="btn ghost" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}" target="_blank" rel="noopener">🧭 পথ দেখুন</a>` : ''}
+      <button class="btn ghost svc-fav${fav ? ' on' : ''}" data-svcfav="${esc(s.id)}" aria-pressed="${!!fav}">${fav ? '❤️' : '🤍'}</button>
+      <button class="btn ghost" data-svcshare="${esc(s.id)}">↗ শেয়ার</button>
+    </div>
+    <div class="sdet-body">${detHtml(s.details) || '<p class="mut">এখনো বিস্তারিত তথ্য যোগ করা হয়নি।</p>'}</div>
+    <button class="btn ghost" style="width:100%;margin-top:12px" data-close>বন্ধ করুন</button></div>`);
+  const sh = $('#sheet'); sh.classList.add('tall'); sh.scrollTop = 0;
+  const g = sh.querySelector('.sdet-gal'), dots = sh.querySelectorAll('.sdet-dots i');
+  if (g && dots.length) g.addEventListener('scroll', () => { const k = Math.round(g.scrollLeft / g.clientWidth); dots.forEach((d, i) => d.classList.toggle('on', i === Math.abs(k))); }, { passive: true });
+  sh.onclick = async e => {
+    if (e.target.closest('[data-close]')) return closeSheet();
+    if (e.target.closest('[data-svcshare]')) {
+      const text = `${s.name}${s.address ? '\n📍 ' + s.address : ''}${s.phone ? '\n📞 ' + s.phone : ''}\n\n— আমার উপজেলা অ্যাপ`;
+      try { if (navigator.share) await navigator.share({ title: s.name, text }); else { await navigator.clipboard.writeText(text); toast('কপি হয়েছে'); } } catch {}
+    }
+  };
+}
 const emergencyHtml = () => `<a class="big" href="tel:999"><span class="n">৯৯৯</span><span><b>জাতীয় জরুরি সেবা</b><br>পুলিশ, ফায়ার সার্ভিস, অ্যাম্বুলেন্স: টোল ফ্রি</span></a>
   <div class="em">${EMERGENCY.map(e => `<a class="emc" href="tel:${e[2]}"><div class="n">${e[0]}</div><div class="t">${esc(e[1])}</div></a>`).join('')}</div>`;
 let svcTimer;
@@ -4418,6 +4458,8 @@ document.addEventListener('click', e => {
   const f = e.target.closest('[data-svcfav]'); if (f) { e.preventDefault(); return toggleSvcFav(Number(f.dataset.svcfav) || f.dataset.svcfav); }
   const c = e.target.closest('[data-svccall]'); if (c) S.api.serviceCalled(Number(c.dataset.svccall) || c.dataset.svccall).catch(() => {});
   const lo = e.target.closest('[data-svcloc]'); if (lo) return svcLocSheet(lo.dataset.svcloc);
+  const dt = e.target.closest('[data-svcdet]'); if (dt) return svcDetailSheet(dt.dataset.svcdet);
+  const cd = e.target.closest('#dir .card.svc'); if (cd && !e.target.closest('a,button')) { const b = cd.querySelector('[data-svcdet]'); if (b) return svcDetailSheet(b.dataset.svcdet); }
   const nc = e.target.closest('[data-nearcat]'); if (nc) { S.nearCat = nc.dataset.nearcat; return drawDir(); }
   if (e.target.closest('[data-nearref]')) { S.myLoc = null; return openNear(); }
   const r = e.target.closest('[data-qprec]'); if (r) { $('#q').value = r.dataset.qprec; $('#qpanel').hidden = true; loadDir(); return; }

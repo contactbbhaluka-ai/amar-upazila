@@ -905,7 +905,7 @@ async function supabaseApi() {
 
     // ---------- সেবা ডিরেক্টরি ও রিপোর্ট
     async services({ category, q }) {
-      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng,url,image_url')
+      let s = sb.from('services').select('id,name,category,address,phone,hours,verified,union_id,call_count,lat,lng,url,image_url,details,images')
         .eq('upazila_id', UPAZILA_ID).order('verified', { ascending: false }).order('name').limit(500);
       if (category) s = s.eq('category', category);
       const term = (q || '').replace(/[,%()*\\]/g, ' ').trim();
@@ -1007,8 +1007,8 @@ function demoApi() {
       { groupId: 2, userId: 'd5', role: 'admin', status: 'active' },
     ]),
     services: get('services', [
-      { id: 901, category: 'tour', name: 'কাদিগড় জাতীয় উদ্যান', address: 'পালগাঁও চৌরাস্তার পাশে, কাচিনা ইউনিয়ন', phone: '', verified: true, url: 'https://beautifulbhaluka.com/', image_url: 'https://beautifulbhaluka.com/wp-content/uploads/2024/12/IMG_20241229_131638.jpg' },
-      { id: 902, category: 'tour', name: 'ভালুকা কৃত্রিম কুমির প্রজনন কেন্দ্র', address: 'হাতিবেড় গ্রাম, উথুরা ইউনিয়ন', phone: '', verified: true, url: 'https://beautifulbhaluka.com/', image_url: 'https://beautifulbhaluka.com/wp-content/uploads/2024/12/images-66.jpeg' },
+      { id: 901, category: 'tour', name: 'কাদিগড় জাতীয় উদ্যান', address: 'পালগাঁও চৌরাস্তার পাশে, কাচিনা ইউনিয়ন', phone: '', verified: true, image_url: 'https://picsum.photos/seed/kadigarh/800/500', images: ['https://picsum.photos/seed/kadigarh2/800/500', 'https://picsum.photos/seed/kadigarh3/800/500'], details: 'ভালুকা উপজেলার কাচিনা ইউনিয়নে অবস্থিত একটি বিশাল শালবন।\n\n### কীভাবে যাবেন\n\n• ভালুকা সিডস্টোর বাজার থেকে সখিপুর রোডে\n• পালগাঁও চৌরাস্তায় নেমে হেঁটে বা অটোতে\n\nনিজেদের খাবার সাথে নিয়ে যাওয়াই ভালো।' },
+      { id: 902, category: 'tour', name: 'ভালুকা কৃত্রিম কুমির প্রজনন কেন্দ্র', address: 'হাতিবেড় গ্রাম, উথুরা ইউনিয়ন', phone: '', verified: true, image_url: 'https://picsum.photos/seed/kumir/800/500', images: [], details: 'দেশের প্রথম বাণিজ্যিক কুমির খামার, ২০০৪ সালে প্রতিষ্ঠিত।\n\n### যা দেখবেন\n\n• পুকুরে বিভিন্ন বয়সের কুমির\n• চারপাশে ফলদ, বনজ ও ঔষধি গাছ' },
       { id: 1, name: 'উপজেলা স্বাস্থ্য কমপ্লেক্স', category: 'health', address: 'হাসপাতাল রোড, সদর', phone: '01700-000001', hours: 'জরুরি বিভাগ ২৪ ঘণ্টা', verified: true },
       { id: 2, name: 'উপজেলা নির্বাহী অফিসারের কার্যালয়', category: 'gov', address: 'উপজেলা পরিষদ চত্বর', phone: '01700-000002', hours: 'রবি–বৃহস্পতি, সকাল ৯টা–বিকাল ৫টা', verified: true },
       { id: 3, name: 'সহকারী কমিশনার (ভূমি) অফিস', category: 'gov', address: 'উপজেলা পরিষদ চত্বর', phone: '01700-000003', hours: 'রবি–বৃহস্পতি, সকাল ৯টা–বিকাল ৫টা', verified: true },

@@ -5119,6 +5119,11 @@ from (values
 ) as v(name, address, union_id, url, image_url)
 where not exists (select 1 from public.services s where s.upazila_id = 1 and s.category = 'tour' and s.name = v.name);
 
+-- সেবার বিস্তারিত লেখা ও ছবির গ্যালারি (অ্যাপের ভেতরেই দেখায়)
+-- সেবার বিস্তারিত লেখা ও ছবির গ্যালারি (ওয়েবসাইট বন্ধ হলেও অ্যাপে সব থাকবে)
+alter table public.services add column if not exists details text check (details is null or char_length(details) <= 20000);
+alter table public.services add column if not exists images text[] not null default '{}' check (cardinality(images) <= 12);
+
 -- =====================================================================
 --  নিজেকে অ্যাডমিন বানাতে: অ্যাপে প্রথমে সাইনআপ করুন, তারপর নিচের লাইনে
 --  নিজের ইমেইল বসিয়ে আলাদাভাবে চালান:

@@ -3927,11 +3927,19 @@ const svcOfficeCard = s => {
   ${bl.length ? `<div class="of-tags">${bl.map(b => `<span>${esc(b)}</span>`).join('')}</div>` : ''}
   <div class="of-foot"><small>${sub ? esc(sub[1]) : ''}${s.hours ? ` · 🕘 ${esc(s.hours)}` : ''}</small>${ph[0] ? `<a class="of-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞</a>` : ''}<a class="of-map" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ' + (s.address || 'ভালুকা'))}" target="_blank" rel="noopener" aria-label="ম্যাপ">🧭</a></div></article>`;
 };
+const kaziArea = s => subsOf('kazi').find(x => x[0] === s.subtype);
+const myKaziArea = () => { const u = me()?.unionId; if (!u) return null; const row = (S.svcAll || []).find(x => (x.category === 'union' || x.category === 'pouro') && x.union_id === u); if (!row) return null; if (row.category === 'pouro') return 'pouro'; const c = bnNorm(areaCore(row)); return (subsOf('kazi').find(x => bnNorm(x[1]).startsWith(c)) || [])[0] || null; };
 const svcKaziCard = s => {
-  const ph = phoneList(s), sub = subsOf('kazi').find(x => x[0] === s.subtype);
-  return `<article class="card svc svc-kazi" style="--sc:${svcColor(s.category)};--i:${TI()}" data-svcdet="${esc(s.id)}">
-  <div class="kz-h"><span class="kz-av">💍</span><div class="kz-t"><h3>${esc(s.name)}</h3><p>📍 ${esc(s.address || 'ভালুকা')}</p></div>${sub ? `<span class="kz-area">${esc(sub[1])}</span>` : ''}</div>
-  ${ph[0] ? `<div class="kz-acts"><a class="kz-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞 <b>${esc(bn(ph[0].n))}</b></a><a class="kz-wa" href="https://wa.me/${waNum(ph[0].n)}" target="_blank" rel="noopener">WhatsApp</a></div>` : ''}</article>`;
+  const ph = phoneList(s), sub = kaziArea(s), mine = !!s.subtype && s.subtype === myKaziArea();
+  const nm = String(s.name || '').replace(/^কাজী\s+/, '').replace(/\s+কাজী$/, '');
+  return `<article class="card svc svc-kazi${mine ? ' mine' : ''}" style="--i:${TI()}" data-svcdet="${esc(s.id)}">
+  ${mine ? '<div class="kz-mine">⭐ আপনার এলাকার কাজী</div>' : ''}
+  <div class="kz-h"><span class="kz-av"><i>${esc((nm.match(/[\u0985-\u09B9\u09DC-\u09DFA-Za-z]/) || ['কা'])[0])}</i><em>💍</em></span>
+    <div class="kz-t"><small>নিকাহ রেজিস্ট্রার</small><h3>${esc(s.name)}</h3><p>📍 ${esc(s.address || 'ভালুকা')}</p></div></div>
+  ${sub ? `<div class="kz-area"><span>${sub[2]}</span>${esc(sub[1])}${s.subtype === 'pouro' ? '' : ' ইউনিয়ন'}<b>বিয়ে ও তালাক নিবন্ধন</b></div>` : ''}
+  ${ph[0] ? `<div class="kz-acts"><a class="kz-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}"><span>📞</span><div><small>কল করুন</small><b>${esc(bn(ph[0].n))}</b></div></a>
+    <a class="kz-ic wa" href="https://wa.me/${waNum(ph[0].n)}" target="_blank" rel="noopener" aria-label="WhatsApp"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg></a>
+    <a class="kz-ic sms" href="sms:${esc(telOf(ph[0].n))}" aria-label="এসএমএস">💬</a></div>` : ''}</article>`;
 };
 const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : s.category === 'office' ? svcOfficeCard(s) : s.category === 'kazi' ? svcKaziCard(s) : EMG_CATS.has(s.category) && phoneList(s).length ? svcEmgCard(s)
   : s.category === 'union' ? svcUnionCard(s) : INFO_CATS.has(s.category) && !s.image_url ? svcInfoCard(s) : s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
@@ -4018,7 +4026,7 @@ function svcDetailSheet(id, opt = {}) {
   const long = String(s.details || '').length > 700, sub = subsOf(s.category).find(x => x[0] === s.subtype);
   const cname = catName(s.category) || 'সেবা', person = s.category === 'famous';
   const act = (k, icon, label, attrs) => `<${k} class="sd-act" ${attrs}><span class="sd-aic">${icon}</span><small>${label}</small></${k}>`;
-  openSheet(s.category === 'union' ? unionPage(s, imgs, admin) : `<div class="sdet${person ? ' sd-person' : ''}" style="--sc:${c}">
+  openSheet(s.category === 'union' ? unionPage(s, imgs, admin) : `<div class="sdet${person ? ' sd-person' : ''}${s.category === 'kazi' ? ' sd-kazi' : ''}" style="--sc:${c}">
     ${person ? `<div class="sp-hero">${imgs[0] ? `<div class="sp-bg" style="background-image:url('${esc(imgs[0])}')"></div>` : ''}
       <button class="sd-x" data-close aria-label="বন্ধ করুন">✕</button>${admin ? '<button class="sd-edit" data-sdedit>✏️ সম্পাদনা</button>' : ''}
       <div class="sp-por">${imgs[0] ? `<img src="${esc(imgs[0])}" alt="" data-sdzoom="0" onerror="this.remove()">` : ''}<span>${esc((s.name || '?').replace(/^(ভাষা সৈনিক|অধ্যাপক|ডক্টর|ডা\.?|মেজর)\s*/g, '').charAt(0))}</span></div>
@@ -4050,6 +4058,7 @@ function svcDetailSheet(id, opt = {}) {
     <div class="sd-acts">
       ${tel ? act('a', '📞', 'কল করুন', `data-svccall="${esc(s.id)}" href="tel:${esc(tel)}"`) : ''}
       ${tel && ['tour', 'hotel', 'food', 'rentcar', 'event'].includes(s.category) ? act('button', '🗓️', 'বুকিং', 'data-sdbook="1"') : ''}
+      ${tel && s.category === 'kazi' ? act('a', '💬', 'WhatsApp', `href="https://wa.me/${waNum(tel)}" target="_blank" rel="noopener"`) : ''}
       ${person ? '' : act('a', '🧭', 'পথ দেখুন', `href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ভালুকা')}`}" target="_blank" rel="noopener"`)}
       ${person ? `<button class="sd-act sd-trib${S.tribSet?.has(s.id) ? ' on' : ''}" data-sdtrib><span class="sd-aic">🌹</span><small>শ্রদ্ধা${s.tribute_count ? ` · ${bn(s.tribute_count)}` : ''}</small></button>` : ''}
       ${person && s.details ? act('button', '🔊', 'শুনুন', 'data-sdtts') : ''}
@@ -5346,7 +5355,7 @@ function drawDir() {
   const subHtml = subs.length > 1 ? `<div class="sub-chips"><button data-dsub=""${S.dsub ? '' : ' class="on"'}>সব <small>${bn(base.length)}</small></button>${subs.map(x => `<button data-dsub="${x[0]}"${S.dsub === x[0] ? ' class="on"' : ''}>${x[2]} ${x[1]} <small>${bn(base.filter(b => b.subtype === x[0]).length)}</small></button>`).join('')}</div>` : '';
   if (S.dsub) base = base.filter(b => b.subtype === S.dsub);
   if (S.dcat === 'union') base = [...base].sort((a, b) => unionNo(a) - unionNo(b));
-  if (S.dcat === 'office' || S.dcat === 'kazi') { const ord = k => { const i = subsOf(S.dcat).findIndex(x => x[0] === k); return i < 0 ? 99 : i; }; base = [...base].sort((a, b) => ord(a.subtype) - ord(b.subtype)); }
+  if (S.dcat === 'office' || S.dcat === 'kazi') { const my = S.dcat === 'kazi' ? myKaziArea() : null; const ord = k => { if (my && k === my) return -1; const i = subsOf(S.dcat).findIndex(x => x[0] === k); return i < 0 ? 99 : i; }; base = [...base].sort((a, b) => ord(a.subtype) - ord(b.subtype)); }
   if (S.dcat === 'police') base = [...base].sort((a, b) => phoneList(b).length - phoneList(a).length);
   if (S.dcat === 'amb') { const ord = k => { const i = subsOf('amb').findIndex(x => x[0] === k); return i < 0 ? 9 : i; }; base = [...base].sort((a, b) => ord(a.subtype) - ord(b.subtype)); }
   const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(base.length)}টি</span>${me()?.admin && cat[0] !== 'fav' ? `<button class="svc-addbtn" data-svcadd="${esc(cat[0])}">＋ যোগ করুন</button>` : ''}</div>${subHtml}`
@@ -5357,10 +5366,22 @@ function drawDir() {
   const famHtml = S.dcat === 'famous' && !q ? annivHtml(list) + `<div class="fam-acts"><button data-famquiz><span>🧠</span><b>আজকের কুইজ</b><small>সঠিক উত্তরে কয়েন</small></button><button data-famsugg><span>📝</span><b>নাম প্রস্তাব করুন</b><small>কৃতী কাউকে চেনেন?</small></button>${me()?.admin ? `<button data-famadmin class="adm"><span>📋</span><b>প্রস্তাব দেখুন</b><small class="fam-pend">…</small></button>` : ''}</div>` : '';
   if (famHtml && me()?.admin) S.api.pendingSuggestions('famous').then(n => { const el = $('.fam-pend'); if (el) el.textContent = n ? `${bn(n)}টি অপেক্ষায়` : 'নতুন কিছু নেই'; }).catch(() => {});
   const offHtml = S.dcat === 'office' && !q ? (() => { const op = offOpen('রবি–বৃহস্পতি'); return `<div class="of-ban${op ? ' on' : ''}"><span>🕘</span><div><b>সরকারি অফিস: রবি–বৃহস্পতি, সকাল ৯টা–বিকেল ৫টা</b><small>${op ? 'এখন অফিস সময় চলছে' : 'এখন অফিস সময় নয়'} · শুক্র, শনি ও সরকারি ছুটির দিনে বন্ধ</small></div></div>`; })() : '';
-  const kaziHtml = S.dcat === 'kazi' && !q ? `<details class="kz-info"><summary><span>📋</span><b>বিয়ে নিবন্ধনে যা লাগে</b><i>⌄</i></summary><div>
-    <ul><li>বর ও কনের জাতীয় পরিচয়পত্র বা জন্ম নিবন্ধন</li><li>বয়স: বর কমপক্ষে ২১ বছর, কনে কমপক্ষে ১৮ বছর</li><li>বর ও কনের ছবি</li><li>দুজন সাক্ষী ও তাঁদের পরিচয়পত্র, কনের পক্ষে উকিল</li><li>দেনমোহরের পরিমাণ ঠিক করে নিকাহনামায় লেখা</li><li>আগে বিয়ে হয়ে থাকলে তালাক বা মৃত্যুর কাগজ</li></ul>
-    <p>নিবন্ধন ফি সরকার নির্ধারিত, দেনমোহরের পরিমাণের ওপর নির্ভর করে। নিবন্ধনের পর নিকাহনামার সত্যায়িত কপি সংগ্রহ করে রাখুন।</p>
-    <a class="kz-109" href="tel:109">🛡️ বাল্যবিবাহের খবর জানাতে ১০৯-এ ফোন করুন</a></div></details>` : '';
+  const kaziHtml = S.dcat === 'kazi' && !q ? (() => {
+    const all = list.filter(x => x.category === 'kazi'), have = new Set(all.map(x => x.subtype).filter(Boolean)), miss = subsOf('kazi').filter(x => !have.has(x[0]));
+    const mine = myKaziArea(), mineK = mine ? all.filter(x => x.subtype === mine) : [];
+    return `<div class="kz-hero"><div class="kz-hero-t"><small>ভালুকা উপজেলা</small><b>কাজী অফিস</b><span>বিয়ে ও তালাক নিবন্ধন · নিজের এলাকার নিকাহ রেজিস্ট্রার খুঁজুন</span></div><div class="kz-hero-n"><b>${bn(all.length)}</b><small>জন কাজী</small><b>${bn(have.size)}</b><small>এলাকায়</small></div><i class="kz-rings">💍</i></div>
+    ${mine && !S.dsub ? (mineK.length ? '' : `<div class="kz-note">আপনার এলাকার কাজীর তথ্য এখনো যোগ হয়নি।</div>`) : ''}
+    <details class="kz-info"><summary><span>📋</span><b>বিয়ে নিবন্ধনে যা লাগে</b><i>⌄</i></summary><div>
+      <div class="kz-steps">
+        <div><span>১</span><b>পরিচয়পত্র</b><small>বর-কনের জাতীয় পরিচয়পত্র বা জন্ম নিবন্ধন ও ছবি</small></div>
+        <div><span>২</span><b>বয়স</b><small>বর কমপক্ষে ২১, কনে কমপক্ষে ১৮ বছর</small></div>
+        <div><span>৩</span><b>সাক্ষী ও উকিল</b><small>দুজন সাক্ষী ও তাঁদের পরিচয়পত্র, কনের পক্ষে উকিল</small></div>
+        <div><span>৪</span><b>দেনমোহর</b><small>পরিমাণ ঠিক করে নিকাহনামায় লেখা</small></div>
+      </div>
+      <p>আগে বিয়ে হয়ে থাকলে তালাক বা মৃত্যুর কাগজ লাগবে। নিবন্ধন ফি সরকার নির্ধারিত, দেনমোহরের পরিমাণের ওপর নির্ভর করে। নিবন্ধনের পর নিকাহনামার সত্যায়িত কপি সংগ্রহ করে রাখুন।</p>
+      <a class="kz-109" href="tel:109">🛡️ বাল্যবিবাহের খবর জানাতে ১০৯-এ ফোন করুন</a></div></details>
+    ${miss.length && !S.dsub ? `<div class="kz-miss"><small>যেসব এলাকার কাজীর তথ্য নেই</small><div>${miss.map(x => `<span>${esc(x[1])}</span>`).join('')}</div>${me()?.admin ? '<button data-svcadd="kazi">＋ কাজী যোগ করুন</button>' : '<p>জানা থাকলে নিচের "নতুন সেবা যোগ করুন" দিয়ে পাঠান।</p>'}</div>` : ''}`;
+  })() : '';
   const upzRow = (S.svcAll || []).find(x => x.category === 'upz');
   const unionMap = S.dcat === 'union' && !q && upzRow?.image_url ? `<div class="u-map"><img src="${esc(upzRow.image_url)}" alt="ভালুকার ইউনিয়নের মানচিত্র" data-ipzoom loading="lazy" onerror="this.parentNode.remove()"><span>🗺️ ভালুকা উপজেলার ইউনিয়নসমূহ · বড় করে দেখতে চাপুন</span></div>` : '';
   const emgHtml = (unionMap || '') + (EMG_CATS.has(S.dcat) && !q ? `<a class="emg-strip" href="tel:999"><span>🚨</span><div><b>জীবন-মৃত্যুর জরুরি অবস্থায় ৯৯৯</b><small>পুলিশ, ফায়ার সার্ভিস ও এম্বুলেন্স — বিনা খরচে, ২৪ ঘণ্টা</small></div><i>কল</i></a>${S.dcat === 'fire' ? '<a class="emg-strip fire" href="tel:102"><span>🚒</span><div><b>ফায়ার সার্ভিস হটলাইন ১০২</b><small>আগুন ও উদ্ধারকাজে সরাসরি</small></div><i>কল</i></a>' : ''}` : '');

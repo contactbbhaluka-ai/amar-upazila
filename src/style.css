@@ -2337,19 +2337,44 @@ details.sv[open]>summary{background:color-mix(in srgb,var(--sc) 7%,var(--card))}
 .of-ban{display:flex;gap:10px;align-items:center;padding:11px 13px;border-radius:14px;margin:0 0 12px;border:1px solid var(--line);background:var(--card)}
 .of-ban>span{font-size:22px}.of-ban b{display:block;font-size:13.5px}.of-ban small{font-size:12px;color:var(--mut)}
 .of-ban.on{border-color:color-mix(in srgb,#16a34a 35%,var(--line));background:color-mix(in srgb,#16a34a 6%,var(--card))}
-.svc-kazi{padding:13px 14px}
-.kz-h{display:flex;gap:11px;align-items:center}
-.kz-av{width:46px;height:46px;flex:0 0 46px;border-radius:50%;display:grid;place-items:center;font-size:22px;background:color-mix(in srgb,#db2777 14%,var(--card))}
-.kz-t{flex:1;min-width:0}.kz-t h3{margin:0;font-size:15px}.kz-t p{margin:3px 0 0;font-size:12.5px;color:var(--mut)}
-.kz-area{font-size:11px;padding:3px 9px;border-radius:10px;background:color-mix(in srgb,var(--sc) 12%,var(--card));color:var(--ink);white-space:nowrap}
-.kz-acts{display:flex;gap:8px;margin-top:11px}
-.kz-call{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:12px;background:#16a34a;color:#fff;text-decoration:none;font-size:14px}
-.kz-wa{padding:9px 14px;border-radius:12px;background:color-mix(in srgb,#25d366 16%,var(--card));color:#128c3e;text-decoration:none;font-weight:700;font-size:13.5px}
 details.kz-info{border:1px solid var(--line);border-radius:14px;background:var(--card);margin:0 0 12px;overflow:hidden}
 details.kz-info>summary{list-style:none;display:flex;align-items:center;gap:9px;padding:11px 13px;cursor:pointer}
 details.kz-info>summary::-webkit-details-marker{display:none}details.kz-info>summary b{flex:1;font-size:14px}details.kz-info>summary i{font-style:normal;color:var(--mut)}
 details.kz-info>div{padding:0 14px 13px}details.kz-info ul{margin:4px 0 8px;padding-left:18px}details.kz-info li{font-size:13.5px;margin:4px 0}
 details.kz-info p{font-size:12.5px;color:var(--mut);margin:0 0 9px}
 .kz-109{display:inline-block;font-size:13px;color:#dc2626;font-weight:700;text-decoration:none}
-.card.svc.svc-off,.card.svc.svc-kazi{display:block;border-radius:16px;cursor:pointer;animation:srIn .4s ease both;animation-delay:calc(min(var(--i,0),8) * 40ms)}
+.card.svc.svc-off{display:block;border-radius:16px;cursor:pointer;animation:srIn .4s ease both;animation-delay:calc(min(var(--i,0),8) * 40ms)}
 .card.svc.svc-off{border-left:4px solid var(--sc)}
+
+/* কাজী অফিস: নতুন নকশা */
+.kz-hero{position:relative;overflow:hidden;display:flex;gap:12px;align-items:center;padding:18px 16px;border-radius:20px;margin:0 0 12px;color:#fff;background:linear-gradient(135deg,#9d174d,#db2777 55%,#f472b6)}
+.kz-hero-t{flex:1;position:relative;z-index:1}.kz-hero-t small{font-size:12px;opacity:.85}.kz-hero-t b{display:block;font-size:22px;line-height:1.3}.kz-hero-t span{display:block;font-size:12.5px;opacity:.92;margin-top:2px}
+.kz-hero-n{position:relative;z-index:1;display:grid;grid-template-columns:auto auto;gap:0 6px;align-items:baseline;padding:8px 11px;border-radius:14px;background:rgba(255,255,255,.16)}
+.kz-hero-n b{font-size:20px;text-align:right}.kz-hero-n small{font-size:11.5px;opacity:.9}
+.kz-rings{position:absolute;right:-10px;bottom:-22px;font-size:96px;opacity:.14;font-style:normal;transform:rotate(-15deg)}
+.kz-note{font-size:13px;padding:9px 12px;border-radius:12px;margin:0 0 12px;background:color-mix(in srgb,#f59e0b 12%,var(--card));border:1px solid color-mix(in srgb,#f59e0b 30%,var(--line))}
+.kz-steps{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 10px}
+.kz-steps>div{position:relative;padding:10px 10px 10px 40px;border-radius:12px;background:color-mix(in srgb,#db2777 5%,var(--card));border:1px solid color-mix(in srgb,#db2777 16%,var(--line))}
+.kz-steps span{position:absolute;left:10px;top:10px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#db2777;color:#fff;font-size:12px;font-weight:700}
+.kz-steps b{display:block;font-size:13.5px}.kz-steps small{font-size:11.5px;color:var(--mut);line-height:1.45}
+.kz-miss{padding:11px 13px;border-radius:14px;border:1px dashed var(--line);margin:0 0 12px}
+.kz-miss small{color:var(--mut);font-size:12px}.kz-miss>div{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
+.kz-miss span{font-size:12px;padding:3px 9px;border-radius:10px;background:var(--line)}
+.kz-miss p{margin:0;font-size:12px;color:var(--mut)}.kz-miss button{border:0;background:none;color:#db2777;font-family:inherit;font-weight:700;font-size:13px;padding:0;cursor:pointer}
+.card.svc.svc-kazi{display:block;position:relative;overflow:hidden;padding:14px 14px 13px;border-radius:18px;cursor:pointer;border:1px solid color-mix(in srgb,#db2777 14%,var(--line));background:linear-gradient(160deg,color-mix(in srgb,#db2777 6%,var(--card)),var(--card) 55%);animation:srIn .4s ease both;animation-delay:calc(min(var(--i,0),8) * 40ms)}
+.svc-kazi.mine{border:2px solid #db2777}
+.kz-mine{margin:-14px -14px 10px;padding:6px 14px;background:#db2777;color:#fff;font-size:12px;font-weight:700}
+.kz-h{display:flex;gap:12px;align-items:center}
+.kz-av{position:relative;width:52px;height:52px;flex:0 0 52px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#be185d,#f472b6);box-shadow:0 4px 12px color-mix(in srgb,#db2777 30%,transparent)}
+.kz-av i{font-style:normal;color:#fff;font-weight:800;font-size:21px}
+.kz-av em{position:absolute;right:-4px;bottom:-4px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--card);font-style:normal;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.kz-t{flex:1;min-width:0}.kz-t small{font-size:11px;color:#db2777;font-weight:700;letter-spacing:.2px}.kz-t h3{margin:1px 0 0;font-size:16px}.kz-t p{margin:3px 0 0;font-size:12.5px;color:var(--mut)}
+.kz-area{display:flex;align-items:center;gap:6px;margin-top:11px;padding:7px 10px;border-radius:11px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:600}
+.kz-area b{margin-left:auto;font-size:11px;font-weight:500;color:var(--mut)}
+.kz-acts{display:flex;gap:8px;margin-top:10px}
+.kz-call{flex:1;display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:13px;background:#16a34a;color:#fff;text-decoration:none}
+.kz-call span{font-size:17px}.kz-call small{display:block;font-size:10.5px;opacity:.85}.kz-call b{font-size:15px;letter-spacing:.3px}
+.kz-ic{width:48px;border-radius:13px;display:grid;place-items:center;text-decoration:none;font-size:18px}
+.kz-ic.wa{background:color-mix(in srgb,#25d366 16%,var(--card));color:#128c3e}.kz-ic.sms{background:color-mix(in srgb,#2563eb 12%,var(--card))}
+.sd-kazi .sd-noimg{background:linear-gradient(135deg,#9d174d,#db2777 60%,#f472b6);color:#fff}
+.sd-kazi .sd-noimg *{background:none!important;color:#fff!important;box-shadow:none!important}

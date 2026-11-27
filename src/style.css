@@ -2139,3 +2139,42 @@ body:has(#modal.on) .totop{display:none}
 .sd-ph>div{flex:1;min-width:0}.sd-ph small{display:block;color:var(--mut);font-size:12px}.sd-ph b{font-size:15px;word-break:break-all}
 .sd-phc{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer}
 .sd-phk{padding:7px 12px;border-radius:18px;background:#16a34a;color:#fff;text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap}
+/* বিস্তারিত লেখার প্রধান অংশ ও উপ-অংশ */
+.sdet-body .dsec{margin:0 0 14px;padding:14px 14px 4px;border:1px solid var(--line);border-radius:16px;background:var(--card);scroll-margin-top:250px}
+.sdet-body .dsec>h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:1.08rem;color:var(--ink)}
+.sdet-body .dsec>h3::before{content:"";flex:0 0 4px;height:20px;border-radius:3px;background:var(--sc)}
+.sdet-body .dsec h4{margin:12px 0 6px;padding:0;background:none;border:0;font-size:.98rem;color:var(--sc)}
+.sdet-body .dsec h4::before{content:"▸ ";opacity:.7}
+.sdet-body .dsec>h3+h4{margin-top:0}
+.sdet-body .dsrc{font-size:12.5px;color:var(--mut);margin-top:6px}
+/* উপজেলা/পৌরসভার সম্পূর্ণ পাতা */
+.ip{--sc:var(--g)}
+.ip-hero{border-radius:18px;overflow:hidden;margin:0 0 12px;background:var(--line)}
+.ip-hero img{width:100%;max-height:300px;object-fit:cover;display:block;cursor:zoom-in}
+.ip-head{padding:16px;border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--sc) 14%,var(--card)),var(--card));border:1px solid var(--line);margin-bottom:12px}
+.ip-head h2{margin:0;font-size:1.45rem}.ip-head>p{margin:4px 0 0;color:var(--mut);font-size:14px}
+.ip-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.ip-btn{padding:7px 13px;border-radius:20px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:inherit;font-size:13.5px;cursor:pointer}
+.ip-toc{display:flex;flex-wrap:wrap;gap:7px;overflow-x:auto;padding:8px 0;margin:0 0 6px;background:var(--bg);scrollbar-width:none}
+
+.ip-toc button{flex:0 0 auto;padding:6px 12px;border-radius:18px;border:1px solid color-mix(in srgb,var(--sc) 30%,var(--line));background:color-mix(in srgb,var(--sc) 7%,var(--card));color:var(--ink);font-family:inherit;font-size:13px;cursor:pointer}
+.ip-body{font-size:15px}
+.ip-links{margin:0 0 14px}
+.ip-chips{display:flex;flex-wrap:wrap;gap:7px}
+.ip-chips button{padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:color-mix(in srgb,var(--sc) 5%,var(--card));color:var(--ink);font-family:inherit;font-size:13.5px;cursor:pointer}
+.ip-chips button.pr{border-color:var(--sc);font-weight:700}
+.ip-people{display:flex;gap:12px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:none}
+.ip-people::-webkit-scrollbar,.ip-places::-webkit-scrollbar{display:none}
+.ip-people button{flex:0 0 96px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;border:0;background:none;color:var(--ink);font-family:inherit;cursor:pointer;padding:0}
+.ipp-img{position:relative;width:74px;height:74px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:color-mix(in srgb,#9333ea 25%,var(--card));border:3px solid color-mix(in srgb,#9333ea 35%,var(--card))}
+.ipp-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 20%;z-index:1}
+.ipp-img i{font-style:normal;font-weight:700;font-size:26px;color:#fff}
+.ip-people b{font-size:12.5px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ip-people small{font-size:11px;color:var(--mut);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ip-places{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:none}
+.ip-places button{flex:0 0 150px;display:flex;flex-direction:column;text-align:left;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card);color:var(--ink);font-family:inherit;cursor:pointer;padding:0}
+.ipl-img{display:block;height:96px;background:color-mix(in srgb,#16a34a 20%,var(--card))}
+.ipl-img img{width:100%;height:100%;object-fit:cover;display:block}
+.ip-places b{padding:7px 9px 0;font-size:13px;line-height:1.35}.ip-places small{padding:2px 9px 9px;font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ip-all{display:block;margin:4px 0 0 auto;border:0;background:none;color:var(--sc);font-family:inherit;font-weight:700;font-size:13.5px;cursor:pointer}
+.ip-rep{display:block;margin:6px auto 20px;color:var(--mut)}

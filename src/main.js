@@ -3907,16 +3907,42 @@ const svcEmgCard = s => {
 const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : EMG_CATS.has(s.category) && phoneList(s).length ? svcEmgCard(s)
   : INFO_CATS.has(s.category) && !s.image_url ? svcInfoCard(s) : s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
 // বিস্তারিত লেখা: ### শিরোনাম, • তালিকা, ফাঁকা লাইনে অনুচ্ছেদ
-function detHtml(t) {
-  const out = []; let ul = [];
+// বিস্তারিত লেখা: "## " প্রধান অংশ, "### " তার ভেতরের উপ-অংশ, "• " তালিকা
+function detHtml(t, idp) {
+  const out = []; let ul = [], inSec = false, n = 0;
   const flush = () => { if (ul.length) out.push(`<ul>${ul.join('')}</ul>`); ul = []; };
   for (const raw of String(t || '').split(/\n+/)) {
     const l = raw.trim(); if (!l) continue;
-    if (l.startsWith('### ')) { flush(); out.push(`<h4>${esc(l.slice(4))}</h4>`); }
+    if (l.startsWith('## ')) { flush(); if (inSec) out.push('</section>'); inSec = true; out.push(`<section class="dsec"${idp ? ` id="${idp}${n}"` : ''}><h3>${esc(l.slice(3))}</h3>`); n++; }
+    else if (l.startsWith('### ')) { flush(); out.push(`<h4>${esc(l.slice(4))}</h4>`); }
     else if (/^[•\-*]\s/.test(l)) ul.push(`<li>${esc(l.replace(/^[•\-*]\s+/, ''))}</li>`);
-    else { flush(); out.push(`<p>${esc(l)}</p>`); }
+    else { flush(); out.push(`<p${/^সূত্র:/.test(l) ? ' class="dsrc"' : ''}>${esc(l)}</p>`); }
   }
-  flush(); return out.join('');
+  flush(); if (inSec) out.push('</section>'); return out.join('');
+}
+// উপজেলা/পৌরসভা: ক্যাটাগরিতে ঢুকলেই পুরো তথ্য (কার্ডে চাপতে হয় না)
+function svcInlinePage(s) {
+  const secs = [...String(s.details || '').matchAll(/^## (.+)$/gm)].map(m => m[1]);
+  const all = S.svcAll || [], fam = all.filter(x => x.category === 'famous'), tour = all.filter(x => x.category === 'tour');
+  const unions = all.filter(x => x.category === 'union').sort((a, b) => unionNo(a) - unionNo(b)), pouro = all.find(x => x.category === 'pouro'), upz = all.find(x => x.category === 'upz');
+  const ph = phoneList(s);
+  const links = s.category === 'upz' ? `
+    ${pouro || unions.length ? `<section class="dsec ip-links"><h3>পৌরসভা ও ইউনিয়নসমূহ</h3><div class="ip-chips">${pouro ? `<button data-svcdet="${esc(pouro.id)}" class="pr">🏢 ${esc(pouro.name)}</button>` : ''}${unions.map(u => `<button data-svcdet="${esc(u.id)}">${esc(String(u.name).replace(/ পরিষদ$/, ''))}</button>`).join('')}</div></section>` : ''}
+    ${fam.length ? `<section class="dsec ip-links"><h3>ভালুকার বিশেষ ব্যক্তিবর্গ</h3><div class="ip-people">${fam.map(x => `<button data-svcdet="${esc(x.id)}"><span class="ipp-img">${x.image_url ? `<img src="${esc(x.image_url)}" alt="" loading="lazy" onerror="this.remove()">` : ''}<i>${esc(String(x.name).replace(/^((ভাষা সৈনিক|অধ্যাপক|ডক্টর|ডা\.?|মেজর)\s*)+/, '').charAt(0))}</i></span><b>${esc(x.name)}</b>${x.tagline ? `<small>${esc(x.tagline)}</small>` : ''}</button>`).join('')}</div>
+      <button class="ip-all" data-ipcat="famous">সব প্রসিদ্ধ ব্যক্তি দেখুন →</button></section>` : ''}
+    ${tour.length ? `<section class="dsec ip-links"><h3>ভালুকার দর্শনীয় স্থান</h3><div class="ip-places">${tour.map(x => `<button data-svcdet="${esc(x.id)}"><span class="ipl-img">${x.image_url ? `<img src="${esc(x.image_url)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span><b>${esc(x.name)}</b>${x.address ? `<small>📍 ${esc(x.address)}</small>` : ''}</button>`).join('')}</div>
+      <button class="ip-all" data-ipcat="tour">সব দর্শনীয় স্থান দেখুন →</button></section>` : ''}`
+    : s.category === 'pouro' && upz ? `<section class="dsec ip-links"><h3>আরও দেখুন</h3><div class="ip-chips"><button data-svcdet="${esc(upz.id)}" class="pr">🏛️ ভালুকা উপজেলা</button></div></section>` : '';
+  return `<div class="ip" style="--sc:${svcColor(s.category)}">
+    ${s.image_url ? `<div class="ip-hero"><img src="${esc(s.image_url)}" alt="" data-ipzoom onerror="this.parentNode.remove()"></div>` : ''}
+    <div class="ip-head"><h2>${esc(s.name)}</h2>${s.tagline ? `<p>${esc(s.tagline)}</p>` : ''}
+      <div class="ip-acts">${ph[0] ? `<a class="si-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞 <b>${esc(bn(ph[0].n))}</b></a>` : ''}${s.email ? `<a class="si-mail" href="mailto:${esc(s.email)}">✉️</a>` : ''}
+        <button class="ip-btn" data-svcsh="${esc(s.id)}">↗️ শেয়ার</button>${me()?.admin ? `<button class="ip-btn" data-ipedit="${esc(s.id)}">✏️ সম্পাদনা</button>` : ''}</div></div>
+    ${secs.length > 2 ? `<div class="ip-toc">${secs.map((t, i) => `<button data-iptoc="${i}">${esc(t)}</button>`).join('')}</div>` : ''}
+    <div class="sdet-body ip-body">${detHtml(s.details, 'ip-sec-')}</div>
+    ${links}
+    <button class="link ip-rep" data-iprep="${esc(s.id)}">⚠️ ভুল তথ্য জানান</button>
+  </div>`;
 }
 const SUBS = {
   amb: [['ambulance', 'এম্বুলেন্স', '🚑'], ['hearse', 'লাশবাহী গাড়ি', '⚰️'], ['helpline', 'হেল্পলাইন', '☎️']],
@@ -5023,6 +5049,7 @@ function drawDir() {
   const famHtml = S.dcat === 'famous' && !q ? annivHtml(list) + `<div class="fam-acts"><button data-famquiz><span>🧠</span><b>আজকের কুইজ</b><small>সঠিক উত্তরে কয়েন</small></button><button data-famsugg><span>📝</span><b>নাম প্রস্তাব করুন</b><small>কৃতী কাউকে চেনেন?</small></button>${me()?.admin ? `<button data-famadmin class="adm"><span>📋</span><b>প্রস্তাব দেখুন</b><small class="fam-pend">…</small></button>` : ''}</div>` : '';
   if (famHtml && me()?.admin) S.api.pendingSuggestions('famous').then(n => { const el = $('.fam-pend'); if (el) el.textContent = n ? `${bn(n)}টি অপেক্ষায়` : 'নতুন কিছু নেই'; }).catch(() => {});
   const emgHtml = EMG_CATS.has(S.dcat) && !q ? `<a class="emg-strip" href="tel:999"><span>🚨</span><div><b>জীবন-মৃত্যুর জরুরি অবস্থায় ৯৯৯</b><small>পুলিশ, ফায়ার সার্ভিস ও এম্বুলেন্স — বিনা খরচে, ২৪ ঘণ্টা</small></div><i>কল</i></a>${S.dcat === 'fire' ? '<a class="emg-strip fire" href="tel:102"><span>🚒</span><div><b>ফায়ার সার্ভিস হটলাইন ১০২</b><small>আগুন ও উদ্ধারকাজে সরাসরি</small></div><i>কল</i></a>' : ''}` : '';
+  if (['upz', 'pouro'].includes(S.dcat) && !q && !S.dsub && base.length === 1 && base[0].details) { $('#dir').innerHTML = head + svcInlinePage(base[0]); return; }
   $('#dir').innerHTML = head + famHtml + emgHtml + catHtml + (base.length ? base.map(svcAnyCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
 }
 function drawNear(list, q) {
@@ -5090,6 +5117,11 @@ document.addEventListener('click', e => {
   const lo = e.target.closest('[data-svcloc]'); if (lo) return svcLocSheet(lo.dataset.svcloc);
   const shb = e.target.closest('[data-svcsh]'); if (shb) { const x = (S.svcAll || []).find(y => String(y.id) === shb.dataset.svcsh); if (x) { S.sdId = x.id; return svcShareSheet(x); } return; }
   const dt = e.target.closest('[data-svcdet]'); if (dt) return svcDetailSheet(dt.dataset.svcdet);
+  const tc = e.target.closest('[data-iptoc]'); if (tc) return document.getElementById('ip-sec-' + tc.dataset.iptoc)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const ipc = e.target.closest('[data-ipcat]'); if (ipc) return openSvcCat(ipc.dataset.ipcat);
+  const ipe = e.target.closest('[data-ipedit]'); if (ipe) { const x = (S.svcAll || []).find(y => String(y.id) === ipe.dataset.ipedit); return x && svcEditSheet(x); }
+  const ipr = e.target.closest('[data-iprep]'); if (ipr) { const x = (S.svcAll || []).find(y => String(y.id) === ipr.dataset.iprep); return x && svcReportSheet(x); }
+  const ipz = e.target.closest('[data-ipzoom]'); if (ipz) return sdZoom([ipz.src], 0);
   const ds = e.target.closest('[data-dsub]'); if (ds) { S.dsub = ds.dataset.dsub || null; return drawDir(); }
   const sa = e.target.closest('[data-svcadd]'); if (sa) return svcEditSheet(null, sa.dataset.svcadd);
   if (e.target.closest('[data-famquiz]')) return famQuizSheet();

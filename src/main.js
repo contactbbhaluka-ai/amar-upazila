@@ -3746,6 +3746,7 @@ document.addEventListener('change', e => {
 const unionOptions = sel => S.unions.map(u => `<option value="${esc(u.id)}" ${String(u.id) === String(sel) ? 'selected' : ''}>${esc(u.name)}</option>`).join('');
 async function renderMe(mode = 'login') {
   const u = me();
+  if (u?.needsSetup) { $('#feed-me').innerHTML = ''; return signupView(true); }
   if (u) {
     $('#me').innerHTML = `<div class="card prof prof-fb">${coverHtml(u, true)}<input type="file" id="coverfile" accept="image/*" hidden>
       <h2 class="ph-h2" style="margin:6px 0 0">${esc(u.name)}${u.verified ? vb(u.verified, true) : vbGet('me')}<span class="ph-acts"><button class="pshare-btn" data-pshare="me" title="প্রোফাইল শেয়ার / QR" aria-label="প্রোফাইল শেয়ার বা QR কোড">${ic('share', 16)}</button><button class="pshare-btn" data-viewas="public" title="অন্যরা কেমন দেখে" aria-label="অন্যরা আপনার প্রোফাইল কেমন দেখে">${ic('eye', 16)}</button></span></h2>${u.username ? `<div class="uname">@${esc(u.username)}</div>` : ''}${u.locked ? '<button class="lock-chip">🔒 প্রোফাইল লক করা</button>' : ''}${u.admin && S.api.mode !== 'demo' ? '<div class="mut">অ্যাডমিন</div>' : ''}
@@ -3804,6 +3805,7 @@ function authView(mode = 'login', pre = '') {
         <div class="au-row"><label class="au-chk"><input type="checkbox" id="au-rem" checked><span>এই ফোনে মনে রাখুন</span></label><button type="button" class="link" id="login-forgot">পাসওয়ার্ড ভুলে গেছেন?</button></div>
         <button class="btn wide au-btn">লগইন</button></form>
       <div class="au-or"><span>অথবা</span></div>
+      ${gBtn('g-login')}
       <button class="au-new" data-auswap="signup"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.6"/><path d="M2.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M19 8v6M16 11h6"/></svg><span>নতুন অ্যাকাউন্ট খুলুন</span></button>
       ${accs.length ? '<button class="link au-back" data-auswap="login">← সেভ করা অ্যাকাউন্টগুলো</button>' : ''}</div>`}
     ${S.api?.demoLogin ? `<div class="au-demo">${demoCard()}</div>` : ''}
@@ -3883,6 +3885,7 @@ function showGate() {
     <div class="gt-feat">${GATE_FEAT.map(([i, t, d], k) => `<div class="gt-f" style="animation-delay:${0.08 * k + 0.1}s"><span class="gt-fi">${ic(i, 22)}</span><div><b>${t}</b><small>${d}</small></div></div>`).join('')}</div>
     <div class="gt-cta"><p class="gt-msg">অ্যাপের সব সুবিধা পেতে একটি অ্যাকাউন্ট খুলুন</p>
       <button class="btn wide au-btn gt-ic" data-gate="signup"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.6"/><path d="M2.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M19 8v6M16 11h6"/></svg><span>নতুন অ্যাকাউন্ট খুলুন</span></button>
+      ${gBtn('g-gate')}
       <button class="gt-login gt-ic" data-gate="login">${ic('login', 19)}<span>${accs.length ? 'সেভ করা অ্যাকাউন্টে লগইন করুন' : 'অ্যাকাউন্ট আছে? লগইন করুন'}</span></button>
       <button class="gt-skip" data-gate="skip">লগইন ছাড়াই ঘুরে দেখুন ${ic('chevR', 16)}</button>
       ${S.api?.demoLogin ? '<button class="gt-demo" data-gate="demo">ডেমো প্রোফাইল দিয়ে সব ফিচার দেখুন</button>' : ''}</div></div>`;
@@ -3898,6 +3901,17 @@ function showGate() {
   });
 }
 function hideGate() { const g = $('#gate'); if (!g) return; g.classList.add('out'); document.body.classList.remove('gate-on'); setTimeout(() => g.remove(), 260); }
+// ---------- Google দিয়ে চালিয়ে যান (শুধু ইমেইল যাচাই; নাম, ছবিসহ সব ধাপ নিজে পূরণ করতে হয়)
+const G_LOGO = '<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+const gOn = () => feat('featGoogle') && S.api?.googleReady?.();
+const gBtn = (cls = '') => gOn() ? `<button type="button" class="g-btn ${cls}" data-google>${G_LOGO}<span>Google দিয়ে চালিয়ে যান</span></button>` : '';
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-google]'); if (!b) return;
+  try { sessionStorage.setItem('au_gate', '1'); } catch { /* */ }
+  const done = auSpin(b);
+  S.api.signInGoogle().then(() => { if (me()) { done(); hideGate(); afterAuth(); } else setTimeout(done, 4000); }).catch(err => { done(); toast(/not enabled|Unsupported provider/i.test(err.message) ? 'Google দিয়ে লগইন এখনো চালু হয়নি' : errText(err)); });
+});
+window.addEventListener('au-oauth-error', () => { const m = S.api?.oauthError?.(); if (m) toast('Google দিয়ে লগইন হয়নি, আবার চেষ্টা করুন'); });
 // ---------- নতুন অ্যাকাউন্ট: ৩ ধাপ
 const SU_ST = [['১', 'আপনার পরিচয়', 'আসল নাম দিন, যাতে বন্ধুরা আপনাকে চিনতে পারেন'], ['২', 'ঠিকানা ও যোগাযোগ', 'আপনার এলাকার খবর আর মানুষ দেখাতে কাজে লাগবে'], ['৩', 'লগইনের তথ্য', 'এই ইমেইল ও পাসওয়ার্ড দিয়ে পরে লগইন করবেন']];
 function pwScore(p) {
@@ -3907,12 +3921,13 @@ function pwScore(p) {
   return s >= 3 ? 3 : s >= 1 ? 2 : 1;
 }
 const PW_LV = [['', 'কমপক্ষে ৬ অক্ষর দিন'], ['weak', 'দুর্বল · সংখ্যা ও চিহ্ন মেশান'], ['mid', 'মাঝারি · আরও একটু লম্বা করুন'], ['strong', 'শক্ত পাসওয়ার্ড']];
-function signupView() {
+function signupView(setup = false) {
+  const gEmail = setup ? me()?.email || '' : '';
   $('#me').innerHTML = `<div class="au au-su">
-    <div class="au-top"><button type="button" class="au-backbtn" id="su-back" aria-label="পেছনে">${ic('chevL', 22)}</button><div><b>নতুন অ্যাকাউন্ট</b><small id="su-stl"></small></div></div>
+    <div class="au-top"><button type="button" class="au-backbtn" id="su-back" aria-label="পেছনে">${ic('chevL', 22)}</button><div><b>${setup ? 'প্রোফাইল সম্পূর্ণ করুন' : 'নতুন অ্যাকাউন্ট'}</b><small id="su-stl"></small></div></div>
     <div class="au-prog" aria-hidden="true">${SU_ST.map((s, i) => `<span data-pi="${i + 1}"><i translate="no">${bn(i + 1)}</i><em>${s[1]}</em></span>`).join('')}</div>
     <div class="au-card"><form id="sform" novalidate>
-      <section data-st="1"><h2>আপনার পরিচয়</h2><p class="au-sub">${SU_ST[0][2]}</p>
+      <section data-st="1">${setup ? `<div class="au-gdone">${G_LOGO}<div><b>Google দিয়ে ইমেইল যাচাই হয়েছে</b><small>অ্যাকাউন্ট চালু করতে নিচের ধাপগুলো পূরণ করুন</small></div></div>` : gBtn('su-g-top')}${!setup && gOn() ? '<div class="au-or"><span>অথবা নিচের ফর্ম পূরণ করুন</span></div>' : ''}<h2>আপনার পরিচয়</h2><p class="au-sub">${SU_ST[0][2]}</p>
         ${auF('an', ic('user', 18), 'আপনার পূর্ণ নাম', 'maxlength="40" autocomplete="name"')}
         <div class="au-blk"><label for="su-g">${ic('users', 16)} লিঙ্গ</label>${genderSelect('su-g', undefined, true)}</div>
         <div class="au-blk" id="su-bd-b"><div class="au-lbl">${ic('calendar', 16)} জন্মতারিখ <span>(বয়স ${bn(MIN_AGE)} বছরের বেশি হতে হবে)</span></div>${dateSelect('su-bd', '', true)}</div></section>
@@ -3921,15 +3936,17 @@ function signupView() {
         ${auF('su-ph', ic('mobile', 18), 'মোবাইল নম্বর (WhatsApp থাকলে এটাই)', 'inputmode="tel" autocomplete="tel" maxlength="17"')}
         <p class="au-hint">এই নম্বর দিয়েও পরে লগইন করতে পারবেন</p>
         <div class="au-blk" id="su-bl-b">${bloodHtml('su', null)}</div></section>
-      <section data-st="3" hidden><h2>লগইনের তথ্য</h2><p class="au-sub">${SU_ST[2][2]}</p>
-        ${auF('ae', ic('mail', 18), 'ইমেইল', 'type="email" inputmode="email" autocomplete="email" autocapitalize="none"')}
-        ${auF('ap', ic('lock', 18), 'নতুন পাসওয়ার্ড', 'type="password" autocomplete="new-password"', true)}
+      <section data-st="3" hidden><h2>লগইনের তথ্য</h2><p class="au-sub">${setup ? 'আপনার Google ইমেইল দিয়েই অ্যাকাউন্ট খোলা হবে' : SU_ST[2][2]}</p>
+        ${setup ? `<div class="au-gmail">${G_LOGO}<div><b translate="no">${esc(gEmail)}</b><small>${ic('check', 13)} যাচাই করা ইমেইল</small></div></div>
+        <p class="au-hint au-pwopt">চাইলে একটা পাসওয়ার্ডও দিন, তাহলে মোবাইল নম্বর বা ইউজারনেম দিয়েও লগইন করতে পারবেন (ঐচ্ছিক)</p>`
+        : auF('ae', ic('mail', 18), 'ইমেইল', 'type="email" inputmode="email" autocomplete="email" autocapitalize="none"')}
+        ${auF('ap', ic('lock', 18), setup ? 'পাসওয়ার্ড (ঐচ্ছিক)' : 'নতুন পাসওয়ার্ড', 'type="password" autocomplete="new-password"', true)}
         <div class="pw-meter" id="pw-m" data-lv="0"><div><i></i><i></i><i></i></div><span>${PW_LV[0][1]}</span></div>
         ${auF('ap2', ic('lock', 18), 'পাসওয়ার্ড আবার লিখুন', 'type="password" autocomplete="new-password"', true)}
         <p class="pw-match" id="pw-mt" hidden></p>
         <div class="au-blk au-agree"><label class="au-chk"><input type="checkbox" id="agree"><span>আমার বয়স ${bn(MIN_AGE)} বছরের বেশি। আমি <a href="./privacy.html">ব্যবহারের নিয়ম</a> মেনে চলব: মিথ্যা খবর, গালিগালাজ বা আপত্তিকর কিছু পোস্ট করব না।</span></label></div></section>
       <button class="btn wide au-btn" id="su-next">পরবর্তী</button></form>
-      <p class="au-swap">আগে থেকে অ্যাকাউন্ট আছে? <button type="button" class="link" data-auswap="login">লগইন করুন</button></p></div></div>`;
+      ${setup ? '<p class="au-swap"><button type="button" class="link" id="su-cancel">বাতিল করে বের হয়ে যান</button></p>' : '<p class="au-swap">আগে থেকে অ্যাকাউন্ট আছে? <button type="button" class="link" data-auswap="login">লগইন করুন</button></p>'}</div></div>`;
   addrRefresh('su');
   let step = 1;
   const show = n => {
@@ -3940,7 +3957,9 @@ function signupView() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   show(1);
-  $('#su-back').onclick = () => (step > 1 ? show(step - 1) : authView('login'));
+  const leave = async () => { if (!(await confirmSheet('প্রোফাইল সম্পূর্ণ না করে বের হবেন? পরে Google দিয়ে আবার ঢুকলে এখান থেকেই শুরু করতে পারবেন।', 'বের হয়ে যান'))) return; await S.api.signOut(); afterAuth(); go('me'); };
+  $('#su-back').onclick = () => (step > 1 ? show(step - 1) : setup ? leave() : authView('login'));
+  $('#su-cancel')?.addEventListener('click', leave);
   $('#sform').addEventListener('click', e => {
     const g = e.target.closest('[data-sug]'); if (!g) return;
     $('#su-g').value = g.dataset.sug; $$('[data-sug]').forEach(b => b.classList.toggle('on', b === g));
@@ -3962,8 +3981,8 @@ function signupView() {
       const bl = readBlood('su'); if (bl.err) return authErr($('#su-bl-b'), bl.err);
     }
     if (n === 3) {
-      if (!/^\S+@\S+\.\S+$/.test($('#ae').value.trim())) return authErr($('#ae'), 'সঠিক ইমেইল দিন (যেমন name@gmail.com)');
-      if ($('#ap').value.length < 6) return authErr($('#ap'), 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে');
+      if (!setup && !/^\S+@\S+\.\S+$/.test($('#ae').value.trim())) return authErr($('#ae'), 'সঠিক ইমেইল দিন (যেমন name@gmail.com)');
+      if ((!setup || $('#ap').value || $('#ap2').value) && $('#ap').value.length < 6) return authErr($('#ap'), 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে');
       if ($('#ap2').value !== $('#ap').value) { $('#pw-mt').hidden = true; return authErr($('#ap2'), 'দুটো পাসওয়ার্ড মেলেনি'); }
       if (!$('#agree').checked) return authErr($('#agree'), 'এগোতে নিয়মে সম্মতি দিন');
     }
@@ -3973,9 +3992,18 @@ function signupView() {
     e.preventDefault();
     if (check(step) !== true) return;
     if (step < 3) return show(step + 1);
-    const email = $('#ae').value.trim().toLowerCase(), password = $('#ap').value, addr = readAddr('su'), blood = readBlood('su'), g = $('#su-g').value;
+    const email = setup ? gEmail : $('#ae').value.trim().toLowerCase(), password = $('#ap').value, addr = readAddr('su'), blood = readBlood('su'), g = $('#su-g').value;
     const extra = { ...addr, phone: normPhone($('#su-ph').value), bloodGroup: blood.bloodGroup, lastDonated: blood.lastDonated, gender: g === 'none' ? '' : g, birthDate: readDate('su-bd', true) };
     const done = auSpin(e.submitter);
+    if (setup) {
+      try {
+        await S.api.finishSetup({ name: $('#an').value.trim().replace(/\s+/g, ' '), ...extra, donorVisible: !(extra.bloodGroup && $('#su-donor') && !$('#su-donor').checked) });
+        if (password) await S.api.setPassword(password);
+        accRemember(me(), email, await S.api.currentToken());
+        afterAuth(); welcomeFlow(1);
+      } catch (err) { authErr($('#su-next'), errText(err)); } finally { done(); }
+      return;
+    }
     try {
       const r = await S.api.signUp({ email, password, name: $('#an').value.trim().replace(/\s+/g, ' '), ...extra });
       if (r.needsConfirm) { done(); return codeSheet(email, 'signup', { ident: email, donorOff: extra.bloodGroup && $('#su-donor') && !$('#su-donor').checked ? extra : null }); }
@@ -4148,6 +4176,8 @@ document.addEventListener('click', async e => {
 });
 function afterAuth() {
   if (me()) hideGate();
+  if (me()?.needsSetup) { go('me'); renderMe(); return; }
+  { const m = S.api?.oauthError?.(); if (m) setTimeout(() => toast('Google দিয়ে লগইন হয়নি, আবার চেষ্টা করুন'), 300); }
   { const u = me(); if (u && accSaved(u.id)) accUpd(u.id, { name: u.name, ...(u.avatar && !String(u.avatar).startsWith('blob:') ? { avatar: u.avatar } : {}) }); }
   if (!me() && S.scope === 'friends') S.scope = 'area';
   renderComposer(); renderFilters(); listenMessages(); refreshBadges(); loadFeed('home'); renderDemoBar();
@@ -7366,7 +7396,7 @@ async function loadAdmin() {
       </div>
       <h3 class="res-h">অ্যাপ নিয়ন্ত্রণ</h3>
       <div class="card">
-        ${[['featBlood', 'ব্লাড ব্যাংক'], ['featGroups', 'গ্রুপ'], ['featPages', 'পেইজ'], ['featBoost', 'পোস্ট বুস্ট (বিজ্ঞাপন)']].map(([k, l]) => `
+        ${[['featBlood', 'ব্লাড ব্যাংক'], ['featGroups', 'গ্রুপ'], ['featPages', 'পেইজ'], ['featBoost', 'পোস্ট বুস্ট (বিজ্ঞাপন)'], ['featGoogle', 'Google দিয়ে লগইন (Supabase-এ Google চালু করার পর)']].map(([k, l]) => `
         <label class="switch-row" for="set-${k}">
           <span class="sw-text"><b>${l}</b><span class="mut">বন্ধ করলে মেনু থেকে লুকিয়ে যায়; অ্যাডমিনরা তখনো দেখতে পান।</span></span>
           <input type="checkbox" id="set-${k}" data-flag="${k}" class="switch" role="switch" ${set[k] !== false ? 'checked' : ''}>
@@ -7930,6 +7960,7 @@ function show(v) {
 }
 // প্রধান ট্যাবে যাওয়া
 function go(v) {
+  if (v !== 'me' && me()?.needsSetup) { toast('আগে প্রোফাইলের ধাপগুলো সম্পূর্ণ করুন'); v = 'me'; }
   if (v === 'me' && S.actAs && me()) { closeSheet(); S.stack = []; return openPage(S.actAs.id); }
   if (v === 'pinsights') {
     if (!S.actAs) return go('friends');
@@ -7996,7 +8027,14 @@ function featGuard(name) { if (feat(name)) return true; toast('এই ফিচ�
 const BUILD_ID = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev';
 const nativeVersion = () => Number(navigator.userAgent.match(/AmarUpazilaApp\/(\d+)/)?.[1]) || 0;
 const versionLabel = () => (nativeVersion() ? `অ্যাপ ${bn(nativeVersion())}` : 'ওয়েব') + ` · আপডেট ${bn(String(BUILD_ID).split('-')[0].slice(-6))}`;
-function settingsChanged() { local.set('settings', S.settings); renderNotices(); if (S.view === 'menu') renderMenu(); checkForceUpdate(); }
+// সেটিং পরে এলে (অ্যাপ খোলার পর) Google বাটন দেখানো/লুকানো, লেখা ঘর না মুছে
+function refreshGBtns() {
+  const on = gOn();
+  if (!on) { document.querySelectorAll('[data-google]').forEach(b => b.remove()); return; }
+  const g = $('#gate [data-gate="signup"]'); if (g && !$('#gate [data-google]')) g.insertAdjacentHTML('afterend', gBtn('g-gate'));
+  const or = $('#me .au-card .au-or'); if (or && $('#aform') && !$('#me [data-google]')) or.insertAdjacentHTML('afterend', gBtn('g-login'));
+}
+function settingsChanged() { refreshGBtns(); local.set('settings', S.settings); renderNotices(); if (S.view === 'menu') renderMenu(); checkForceUpdate(); }
 const hashStr = t => { let h = 0; for (const c of String(t)) h = (h * 31 + c.charCodeAt(0)) | 0; return String(h); };
 function renderNotices() {
   const box = $('#notices'); if (!box) return;

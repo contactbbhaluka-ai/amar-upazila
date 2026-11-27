@@ -50,7 +50,7 @@ async function supabaseApi() {
   // !…_fkey: একাধিক সম্পর্ক থাকলে কোনটা ধরতে হবে Supabase-কে বলে দেওয়া (না দিলে 400 এরর)
   let tokCb = null;
   let recoveryPending = false, recoveryCb = null, delCancelled = false, delCb = null; const delChecked = new Set();
-  const PROFILE_FULL = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,friend_req_from,delete_requested_at,unions!profiles_union_id_fkey(name)';
+  const PROFILE_FULL = 'id,name,union_id,district,upazila,blood_group,donor_visible,last_donated,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,gender,username,verified,verified_until,locked,pinned_post_id,donor_ready,friend_req_from,delete_requested_at,needs_setup,unions!profiles_union_id_fkey(name)';
   // লগইন ছাড়া: লিঙ্গ, ব্লাড গ্রুপ, রক্তদানের তারিখ ডাটাবেস দেয় না, তাই চাওয়াও হয় না
   const PROFILE_PUB = 'id,name,union_id,district,upazila,avatar_url,cover_url,bio,role,friends_visibility,followers_visibility,following_visibility,created_at,username,verified,verified_until,locked,pinned_post_id,friend_req_from,delete_requested_at,unions!profiles_union_id_fkey(name)';
   let PROFILE = PROFILE_PUB;
@@ -60,7 +60,7 @@ async function supabaseApi() {
     bloodGroup: p.blood_group || '', donorVisible: p.donor_visible !== false, lastDonated: p.last_donated || '',
     avatar: p.avatar_url || '', cover: p.cover_url || '', bio: p.bio || '', admin: p.role === 'admin',
     friendsVisibility: p.friends_visibility || 'public', followersVisibility: p.followers_visibility || 'public', followingVisibility: p.following_visibility || 'public', joinedAt: p.created_at || '',
-    gender: p.gender || '', username: p.username || '', verified: badgeOf(p), verifiedUntil: p.verified_until || null, locked: !!p.locked, pinnedPostId: p.pinned_post_id || null, donorReady: !!p.donor_ready, friendReqFrom: p.friend_req_from || 'everyone',
+    gender: p.gender || '', needsSetup: !!p.needs_setup, username: p.username || '', verified: badgeOf(p), verifiedUntil: p.verified_until || null, locked: !!p.locked, pinnedPostId: p.pinned_post_id || null, donorReady: !!p.donor_ready, friendReqFrom: p.friend_req_from || 'everyone',
     social: {}, works: [], educations: [],
   });
   const toPost = (r, mine, saved) => ({
@@ -91,7 +91,7 @@ async function supabaseApi() {
     PROFILE = session ? PROFILE_FULL : PROFILE_PUB;
     if (!session) { me = null; blocked = new Set(); return null; }
     const p = ok(await sb.from('profiles').select(PROFILE).eq('id', session.user.id).maybeSingle());
-    me = p ? { ...toUser(p), email: session.user.email } : null;
+    me = p ? { ...toUser(p), email: session.user.email, provider: session.user.app_metadata?.provider || 'email', hasPassword: (session.user.identities || []).some(i => i.provider === 'email') } : null;
     // মুছে ফেলার অনুরোধের পর আবার লগইন করলে অনুরোধ বাতিল
     if (me && !delChecked.has(me.id)) { delChecked.add(me.id); sb.rpc('cancel_account_deletion').then(r => { if (r.data) { delCancelled = true; delCb?.(); } }, () => {}); }
     if (me) me.phone = ok(await sb.from('profile_private').select('phone').eq('user_id', me.id).maybeSingle())?.phone || '';
@@ -140,8 +140,47 @@ async function supabaseApi() {
     return sb.storage.from('media').getPublicUrl(path).data.publicUrl;
   }
 
+  let oauthErr = '';
+  async function takeOAuthHash(url) {
+    const i = String(url).indexOf('#'); if (i < 0) return false;
+    const h = new URLSearchParams(String(url).slice(i + 1));
+    if (h.get('error')) { oauthErr = h.get('error_description') || h.get('error'); if (url === location.href) history.replaceState(null, '', location.pathname + location.search); return false; }
+    const at = h.get('access_token'), rt = h.get('refresh_token');
+    if (!at || !rt) return false;
+    if (url === location.href) history.replaceState(null, '', location.pathname + location.search);
+    ok(await sb.auth.setSession({ access_token: at, refresh_token: rt }));
+    return true;
+  }
+  const NATIVE_CB = 'com.amarupazila.app://auth';
+  let appListen = false;
   return {
     mode: 'supabase',
+    oauthError() { const e = oauthErr; oauthErr = ''; return e; },
+    // Google: ওয়েবসাইটে পুরো পাতা Google-এ যায় ও ফেরে; অ্যাপে আলাদা ব্রাউজারে খোলে (Google অ্যাপের ভেতরের WebView-এ লগইন দেয় না)
+    googleReady() { const C = window.Capacitor; return !C?.isNativePlatform?.() || !!(C.Plugins?.Browser && C.Plugins?.App); },
+    async signInGoogle() {
+      const C = window.Capacitor, nat = C?.isNativePlatform?.();
+      const back = nat ? NATIVE_CB : (PUBLIC_URL || location.href.split('#')[0]).replace(/#.*$/, '');
+      const { data, error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: back, skipBrowserRedirect: !!nat, queryParams: { prompt: 'select_account' } } });
+      if (error) throw error;
+      if (!nat) return;
+      if (!appListen) {
+        appListen = true;
+        C.Plugins.App.addListener('appUrlOpen', async ({ url }) => {
+          if (!String(url).startsWith(NATIVE_CB)) return;
+          C.Plugins.Browser.close?.().catch?.(() => {});
+          try { await takeOAuthHash(url); } catch (e) { oauthErr = e.message; }
+          if (oauthErr) window.dispatchEvent(new CustomEvent('au-oauth-error'));
+        });
+      }
+      await C.Plugins.Browser.open({ url: data.url, presentationStyle: 'popover' });
+    },
+    async setPassword(password) { ok(await sb.auth.updateUser({ password })); if (me) me.hasPassword = true; },
+    async finishSetup(v) {
+      await this.updateProfile({ ...v, bio: me.bio || '' });
+      ok(await sb.from('profiles').update({ needs_setup: false }).eq('id', me.id));
+      return loadMe((await sb.auth.getSession()).data.session);
+    },
     // ইমেইলের "পাসওয়ার্ড ভুলে গেছেন" লিংক থেকে ফিরলে নতুন পাসওয়ার্ড চাওয়া
     onDeletionCancelled(cb) { delCb = cb; if (delCancelled) setTimeout(cb, 0); },
     async requestAccountDeletion(password) {
@@ -150,6 +189,8 @@ async function supabaseApi() {
     },
     onPasswordRecovery(cb) { recoveryCb = cb; if (recoveryPending) setTimeout(cb, 0); },
     async init(onAuth) {
+      // Google থেকে ফেরার পর ঠিকানার # অংশে টোকেন আসে (ওয়েবসাইটে)
+      await takeOAuthHash(location.href).catch(() => {});
       const { data } = await sb.auth.getSession();
       await loadMe(data.session);
       sb.auth.onAuthStateChange((event, session) => {
@@ -1114,7 +1155,7 @@ function demoApi() {
   const person = id => db.users.find(u => u.id === id) || PEOPLE.find(u => u.id === id);
   const user = id => { const p = person(id); return p && { id: p.id, name: p.name, unionId: p.unionId, district: p.district || '', upazila: p.upazila || '', union: (uname(p.unionId) ? [uname(p.unionId), p.upazila] : [p.upazila, p.district]).filter(Boolean).join(', '), bloodGroup: p.bloodGroup || '', donorVisible: p.donorVisible !== false, lastDonated: p.lastDonated || '', avatar: p.avatar || '', cover: p.cover || '', bio: p.bio || '', friendsVisibility: p.friendsVisibility || 'public', followersVisibility: p.followersVisibility || 'public', followingVisibility: p.followingVisibility || 'public', social: p.social || {}, works: p.works || [], educations: p.educations || [], joinedAt: p.joinedAt || '', gender: p.gender || '', username: p.username || '', birthYear: p.birthYear || 0, birthDate: p.birthDate || '', relationship: p.relationship || '', religion: p.religion || '', orgs: p.orgs || [], featured: p.featured || FEATURED0, verified: badgeOf(p), verifiedUntil: p.verifiedUntil || null, locked: !!p.locked, pinnedPostId: p.pinnedPostId || null, donorReady: !!p.donorReady, friendReqFrom: p.friendReqFrom || 'everyone', gone: !!p.deleteAt && p.id !== meId }; };
   const ABOUT_VIS0 = { works: 'public', educations: 'public', contact: 'only_me', social: 'public', birth: 'only_me', relationship: 'only_me', religion: 'only_me', orgs: 'public' };
-  const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', admin: true, aboutVis: { ...ABOUT_VIS0, ...(person(meId).aboutVis || {}) } } : null);
+  const meUser = () => (meId && person(meId) ? { ...user(meId), email: person(meId).email, phone: person(meId).phone || '', needsSetup: !!person(meId).needsSetup, provider: person(meId).provider || 'email', hasPassword: !!person(meId).password, admin: true, aboutVis: { ...ABOUT_VIS0, ...(person(meId).aboutVis || {}) } } : null);
   const isBlocked = id => db.blocks.includes(meId + ':' + id);
   const demoN = n => ({ ...n, p: { page_id: db.posts.find(x => x.id === n.postId)?.pageId || null }, meta: n.meta || {} });
   // ডেমো: কাজ করলে কয়েন (আসল সার্ভারে এটা ডাটাবেসের ট্রিগার করে)
@@ -1332,6 +1373,15 @@ function demoApi() {
       meId = u.id; if (u.deleteAt) { delete u.deleteAt; this._delCancelled = true; setTimeout(() => this._delCb?.(), 0); } save(); return meUser();
     },
     async verifyCode() { return meUser(); },
+    oauthError() { return ''; },
+    googleReady() { return true; },
+    async signInGoogle() {
+      // ডেমো: Google-এর মতো একটা যাচাই করা Gmail দিয়ে নতুন অ্যাকাউন্ট, বাকি ধাপ পূরণ বাকি
+      const n = Date.now().toString(36).slice(-4), u = { id: 'g' + Date.now(), email: `google.${n}@gmail.com`, password: '', name: 'নতুন সদস্য', needsSetup: true, provider: 'google', district: '', upazila: '', unionId: null, phone: '', bloodGroup: '', lastDonated: '', donorVisible: true, avatar: '', bio: '' };
+      db.users.push(u); meId = u.id; seedFor(u.id); save(); return meUser();
+    },
+    async setPassword(pw) { person(meId).password = pw; save(); },
+    async finishSetup(v) { await this.updateProfile({ ...v, bio: '' }); const p = person(meId); p.needsSetup = false; save(); return meUser(); },
     async resendCode() {},
     onTokens() {},
     async currentToken() { return meId || ''; },
@@ -1379,7 +1429,7 @@ function demoApi() {
           area: (uname(m.unionId) ? [uname(m.unionId), m.upazila] : [m.upazila, m.district]).filter(Boolean).join(', '), phone: showPhone ? m.phone : '', lastDonated: m.lastDonated || '' }));
       return wait([...users, ...manual].sort((a, b) => (b.ready - a.ready) || (ready(b) - ready(a)) || a.bloodGroup.localeCompare(b.bloodGroup) || a.name.localeCompare(b.name, 'bn')));
     },
-    async settings() { return { ...settingDefaults(), ...db.settings }; },
+    async settings() { return { ...settingDefaults(), featGoogle: true, ...db.settings }; },   // ডেমোতে Google বাটন দেখা যায়
     async setSetting(name, value) { db.settings[name] = value; save(); },
     async boostedPosts(n = 3) {
       if (db.settings.featBoost === false) return [];

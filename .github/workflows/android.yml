@@ -81,6 +81,12 @@ jobs:
           grep -q ACCESS_FINE_LOCATION "$M" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="false" />\n</manifest>#' "$M"
           grep -n "LOCATION\|location" "$M"
 
+      - name: Google login deep link (Google থেকে অ্যাপে ফেরা: com.amarupazila.app://auth)
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q 'android:host="auth"' "$M" || perl -0pi -e 's#(<activity\b[^>]*MainActivity.*?)(\s*</activity>)#$1\n            <intent-filter>\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <category android:name="android.intent.category.BROWSABLE" />\n                <data android:scheme="com.amarupazila.app" android:host="auth" />\n            </intent-filter>$2#s' "$M"
+          grep -n 'android:host="auth"' "$M"
+
       - name: Generate app icon and splash
         continue-on-error: true
         run: npx @capacitor/assets generate --android --iconBackgroundColor '#006a4e' --iconBackgroundColorDark '#006a4e' --splashBackgroundColor '#006a4e' --splashBackgroundColorDark '#006a4e'

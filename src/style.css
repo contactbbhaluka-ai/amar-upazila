@@ -2637,3 +2637,15 @@ body.gate-on{overflow:hidden}
 .gst-lock b{display:block;font-size:16px}.gst-lock p{font-size:13.5px;margin:6px 0 2px;line-height:1.55}
 #dir.bl-busy .bstats,#dir.bl-busy .bg-grid,#dir.bl-busy .res-h,#dir.bl-busy .donor{opacity:.5;transition:opacity .15s;pointer-events:none}
 .fd-busy{opacity:.45;transition:opacity .15s;pointer-events:none}
+/* Google দিয়ে চালিয়ে যান */
+.g-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:50px;margin-top:10px;border-radius:14px;border:1px solid light-dark(#d5dcd8,#2c3c36);background:var(--card);color:var(--ink);font:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:background .15s}
+.g-btn:active{background:light-dark(#f3f5f4,#1a2621)}
+.g-btn svg{flex:none}
+.g-login{margin:0 0 12px}
+.su-g-top{margin:0 0 4px}
+.au-su .au-or{margin:14px 0}
+.au-gdone,.au-gmail{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:light-dark(#f2faf6,#13241e);border:1px solid light-dark(#cfe9de,#24503f);margin-bottom:14px}
+.au-gdone b,.au-gmail b{display:block;font-size:14.5px;word-break:break-all}
+.au-gdone small,.au-gmail small{display:flex;align-items:center;gap:4px;color:var(--g);font-size:12.5px;font-weight:600}
+.au-gmail{margin:4px 0 0}
+.au-pwopt{margin-top:10px}

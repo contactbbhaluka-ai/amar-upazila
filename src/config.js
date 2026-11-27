@@ -90,5 +90,7 @@ export const SETTING_KEYS = {
   earnCap: ['earn_daily_cap', 50], badgePrice: ['badge_price', 500], badgeDays: ['badge_days', 30],
   // পোস্ট বুস্ট (বিজ্ঞাপন)
   boostPrice: ['boost_price_day', 50], featBoost: ['feature_boost', true],
+  // Google দিয়ে লগইন: Supabase-এ Google provider চালু করার পর অ্যাডমিন ড্যাশবোর্ড থেকে চালু করুন
+  featGoogle: ['feature_google', false],
 };
 export const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.amarupazila.app';

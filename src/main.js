@@ -1056,9 +1056,11 @@ function renderFeed(key) {
     if (fresh.length) { fresh.forEach(id => S.seenBoosts.add(id)); S.api.boostSeen(fresh).catch(() => {}); }
   }
 }
-async function loadFeed(key, append) {
+async function loadFeed(key, append, soft) {
   const f = S.feeds[key], box = $('#feed-' + key);
-  if (!append) box.innerHTML = '<div class="skel"></div><div class="skel"></div>';
+  // ফিল্টার বদলালে পুরোনো পোস্ট হালকা করে রেখে নতুনগুলো এলে বদলানো (পাতা লাফায় না)
+  const keep = soft && !append && box.querySelector('.post');
+  if (!append) { if (keep) box.classList.add('fd-busy'); else box.innerHTML = '<div class="skel"></div><div class="skel"></div>'; }
   const q = key === 'home'
     ? { scope: S.scope, unionId: S.union ? Number(S.union) : null, category: S.fcat || null }
     : key === 'post' ? { postId: S.postId }
@@ -1085,6 +1087,7 @@ async function loadFeed(key, append) {
     if (key === 'home' && !me()) f.more = false;   // লগইন ছাড়া: অল্প কয়েকটা পোস্ট, তারপর লগইনের কার্ড
     if (pinP) { const pin = (await pinP)[0]; if (pin) f.posts = [{ ...pin, pinnedPage: true }, ...f.posts.filter(x => x.id !== pin.id)]; }
   } catch (e) { toast(errText(e)); if (!append) f.posts = []; }
+  box.classList.remove('fd-busy');
   renderFeed(key);
 }
 const feedOf = el => el.closest('[data-feed]')?.dataset.feed;
@@ -1566,13 +1569,13 @@ function renderFilters() {
   document.querySelectorAll('#scope button').forEach(b => b.classList.toggle('on', b.dataset.s === S.scope));
   $('#locrow').hidden = S.scope === 'friends';
 }
-$('#fchips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { S.fcat = b.dataset.f; renderFilters(); loadFeed('home'); } });
+$('#fchips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { S.fcat = b.dataset.f; renderFilters(); loadFeed('home', false, true); } });
 $('#scope').addEventListener('click', e => {
   const b = e.target.closest('[data-s]'); if (!b) return;
   if (b.dataset.s === 'friends' && !needUser()) return;
-  S.scope = b.dataset.s; renderFilters(); loadFeed('home');
+  S.scope = b.dataset.s; renderFilters(); loadFeed('home', false, true);
 });
-$('#loc').addEventListener('change', e => { S.union = e.target.value; local.set('union', S.union); loadFeed('home'); });
+$('#loc').addEventListener('change', e => { S.union = e.target.value; local.set('union', S.union); loadFeed('home', false, true); });
 $('#more-home').addEventListener('click', e => busy(e.currentTarget, () => loadFeed('home', true)));
 // নিচে পৌঁছানোর আগেই পরের পোস্টগুলো নিজে থেকে লোড (বাটনটা থাকে, দরকার হলে চাপা যায়)
 let autoMoreT = 0;
@@ -5938,16 +5941,24 @@ $('#q').addEventListener('blur', () => setTimeout(() => { if (document.activeEle
 $('#dir').addEventListener('click', e => {
   const t = e.target.closest('[data-svc]'); if (t) return openSvcCat(t.dataset.svc);
   const b = e.target.closest('.blood-sum[data-d]'); if (b) { S.dcat = 'blood'; loadDir(); window.scrollTo(0, 0); return; }
-  const g = e.target.closest('[data-bg]'); if (g) { S.bgroup = g.dataset.bg; loadBlood(); return; }
-  const sc = e.target.closest('[data-bscope]'); if (sc) { S.bscope = sc.dataset.bscope; loadBlood(); }
+  const g = e.target.closest('[data-bg]'); if (g) { S.bgroup = g.dataset.bg; loadBlood({ soft: true }); return; }
+  const sc = e.target.closest('[data-bscope]'); if (sc) { if (S.bscope === sc.dataset.bscope) return; S.bscope = sc.dataset.bscope; loadBlood({ soft: true }); }
 });
-$('#dir').addEventListener('change', e => { if (e.target.id === 'bready') { S.bready = e.target.checked; loadBlood(); } });
-async function loadBlood() {
-  const box = $('#dir');
-  box.innerHTML = '<div class="skel"></div>';
+$('#dir').addEventListener('change', e => { if (e.target.id === 'bready') { S.bready = e.target.checked; loadBlood({ soft: true }); } });
+// ফিল্টার বদলালে পাতা খালি না করে, স্ক্রল যেখানে ছিল সেখানেই রেখে শুধু তালিকা বদলায় (ঝাঁকুনি নেই)
+async function loadBlood({ soft } = {}) {
+  const box = $('#dir'), key = S.bscope === 'home' ? 'h' : 'a', had = !!box.querySelector('.blood-head');
+  S.bcache = S.bcache || {};
+  if (!had) box.innerHTML = '<div class="skel"></div>';
   try {
     // এক বারে এলাকার সব ডোনার আনি; গ্রুপের সংখ্যা ও ফিল্টার এখান থেকেই
-    const all = await S.api.donors({ upazila: S.bscope === 'home' ? HOME_UPAZILA : null });
+    let all = soft ? S.bcache[key] : null;
+    if (!all) {
+      if (had) box.classList.add('bl-busy');
+      all = await S.api.donors({ upazila: S.bscope === 'home' ? HOME_UPAZILA : null }); S.bcache[key] = all;
+      if (!soft) delete S.bcache[key === 'h' ? 'a' : 'h'];
+    }
+    const keepY = window.scrollY, focusId = document.activeElement?.closest?.('#dir') ? (document.activeElement.dataset.bg != null ? `[data-bg="${document.activeElement.dataset.bg}"]` : document.activeElement.dataset.bscope ? `[data-bscope="${document.activeElement.dataset.bscope}"]` : document.activeElement.id ? '#' + document.activeElement.id : '') : '';
     const u = me(), mineInList = u && all.find(d => d.id === u.id);
     const count = g => all.filter(d => d.bloodGroup === g).length;
     const readyCount = all.filter(d => canDonate(d.lastDonated)).length;
@@ -5969,7 +5980,9 @@ async function loadBlood() {
       <label class="chk" style="margin:4px 4px 10px"><input type="checkbox" id="bready" ${S.bready ? 'checked' : ''}> <span>শুধু যারা এখন রক্ত দিতে পারবেন (শেষ রক্তদানের ৯০ দিন পার)</span></label>
       <h3 class="res-h">${S.bgroup ? `${esc(S.bgroup)} গ্রুপের` : 'সব'} রক্তদাতা (${bn(list.length)} জন${mineInList && (!S.bgroup || mineInList.bloodGroup === S.bgroup) ? ', আপনি ছাড়া' : ''})</h3>
       ${list.length ? list.map(d => donorCard(d, false)).join('') : `<div class="empty">${S.bgroup ? `${esc(S.bgroup)} গ্রুপের` : 'কোনো'} রক্তদাতা ${S.bready ? 'এখন রক্ত দেওয়ার মতো অবস্থায় ' : ''}নেই।${S.bscope === 'home' ? '<br>"সব এলাকা" চেপে দেখুন।' : ''}</div>`}`;
-  } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+    box.classList.remove('bl-busy');
+    if (had) { window.scrollTo({ top: keepY, behavior: 'instant' }); if (focusId) box.querySelector(focusId)?.focus({ preventScroll: true }); }
+  } catch (e) { box.classList.remove('bl-busy'); box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 $('#dir').addEventListener('click', e => {
   const b = e.target.closest('[data-verify]');

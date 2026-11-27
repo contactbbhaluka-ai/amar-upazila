@@ -2635,3 +2635,5 @@ body.gate-on{overflow:hidden}
 .gst-prof>p{margin:0;display:flex;align-items:center;justify-content:center;gap:4px;font-size:14px}
 .gst-lock{margin:16px 16px 0;padding:18px 14px 6px;border-top:1px solid var(--line)}
 .gst-lock b{display:block;font-size:16px}.gst-lock p{font-size:13.5px;margin:6px 0 2px;line-height:1.55}
+#dir.bl-busy .bstats,#dir.bl-busy .bg-grid,#dir.bl-busy .res-h,#dir.bl-busy .donor{opacity:.5;transition:opacity .15s;pointer-events:none}
+.fd-busy{opacity:.45;transition:opacity .15s;pointer-events:none}

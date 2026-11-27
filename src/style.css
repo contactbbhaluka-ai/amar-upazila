@@ -1722,3 +1722,16 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .qmic.on{background:#e03131;color:#fff;animation:micp 1.1s ease-in-out infinite}@keyframes micp{0%,100%{box-shadow:0 0 0 0 rgba(224,49,49,.45)}50%{box-shadow:0 0 0 8px rgba(224,49,49,0)}}
 .svc-off{margin:8px 0 0;padding:9px 12px;border-radius:12px;background:#fff4e5;color:#8a4b00;font-size:13.5px;border:1px solid #ffd8a8}
 [data-theme=dark] .svc-off{background:#3a2a12;color:#ffc078;border-color:#6b4a1a}
+
+.day-note{margin:10px 0 0;padding:9px 12px;border-radius:12px;background:color-mix(in srgb,#1c7ed6 9%,var(--card));border:1px solid color-mix(in srgb,#1c7ed6 25%,var(--line));font-size:13.5px}
+.day-note.hol{background:color-mix(in srgb,#e8590c 10%,var(--card));border-color:color-mix(in srgb,#e8590c 30%,var(--line))}
+.sos-row2{display:flex;gap:8px;margin:10px 0 0}.sos-row2 button{flex:1;border:0;border-radius:14px;padding:12px 8px;font:inherit;font-weight:800;font-size:15px;cursor:pointer}
+.sos-btn{background:#e03131;color:#fff;box-shadow:0 2px 8px rgba(224,49,49,.3)}.aid-btn{background:color-mix(in srgb,#e03131 10%,var(--card));color:#c92a2a;border:1px solid color-mix(in srgb,#e03131 30%,var(--line))!important}
+[data-theme=dark] .aid-btn{color:#ff8787}
+.sos-sheet{text-align:center}.sos-ic{font-size:44px}.sos-sheet .btn{margin-top:10px}.sos-go{background:#e03131;border-color:#e03131}
+.sos-999{display:block;text-align:center;text-decoration:none;margin-top:10px;background:#c92a2a;border-color:#c92a2a;color:#fff}
+.sos-calls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px}.sos-call{border:1px solid var(--line);border-radius:999px;padding:7px 14px;text-decoration:none;color:inherit;font-weight:700}
+.sos-note{font-size:12.5px;margin-top:10px}.sos-row{display:flex;gap:6px;margin-top:8px}.sos-row .f{flex:1;min-width:0}
+.aid-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}.aid-tile{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:inherit;font:inherit;font-weight:700;text-align:left;cursor:pointer}
+.aid-e{font-size:24px}.aid-back{margin-bottom:6px}.aid-h{font-size:15px;margin:14px 0 6px}.aid-h.ok{color:#2b8a3e}.aid-h.no{color:#c92a2a}
+.aid-steps,.aid-no{margin:0;padding-left:22px;line-height:1.6}.aid-steps li,.aid-no li{margin-bottom:6px}

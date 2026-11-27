@@ -144,6 +144,12 @@ const PLACES = {
 
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
+  'বিপদে আছি': "I'm in danger", 'প্রাথমিক চিকিৎসা': 'First aid', 'বিপদে আছেন': 'In danger', 'লোকেশনসহ SMS পাঠান': 'Send SMS with location', 'WhatsApp-এ লোকেশন পাঠান': 'Send location on WhatsApp',
+  '৯৯৯-এ কল করুন (পুলিশ, ফায়ার, অ্যাম্বুলেন্স': 'Call 999 (police, fire, ambulance', '৯৯৯-এ কল করুন': 'Call 999', 'পরিচিতজন বদলান': 'Change contacts', 'পরিচিতজনের নম্বর যোগ করুন': 'Add contact numbers',
+  'বিপদের পরিচিতজন': 'Emergency contacts', 'পরিচিতজন সংরক্ষণ হয়েছে': 'Contacts saved', 'লোকেশন খুঁজছি…': 'Finding location…', 'জরুরি অবস্থায় কী করবেন': 'What to do in an emergency', 'সব বিষয়': 'All topics',
+  'যা করবেন': 'Do', 'যা করবেন না': "Don't", 'রাতে দরকার হতে পারে': 'May be needed at night', 'সকালের দরকারি সেবা': 'Useful this morning', 'এখন দরকারি সেবা': 'Useful now', 'সন্ধ্যার দরকারি সেবা': 'Useful this evening',
+  'নম্বরগুলো শুধু এই ফোনে থাকে, কোথাও পাঠানো হয় না। SMS-এর সাধারণ খরচ লাগতে পারে': 'The numbers stay only on this phone and are never uploaded. Normal SMS charges may apply',
+  'এগুলো প্রাথমিক সাহায্য, চিকিৎসার বিকল্প নয়': 'This is first aid, not a substitute for medical care',
   'কণ্ঠে খুঁজুন': 'Voice search', 'বলুন… (যেমন: হাসপাতাল': 'Speak… (e.g. hospital', 'কিছু শোনা যায়নি, আবার চেষ্টা করুন': "Didn't catch that, please try again", 'কণ্ঠে খোঁজা যায়নি, আবার চেষ্টা করুন': "Voice search didn't work, please try again",
   'মাইক্রোফোনের অনুমতি দিন': 'Allow the microphone', 'ইন্টারনেট নেই · {n} তারিখে সেভ করা তালিকা দেখাচ্ছেন। কল করা যাবে': 'No internet · showing the list saved on {n}. You can still call',
   'ইন্টারনেট নেই, আর আগে সেভ করা কোনো তালিকাও নেই। নেট চালু করে একবার খুললে পরের বার নেট ছাড়াও দেখা যাবে': 'No internet and no saved list yet. Open it once with internet and next time it will work offline',

@@ -3892,12 +3892,13 @@ const SVC_IC = {
   gents: '<circle cx="6" cy="6.5" r="2.5"/><circle cx="6" cy="17.5" r="2.5"/><path d="M8.2 7.8L20 17M8.2 16.2L20 7"/>',
   band: '<ellipse cx="12" cy="8" rx="8" ry="3"/><path d="M4 8v8c0 1.7 3.6 3 8 3s8-1.3 8-3V8M8 3l3 4M16 3l-3 4"/>',
   near: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22"/>',
+  aid: '<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M9 6V4h6v2M12 10v6M9 13h6"/>',
   fav: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
   all: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><path d="M17 13.5v7M13.5 17h7"/>',
 };
 // [শিরোনাম, রং, কী-গুলো]
 const SVC_GROUPS = [
-  ['জরুরি সেবা', '#d92d3a', ['sos', 'fire', 'police', 'amb', 'blood']],
+  ['জরুরি সেবা', '#d92d3a', ['sos', 'aid', 'fire', 'police', 'amb', 'blood']],
   ['সরকারি ও প্রশাসন', '#0f8a5f', ['upz', 'pouro', 'union', 'gov', 'voter', 'office', 'kazi']],
   ['স্বাস্থ্য', '#d6336c', ['health', 'doc', 'gym']],
   ['শিক্ষা ও পেশাজীবী', '#2f6fe0', ['edu', 'tutor', 'lawyer', 'press', 'it', 'graphics', 'video']],
@@ -4018,13 +4019,186 @@ function popCatsHtml() {
   const name = k => k === 'sos' ? 'জরুরি নম্বর' : cats.find(c => c[0] === k)[1];
   return `<h3 class="svc-sec" style="--c:#e8590c"><i></i>🔥 জনপ্রিয় ক্যাটাগরি</h3><div class="svc-grid pop-cats">${top.map(k => `<button class="svc-tile" data-svc="${k}">${svcIc(k, 22)}<span class="st-n">${esc(name(k))}</span></button>`).join('')}</div>`;
 }
+// ---------- সময় বুঝে দরকারি সেবা ও আজকের দিনের নোটিশ
+// সরকারি ছুটি (জনপ্রশাসন মন্ত্রণালয়ের প্রজ্ঞাপন; * = চাঁদ দেখার ওপর নির্ভর, তারিখ বদলাতে পারে)
+const GOV_HOLIDAYS = {
+  '2026-12-16': 'বিজয় দিবস', '2026-12-25': 'বড়দিন',
+  '2027-01-24': 'শবে বরাত*', '2027-02-21': 'শহীদ দিবস ও আন্তর্জাতিক মাতৃভাষা দিবস', '2027-03-05': 'জুমাতুল বিদা', '2027-03-07': 'শবে কদর*',
+  '2027-03-08': 'ঈদুল ফিতরের ছুটি*', '2027-03-09': 'ঈদুল ফিতরের ছুটি*', '2027-03-10': 'ঈদুল ফিতর*', '2027-03-11': 'ঈদুল ফিতরের ছুটি*', '2027-03-12': 'ঈদুল ফিতরের ছুটি*',
+  '2027-03-26': 'স্বাধীনতা ও জাতীয় দিবস', '2027-04-14': 'বাংলা নববর্ষ', '2027-05-01': 'মে দিবস',
+  '2027-05-15': 'ঈদুল আজহার ছুটি*', '2027-05-16': 'ঈদুল আজহার ছুটি*', '2027-05-17': 'ঈদুল আজহা*', '2027-05-18': 'ঈদুল আজহার ছুটি*', '2027-05-19': 'ঈদুল আজহার ছুটি*', '2027-05-20': 'বুদ্ধ পূর্ণিমা ও ঈদুল আজহার ছুটি*',
+  '2027-06-16': 'আশুরা*', '2027-08-05': 'জুলাই গণঅভ্যুত্থান দিবস', '2027-08-15': 'ঈদে মিলাদুন্নবী (সা.)*', '2027-08-25': 'জন্মাষ্টমী',
+  '2027-10-09': 'দুর্গাপূজা (নবমী)', '2027-10-10': 'বিজয়া দশমী', '2027-11-07': 'জাতীয় বিপ্লব ও সংহতি দিবস', '2027-12-16': 'বিজয় দিবস', '2027-12-25': 'বড়দিন',
+};
+const dkKey = d => { const t = dhakaParts(d); return `${t.year}-${String(t.mon + 1).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`; };
+const hName = n => n.replace('*', ' (চাঁদ দেখার ওপর নির্ভর)');
+function todayInfo() {
+  const now = new Date(), t = dhakaParts(now), hol = GOV_HOLIDAYS[dkKey(now)], weekend = t.wd === 5 || t.wd === 6;
+  return { t, hol, closed: !!hol || weekend, weekend };
+}
+function dayNoticeHtml() {
+  const { t, hol, weekend } = todayInfo();
+  let msg = '', cls = '';
+  if (hol) { msg = `🏖️ আজ সরকারি ছুটি: <b>${esc(hName(hol))}</b>। সরকারি অফিস ও ব্যাংক বন্ধ।`; cls = ' hol'; }
+  else if (weekend) msg = `📅 আজ ${esc(BN_WD[t.wd])}, সাপ্তাহিক ছুটি: সরকারি অফিস ও ব্যাংক বন্ধ।`;
+  else {
+    for (let i = 1; i <= 7; i++) {   // সামনের ৭ দিনের মধ্যে ছুটি থাকলে আগেই জানাই
+      const d = new Date(Date.now() + i * 864e5), h = GOV_HOLIDAYS[dkKey(d)];
+      if (h) { const p = dhakaParts(d); msg = `📅 ${i === 1 ? 'আগামীকাল' : `${bn(p.day)} ${BN_MON[p.mon]} (${BN_WD[p.wd]})`} সরকারি ছুটি: <b>${esc(hName(h))}</b>`; break; }
+    }
+    if (!msg && t.h >= 8 && t.h < 17) msg = '🏢 আজ সরকারি অফিস খোলা · সাধারণত সকাল ৯টা থেকে বিকেল ৫টা';
+  }
+  return msg ? `<div class="day-note${cls}">${msg}</div>` : '';
+}
+// দিনের কোন সময়ে কোন সেবা বেশি দরকার হয়
+function timeSuggestHtml() {
+  const { t, closed } = todayInfo(), h = t.h, cats = svcCats();
+  let title, keys;
+  if (h >= 21 || h < 6) { title = '🌙 রাতে দরকার হতে পারে'; keys = ['amb', 'health', 'doc', 'police', 'fire', 'blood']; }
+  else if (h < 11) { title = '🌅 সকালের দরকারি সেবা'; keys = ['doc', 'health', 'edu', 'bank', 'office', 'courier']; }
+  else if (h < 17) { title = '☀️ এখন দরকারি সেবা'; keys = ['office', 'bank', 'gov', 'upz', 'courier', 'shop', 'fix']; }
+  else { title = '🌆 সন্ধ্যার দরকারি সেবা'; keys = ['food', 'shop', 'doc', 'gents', 'ladies', 'gym']; }
+  if (closed) keys = keys.filter(k => !['bank', 'office', 'gov', 'upz'].includes(k)).concat(['shop', 'food', 'fix', 'doc']);
+  keys = [...new Set(keys)].filter(k => cats.some(c => c[0] === k)).slice(0, 5);
+  return `<h3 class="svc-sec" style="--c:#5f3dc4"><i></i>${title}</h3><div class="svc-grid pop-cats">${keys.map(k => `<button class="svc-tile" data-svc="${k}">${svcIc(k, 22)}<span class="st-n">${esc(cats.find(c => c[0] === k)[1])}</span></button>`).join('')}</div>`;
+}
+
+// ---------- 🆘 বিপদে আছি: লোকেশনসহ মেসেজ পরিচিতজনদের কাছে
+// নম্বরগুলো শুধু এই ফোনে থাকে, কোথাও পাঠানো হয় না
+const sosContacts = () => (local.get('sos_contacts', []) || []).filter(c => c && c.phone);
+const isIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent);
+function sosLocate() {
+  return new Promise(res => {
+    if (!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude.toFixed(6), lng: p.coords.longitude.toFixed(6) }), () => res(null), { enableHighAccuracy: true, timeout: 9000, maximumAge: 60000 });
+  });
+}
+function sosText(loc) {
+  const t = dhakaParts(new Date());
+  return `জরুরি! আমি বিপদে আছি, এখনই সাহায্য দরকার।\n${loc ? `আমার অবস্থান: https://maps.google.com/?q=${loc.lat},${loc.lng}` : 'আমার অবস্থান পাওয়া যায়নি, ফোন করুন।'}\nসময়: ${hm(t.h + t.m / 60)}\n(আমার উপজেলা অ্যাপ থেকে পাঠানো)`;
+}
+function sosSms(nums, body) { const sep = isIOS() ? ',' : ';'; return `sms:${nums.join(sep)}${isIOS() ? '&' : '?'}body=${encodeURIComponent(body)}`; }
+function openUrl(u) { const a = document.createElement('a'); a.href = u; a.rel = 'noopener'; if (/^https?:/.test(u)) a.target = '_blank'; document.body.append(a); a.click(); a.remove(); }
+function sosSheet() {
+  const cs = sosContacts();
+  openSheet(`<div class="sos-sheet"><div class="sos-ic">🆘</div><h2>বিপদে আছেন?</h2>
+    ${cs.length ? `<p class="mut">নিচের বাটনে চাপলে আপনার লোকেশনসহ মেসেজ লেখা হয়ে যাবে: ${cs.map(c => `<b>${esc(c.name || c.phone)}</b>`).join(', ')}। আপনি শুধু "পাঠান" চাপবেন।</p>
+      <button class="btn wide sos-go" id="sos-sms">📍 লোকেশনসহ SMS পাঠান</button>
+      <button class="btn ghost wide" id="sos-wa" style="margin-top:8px">💬 WhatsApp-এ লোকেশন পাঠান</button>
+      <div class="sos-calls">${cs.map((c, i) => `<a class="sos-call" href="tel:${esc(c.phone)}" data-sosc="${i}">📞 ${esc(c.name || c.phone)}</a>`).join('')}</div>`
+    : `<p class="mut">পরিবারের বা কাছের ২–৩ জনের নম্বর রাখুন। বিপদে এক চাপে তাদের কাছে আপনার লোকেশনসহ মেসেজ চলে যাবে।</p><button class="btn wide" id="sos-edit2">➕ পরিচিতজনের নম্বর যোগ করুন</button>`}
+    <a class="btn wide sos-999" href="tel:999">📞 ৯৯৯-এ কল করুন (পুলিশ, ফায়ার, অ্যাম্বুলেন্স)</a>
+    ${cs.length ? '<button class="link" id="sos-edit" style="margin-top:10px">✏️ পরিচিতজন বদলান</button>' : ''}
+    <p class="mut sos-note">নম্বরগুলো শুধু এই ফোনে থাকে, কোথাও পাঠানো হয় না। SMS-এর সাধারণ খরচ লাগতে পারে।</p></div>`);
+  const send = async (kind, btn) => {
+    btn.disabled = true; const old = btn.textContent; btn.textContent = '📍 লোকেশন খুঁজছি…';
+    const loc = await sosLocate(); btn.disabled = false; btn.textContent = old;
+    if (!loc) toast('লোকেশন পাওয়া যায়নি, লোকেশন ছাড়াই মেসেজ যাচ্ছে');
+    const body = sosText(loc);
+    openUrl(kind === 'wa' ? `https://wa.me/?text=${encodeURIComponent(body)}` : sosSms(sosContacts().map(c => c.phone), body));
+  };
+  $('#sos-sms')?.addEventListener('click', e => send('sms', e.currentTarget));
+  $('#sos-wa')?.addEventListener('click', e => send('wa', e.currentTarget));
+  $('#sos-edit')?.addEventListener('click', sosEditSheet);
+  $('#sos-edit2')?.addEventListener('click', sosEditSheet);
+}
+function sosEditSheet() {
+  const cs = sosContacts();
+  openSheet(`<h2>🆘 বিপদের পরিচিতজন</h2><p class="mut" style="margin-top:-4px">সর্বোচ্চ ৩ জন। যেমন মা-বাবা, ভাই-বোন বা কাছের বন্ধু।</p>
+    <form id="sos-f">${[0, 1, 2].map(i => `<div class="sos-row"><input class="f" id="sosn${i}" maxlength="30" placeholder="নাম (যেমন: আব্বু)" value="${esc(cs[i]?.name || '')}"><input class="f" id="sosp${i}" inputmode="tel" maxlength="16" placeholder="মোবাইল নম্বর" value="${esc(cs[i]?.phone || '')}"></div>`).join('')}
+    <div class="row" style="margin-top:14px"><button class="btn" style="flex:1">সংরক্ষণ</button><button class="btn ghost" type="button" data-close>বাতিল</button></div></form>`);
+  $('#sos-f').onsubmit = e => {
+    e.preventDefault();
+    const toEn = x => x.replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d)).replace(/[^\d+]/g, '');
+    const out = [];
+    for (const i of [0, 1, 2]) {
+      const name = $('#sosn' + i).value.trim(), phone = toEn($('#sosp' + i).value);
+      if (!phone && !name) continue;
+      if (!/^(\+?88)?01[3-9]\d{8}$/.test(phone)) return toast(`${bn(i + 1)} নম্বর সারির মোবাইল নম্বর ঠিক নেই (যেমন: 01712345678)`);
+      out.push({ name, phone });
+    }
+    local.set('sos_contacts', out); toast(out.length ? 'পরিচিতজন সংরক্ষণ হয়েছে' : 'সব নম্বর সরানো হয়েছে'); sosSheet();
+  };
+}
+
+// ---------- 🩹 জরুরি অবস্থায় কী করবেন (নেট ছাড়াও দেখা যায়)
+const FIRST_AID = [
+  ['snake', '🐍', 'সাপে কামড়', [
+    'আতঙ্কিত হবেন না, রোগীকে শান্ত রাখুন ও শুইয়ে দিন। বেশিরভাগ সাপ বিষধর নয়।',
+    'কামড়ানো হাত বা পা নড়াচড়া করতে দেবেন না, কাঠ বা বাঁশ দিয়ে হালকা করে বেঁধে সোজা রাখুন।',
+    'আংটি, চুড়ি, ঘড়ি, শক্ত কাপড় খুলে দিন, কারণ জায়গাটা ফুলে যেতে পারে।',
+    'যত দ্রুত সম্ভব উপজেলা স্বাস্থ্য কমপ্লেক্স বা হাসপাতালে নিন। সাপের বিষের ওষুধ (অ্যান্টিভেনম) সেখানেই পাওয়া যায়।'],
+    ['শক্ত করে বাঁধন দেবেন না', 'কাটবেন না, চুষবেন না, কিছু লাগাবেন না', 'ওঝা বা কবিরাজের কাছে নিয়ে সময় নষ্ট করবেন না']],
+  ['burn', '🔥', 'আগুনে পোড়া', [
+    'আগুন নেভান। কাপড়ে আগুন লাগলে মাটিতে গড়াগড়ি দিন বা কম্বল দিয়ে চেপে ধরুন।',
+    'পোড়া জায়গায় ২০ মিনিট ধরে কলের সাধারণ ঠান্ডা পানি ঢালুন।',
+    'আংটি, ঘড়ি ও আঁটসাঁট জিনিস দ্রুত খুলে ফেলুন, তবে চামড়ায় লেগে থাকা কাপড় টানবেন না।',
+    'পরিষ্কার পাতলা কাপড় বা প্লাস্টিক র‍্যাপ দিয়ে আলগা করে ঢেকে দিন। বড় বা মুখে পোড়া হলে দ্রুত হাসপাতালে নিন।'],
+    ['বরফ দেবেন না', 'টুথপেস্ট, ডিম, তেল, ঘি লাগাবেন না', 'ফোসকা গলাবেন না']],
+  ['drown', '🌊', 'পানিতে ডোবা', [
+    'নিজে নিরাপদ থেকে উদ্ধার করুন: লাঠি, দড়ি, গামছা বা ভাসার জিনিস এগিয়ে দিন। সাঁতার না জানলে নিজে নামবেন না।',
+    'তুলে আনার পর চিৎ করে শোয়ান। শ্বাস চলছে কিনা দেখুন।',
+    'শ্বাস না চললে সাথে সাথে বুকের মাঝখানে জোরে জোরে চাপ (মিনিটে ১০০–১২০ বার) ও মুখে শ্বাস দেওয়া শুরু করুন, আর কাউকে ৯৯৯-এ কল করতে বলুন।',
+    'শ্বাস চললে কাত করে শুইয়ে রাখুন, গা মুছে গরম রাখুন এবং হাসপাতালে নিন।'],
+    ['পেট থেকে পানি বের করতে উল্টো করে ঝোলাবেন না বা ঘোরাবেন না', 'পেটে চাপ দিয়ে সময় নষ্ট করবেন না']],
+  ['heat', '🥵', 'হিট স্ট্রোক', [
+    'রোগীকে দ্রুত ছায়া বা ঠান্ডা জায়গায় নিন।',
+    'বাড়তি কাপড় খুলে দিন। গায়ে পানি ছিটিয়ে বাতাস করুন, ঘাড়, বগল ও কুঁচকিতে ভেজা কাপড় দিন।',
+    'জ্ঞান থাকলে অল্প অল্প করে পানি বা খাবার স্যালাইন খেতে দিন।',
+    'জ্ঞান হারালে, খিঁচুনি হলে বা বিভ্রান্ত দেখালে দ্রুত হাসপাতালে নিন।'],
+    ['অজ্ঞান রোগীকে মুখে কিছু খাওয়াবেন না']],
+  ['shock', '⚡', 'বিদ্যুৎস্পৃষ্ট', [
+    'খালি হাতে রোগীকে ছোঁবেন না। আগে মেইন সুইচ বন্ধ করুন।',
+    'সুইচ বন্ধ করা না গেলে শুকনো কাঠ, বাঁশ বা প্লাস্টিক দিয়ে তার সরিয়ে দিন, নিজে শুকনো জায়গায় দাঁড়ান।',
+    'শ্বাস না চললে বুকে চাপ দেওয়া শুরু করুন এবং ৯৯৯-এ কল করুন।',
+    'আপাতত ঠিক দেখালেও হাসপাতালে নিন, কারণ ভেতরে ক্ষতি হতে পারে।'],
+    ['ভেজা হাতে বা ধাতব জিনিস দিয়ে তার সরাবেন না']],
+  ['bleed', '🩸', 'বেশি রক্তপাত', [
+    'পরিষ্কার কাপড় বা গজ দিয়ে ক্ষতের ওপর জোরে চেপে ধরুন, অন্তত ১০ মিনিট ছাড়বেন না।',
+    'কাপড় ভিজে গেলে সরাবেন না, ওপরে আরেকটা কাপড় দিয়ে চাপ দিন।',
+    'সম্ভব হলে আহত অংশ বুকের চেয়ে উঁচু করে রাখুন।',
+    'রক্ত না থামলে বা ক্ষত গভীর হলে দ্রুত হাসপাতালে নিন।'],
+    ['ক্ষতে গেঁথে থাকা জিনিস টেনে বের করবেন না', 'ক্ষতে মাটি, গোবর বা পাতা লাগাবেন না']],
+  ['faint', '😵', 'অজ্ঞান হলে / শ্বাস বন্ধ', [
+    'জোরে ডাকুন ও কাঁধে হালকা ঝাঁকুনি দিন। সাড়া না দিলে চিৎকার করে লোক ডাকুন, কাউকে ৯৯৯-এ কল করতে বলুন।',
+    'শ্বাস চলছে কিনা ১০ সেকেন্ড দেখুন।',
+    'শ্বাস চললে কাত করে শোয়ান (রিকভারি পজিশন), যাতে বমি হলে গলায় না আটকায়।',
+    'শ্বাস না চললে বুকের মাঝখানে দুই হাত রেখে জোরে ও দ্রুত চাপ দিন (মিনিটে ১০০–১২০ বার, ৫–৬ সেমি গভীর), সাহায্য না আসা পর্যন্ত থামবেন না।'],
+    ['অজ্ঞান রোগীকে পানি বা কিছু খাওয়াবেন না', 'মুখে পানি ছিটিয়ে সময় নষ্ট করবেন না']],
+  ['poison', '☠️', 'বিষ খেলে', [
+    'কী খেয়েছে, কতটুকু ও কখন, জানার চেষ্টা করুন। বোতল বা প্যাকেট সাথে রাখুন।',
+    'মুখে লেগে থাকা জিনিস মুছে দিন। কীটনাশক গায়ে লাগলে কাপড় খুলে সাবান-পানি দিয়ে ধুয়ে দিন।',
+    'রোগী অজ্ঞান হলে কাত করে শোয়ান।',
+    'এক মুহূর্ত দেরি না করে হাসপাতালে নিন।'],
+    ['জোর করে বমি করাবেন না', 'দুধ, ডিম, লবণ-পানি খাওয়াবেন না (ডাক্তার না বললে)']],
+];
+function aidSheet(id) {
+  const x = id && FIRST_AID.find(f => f[0] === id);
+  if (!x) {
+    openSheet(`<h2>🩹 জরুরি অবস্থায় কী করবেন</h2><p class="mut" style="margin-top:-4px">হাসপাতালে নেওয়ার আগে প্রথমে কী করবেন। নেট ছাড়াও দেখা যায়।</p>
+      <div class="aid-grid">${FIRST_AID.map(f => `<button class="aid-tile" data-aid="${f[0]}"><span class="aid-e">${f[1]}</span><span>${esc(f[2])}</span></button>`).join('')}</div>
+      <a class="btn wide sos-999" href="tel:999">📞 ৯৯৯-এ কল করুন</a><p class="mut sos-note">এগুলো প্রাথমিক সাহায্য, চিকিৎসার বিকল্প নয়। সবসময় দ্রুত ডাক্তার বা হাসপাতালে যোগাযোগ করুন।</p>`);
+    return;
+  }
+  openSheet(`<button class="link aid-back" data-aid="">← সব বিষয়</button><h2>${x[1]} ${esc(x[2])}</h2>
+    <h3 class="aid-h ok">✅ যা করবেন</h3><ol class="aid-steps">${x[3].map(s => `<li>${esc(s)}</li>`).join('')}</ol>
+    <h3 class="aid-h no">❌ যা করবেন না</h3><ul class="aid-no">${x[4].map(s => `<li>${esc(s)}</li>`).join('')}</ul>
+    <a class="btn wide sos-999" href="tel:999">📞 ৯৯৯-এ কল করুন</a><p class="mut sos-note">এগুলো প্রাথমিক সাহায্য, চিকিৎসার বিকল্প নয়।</p>`);
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-aid]'); if (a && a.closest('#sheet')) return aidSheet(a.dataset.aid);
+  if (e.target.closest('[data-sos]')) return sosSheet();
+});
 function renderSvcGrid(list) {
   const n = k => list.filter(x => x.category === k).length;
-  const total = list.length, cats = svcCats(), has = k => k === 'sos' || cats.some(c => c[0] === k);
-  const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : c[1], cnt = k === 'sos' || SVC_SPECIAL[k] ? 0 : n(k);
+  const total = list.length, cats = svcCats(), has = k => k === 'sos' || k === 'aid' || cats.some(c => c[0] === k);
+  const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : k === 'aid' ? 'প্রাথমিক চিকিৎসা' : c[1], cnt = k === 'sos' || k === 'aid' || SVC_SPECIAL[k] ? 0 : n(k);
     return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
   const favs = list.filter(x => S.svcFav?.has(x.id));
   $('#dir').innerHTML = `<div class="svc-hero"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div>`
+    + dayNoticeHtml()
+    + `<div class="sos-row2"><button class="sos-btn" data-sos>🆘 বিপদে আছি</button><button class="aid-btn" data-svc="aid">🩹 প্রাথমিক চিকিৎসা</button></div>`
+    + timeSuggestHtml()
     + popCatsHtml()
     + `<button class="near-card" data-svc="near">${svcIc('near', 24)}<span><b>আমার কাছের সেবা</b><small>লোকেশন দিলে কাছের হাসপাতাল, ডাক্তার, ব্যাংক দূরত্বসহ দেখাবে</small></span><span class="near-go">›</span></button>`
     + (favs.length ? `<h3 class="svc-sec" style="--c:#e0245e"><i></i>❤️ আমার প্রিয় সেবা <button class="svc-more" data-svc="fav">সব দেখুন</button></h3>${favs.slice(0, 3).map(svcCard).join('')}` : '')
@@ -4099,6 +4273,7 @@ async function loadDir() {
   }
 }
 function openSvcCat(k) {
+  if (k === 'aid') return aidSheet();
   if (k && k !== 'near' && k !== 'fav') { S.catSeen = S.catSeen || new Set(); if (!S.catSeen.has(k)) { S.catSeen.add(k); S.api.serviceCatVisit(k).catch(() => {}); } }   // একই সেশনে একবারই গোনা
   const sp = SVC_SPECIAL[k];
   if (sp && sp !== 'blood') {   // ক্রয়বিক্রয় ও চাকরি: ফিডের সেই ধরনের পোস্ট; Back চাপলে ডিরেক্টরির একই জায়গায় ফেরা

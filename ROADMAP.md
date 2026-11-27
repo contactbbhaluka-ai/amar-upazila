@@ -37,3 +37,9 @@
 
 ## Play Store-এ প্রকাশের পরে
 ফোনের ব্রাউজারে ওয়েবসাইট খুললে উপরে ছোট বার: "আমার উপজেলা অ্যাপ নামান, Play Store" (অ্যাপের ভেতরে দেখাবে না)
+
+## রিলিজের আগে (লগইন)
+- Supabase → Authentication → Sign In / Providers → Email → "Confirm email" আবার চালু করা (টেস্টিংয়ে বন্ধ)
+- Brevo (ফ্রি, দিনে ৩০০ ইমেইল) বা অন্য SMTP বসানো: Authentication → Emails → SMTP Settings; তারপর Rate Limits-এ ইমেইলের সীমা বাড়ানো
+- "Confirm signup" ও "Reset Password" টেমপ্লেটে {{ .Token }} যোগ করা, যাতে ৬ সংখ্যার কোড যায় (অ্যাপের কোডের পাতা তৈরি আছে)
+- পরে চাইলে দেশি SMS কোম্পানি দিয়ে মোবাইল OTP (Supabase Send SMS Hook)

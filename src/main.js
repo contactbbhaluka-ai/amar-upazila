@@ -4287,18 +4287,13 @@ function unionPage(s, imgs, admin) {
   const svcs = (S.svcAll || []).filter(x => !['famous', 'tour', 'union', 'upz', 'pouro', 'shop', 'edu'].includes(x.category) && inArea(x, s));
   const edus = (S.svcAll || []).filter(x => x.category === 'edu' && inArea(x, s)), eduCnt = t => edus.filter(x => eduType(x) === t).length;
   const sc = unionScore(s);
-  const emg = [...ph.map(p => [p.l === 'ফোন' ? 'ইউনিয়ন পরিষদ' : p.l, p.n, '🏛️']),
-    ...cn.filter(c => c.p && /সচিব|উদ্যোক্তা|গ্রাম পুলিশ|দফাদার|চৌকিদার/.test(c.r || '')).map(c => [`${c.r}: ${c.n}`, c.p, '👤']),
-    ...(S.svcAll || []).filter(x => x.category === 'health' && inArea(x, s)).slice(0, 3).flatMap(x => phoneList(x).slice(0, 1).map(p => [x.name, p.n, '🏥'])),
-    ...['police', 'fire'].flatMap(c => { const x = (S.svcAll || []).filter(y => y.category === c).sort((p, q) => phoneList(q).length - phoneList(p).length)[0]; return x ? phoneList(x).slice(0, 1).map(p => [x.name, p.n, c === 'police' ? '👮' : '🚒']) : []; }),
-    ['জাতীয় জরুরি সেবা', '999', '🚨'], ['স্বাস্থ্য বাতায়ন', '16263', '🩺'], ['নারী ও শিশু নির্যাতন প্রতিরোধ', '109', '🛡️'], ['সরকারি তথ্য ও সেবা', '333', 'ℹ️']];
   const site = s.url && !/beautifulbhaluka/.test(s.url) ? s.url : '';
   const dsecs = [...det.matchAll(/^## (.+)$/gm)].map(m => m[1]);
   const all = S.svcAll || [], others = all.filter(x => x.category === 'union' && x.id !== s.id).sort((a, b) => unionNo(a) - unionNo(b));
   const upz = all.find(x => x.category === 'upz'), pouro = all.find(x => x.category === 'pouro');
   const fam = all.filter(x => x.category === 'famous' && inArea(x, s)), tour = all.filter(x => x.category === 'tour' && inArea(x, s));
   const chair = cn.find(c => /চেয়ারম্যান/.test(c.r || ''));
-  const toc = [f.length ? ['us-f', 'এক নজরে'] : null, ['us-e', 'জরুরি নম্বর'], ['us-w', 'ওয়ার্ড খুঁজুন'], ['us-v', 'সেবা ও কাগজপত্র'], ['us-c', 'ইউনিয়ন পরিষদ'], ...dsecs.map((t, i) => ['us-d' + i, t]), hats.length ? ['us-h', 'হাটবার'] : null, ex.length ? ['us-x', 'সাবেক চেয়ারম্যান'] : null, ['us-k', 'তুলনা'], ['us-m', 'মানচিত্র'], ['us-i', 'এলাকার সমস্যা'], edus.length ? ['us-ed', 'শিক্ষা প্রতিষ্ঠান'] : null, svcs.length ? ['us-s', 'সেবা ও প্রতিষ্ঠান'] : null, fam.length ? ['us-p', 'বিশেষ ব্যক্তিবর্গ'] : null, tour.length ? ['us-t', 'দর্শনীয় স্থান'] : null, others.length ? ['us-o', 'অন্যান্য ইউনিয়ন'] : null].filter(Boolean);
+  const toc = [f.length ? ['us-f', 'এক নজরে'] : null, ['us-w', 'ওয়ার্ড খুঁজুন'], ['us-v', 'সেবা ও কাগজপত্র'], ['us-c', 'ইউনিয়ন পরিষদ'], ...dsecs.map((t, i) => ['us-d' + i, t]), hats.length ? ['us-h', 'হাটবার'] : null, ex.length ? ['us-x', 'সাবেক চেয়ারম্যান'] : null, ['us-k', 'তুলনা'], ['us-m', 'মানচিত্র'], ['us-i', 'এলাকার সমস্যা'], edus.length ? ['us-ed', 'শিক্ষা প্রতিষ্ঠান'] : null, svcs.length ? ['us-s', 'সেবা ও প্রতিষ্ঠান'] : null, fam.length ? ['us-p', 'বিশেষ ব্যক্তিবর্গ'] : null, tour.length ? ['us-t', 'দর্শনীয় স্থান'] : null, others.length ? ['us-o', 'অন্যান্য ইউনিয়ন'] : null].filter(Boolean);
   return `<div class="ip up" style="--sc:${svcColor(s.category)}">
     <div class="up-bar"><button class="up-x" data-close aria-label="বন্ধ করুন">✕</button><span>${esc(short)}</span>${admin ? '<button class="ip-btn" data-sdedit>✏️ সম্পাদনা</button>' : ''}</div>
     ${imgs.length ? `<div class="ip-hero"><img src="${esc(imgs[0])}" alt="" data-sdzoom="0" onerror="this.parentNode.remove()">${imgs.length > 1 ? `<span class="up-cnt">🖼️ ${bn(imgs.length)}টি ছবি</span>` : ''}</div>` : ''}
@@ -4314,7 +4309,6 @@ function unionPage(s, imgs, admin) {
     ${admin ? '<div class="sd-reps"></div>' : ''}
     <div class="sdet-body ip-body">
       ${f.length ? `<section class="dsec" id="us-f"><h3>এক নজরে</h3><div class="u-tiles">${f.map(x => `<div><b>${esc(String(x.v))}</b><small>${esc(x.k)}</small></div>`).join('')}</div></section>` : ''}
-      <section class="dsec" id="us-e"><h3>জরুরি নম্বর</h3><div class="ue-grid">${emg.map(([l, n, ic]) => `<a class="ue" href="tel:${esc(telOf(n))}"><span>${ic}</span><div><small>${esc(l)}</small><b>${esc(bn(n))}</b></div></a>`).join('')}</div></section>
       <section class="dsec wf" id="us-w"><h3>কোন ওয়ার্ড, কোন মেম্বার?</h3>
         ${villages.length ? `<input class="f wf-in" list="wf-dl" placeholder="🔍 আপনার গ্রামের নাম লিখুন" autocomplete="off"><datalist id="wf-dl">${villages.map(v => `<option value="${esc(v)}">`).join('')}</datalist>` : ''}
         <div class="wf-chips"><small>${villages.length ? 'অথবা ওয়ার্ড বাছুন' : 'ওয়ার্ড বাছুন'}</small>${wardAll.map(w => `<button data-ward="${w}">${bn(w)}</button>`).join('')}</div>

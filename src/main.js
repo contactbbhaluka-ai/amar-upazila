@@ -4205,17 +4205,16 @@ function wxMsg(w) {
 }
 function dirHeroWx(w) {
   const el = $('#dh-wx'), msg = $('#dh-msg'); if (!el) return;
-  if (!w) { el.innerHTML = ''; msg.textContent = S.wxErr ? 'আবহাওয়ার তথ্য এখন আনা যায়নি' : ''; msg.hidden = !msg.textContent; return; }
+  if (!w) { el.innerHTML = ''; msg.textContent = S.wxErr ? 'আবহাওয়ার তথ্য এখন আনা যায়নি' : ''; msg.hidden = !msg.textContent; $('#dir-hero .dh-wxrow').hidden = !msg.textContent; return; }
   const [ico, name] = WX[w.code] || ['🌡️', ''];
-  el.innerHTML = `<span class="dh-ico">${ico}</span><span class="dh-temp">${bn(w.temp)}°</span><small>${esc(name)}</small>`;
+  el.innerHTML = `<span class="dh-ico">${ico}</span><span class="dh-temp">${bn(w.temp)}°</span><small>${esc(name)}</small>`; $('#dir-hero .dh-wxrow').hidden = false;
   msg.textContent = wxMsg(w); msg.hidden = !msg.textContent;
 }
 function dirHeroHtml(total, cats) {
   const now = new Date(), t = dhakaParts(now), bd = banglaDate(t);
-  const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)} বঙ্গাব্দ`;
-  return `<div class="dir-hero" id="dir-hero"><div class="dh-top"><div class="dh-date"><b>${esc(BN_WD[t.wd])}</b><span>${esc(son)}</span><small>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</small></div>
-      <button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ"></button></div>
-    <div class="dh-msg" id="dh-msg" hidden></div>
+  const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)}`;
+  return `<div class="dir-hero" id="dir-hero"><div class="dh-date"><b>${esc(BN_WD[t.wd])}</b><i>·</i><span>${esc(son)}</span><i>·</i><span>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</span></div>
+    <div class="dh-wxrow"><button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ"></button><div class="dh-msg" id="dh-msg" hidden></div></div>
     <div class="dh-bot"><div><b>${esc(HOME_UPAZILA)}র সব সেবা এক জায়গায়</b><small>${bn(cats.length)}টি ধরন · মোট ${bn(total)}টি সেবা যুক্ত</small></div><a class="svc-999" href="tel:999" aria-label="৯৯৯-এ কল করুন">📞 ৯৯৯</a></div></div>`;
 }
 function sliderHtml(total, cats) {

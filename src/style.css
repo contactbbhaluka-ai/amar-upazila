@@ -1758,3 +1758,8 @@ html.nav-restore main::before{content:'';display:block;height:120px;border-radiu
 .dh-msg{margin:10px 0 0;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.15);font-size:13.5px}
 .dh-bot{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.25)}.dh-bot div{flex:1;display:flex;flex-direction:column}.dh-bot b{font-size:14.5px}.dh-bot small{font-size:12.5px;opacity:.9}
 .ds-add{display:block;width:100%;margin:10px 0 0;padding:10px;border:1px dashed var(--line);border-radius:14px;background:none;color:var(--g);font:inherit;font-weight:700;cursor:pointer}
+
+.dir-hero .dh-date{display:flex;align-items:baseline;gap:6px;white-space:nowrap;overflow:hidden;font-size:min(15px,4.1vw);flex-direction:row}
+.dir-hero .dh-date b{font-size:1.12em}.dir-hero .dh-date span{font-weight:600;font-size:1em}.dir-hero .dh-date i{font-style:normal;opacity:.7}
+.dh-wxrow{display:flex;align-items:stretch;gap:8px;margin-top:10px}.dh-wxrow .dh-wx{flex-direction:row;gap:6px;align-items:center;padding:8px 10px;min-width:0}
+.dh-wxrow .dh-wx small{white-space:nowrap}.dh-wxrow .dh-msg{flex:1;margin:0;display:flex;align-items:center}

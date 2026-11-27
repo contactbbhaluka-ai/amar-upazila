@@ -2394,3 +2394,28 @@ details.sv[open]>summary{background:color-mix(in srgb,var(--sc) 7%,var(--card))}
 .ht-days span.td{background:#f59e0b;color:#fff}
 .sub-chips.ht-af{flex-wrap:wrap;overflow:visible}
 .ht-flab{width:100%;font-size:12.5px;font-weight:700;color:var(--mut);margin-bottom:-1px}
+
+/* হাট কার্ড: প্রিমিয়াম নকশা */
+.card.svc.svc-hat{display:block;padding:0;overflow:hidden;border-radius:20px;border:1px solid color-mix(in srgb,var(--ink) 7%,transparent);background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.05),0 6px 18px -8px rgba(0,0,0,.18);transition:transform .15s ease,box-shadow .2s ease}
+.card.svc.svc-hat:active{transform:scale(.985)}
+.svc-hat.today{background:var(--card)}
+.hc-top{position:relative;height:92px;background:radial-gradient(circle at 85% -20%,rgba(255,255,255,.35),transparent 55%),linear-gradient(135deg,var(--g1),var(--g2));overflow:hidden}
+.hc-top::after{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.18) 1.2px,transparent 1.3px);background-size:14px 14px;opacity:.6}
+.hc-top.img{height:140px}.hc-top.img::after{background:linear-gradient(180deg,rgba(0,0,0,.05) 30%,rgba(0,0,0,.55));opacity:1}
+.hc-top img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.hc-emo{position:absolute;right:14px;bottom:-10px;font-size:62px;line-height:1;filter:drop-shadow(0 4px 10px rgba(0,0,0,.25));transform:rotate(-8deg);z-index:1}
+.hc-top.img .hc-emo{display:none}
+.hc-area{position:absolute;left:12px;top:11px;z-index:2;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;background:rgba(0,0,0,.22);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.hc-st{position:absolute;left:12px;bottom:11px;z-index:2;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12.5px;font-weight:800;background:#fff;color:#1f2937;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+.hc-st.today{color:#c2410c}.hc-st.live{background:#dc2626;color:#fff}.hc-st.tomorrow{color:#b45309}.hc-st.season{color:#6d28d9}
+.hc-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:hcPulse 1.4s ease-in-out infinite}
+@keyframes hcPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.8)}50%{box-shadow:0 0 0 5px rgba(255,255,255,0)}}
+.hc-body{padding:12px 14px 14px}
+.hc-tt{display:flex;align-items:center;gap:8px}.hc-tt h3{flex:1;margin:0;font-size:16.5px;font-weight:800;letter-spacing:.1px}
+.hc-type{flex:0 0 auto;font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;color:var(--g2);background:color-mix(in srgb,var(--g1) 14%,var(--card))}
+.hc-addr{margin:3px 0 0;font-size:12.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hc-days{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:11px}
+.hc-days span{min-width:44px;text-align:center;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:11px;background:color-mix(in srgb,var(--g1) 11%,var(--card));color:var(--ink);border:1px solid color-mix(in srgb,var(--g1) 22%,var(--line))}
+.hc-days span.td{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;border-color:transparent;box-shadow:0 3px 8px -2px color-mix(in srgb,var(--g2) 60%,transparent)}
+.hc-days small{margin-left:auto;font-size:11.5px;color:var(--mut)}
+.svc-hat .ht-notice{margin-top:10px}

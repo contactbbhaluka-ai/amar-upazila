@@ -4221,18 +4221,21 @@ async function loadHatX(force) { if (S.hatX && !force) return; try { S.hatX = aw
 const hatUnion = x => (S.svcAll || []).find(u => u.category === 'union' && inArea(x, u)) || ((S.svcAll || []).find(u => u.category === 'pouro' && inArea(x, u)));
 function myAreaRow() { const u = me()?.unionId; return u ? (S.svcAll || []).find(x => (x.category === 'union' || x.category === 'pouro') && x.union_id === u) : null; }
 const weekStrip = (days, today) => `<div class="hw">${DAY_SHORT.map((d, i) => `<span class="${days.includes(i) ? 'on' : ''}${i === today ? ' td' : ''}">${d}</span>`).join('')}</div>`;
+const HAT_LOOK = { weekly: ['#f59e0b', '#ea580c', '🧺'], daily: ['#14b8a6', '#0f766e', '🛒'], cattle: ['#65a30d', '#3f6212', '🐄'], fish: ['#38bdf8', '#1d4ed8', '🐟'], seasonal: ['#a855f7', '#6d28d9', '🐂'] };
 const svcHatCard = s => {
-  const sub = subsOf('shop').find(x => x[0] === s.subtype), nh = nextHat(s), days = hatDaysOf(s), u = hatUnion(s), wd = dhakaParts(new Date()).wd, ph = phoneList(s);
-  const g = (s.goods || []).map(k => GOODS.find(x => x[0] === k)).filter(Boolean);
-  return `<article class="card svc svc-hat${nh?.k === 'today' ? ' today' : ''}" style="--sc:${svcColor(s.category)};--i:${TI()}" data-svcdet="${esc(s.id)}">
-    <div class="ht-h">${s.image_url ? `<img class="ht-img" src="${esc(s.image_url)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="ht-ic">${sub ? sub[2] : '🛒'}</span>`}
-      <div class="ht-t"><h3>${esc(s.name)}</h3><p>${u ? `<b>${esc(areaCore(u))}${u.category === 'pouro' ? '' : ' ইউনিয়ন'}</b> · ` : ''}${esc(s.address || '')}</p>${sub ? `<small>${esc(sub[1])}</small>` : ''}</div></div>
-    ${nh ? `<div class="ht-next ${nh.k}${nh.live ? ' live' : ''}">${nh.k === 'today' ? '🛒' : nh.k === 'daily' ? '🔁' : '📅'} ${esc(nh.label)}</div>` : ''}
-    ${hatNotices(s.id).filter(n => n.on_date <= dhakaYmd(10) || (n.new_date && n.new_date <= dhakaYmd(10))).map(n => `<div class="ht-notice ${n.kind}">${n.kind === 'closed' ? '⚠️' : '↪️'} ${esc(noticeText(n))}</div>`).join('')}
-    ${s.subtype === 'seasonal' && (s.season_from || s.season_to) ? `<div class="ht-next season">🕌 ${hatDate(s.season_from)}${s.season_to ? ` – ${hatDate(s.season_to)}` : ''}</div>` : ''}
-    ${days.length ? `<div class="ht-days"><small>হাটবার</small>${days.map(d => `<span${d === wd ? ' class="td"' : ''}>${DAY_SHORT[d]}</span>`).join('')}</div>` : ''}
-    ${s.verified === false ? `<div class="ht-pend">⏳ যাচাইয়ের অপেক্ষায়${me()?.admin ? `<button class="btn sm" data-verify="${esc(s.id)}">✔ যাচাই করুন</button>` : ' · শুধু আপনি দেখছেন'}</div>` : ''}
-    <div class="of-foot ht-foot">${ph[0] ? `<a class="of-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}">📞</a>` : ''}<a class="of-map" href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ' + (s.address || 'ভালুকা'))}`}" target="_blank" rel="noopener" aria-label="পথ">🧭</a></div></article>`;
+  const sub = subsOf('shop').find(x => x[0] === s.subtype), nh = nextHat(s), days = hatDaysOf(s), u = hatUnion(s), wd = dhakaParts(new Date()).wd;
+  const lk = HAT_LOOK[s.subtype] || HAT_LOOK.weekly, ns = hatNotices(s.id).filter(n => n.on_date <= dhakaYmd(10) || (n.new_date && n.new_date <= dhakaYmd(10)));
+  const st = s.subtype === 'seasonal' && (s.season_from || s.season_to) ? ['season', `🕌 ${hatDate(s.season_from)}${s.season_to ? ` – ${hatDate(s.season_to)}` : ''}`]
+    : nh ? [nh.k + (nh.live ? ' live' : ''), `${nh.live ? '<i class="hc-dot"></i>' : nh.k === 'today' ? '🛒 ' : nh.k === 'daily' ? '🔁 ' : '📅 '}${esc(nh.label)}`] : null;
+  return `<article class="card svc svc-hat${nh?.k === 'today' ? ' today' : ''}" style="--g1:${lk[0]};--g2:${lk[1]};--i:${TI()}" data-svcdet="${esc(s.id)}">
+    <div class="hc-top${s.image_url ? ' img' : ''}">${s.image_url ? `<img src="${esc(s.image_url)}" alt="" loading="lazy" onerror="this.parentNode.classList.remove('img');this.remove()">` : ''}<span class="hc-emo">${lk[2]}</span>
+      ${u ? `<span class="hc-area">📍 ${esc(areaCore(u))}${u.category === 'pouro' ? ' পৌরসভা' : ''}</span>` : ''}
+      ${st ? `<span class="hc-st ${st[0]}">${st[1]}</span>` : ''}</div>
+    <div class="hc-body"><div class="hc-tt"><h3>${esc(s.name)}</h3>${sub ? `<span class="hc-type">${esc(sub[1])}</span>` : ''}</div>
+      ${s.address ? `<p class="hc-addr">${esc(s.address)}</p>` : ''}
+      ${days.length ? `<div class="hc-days">${days.map(d => `<span${d === wd ? ' class="td"' : ''}>${DAY_SHORT[d]}</span>`).join('')}<small>${days.length === 1 ? 'সাপ্তাহিক' : `সপ্তাহে ${bn(days.length)} দিন`}</small></div>` : ''}
+      ${ns.map(n => `<div class="ht-notice ${n.kind}">${n.kind === 'closed' ? '⚠️' : '↪️'} ${esc(noticeText(n))}</div>`).join('')}
+      ${s.verified === false ? `<div class="ht-pend">⏳ যাচাইয়ের অপেক্ষায়${me()?.admin ? `<button class="btn sm" data-verify="${esc(s.id)}">✔ যাচাই করুন</button>` : ' · শুধু আপনি দেখছেন'}</div>` : ''}</div></article>`;
 };
 // হাট বাজার ক্যাটাগরির উপরের অংশ: আজকের হাট, মৌসুমি হাট, পণ্য ও এলাকা ফিল্টার
 function hatTop(all) {

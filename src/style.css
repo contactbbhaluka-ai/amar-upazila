@@ -2244,3 +2244,6 @@ details.dacc[open]>summary{border-bottom:1px solid var(--line)}
 .up .cn{margin-top:4px}.cn-cap{padding:10px 12px 0;font-weight:700;font-size:14px}
 .up .dacc .cn{border:1px solid var(--line);border-radius:14px}
 .up .ip-links{padding:0 2px}
+.up-src{margin:14px 4px 4px;font-size:12.5px;color:var(--mut);line-height:1.6;word-break:break-word}
+.dsrc a{color:var(--sc);text-decoration:underline}
+.cn-note{font-size:12px;margin:8px 12px 12px}

@@ -207,7 +207,7 @@ const me = () => S.api?.me();
 // ================================================================ UI টুকরো
 function toast(m) { const t = $('#toast'); t.setAttribute('translate', DIR_BN ? 'no' : 'yes'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2600); }
 function openSheet(html) { const s = $('#sheet'); s.setAttribute('translate', DIR_BN ? 'no' : 'yes'); s.onclick = null; s.onchange = null; s.classList.remove('tall'); s.innerHTML = html; $('#modal').classList.add('on'); s.querySelector('input,textarea,select,button')?.focus(); }
-function closeSheet() { $('#modal').classList.remove('on'); $('#sheet').classList.remove('tall'); $('#sheet').innerHTML = ''; }
+function closeSheet() { document.querySelector('.sd-lbx')?.remove(); $('#modal').classList.remove('on'); $('#sheet').classList.remove('tall'); $('#sheet').innerHTML = ''; }
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' || e.target.closest('[data-close]')) closeSheet(); });
 function confirmSheet(text, okLabel, danger) {
   return new Promise(res => {
@@ -3861,28 +3861,69 @@ function svcDetailSheet(id) {
   const s = (S.svcAll || []).find(x => String(x.id) === String(id)); if (!s) return;
   const imgs = [...new Set([s.image_url, ...(s.images || [])].filter(Boolean))];
   const fav = S.svcFav?.has(s.id), tel = s.phone ? String(s.phone).replace(/[^\d+]/g, '') : '';
-  openSheet(`<div class="sdet">
-    ${imgs.length ? `<div class="sdet-gal">${imgs.map((u, i) => `<img src="${esc(u)}" alt="" ${i ? 'loading="lazy"' : ''} decoding="async" onerror="this.remove()">`).join('')}</div>${imgs.length > 1 ? `<div class="sdet-dots">${imgs.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</div>` : ''}` : ''}
-    <h2>${esc(s.name)}</h2>
-    ${s.address ? `<div class="meta">📍 ${esc(s.address)}</div>` : ''}${s.hours ? `<div class="meta">🕘 ${esc(s.hours)}</div>` : ''}
-    <div class="sdet-act">
-      ${tel ? `<a class="btn" data-svccall="${esc(s.id)}" href="tel:${esc(tel)}">📞 কল</a>` : ''}
-      ${s.lat != null ? `<a class="btn ghost" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}" target="_blank" rel="noopener">🧭 পথ দেখুন</a>` : ''}
-      <button class="btn ghost svc-fav${fav ? ' on' : ''}" data-svcfav="${esc(s.id)}" aria-pressed="${!!fav}">${fav ? '❤️' : '🤍'}</button>
-      <button class="btn ghost" data-svcshare="${esc(s.id)}">↗ শেয়ার</button>
+  const c = svcColor(s.category), d = svcDist(s);
+  const words = String(s.details || '').split(/\s+/).filter(Boolean).length, mins = Math.max(1, Math.round(words / 180));
+  const rel = (S.svcAll || []).filter(x => x.category === s.category && x.id !== s.id && svcHasDet(x)).slice(0, 10);
+  const long = String(s.details || '').length > 700;
+  const act = (k, icon, label, attrs) => `<${k} class="sd-act" ${attrs}><span class="sd-aic">${icon}</span><small>${label}</small></${k}>`;
+  openSheet(`<div class="sdet" style="--sc:${c}">
+    <div class="sd-hero">
+      ${imgs.length ? `<div class="sdet-gal">${imgs.map((u, i) => `<img src="${esc(u)}" alt="" data-sdzoom="${i}" ${i ? 'loading="lazy"' : ''} decoding="async" onerror="this.remove()">`).join('')}</div>`
+        : `<div class="sd-noimg">${svcIc(s.category, 64)}</div>`}
+      <div class="sd-shade"></div>
+      <button class="sd-x" data-close aria-label="বন্ধ করুন">✕</button>
+      ${imgs.length > 1 ? `<span class="sd-count"><b>১</b>/${bn(imgs.length)}</span>` : ''}
+      <div class="sd-title"><span class="sd-cat">${svcIc(s.category, 14)} ${esc(catName(s.category) || 'সেবা')}</span><h2>${esc(s.name)}</h2>
+        ${s.address ? `<div class="sd-addr">📍 ${esc(s.address)}</div>` : ''}</div>
     </div>
-    <div class="sdet-body">${detHtml(s.details) || '<p class="mut">এখনো বিস্তারিত তথ্য যোগ করা হয়নি।</p>'}</div>
-    <button class="btn ghost" style="width:100%;margin-top:12px" data-close>বন্ধ করুন</button></div>`);
+    ${imgs.length > 1 ? `<div class="sd-thumbs">${imgs.map((u, i) => `<button data-sdthumb="${i}"${i ? '' : ' class="on"'}><img src="${esc(u)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></button>`).join('')}</div>` : ''}
+    <div class="sd-chips">
+      ${s.verified ? '<span class="sd-chip ok">✔ যাচাইকৃত</span>' : ''}
+      ${d != null ? `<span class="sd-chip">📍 ${fmtDist(d)} দূরে</span>` : ''}
+      ${s.hours ? `<span class="sd-chip">🕘 ${esc(s.hours)}</span>` : ''}
+      ${words ? `<span class="sd-chip">📖 ${bn(mins)} মিনিটে পড়ুন</span>` : ''}
+      ${imgs.length ? `<span class="sd-chip">🖼️ ${bn(imgs.length)}টি ছবি</span>` : ''}
+    </div>
+    <div class="sd-acts">
+      ${tel ? act('a', '📞', 'কল করুন', `data-svccall="${esc(s.id)}" href="tel:${esc(tel)}"`) : ''}
+      ${act('a', '🧭', 'পথ দেখুন', `href="${s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ভালুকা')}`}" target="_blank" rel="noopener"`)}
+      <button class="sd-act sd-fav${fav ? ' on' : ''}" data-sdfav="${esc(s.id)}" aria-pressed="${!!fav}"><span class="sd-aic">${fav ? '❤️' : '🤍'}</span><small>${fav ? 'প্রিয়তে আছে' : 'প্রিয়তে রাখুন'}</small></button>
+      ${act('button', '↗️', 'শেয়ার', 'data-svcshare="1"')}
+    </div>
+    <div class="sd-sec"><h3>সম্পর্কে</h3>
+      <div class="sdet-body${long ? ' clamp' : ''}">${detHtml(s.details) || '<p class="mut">এখনো বিস্তারিত তথ্য যোগ করা হয়নি।</p>'}</div>
+      ${long ? '<button class="sd-more" data-sdmore>আরও পড়ুন ⌄</button>' : ''}</div>
+    ${rel.length ? `<div class="sd-sec"><h3>আরও ${esc(catName(s.category) || 'সেবা')}</h3><div class="sd-rel">${rel.map(x => `<button class="sd-rc" data-sdrel="${esc(x.id)}">${x.image_url || x.images?.[0] ? `<img src="${esc(x.image_url || x.images[0])}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sd-rph'}))">` : '<span class="sd-rph"></span>'}<b>${esc(x.name)}</b></button>`).join('')}</div></div>` : ''}
+  </div>`);
   const sh = $('#sheet'); sh.classList.add('tall'); sh.scrollTop = 0;
-  const g = sh.querySelector('.sdet-gal'), dots = sh.querySelectorAll('.sdet-dots i');
-  if (g && dots.length) g.addEventListener('scroll', () => { const k = Math.round(g.scrollLeft / g.clientWidth); dots.forEach((d, i) => d.classList.toggle('on', i === Math.abs(k))); }, { passive: true });
+  const g = sh.querySelector('.sdet-gal'), cnt = sh.querySelector('.sd-count b');
+  const goImg = i => g && g.scrollTo({ left: i * g.clientWidth, behavior: 'smooth' });
+  if (g) g.addEventListener('scroll', () => {
+    const k = Math.abs(Math.round(g.scrollLeft / g.clientWidth));
+    if (cnt) cnt.textContent = bn(k + 1);
+    sh.querySelectorAll('[data-sdthumb]').forEach((t, i) => t.classList.toggle('on', i === k));
+  }, { passive: true });
   sh.onclick = async e => {
-    if (e.target.closest('[data-close]')) return closeSheet();
+    const t = e.target.closest('[data-sdthumb]'); if (t) return goImg(+t.dataset.sdthumb);
+    const z = e.target.closest('[data-sdzoom]'); if (z) return sdZoom([...g.querySelectorAll('img')].map(i => i.src), [...g.querySelectorAll('img')].indexOf(z));
+    const r = e.target.closest('[data-sdrel]'); if (r) return svcDetailSheet(r.dataset.sdrel);
+    const f = e.target.closest('[data-sdfav]'); if (f) { await toggleSvcFav(s.id); const on = S.svcFav?.has(s.id); f.classList.toggle('on', on); f.setAttribute('aria-pressed', on); f.innerHTML = `<span class="sd-aic">${on ? '❤️' : '🤍'}</span><small>${on ? 'প্রিয়তে আছে' : 'প্রিয়তে রাখুন'}</small>`; if (on) f.querySelector('.sd-aic').classList.add('pop'); return; }
+    const m = e.target.closest('[data-sdmore]'); if (m) { sh.querySelector('.sdet-body').classList.remove('clamp'); m.remove(); return; }
     if (e.target.closest('[data-svcshare]')) {
       const text = `${s.name}${s.address ? '\n📍 ' + s.address : ''}${s.phone ? '\n📞 ' + s.phone : ''}\n\n— আমার উপজেলা অ্যাপ`;
       try { if (navigator.share) await navigator.share({ title: s.name, text }); else { await navigator.clipboard.writeText(text); toast('কপি হয়েছে'); } } catch {}
     }
   };
+}
+// ছবি বড় করে দেখা (পুরো স্ক্রিন, সোয়াইপ)
+function sdZoom(list, at) {
+  if (!list.length) return;
+  const w = document.createElement('div'); w.className = 'sd-lbx'; w.setAttribute('translate', 'no');
+  w.innerHTML = `<div class="sd-lg">${list.map(u => `<img src="${esc(u)}" alt="">`).join('')}</div><button class="sd-lx" aria-label="বন্ধ করুন">✕</button>${list.length > 1 ? `<span class="sd-lc">${bn(at + 1)}/${bn(list.length)}</span>` : ''}`;
+  document.body.append(w);
+  const lg = w.querySelector('.sd-lg'); lg.scrollLeft = at * lg.clientWidth;
+  lg.addEventListener('scroll', () => { const c = w.querySelector('.sd-lc'); if (c) c.textContent = `${bn(Math.abs(Math.round(lg.scrollLeft / lg.clientWidth)) + 1)}/${bn(list.length)}`; }, { passive: true });
+  w.onclick = e => { if (e.target.closest('.sd-lx') || e.target === w) w.remove(); };
 }
 const emergencyHtml = () => `<a class="big" href="tel:999"><span class="n">৯৯৯</span><span><b>জাতীয় জরুরি সেবা</b><br>পুলিশ, ফায়ার সার্ভিস, অ্যাম্বুলেন্স: টোল ফ্রি</span></a>
   <div class="em">${EMERGENCY.map(e => `<a class="emc" href="tel:${e[2]}"><div class="n">${e[0]}</div><div class="t">${esc(e[1])}</div></a>`).join('')}</div>`;

@@ -4,7 +4,7 @@
 const BEN = /[ঀ-৿]/;
 const DIG = '০১২৩৪৫৬৭৮৯';
 // ব্যবহারকারীর লেখা থাকে এমন জায়গা: এগুলোর ভেতরে হাত দেওয়া হয় না
-const SKIP = '[translate="no"],textarea,script,style,.m-t,.cm-text,.pbg,.ptext,.se-body,.st-cap,.bio,.ann-full,.n-txt,.more-t,.who-btn b,.avbtn b,.cmention,.mention';
+const SKIP = '#v-dir,[translate="no"],textarea,script,style,.m-t,.cm-text,.pbg,.ptext,.se-body,.st-cap,.bio,.ann-full,.n-txt,.more-t,.who-btn b,.avbtn b,.cmention,.mention';
 const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
 
 // বাংলায় ফেরার জন্য আসল লেখা মনে রাখি

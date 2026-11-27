@@ -99,7 +99,11 @@ const linkify = t => esc(t).replace(/https?:\/\/[^\s<]+/g, u => { const jm = u.m
 // ================================================================ সহায়ক
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const bn = n => (EN ? String(n) : String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]));
+// সেবা ডিরেক্টরি সবসময় বাংলায় (অ্যাপ ইংরেজিতে থাকলেও), তাই সেখানে সংখ্যাও বাংলা
+let DIR_BN = false;
+const bn = n => (EN && !DIR_BN ? String(n) : String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]));
+const WD_BN = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+const MON_BN = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
 const local = {
   get(k, d) { try { const v = localStorage.getItem('au_' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem('au_' + k, JSON.stringify(v)); } catch { /* ignore */ } },
@@ -201,8 +205,8 @@ const S = {
 const me = () => S.api?.me();
 
 // ================================================================ UI টুকরো
-function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2600); }
-function openSheet(html) { const s = $('#sheet'); s.onclick = null; s.onchange = null; s.classList.remove('tall'); s.innerHTML = html; $('#modal').classList.add('on'); s.querySelector('input,textarea,select,button')?.focus(); }
+function toast(m) { const t = $('#toast'); t.setAttribute('translate', DIR_BN ? 'no' : 'yes'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2600); }
+function openSheet(html) { const s = $('#sheet'); s.setAttribute('translate', DIR_BN ? 'no' : 'yes'); s.onclick = null; s.onchange = null; s.classList.remove('tall'); s.innerHTML = html; $('#modal').classList.add('on'); s.querySelector('input,textarea,select,button')?.focus(); }
 function closeSheet() { $('#modal').classList.remove('on'); $('#sheet').classList.remove('tall'); $('#sheet').innerHTML = ''; }
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' || e.target.closest('[data-close]')) closeSheet(); });
 function confirmSheet(text, okLabel, danger) {
@@ -4040,11 +4044,11 @@ function dayNoticeHtml() {
   const { t, hol, weekend } = todayInfo();
   let msg = '', cls = '';
   if (hol) { msg = `🏖️ আজ সরকারি ছুটি: <b>${esc(hName(hol))}</b>। সরকারি অফিস ও ব্যাংক বন্ধ।`; cls = ' hol'; }
-  else if (weekend) msg = `📅 আজ ${esc(BN_WD[t.wd])}, সাপ্তাহিক ছুটি: সরকারি অফিস ও ব্যাংক বন্ধ।`;
+  else if (weekend) msg = `📅 আজ ${esc(WD_BN[t.wd])}, সাপ্তাহিক ছুটি: সরকারি অফিস ও ব্যাংক বন্ধ।`;
   else {
     for (let i = 1; i <= 7; i++) {   // সামনের ৭ দিনের মধ্যে ছুটি থাকলে আগেই জানাই
       const d = new Date(Date.now() + i * 864e5), h = GOV_HOLIDAYS[dkKey(d)];
-      if (h) { const p = dhakaParts(d); msg = `📅 ${i === 1 ? 'আগামীকাল' : `${bn(p.day)} ${BN_MON[p.mon]} (${BN_WD[p.wd]})`} সরকারি ছুটি: <b>${esc(hName(h))}</b>`; break; }
+      if (h) { const p = dhakaParts(d); msg = `📅 ${i === 1 ? 'আগামীকাল' : `${bn(p.day)} ${MON_BN[p.mon]} (${WD_BN[p.wd]})`} সরকারি ছুটি: <b>${esc(hName(h))}</b>`; break; }
     }
     if (!msg && t.h >= 8 && t.h < 17) msg = '🏢 আজ সরকারি অফিস খোলা · সাধারণত সকাল ৯টা থেকে বিকেল ৫টা';
   }
@@ -4219,17 +4223,17 @@ function greetText() { const [g, e] = greetPart(), n = me()?.name?.trim(); retur
 function heroTone() { const h = dhakaParts(new Date()).h; return h >= 5 && h < 9 ? 'dawn' : h < 15 && h >= 9 ? 'day' : h < 18 && h >= 15 ? 'noon' : h < 20 && h >= 18 ? 'dusk' : 'night'; }
 function dirHeroHtml(total, cats) {
   const now = new Date(), t = dhakaParts(now), bd = banglaDate(t);
-  const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)}`;
+  const son = `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)}`;
   return `<div class="dir-hero tone-${heroTone()}" id="dir-hero">
     <div class="dh-greet">${esc(greetText())}</div>
-    <div class="dh-date"><span class="dh-wd"><small>আজ</small> ${esc(BN_WD[t.wd])}</span><i></i><span>${esc(son)}</span><i></i><span>${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}</span></div>
+    <div class="dh-date"><span class="dh-wd"><small>আজ</small> ${esc(WD_BN[t.wd])}</span><i></i><span>${esc(son)}</span><i></i><span>${bn(t.day)} ${MON_BN[t.mon]} ${bn(t.year)}</span></div>
     <button class="dh-wx" id="dh-wx" aria-label="আবহাওয়া ও নামাজ" hidden></button>
   </div>`;
 }
 // সবুজ কার্ডটা পুরো ডিরেক্টরির হেডার: সব পাতায় একদম উপরে থাকে
 function renderDirHead(list) {
   const box = $('#dir-head'); if (!box) return;
-  const cats = svcCats(), key = `${list.length}|${cats.length}|${dkKey(new Date())}|${EN}|${greetPart()[0]}|${heroTone()}|${me()?.name || ''}`;
+  const cats = svcCats(), key = `${list.length}|${cats.length}|${dkKey(new Date())}|${greetPart()[0]}|${heroTone()}|${me()?.name || ''}`;
   if (box.dataset.k !== key || !box.children.length) { box.innerHTML = dirHeroHtml(list.length, cats); box.dataset.k = key; const c = local.get('wx'); if (c?.v) dirHeroWx(c.v); else dirHeroWx(null); }
   if (!S.wxT || Date.now() - S.wxT > 6e4) { S.wxT = Date.now(); loadWeather().then(dirHeroWx); }
 }
@@ -4334,7 +4338,7 @@ function drawDir() {
   renderDirHead(list);
   dirChips();
   $('#svc-off')?.remove();
-  if (S.svcOffline) $('#dir').insertAdjacentHTML('beforebegin', `<div id="svc-off" class="svc-off">📴 ইন্টারনেট নেই · ${esc(dateBn(S.svcOffline))} তারিখে সেভ করা তালিকা দেখাচ্ছেন। কল করা যাবে।</div>`);
+  if (S.svcOffline) $('#dir').insertAdjacentHTML('beforebegin', `<div id="svc-off" class="svc-off">📴 ইন্টারনেট নেই · ${(p => `${bn(p.day)} ${MON_BN[p.mon]}`)(dhakaParts(new Date(S.svcOffline)))} তারিখে সেভ করা তালিকা দেখাচ্ছেন। কল করা যাবে।</div>`);
   if (S.dcat === 'sos' || S.dcat === 'blood') return;
   if (!S.dcat && !q) return renderSvcGrid(list);
   if (S.dcat === 'near') return drawNear(list, q);
@@ -4441,7 +4445,7 @@ function voiceDone(text) {
 }
 $('#qmic')?.addEventListener('click', async () => {
   const btn = $('#qmic'); if (btn.classList.contains('on')) { try { S.rec?.stop(); } catch { /* ignore */ } return; }
-  const lang = EN ? 'en-US' : 'bn-BD', P = nativeSpeech();
+  const lang = 'bn-BD', P = nativeSpeech();   // ডিরেক্টরি বাংলায়, তাই কণ্ঠেও বাংলা
   btn.classList.add('on'); $('#q').placeholder = 'বলুন… (যেমন: হাসপাতাল)';
   if (P) {
     try {
@@ -6350,6 +6354,7 @@ const RELOAD = {
 };
 function pushNav() { try { history.pushState({ au: 1 }, ''); } catch { /* sandbox */ } }
 function show(v) {
+  DIR_BN = v === 'dir';
   if (v !== 'dir') S.dirAnimDone = false;
   if (v !== 'thread') { try { VP.a.pause(); } catch { /* প্লেয়ার এখনো তৈরি হয়নি */ } }
   if (v !== 'msgs' && v !== 'thread') S.convPage = null;   // পেইজের মেসেজ-ফিল্টার শুধু ওই পাতায়

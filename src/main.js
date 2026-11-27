@@ -3990,6 +3990,7 @@ function svcReviewSheet(s, mine) {
 }
 // ভুল তথ্য জানানো
 function svcReportSheet(s) {
+  if (!needUser()) return;
   const opts = ['ফোন নম্বর ভুল / বন্ধ', 'ঠিকানা বা অবস্থান ভুল', 'স্থানটি বন্ধ হয়ে গেছে', 'ছবি ভুল বা পুরোনো', 'বিস্তারিত তথ্য ভুল', 'অন্য কিছু'];
   openSheet(`<form class="rvf"><h2>⚠️ ভুল তথ্য জানান</h2><p class="mut" style="margin:-4px 0 12px">${esc(s.name)} — কোন তথ্যটি ভুল?</p>
     <div class="rp-opts">${opts.map((o, i) => `<label><input type="radio" name="rp" value="${esc(o)}"${i ? '' : ' checked'}> ${esc(o)}</label>`).join('')}</div>
@@ -3997,11 +3998,16 @@ function svcReportSheet(s) {
     <button class="btn" style="width:100%;margin-top:12px">পাঠান</button><button type="button" class="btn ghost" style="width:100%;margin-top:8px" data-back>ফিরে যান</button></form>`);
   const sh = $('#sheet');
   sh.onclick = e => { if (e.target.closest('[data-back]')) svcDetailSheet(s.id); };
-  sh.querySelector('form').onsubmit = e => { e.preventDefault(); if (!needUser()) return; const r = sh.querySelector('[name=rp]:checked').value, b = $('#rp-b').value.trim();
-    busy(e.submitter, async () => { await S.api.report('service', s.id, (r + (b ? ': ' + b : '')).slice(0, 300)); toast('ধন্যবাদ! অ্যাডমিন যাচাই করে ঠিক করবেন'); svcDetailSheet(s.id); }); };
+  sh.querySelector('form').onsubmit = e => { e.preventDefault(); const r = sh.querySelector('[name=rp]:checked').value, b = $('#rp-b').value.trim();
+    busy(e.submitter, async () => {
+      try { await S.api.report('service', s.id, (r + (b ? ': ' + b : '')).slice(0, 300)); toast('ধন্যবাদ! অ্যাডমিন যাচাই করে ঠিক করবেন'); }
+      catch (er) { if (er?.code === '23505' || /duplicate|unique/i.test(er?.message || '')) toast('আপনি এই সেবার বিষয়ে আগেই জানিয়েছেন। অ্যাডমিন দেখছেন।'); else throw er; }
+      svcDetailSheet(s.id);
+    }); };
 }
 // বুকিং বার্তা: WhatsApp বা SMS
 function svcBookSheet(s) {
+  if (!needUser()) return;
   const today = new Date(Date.now() + 6 * 3600e3).toISOString().slice(0, 10);
   openSheet(`<form class="rvf bk"><h2>🗓️ বুকিং / খোঁজ নিন</h2><p class="mut" style="margin:-4px 0 12px">${esc(s.name)}-এ সরাসরি বার্তা যাবে</p>
     <label>কী ধরনের<select class="f" id="bk-t"><option>দিনের ভ্রমণ / পিকনিক</option><option>রাত্রিযাপন (রুম)</option><option>অনুষ্ঠান / হলরুম</option><option>শুধু তথ্য জানতে চাই</option></select></label>
@@ -4185,17 +4191,26 @@ async function ensureSvcFavs() {
   if (S.svcFav && S.svcFavFor === who) return;
   S.svcFavFor = who;
   let ids;
-  if (who) { try { ids = await S.api.serviceFavs(); local.set('svc_favs_' + who, ids); } catch { ids = local.get('svc_favs_' + who, []); } }
-  else ids = local.get('svc_favs', []);
+  if (who) {
+    try {
+      ids = await S.api.serviceFavs();
+      // লগইন ছাড়া আগে ফোনে রাখা প্রিয় সেবা থাকলে এই অ্যাকাউন্টেই তুলে দিই
+      const old = local.get('svc_favs', []).filter(x => !ids.includes(x));
+      if (old.length) { for (const x of old) await S.api.setServiceFav(x, true).catch(() => {}); ids = [...ids, ...old]; }
+      local.del ? local.del('svc_favs') : local.set('svc_favs', []);
+      local.set('svc_favs_' + who, ids);
+    } catch { ids = local.get('svc_favs_' + who, []); }
+  } else ids = [];   // প্রিয় সেবা শুধু অ্যাকাউন্টে থাকে
   S.svcFav = new Set(ids);
 }
 async function toggleSvcFav(id) {
+  if (!needUser()) return;
   await ensureSvcFavs();
   const on = !S.svcFav.has(id);
   on ? S.svcFav.add(id) : S.svcFav.delete(id);
   document.querySelectorAll(`[data-svcfav="${id}"]`).forEach(b => { b.classList.toggle('on', on); b.textContent = on ? '❤️' : '🤍'; b.setAttribute('aria-pressed', on); });
   toast(on ? 'প্রিয় সেবায় রাখা হয়েছে' : 'প্রিয় থেকে সরানো হয়েছে');
-  try { if (me()) await S.api.setServiceFav(id, on); else local.set('svc_favs', [...S.svcFav]); } catch (e) { toast(errText(e)); }
+  try { await S.api.setServiceFav(id, on); local.set('svc_favs_' + me().id, [...S.svcFav]); } catch (e) { on ? S.svcFav.delete(id) : S.svcFav.add(id); toast(errText(e)); }
   if (!S.dcat && !$('#q').value.trim() || S.dcat === 'fav') { const y = window.scrollY; drawDir(); window.scrollTo(0, y); }
 }
 // ---------- সাম্প্রতিক খোঁজা ও জনপ্রিয় সেবা (সার্চ বক্সে চাপলে)

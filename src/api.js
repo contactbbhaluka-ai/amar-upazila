@@ -2117,7 +2117,7 @@ function demoApi() {
       if (id) { const s = db.services.find(x => x.id === id); if (s) Object.assign(s, v); save(); return wait(id); }
       const nidv = nid(db.services); db.services.unshift({ ...v, id: nidv, verified: true }); save(); return wait(nidv);
     },
-    async report(t, id, reason) { if (t === 'service') { db.svcReports ||= []; db.svcReports.push({ id: Date.now(), sid: String(id), reason, created_at: new Date().toISOString() }); save(); } return wait(true); },
+    async report(t, id, reason) { if (t === 'service') { db.svcReports ||= []; if (db.svcReports.some(r => r.sid === String(id) && r.by === meId)) throw Object.assign(new Error('duplicate'), { code: '23505' }); db.svcReports.push({ by: meId, id: Date.now(), sid: String(id), reason, created_at: new Date().toISOString() }); save(); } return wait(true); },
     async serviceReports(id) { return wait((db.svcReports || []).filter(r => r.sid === String(id))); },
     async resolveReport(rid) { db.svcReports = (db.svcReports || []).filter(r => r.id !== rid); save(); return wait(); },
   };

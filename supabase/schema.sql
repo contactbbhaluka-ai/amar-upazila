@@ -5169,6 +5169,9 @@ update public.services set subtype = case
   when name ~ 'উদ্যান|বন|কুমির' then 'nature' else 'other' end
 where category = 'tour' and subtype is null;
 
+-- একজন অ্যাকাউন্টধারী একটি সেবার বিষয়ে একবারই (অমীমাংসিত) ভুল তথ্যের রিপোর্ট দিতে পারবেন
+create unique index if not exists reports_service_once on public.reports (reporter_id, target_id) where target_type = 'service' and not resolved;
+
 -- =====================================================================
 --  নিজেকে অ্যাডমিন বানাতে: অ্যাপে প্রথমে সাইনআপ করুন, তারপর নিচের লাইনে
 --  নিজের ইমেইল বসিয়ে আলাদাভাবে চালান:

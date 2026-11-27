@@ -2,6 +2,7 @@
 import { createApi, PAGE, boostState } from './api.js';
 import { POST_CATS, CAT_ICON, SERVICE_CATS, SVC_SPECIAL, EMERGENCY, PUBLIC_URL, SETTING_KEYS, PLAY_URL } from './config.js';
 import { DISTRICTS, DISTRICT_ORDER, HOME_UPAZILA, HOME_DISTRICT, BLOOD_GROUPS } from './bd-geo.js';
+import { CAT_CFG } from './cat-cfg.js';
 // ভাষা: ডিফল্ট বাংলা; ইংরেজি বাছাই করলে অনুবাদক লোড হয় (মেনু → দেখতে কেমন → ভাষা)
 let EN = (() => { try { return localStorage.getItem('au_lang') === '"en"'; } catch { return false; } })();
 let LOC = EN ? 'en-GB' : 'bn-BD';
@@ -3923,7 +3924,64 @@ const svcEmgCard = s => {
   <div class="se-nums">${ph.slice(0, 3).map(p => `<a class="se-num" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(p.n))}"><span>${esc(p.l)}</span><b>${esc(bn(p.n))}</b><i>📞</i></a>`).join('')}</div>
   ${ph.length > 3 ? `<div class="se-more">আরও ${bn(ph.length - 3)}টি নম্বর · বিস্তারিত →</div>` : ''}</article>`;
 };
-const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : s.category === 'shop' ? svcHatCard(s) : EMG_CATS.has(s.category) && phoneList(s).length ? svcEmgCard(s)
+// ক্যাটাগরিভিত্তিক কার্ড (cat-cfg.js অনুযায়ী): person / place / service নকশা
+const CF_DAYS = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
+const cfHas = v => !(v == null || v === '' || v === false || (Array.isArray(v) && !v.length));
+function cfVal(f, v) {
+  if (f.t === 'money') return `৳${bn(Number(v).toLocaleString('en-IN'))}${f.o && typeof f.o === 'string' && !/যেমন/.test(f.o) ? ` <small>${esc(f.o)}</small>` : ''}`;
+  if (f.t === 'num') return `${bn(v)}${f.o && !/যেমন/.test(f.o) ? ' ' + esc(f.o) : ''}`;
+  if (f.t === 'days') return (v || []).map(d => CF_DAYS[d]).join(', ');
+  if (f.t === 'tags') return (v || []).map(esc).join(', ');
+  if (f.t === 'bool') return 'হ্যাঁ';
+  if (f.t === 'phone') return esc(bn(v));
+  return esc(v);
+}
+function svcCfgCard(s) {
+  const c = CAT_CFG[s.category], a = s.attrs || {}, ph = phoneList(s), init = (String(s.name).replace(/^(ডা\.|ডাঃ|অ্যাড\.|মোঃ|মো:|মোছাঃ)\s*/, '').match(/[অ-হড়-য়A-Za-z]/) || ['•'])[0];
+  const subF = c.f.find(f => f.k === c.sub), sub = subF && cfHas(a[subF.k]) ? (subF.t === 'tags' ? a[subF.k].slice(0, 3).join(' · ') : String(a[subF.k])) : '';
+  const chips = c.f.filter(f => f.card && f.k !== c.sub && cfHas(a[f.k])).slice(0, 4).map(f =>
+    f.t === 'bool' ? `<span class="cc-ok">✓ ${esc(f.l)}</span>` : f.t === 'tags' ? a[f.k].slice(0, 3).map(t => `<span class="cc-tag">${esc(t)}</span>`).join('') : `<span><i>${f.ic}</i>${esc(f.l)} <b>${cfVal(f, a[f.k])}</b></span>`).join('');
+  const call = ph[0] ? `<a class="cc-call" data-svccall="${esc(s.id)}" href="tel:${esc(telOf(ph[0].n))}" aria-label="কল করুন"><svg viewBox="0 0 24 24" width="19" height="19"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg></a>` : '';
+  const pend = s.verified === false ? `<div class="ht-pend">⏳ যাচাইয়ের অপেক্ষায়${me()?.admin ? `<button class="btn sm" data-verify="${esc(s.id)}">✔ যাচাই করুন</button>` : ''}</div>` : '';
+  const head = `<h3>${esc(s.name)}</h3>${sub ? `<p class="cc-sub">${esc(sub)}</p>` : ''}${s.address ? `<p class="cc-addr">📍 ${esc(s.address)}</p>` : ''}`;
+  if (c.L === 'place') return `<article class="card svc svc-cc L-place" style="--g1:${c.g[0]};--g2:${c.g[1]};--i:${TI()}" data-svcdet="${esc(s.id)}">
+    <div class="hc-top${s.image_url ? ' img' : ''}">${s.image_url ? `<img src="${esc(s.image_url)}" alt="" loading="lazy" onerror="this.parentNode.classList.remove('img');this.remove()">` : ''}<span class="hc-emo">${c.e}</span>${sub ? `<span class="hc-area">${esc(sub)}</span>` : ''}${s.verified ? '<span class="cc-vf">✔ যাচাইকৃত</span>' : ''}</div>
+    <div class="cc-body"><div class="cc-row"><div class="cc-t"><h3>${esc(s.name)}</h3>${s.address ? `<p class="cc-addr">📍 ${esc(s.address)}</p>` : ''}</div>${call}</div>${chips ? `<div class="cc-chips">${chips}</div>` : ''}${pend}</div></article>`;
+  return `<article class="card svc svc-cc L-${c.L}" style="--g1:${c.g[0]};--g2:${c.g[1]};--i:${TI()}" data-svcdet="${esc(s.id)}">
+    <div class="cc-row"><span class="cc-av">${s.image_url ? `<img src="${esc(s.image_url)}" alt="" loading="lazy" onerror="this.remove()">` : ''}<i>${c.L === 'person' ? esc(init) : c.e}</i>${c.L === 'person' ? `<em>${c.e}</em>` : ''}</span>
+      <div class="cc-t">${head}</div>${call}</div>${chips ? `<div class="cc-chips">${chips}</div>` : ''}${pend}</article>`;
+}
+// বিস্তারিত পাতায় সব তথ্য আইকনসহ
+function cfgInfo(s) {
+  const c = CAT_CFG[s.category], a = s.attrs || {}, fs = c?.f.filter(f => cfHas(a[f.k])) || [];
+  if (!fs.length) return '';
+  return `<div class="sd-sec"><h3>তথ্য</h3><div class="cfi" style="--g1:${c.g[0]};--g2:${c.g[1]}">${fs.map(f => `<div class="${f.t === 'tags' ? 'w' : ''}"><span>${f.ic}</span><div><small>${esc(f.l)}</small>${
+    f.t === 'tags' ? `<p class="cfi-tags">${a[f.k].map(t => `<b>${esc(t)}</b>`).join('')}</p>`
+    : f.t === 'phone' ? `<a href="tel:${esc(telOf(a[f.k]))}">${esc(bn(a[f.k]))}</a>` : f.t === 'url' ? `<a href="${esc(/^https?:/.test(a[f.k]) ? a[f.k] : 'https://' + a[f.k])}" target="_blank" rel="noopener">লিংক খুলুন ↗</a>`
+    : f.t === 'email' ? `<a href="mailto:${esc(a[f.k])}">${esc(a[f.k])}</a>` : `<b>${f.t === 'bool' ? '✓ হ্যাঁ' : cfVal(f, a[f.k])}</b>`}</div></div>`).join('')}</div></div>`;
+}
+// সম্পাদনা/যোগের ফর্মে ক্যাটাগরির ঘর
+function cfgForm(cat, a = {}) {
+  const c = CAT_CFG[cat]; if (!c) return '';
+  return `<div class="cf"><div class="cf-h"><span style="background:linear-gradient(135deg,${c.g[0]},${c.g[1]})">${c.e}</span>${esc(catName(cat) || '')}-এর তথ্য</div>${c.f.map(f => {
+    const v = a[f.k], ph = typeof f.o === 'string' && /যেমন/.test(f.o) ? f.o : '', unit = typeof f.o === 'string' && !ph ? ` <small class="mut">(${esc(f.o)})</small>` : '';
+    if (f.t === 'bool') return `<button type="button" class="cf-bool${v ? ' on' : ''}" data-cfb="${f.k}">${f.ic} ${esc(f.l)}</button>`;
+    if (f.t === 'tags' || f.t === 'days') { const opts = f.t === 'days' ? CF_DAYS.map((d, i) => [i, d]) : f.o.map(o => [o, o]), sel = new Set((v || []).map(String));
+      return `<label class="cf-l">${f.ic} ${esc(f.l)}</label><div class="hf-goods cf-m" data-cfm="${f.k}" data-cft="${f.t}">${opts.map(([k, l]) => `<button type="button" data-cfv="${esc(k)}"${sel.has(String(k)) ? ' class="on"' : ''}>${esc(l)}</button>`).join('')}</div>`; }
+    if (f.t === 'select') return `<label>${f.ic} ${esc(f.l)}<select class="f" data-cf="${f.k}"><option value="">—</option>${f.o.map(o => `<option${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
+    const type = f.t === 'num' || f.t === 'money' ? 'number' : f.t === 'url' ? 'url' : f.t === 'email' ? 'email' : f.t === 'phone' ? 'tel' : 'text';
+    return `<label>${f.ic} ${esc(f.l)}${unit}<input data-cf="${f.k}" data-cfty="${f.t}" type="${type}"${type === 'number' ? ' min="0" inputmode="numeric"' : ''} maxlength="160" value="${esc(v ?? '')}"${ph ? ` placeholder="${esc(ph)}"` : ''}></label>`;
+  }).join('')}</div>`;
+}
+function cfgRead(root, cat) {
+  const c = CAT_CFG[cat], out = {}; if (!c) return out;
+  root.querySelectorAll('[data-cf]').forEach(i => { const v = i.value.trim(); if (!v) return; out[i.dataset.cf] = ['num', 'money'].includes(i.dataset.cfty) ? Number(v.replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d))) : v; });
+  root.querySelectorAll('[data-cfm]').forEach(m => { const on = [...m.querySelectorAll('.on')].map(b => m.dataset.cft === 'days' ? +b.dataset.cfv : b.dataset.cfv); if (on.length) out[m.dataset.cfm] = on; });
+  root.querySelectorAll('[data-cfb].on').forEach(b => { out[b.dataset.cfb] = true; });
+  return out;
+}
+const cfgToggle = e => { const b = e.target.closest('[data-cfv], [data-cfb]'); if (!b) return false; b.classList.toggle('on'); return true; };
+const svcAnyCard = s => (s.category === 'famous' ? svcPersonCard(s) : CAT_CFG[s.category] ? svcCfgCard(s) : s.category === 'shop' ? svcHatCard(s) : EMG_CATS.has(s.category) && phoneList(s).length ? svcEmgCard(s)
   : s.category === 'union' ? svcUnionCard(s) : INFO_CATS.has(s.category) && !s.image_url ? svcInfoCard(s) : s.image_url && svcHasDet(s) ? svcRichCard(s) : svcCard(s));
 // বিস্তারিত লেখা: ### শিরোনাম, • তালিকা, ফাঁকা লাইনে অনুচ্ছেদ
 // বিস্তারিত লেখা: "## " প্রধান অংশ, "### " তার ভেতরের উপ-অংশ, "• " তালিকা
@@ -4062,6 +4120,7 @@ function svcDetailSheet(id, opt = {}) {
     <div class="sd-sec"><h3>${person ? 'জীবনী' : 'সম্পর্কে'}</h3>
       <div class="sdet-body${long ? ' clamp' : ''}">${detHtml(s.category === 'union' && s.facts?.length ? String(s.details || '').replace(/## এক নজরে[\s\S]*?(?=\n## |$)/, '') : s.details) || '<p class="mut">এখনো বিস্তারিত তথ্য যোগ করা হয়নি।</p>'}</div>
       ${long ? '<button class="sd-more" data-sdmore>আরও পড়ুন ⌄</button>' : ''}</div>
+    ${CAT_CFG[s.category] ? cfgInfo(s) : ''}
     ${s.category === 'shop' ? (() => { const nh = nextHat(s), days = hatDaysOf(s), g = (s.goods || []).map(k => GOODS.find(x => x[0] === k)).filter(Boolean), u = hatUnion(s);
       return `<div class="sd-sec"><h3>হাটবার</h3><div class="sd-hat">${nh ? `<div class="ht-next ${nh.k}${nh.live ? ' live' : ''}">${nh.k === 'today' ? '🛒' : nh.k === 'daily' ? '🔁' : '📅'} ${esc(nh.label)}</div>` : '<p class="mut">হাটবার এখনো যোগ হয়নি।</p>'}
         ${days.length ? weekStrip(days, dhakaParts(new Date()).wd) + `<p class="sd-hatp">প্রতি ${esc(days.length > 1 ? days.slice(0, -1).map(d => BN_DAYS[d]).join(', ') + ' ও ' + BN_DAYS[days[days.length - 1]] : BN_DAYS[days[0]])}${HAT_TIME[s.hat_time] ? ` · ${HAT_TIME[s.hat_time][0]}` : ''}</p>` : ''}
@@ -4511,6 +4570,7 @@ function svcEditSheet(s, category) {
     ${person || place || hat ? (() => { const ar = (S.svcAll || []).filter(x => (x.category === 'union' || x.category === 'pouro') && x.union_id).sort((x, y) => (x.category === 'pouro' ? -1 : unionNo(x)) - (y.category === 'pouro' ? -1 : unionNo(y)));
       return ar.length ? `<label>${person ? 'জন্মস্থান কোন ইউনিয়ন/পৌরসভায়' : hat ? 'ইউনিয়ন / পৌরসভা *' : 'কোন ইউনিয়ন/পৌরসভায়'} <small class="mut">(সেই এলাকার পাতায় দেখাবে)</small><select class="f" id="se-area"><option value="">${hat ? '— বাছাই করুন —' : 'ঠিকানা দেখে নিজে মিলিয়ে নিক'}</option>${ar.map(x => `<option value="${esc(x.union_id)}"${x.union_id === v.union_id ? ' selected' : ''}>${esc(String(x.name).replace(/ পরিষদ$/, ''))}</option>`).join('')}</select></label>` : ''; })() : ''}
     ${hat ? `${inp('se-addr', F.addr, v.address, 'maxlength="200"')}` : ''}
+    ${CAT_CFG[cat] ? cfgForm(cat, v.attrs || {}) : ''}
     ${!person && !hat ? `<label>সব যোগাযোগ নম্বর <small class="mut">(প্রতি লাইনে "পদবি/নাম: নম্বর" — প্রথমটি প্রধান)</small><textarea id="se-phones" rows="3" placeholder="ডিউটি অফিসার: 01320103300&#10;ওসি: 01320103295">${esc((v.phones || []).map(p => `${p.l}: ${p.n}`).join('\n'))}</textarea></label>
     <label>ইমেইল<input id="se-email" type="email" maxlength="120" value="${esc(v.email || '')}"></label>
     ${INFO_CATS.has(cat) ? `<label>ওয়েবসাইট<input id="se-url" type="url" maxlength="300" placeholder="https://" value="${esc(/beautifulbhaluka/.test(v.url || '') ? '' : v.url || '')}"></label>` : ''}` : ''}
@@ -4562,6 +4622,7 @@ function svcEditSheet(s, category) {
     const ra = e.target.closest('[data-reladd]'); if (ra) { if (rel.length < 20) rel.push(+ra.dataset.reladd); sh.querySelector('#se-relq').value = ''; sh.querySelector('.se-relres').innerHTML = ''; return drawRel(); }
     const rd = e.target.closest('[data-reldel]'); if (rd) { rel.splice(rel.indexOf(+rd.dataset.reldel), 1); return drawRel(); }
     const hf = e.target.closest('[data-hfd], [data-hfg]'); if (hf) { hf.classList.toggle('on'); return; }
+    if (cfgToggle(e)) return;
     const a = e.target.closest('[data-am]'); if (a) { a.classList.toggle('on'); am[a.classList.contains('on') ? 'add' : 'delete'](a.dataset.am); return; }
     const d = e.target.closest('[data-imdel]'); if (d) { imgs.splice(+d.dataset.imdel, 1); return drawImgs(); }
     const cv = e.target.closest('[data-imcover]'); if (cv) { imgs.unshift(...imgs.splice(+cv.dataset.imcover, 1)); return drawImgs(); }
@@ -4572,6 +4633,7 @@ function svcEditSheet(s, category) {
     const p = { name: $('#se-name').value.trim(), category: cat, address: val('#se-addr') || '', details: val('#se-det'), image_url: imgs[0] || null, images: imgs.slice(1, 13) };
     if (has('#se-sub')) p.subtype = val('#se-sub');
     if (has('#se-url')) p.url = val('#se-url') || (/beautifulbhaluka/.test(v.url || '') ? v.url : null);
+    if (CAT_CFG[cat]) p.attrs = cfgRead(sh, cat);
     if (has('#se-area')) p.union_id = val('#se-area') ? +val('#se-area') : null;
     if (hat && !p.union_id) return toast('ইউনিয়ন বা পৌরসভা বাছাই করুন');
     if (has('#se-phone')) p.phone = val('#se-phone') || ''; else if (!s) p.phone = '';
@@ -5666,15 +5728,18 @@ $('#addsvc').addEventListener('click', () => {
     <label for="sa">ঠিকানা / এলাকা</label><input id="sa" required maxlength="120">
     <label for="sp">ফোন নম্বর</label><input id="sp" required inputmode="tel" maxlength="20" pattern="[0-9০-৯+\\- ]{3,20}">
     <label for="sh">খোলার সময় (ঐচ্ছিক)</label><input id="sh" maxlength="60">
+    <div id="cfgbox">${cfgForm(SERVICE_CATS.find(c => c[0] === S.dcat && !SVC_SPECIAL[c[0]]) ? S.dcat : SERVICE_CATS.filter(c => !SVC_SPECIAL[c[0]])[0][0])}</div>
     ${geoFieldHtml(null)}
     <div class="row" style="margin-top:16px"><button class="btn" style="flex:1">জমা দিন</button><button class="btn ghost" type="button" data-close>বাতিল</button></div>
     <p class="mut">যাচাইয়ের পর তালিকায় "যাচাইকৃত" চিহ্ন দেখাবে।</p></form>`);
   const sst = { geo: null }; bindGeoField(sst);
+  $('#sc').onchange = () => { $('#cfgbox').innerHTML = cfgForm($('#sc').value); };
+  $('#sheet').onclick = e => { cfgToggle(e); };
   $('#sform').onsubmit = e => {
     e.preventDefault();
     if ($('#geo-link').value.trim() && !coordsFrom($('#geo-link').value)) return toast('ম্যাপের লিংক থেকে লোকেশন বোঝা যায়নি। লিংকটা আবার দেখুন বা "আমি এখন যেখানে আছি" চাপুন।');
     const toEn = s => s.replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
-    const v = { name: $('#sn').value.trim(), category: $('#sc').value, address: $('#sa').value.trim(), phone: toEn($('#sp').value.trim()), hours: $('#sh').value.trim() || null, lat: sst.geo?.lat ?? null, lng: sst.geo?.lng ?? null };
+    const v = { name: $('#sn').value.trim(), category: $('#sc').value, address: $('#sa').value.trim(), phone: toEn($('#sp').value.trim()), hours: $('#sh').value.trim() || null, lat: sst.geo?.lat ?? null, lng: sst.geo?.lng ?? null, attrs: cfgRead($('#sform'), $('#sc').value) };
     busy(e.submitter, async () => { await S.api.addService(v); closeSheet(); S.dcat = ''; await loadDir(); toast('জমা হয়েছে, যাচাইয়ের অপেক্ষায়'); });
   };
 });

@@ -4017,7 +4017,7 @@ function popCatsHtml() {
   const cats = svcCats(), top = (S.popCats || []).map(r => r.category).filter(k => k === 'sos' || cats.some(c => c[0] === k)).slice(0, 5);
   if (!top.length) return '';
   const name = k => k === 'sos' ? 'জরুরি নম্বর' : cats.find(c => c[0] === k)[1];
-  return `<h3 class="svc-sec" style="--c:#e8590c"><i></i>🔥 জনপ্রিয় ক্যাটাগরি</h3><div class="svc-grid pop-cats">${top.map(k => `<button class="svc-tile" data-svc="${k}">${svcIc(k, 22)}<span class="st-n">${esc(name(k))}</span></button>`).join('')}</div>`;
+  return `<h3 class="svc-sec" style="--c:#e8590c"><i></i>🔥 জনপ্রিয় ক্যাটাগরি</h3><div class="svc-grid pop-cats">${top.map(k => `<button class="svc-tile" data-svc="${k}" style="--c:${svcColor(k)};--i:${TI()}">${svcIc(k, 22)}<span class="st-n">${esc(name(k))}</span></button>`).join('')}</div>`;
 }
 // ---------- সময় বুঝে দরকারি সেবা ও আজকের দিনের নোটিশ
 // সরকারি ছুটি (জনপ্রশাসন মন্ত্রণালয়ের প্রজ্ঞাপন; * = চাঁদ দেখার ওপর নির্ভর, তারিখ বদলাতে পারে)
@@ -4060,7 +4060,7 @@ function timeSuggestHtml() {
   else { title = '🌆 সন্ধ্যার দরকারি সেবা'; keys = ['food', 'shop', 'doc', 'gents', 'ladies', 'gym']; }
   if (closed) keys = keys.filter(k => !['bank', 'office', 'gov', 'upz'].includes(k)).concat(['shop', 'food', 'fix', 'doc']);
   keys = [...new Set(keys)].filter(k => cats.some(c => c[0] === k)).slice(0, 5);
-  return `<h3 class="svc-sec" style="--c:#5f3dc4"><i></i>${title}</h3><div class="svc-grid pop-cats">${keys.map(k => `<button class="svc-tile" data-svc="${k}">${svcIc(k, 22)}<span class="st-n">${esc(cats.find(c => c[0] === k)[1])}</span></button>`).join('')}</div>`;
+  return `<h3 class="svc-sec" style="--c:#5f3dc4"><i></i>${title}</h3><div class="svc-grid pop-cats">${keys.map(k => `<button class="svc-tile" data-svc="${k}" style="--c:${svcColor(k)};--i:${TI()}">${svcIc(k, 22)}<span class="st-n">${esc(cats.find(c => c[0] === k)[1])}</span></button>`).join('')}</div>`;
 }
 
 // ---------- 🆘 বিপদে আছি: লোকেশনসহ মেসেজ পরিচিতজনদের কাছে
@@ -4246,7 +4246,7 @@ function startSlider() {
   clearInterval(S.dsTimer);
   const tr = $('#ds-track'); if (!tr) return;
   const n = tr.children.length, dots = [...document.querySelectorAll('.ds-dots i')];
-  const idx = () => Math.round(tr.scrollLeft / Math.max(1, tr.clientWidth));
+  const idx = () => { let best = 0, d = 1e9; [...tr.children].forEach((c, j) => { const x = Math.abs(c.offsetLeft - tr.offsetLeft - tr.scrollLeft); if (x < d) { d = x; best = j; } }); return best; };
   tr.onscroll = () => { const i = idx(); dots.forEach((d, j) => d.classList.toggle('on', j === i)); };
   let hold = 0;
   tr.onpointerdown = tr.ontouchstart = () => { hold = Date.now(); };
@@ -4254,7 +4254,7 @@ function startSlider() {
   S.dsTimer = setInterval(() => {
     if (!tr.isConnected) return clearInterval(S.dsTimer);
     if (S.view !== 'dir' || document.hidden || Date.now() - hold < 6000) return;   // কেউ টানলে একটু থামে
-    const i = (idx() + 1) % n; tr.scrollTo({ left: i * tr.clientWidth, behavior: 'smooth' });
+    const i = (idx() + 1) % n, c = tr.children[i]; tr.scrollTo({ left: c.offsetLeft - tr.offsetLeft - 0, behavior: 'smooth' });
   }, 4500);
 }
 function dsLink(l) {
@@ -4300,12 +4300,16 @@ document.addEventListener('click', e => {
   const d = e.target.closest('[data-dsdel]');
   if (d) { if (!confirm('এই ব্যানারটি মুছবেন?')) return; S.api.delDirBanner(Number(d.dataset.dsdel) || d.dataset.dsdel).then(async () => { S.dirBanners = await S.api.dirBanners(); toast('ব্যানার মুছে ফেলা হয়েছে'); drawDir(); dsEditSheet(); }).catch(err => toast(errText(err))); }
 });
+let tileN = 0; const TI = () => tileN++;
 function renderSvcGrid(list) {
+  tileN = 0;
+  const anim = !S.dirAnimDone && !matchMedia('(prefers-reduced-motion: reduce)').matches; S.dirAnimDone = true;
   const n = k => list.filter(x => x.category === k).length;
   const total = list.length, cats = svcCats(), has = k => k === 'sos' || k === 'aid' || cats.some(c => c[0] === k);
   const tile = k => { const c = cats.find(x => x[0] === k), name = k === 'sos' ? 'জরুরি নম্বর' : k === 'aid' ? 'প্রাথমিক চিকিৎসা' : c[1], cnt = k === 'sos' || k === 'aid' || SVC_SPECIAL[k] ? 0 : n(k);
-    return `<button class="svc-tile" data-svc="${k}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
+    return `<button class="svc-tile" data-svc="${k}" style="--c:${svcColor(k)};--i:${TI()}">${svcIc(k, 24)}<span class="st-n">${esc(name)}</span>${cnt ? `<span class="st-c">${bn(cnt)}</span>` : ''}</button>`; };
   const favs = list.filter(x => S.svcFav?.has(x.id));
+  $('#dir').classList.toggle('anim', anim);
   $('#dir').innerHTML = sliderHtml(total, cats)
     + dayNoticeHtml()
     + `<div class="sos-row2"><button class="sos-btn" data-sos>🆘 বিপদে আছি</button><button class="aid-btn" data-svc="aid">🩹 প্রাথমিক চিকিৎসা</button></div>`
@@ -4340,7 +4344,7 @@ function drawDir() {
   if (S.myLoc) base = [...base].sort((a, b) => (svcDist(a) ?? 1e9) - (svcDist(b) ?? 1e9));   // লোকেশন জানা থাকলে কাছেরটা আগে
   const head = cat ? `<div class="svc-head">${svcIc(cat[0], 22)}<b>${esc(cat[1])}</b><span class="mut">${bn(base.length)}টি</span></div>`
     : `<div class="svc-head"><b>"${esc(q)}"</b><span class="mut">${bn(base.length)}টি সেবা</span></div>`;
-  const catHtml = cats.length ? `<div class="svc-grid svc-qcats">${cats.slice(0, 8).map(([k, n]) => `<button class="svc-tile" data-svc="${k}">${svcIc(k, 22)}<span class="st-n">${esc(n)}</span></button>`).join('')}</div>` : '';
+  const catHtml = cats.length ? `<div class="svc-grid svc-qcats">${cats.slice(0, 8).map(([k, n]) => `<button class="svc-tile" data-svc="${k}" style="--c:${svcColor(k)};--i:${TI()}">${svcIc(k, 22)}<span class="st-n">${esc(n)}</span></button>`).join('')}</div>` : '';
   const empty = S.dcat === 'fav' ? 'এখনো কোনো প্রিয় সেবা নেই। যেকোনো সেবার কার্ডে 🤍 চাপলে এখানে থাকবে।'
     : cat ? 'এই ধরনের কোনো সেবা এখনো যোগ হয়নি। নিচের বোতাম চেপে প্রথমটি যোগ করুন।' : 'কিছু পাওয়া যায়নি। অন্য শব্দ দিয়ে খুঁজুন বা নতুন সেবা যোগ করুন।';
   $('#dir').innerHTML = head + catHtml + (base.length ? base.map(svcCard).join('') : catHtml ? '' : `<div class="empty">${empty}</div>`);
@@ -4413,6 +4417,13 @@ document.addEventListener('click', e => {
   if (e.target.closest('[data-qpclear]')) { local.set('svc_recent', []); showQPanel(); }
 });
 addEventListener('online', () => { if (S.view === 'dir' && S.svcOffline) loadDir(); });
+// নিচে গেলে "উপরে ফিরুন" বাটন
+{ const b = document.createElement('button'); b.id = 'totop'; b.className = 'totop'; b.setAttribute('aria-label', 'উপরে ফিরুন'); b.innerHTML = '↑'; b.hidden = true; document.body.append(b);
+  b.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  let tk = 0; addEventListener('scroll', () => { if (tk) return; tk = requestAnimationFrame(() => { tk = 0; b.hidden = !(S.view === 'dir' && window.scrollY > 700); }); }, { passive: true }); }
+// আটকে থাকা সার্চের জন্য উপরের হেডারের উচ্চতা
+const setTopH = () => document.documentElement.style.setProperty('--toph', ($('#top')?.offsetHeight || 0) + 'px');
+addEventListener('resize', setTopH); setTimeout(setTopH, 0); setTimeout(setTopH, 1500);
 // ---------- কণ্ঠে খোঁজা: অ্যাপে নেটিভ প্লাগইন, ব্রাউজারে Web Speech
 const nativeSpeech = () => window.Capacitor?.isNativePlatform?.() && window.Capacitor?.Plugins?.SpeechRecognition;
 const webSpeech = () => window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -6339,6 +6350,7 @@ const RELOAD = {
 };
 function pushNav() { try { history.pushState({ au: 1 }, ''); } catch { /* sandbox */ } }
 function show(v) {
+  if (v !== 'dir') S.dirAnimDone = false;
   if (v !== 'thread') { try { VP.a.pause(); } catch { /* প্লেয়ার এখনো তৈরি হয়নি */ } }
   if (v !== 'msgs' && v !== 'thread') S.convPage = null;   // পেইজের মেসেজ-ফিল্টার শুধু ওই পাতায়
   S.view = v;

@@ -2765,8 +2765,8 @@ function dayLabel(d) {
 }
 const fmtSecs = s => `${bn(Math.floor(s / 60))}:${bn(String(Math.floor(s % 60)).padStart(2, '0'))}`;
 // পুরোনো ডাক: সাধারণ বা পেইজের চ্যাট
-function openThread(id, silent, pageId = null) { if (!pageId) pushClear('u' + id); else { pushClear(`q${pageId}-${id}`); if (me()) pushClear(`q${pageId}-${me().id}`); } return openConv({ kind: pageId ? 'page' : 'dm', id, pageId: pageId || null }, silent); }
-function openChatGroup(chatId, silent) { pushClear('g' + chatId); return openConv({ kind: 'group', id: Number(chatId) || chatId }, silent); }
+function openThread(id, silent, pageId = null) { if (!silent) setTimeout(() => deskConvs?.(), 400); if (!pageId) pushClear('u' + id); else { pushClear(`q${pageId}-${id}`); if (me()) pushClear(`q${pageId}-${me().id}`); } return openConv({ kind: pageId ? 'page' : 'dm', id, pageId: pageId || null }, silent); }
+function openChatGroup(chatId, silent) { if (!silent) setTimeout(() => deskConvs?.(), 400); pushClear('g' + chatId); return openConv({ kind: 'group', id: Number(chatId) || chatId }, silent); }
 async function openConv(t, silent) {
   if (!silent) {
     $('#tform').hidden = false; $('#t-ro').hidden = true; VP.a.pause(); VP.id = null; VP.pct = 0;
@@ -4487,6 +4487,7 @@ function afterAuth() {
   S.announcer = null; if (me()) S.api.myAnnouncer?.().then(a => { S.announcer = a; if (S.view === 'menu') renderMenu(); }).catch(() => {});
   if (S.view === 'me') renderMe(); if (S.view === 'friends') loadFriends(); if (S.view === 'msgs') loadConvs(); if (S.view === 'notif') loadNotifs(); if (S.view === 'menu') renderMenu();
   if (me() && S.bubbleRun) setTimeout(S.bubbleRun, 0);
+  renderDesk();
 }
 
 // ================================================================ ☰ সেবা ডিরেক্টরি
@@ -7260,9 +7261,8 @@ document.addEventListener('click', e => {
   if (t && d) { const open = d.hidden; d.hidden = !open; t.setAttribute('aria-expanded', open); t.classList.toggle('open', open); return; }
   if (d && !d.hidden && !e.target.closest('.me-wrap')) { d.hidden = true; $('#sw-toggle')?.classList.remove('open'); $('#sw-toggle')?.setAttribute('aria-expanded', 'false'); }
 });
-$('#menu').addEventListener('click', e => {
-  const b = e.target.closest('[data-mgo]'); if (!b) return;
-  const t = b.dataset.mgo;
+$('#menu').addEventListener('click', e => { const b = e.target.closest('[data-mgo]'); if (b) menuGo(b.dataset.mgo); });
+function menuGo(t) {
   if (t === 'blood' && !featGuard('featBlood')) return;
   if (t === 'dir' || t === 'sos' || t === 'blood') { S.dcat = t === 'dir' ? '' : t; $('#q').value = ''; open('dir'); loadDir(); }
   else if (t === 'prayer') prayerWeatherSheet();
@@ -7278,7 +7278,7 @@ $('#menu').addEventListener('click', e => {
   else if (t === 'pages') { if (featGuard('featPages')) { open('pages'); loadPages(); } }
   else if (t === 'groups') { if (featGuard('featGroups')) { open('groups'); loadGroups(); } }
   else if (t === 'admin') { open('admin'); loadAdmin(); }
-});
+}
 
 
 // ================================================================ পুশ নোটিফিকেশন (Android): অ্যাপ বন্ধ থাকলেও ফোনে
@@ -8685,3 +8685,59 @@ if (window.__auBubble) window.auBubble(window.__auBubble);
 { const tc = document.querySelector('#v-thread .tcomp'), th = document.getElementById('thread');
   if (tc && th && window.ResizeObserver) new ResizeObserver(() => { const atEnd = innerHeight + scrollY >= document.documentElement.scrollHeight - 40;
     th.style.paddingBottom = (tc.offsetHeight + 12) + 'px'; if (atEnd && S.view === 'thread') scrollTo({ top: document.documentElement.scrollHeight }); }).observe(tc); }
+
+// ================================================================ ডেস্কটপ (বড় পর্দা): Facebook-এর মতো বাঁয়ে শর্টকাট, মাঝে ফিড, ডানে যোগাযোগ
+const DESK = matchMedia('(min-width: 1100px)');
+function deskEls() {
+  if ($('#desk-l')) return;
+  document.body.insertAdjacentHTML('beforeend', '<aside class="desk-side desk-l" id="desk-l" aria-label="শর্টকাট"></aside><aside class="desk-side desk-r" id="desk-r" aria-label="যোগাযোগ"></aside><aside class="desk-side desk-c" id="desk-c" aria-label="চ্যাট"></aside>');
+  // চ্যাট খোলা থাকলে বাঁয়ে সব চ্যাটের তালিকা (Messenger ডেস্কটপের মতো)
+  $('#desk-c').addEventListener('click', e => { const c = e.target.closest('[data-dcv]'); if (!c) return; const x = (S.deskConvs || [])[Number(c.dataset.dcv)]; if (x) openConvItem(x); });
+  $('#desk-l').addEventListener('click', e => {
+    const v = e.target.closest('[data-dv]'); if (v) return v.dataset.dv === 'me' ? go('me') : go(v.dataset.dv);
+    const b = e.target.closest('[data-mgo]'); if (b) menuGo(b.dataset.mgo);
+  });
+  $('#desk-r').addEventListener('click', e => {
+    const u = e.target.closest('[data-dmsg]'); if (u) return openThread(u.dataset.dmsg);
+    if (e.target.closest('[data-dbday]')) return birthdaySheet();
+  });
+}
+function renderDesk() {
+  document.documentElement.classList.toggle('desk', DESK.matches);
+  if (!DESK.matches) return;
+  deskEls();
+  const u = me(), pins = u ? menuPins() : [];
+  const list = (u ? [...pins, ...SC_ALL.map(x => x[0]).filter(k => !pins.includes(k))] : SC_ALL.map(x => x[0]))
+    .map(k => SC_ALL.find(x => x[0] === k)).filter(x => x && !(x[4] && S.settings?.[x[4]] === false && !u?.admin));
+  const row = (attr, icn, t) => `<button class="dk-row" ${attr}><span class="dk-ic">${icn}</span><span>${esc(t)}</span></button>`;
+  $('#desk-l').innerHTML = (u ? row('data-dv="me"', av(u, 'sm'), u.name) : '')
+    + row('data-dv="friends"', ic('users', 20), 'বন্ধু') + row('data-dv="msgs"', ic('message', 20), 'মেসেজ') + row('data-dv="notif"', ic('bell', 20), 'নোটিফিকেশন')
+    + '<hr class="dk-hr">' + list.slice(0, 14).map(x => row(`data-mgo="${x[0]}"`, ic(x[1], 20), x[2])).join('')
+    + row('data-dv="menu"', ic('dots', 20), 'সব দেখুন')
+    + `<p class="dk-foot">আমার উপজেলা${($('#upname')?.textContent || '').trim() ? ' · ' + esc($('#upname').textContent.trim()) : ''}</p>`;
+  deskRight();
+}
+async function deskRight() {
+  const box = $('#desk-r'); if (!box) return;
+  if (!me()) { box.innerHTML = '<p class="mut dk-empty">লগইন করলে এখানে আপনার বন্ধুরা দেখাবে</p>'; return; }
+  try {
+    const fr = (await S.api.friends()).slice(0, 40);
+    const seen = await S.api.presence(fr.map(f => f.id)).catch(() => new Map());
+    fr.sort((a, b) => (isOnline(seen.get(b.id)) - isOnline(seen.get(a.id))) || String(a.name).localeCompare(String(b.name), 'bn'));
+    const bd = (S.bdays || []).length;
+    box.innerHTML = (bd ? `<h4 class="dk-h">জন্মদিন</h4><button class="dk-row" data-dbday><span class="dk-ic">${ic('cake', 20)}</span><span>আজ ${bn(bd)} জনের জন্মদিন</span></button><hr class="dk-hr">` : '')
+      + `<h4 class="dk-h">যোগাযোগ</h4>` + (fr.length ? fr.map(f => `<button class="dk-row" data-dmsg="${esc(f.id)}"><span class="dk-ic dk-av">${av(f, 'sm')}${isOnline(seen.get(f.id)) ? '<i class="on-dot"></i>' : ''}</span><span>${esc(f.name)}</span></button>`).join('') : '<p class="mut dk-empty">এখনো কোনো বন্ধু নেই</p>');
+  } catch { box.innerHTML = ''; }
+}
+async function deskConvs() {
+  const box = $('#desk-c'); if (!box || !DESK.matches || !me()) return;
+  try {
+    const l = (await S.api.inbox()).filter(c => !c.request).slice(0, 40); S.deskConvs = l;
+    const th = S.th, cur = c => th && (c.kind === 'group' ? th.kind === 'group' && String(th.id) === String(c.chatId) : th.kind !== 'group' && String(th.id) === String(c.userId) && (th.pageId || null) === (c.pageId || null));
+    box.innerHTML = `<h3 class="dk-title">চ্যাট</h3>` + l.map((c, i) => `<button class="dk-cv${cur(c) ? ' on' : ''}${c.unread ? ' un' : ''}" data-dcv="${i}">${c.kind === 'group' ? groupAv(c.name, '', c.avatar) : c.pageId && !c.asPage ? entAv({ name: c.name, avatar: c.avatar }) : av(c)}<span class="dk-cvt"><b>${esc(c.name)}</b><small>${esc((c.lastMine ? 'আপনি: ' : '') + (c.last || ''))}</small></span>${c.unread ? '<i class="dk-dot"></i>' : ''}</button>`).join('');
+  } catch { /* থাক */ }
+}
+function openConvItem(c) { if (c.kind === 'group') openChatGroup(c.chatId); else openThread(c.userId, false, c.pageId); }
+DESK.addEventListener?.('change', renderDesk);
+renderDesk();
+setInterval(() => { if (DESK.matches && document.visibilityState === 'visible') deskRight(); }, 120000);

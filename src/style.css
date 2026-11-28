@@ -2888,3 +2888,61 @@ body.bubble { --hh: 0px; }
 .qrx-more{display:grid;place-items:center;color:var(--g)!important;border-style:dashed!important}
 
 .is-busy{opacity:.45;pointer-events:none}
+
+/* ================================================================ ডেস্কটপ (বড় পর্দা) */
+.desk-side{display:none}
+@media (min-width:1100px){
+  :root{--dkw:300px}
+  .app{max-width:none;padding-bottom:24px}
+  /* উপরের এক সারির হেডার: বাঁয়ে নাম, মাঝে ট্যাব, ডানে সার্চ ও মেনু */
+  header{display:flex;align-items:center;padding:0 16px;height:60px;position:sticky}
+  header .topbar{display:contents}
+  header .topbar .title{flex:0 0 calc(var(--dkw) - 16px);order:0}
+  header .topbar h1{font-size:26px}
+  header nav.tabs{position:absolute;left:50%;top:var(--st);transform:translateX(-50%);width:min(620px,44vw);height:60px}
+  header nav.tabs button{min-height:60px;border-radius:10px 10px 0 0}
+  header nav.tabs button:hover{background:var(--g2)}
+  header .topbar .circle{order:2}
+  header .topbar #open-search{margin-left:auto}
+  header .topbar .circle+.circle{margin-left:8px}
+  /* মাঝের কলাম */
+  main{max-width:680px;margin:0 auto;padding:18px 12px}
+  html.desk #v-dir.on,html.desk #v-admin.on,html.desk #v-insights.on{max-width:none}
+  .tcomp{left:50%!important;right:auto!important;width:min(680px,100%);transform:translateX(-50%)}
+  .tcomp form{max-width:none}
+  .toast{bottom:28px}
+  /* শিট: নিচ থেকে নয়, মাঝখানে ছোট জানালা */
+  .modal{align-items:center}
+  .sheet{border-radius:18px;max-height:84vh;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  /* বাঁ ও ডান পাশ: শুধু হোম ট্যাবে */
+  .desk-side{position:fixed;top:var(--hh,60px);bottom:0;width:var(--dkw);overflow-y:auto;padding:14px 8px 20px;scrollbar-width:thin;z-index:2}
+  html.desk body:has(#v-home.on) :is(.desk-l,.desk-r){display:block}
+  .desk-l{left:0}.desk-r{right:0}
+  .dk-row{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;padding:7px 10px;border-radius:10px;text-align:left;font:inherit;font-size:15px;font-weight:500;color:var(--ink);cursor:pointer}
+  .dk-row:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+  .dk-ic{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--g2);color:var(--g);position:relative}
+  .dk-ic .av{width:36px;height:36px;font-size:15px}
+  .dk-av{background:none}
+  .dk-av .on-dot{position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;background:#31a24c;border:2px solid var(--bg)}
+  .dk-hr{border:0;border-top:1px solid var(--line);margin:10px 10px}
+  .dk-h{margin:6px 10px 6px;font-size:15px;color:var(--mut);font-weight:600}
+  .dk-foot{font-size:12px;color:var(--mut);margin:14px 10px 0}
+  .dk-empty{padding:6px 10px;font-size:13px}
+}
+@media (min-width:1100px) and (max-width:1279px){:root{--dkw:260px}}
+
+@media (min-width:1100px){
+  html.desk body:has(#v-thread.on) .desk-c{display:block}
+  .desk-c{left:0;width:340px;background:var(--card);border-right:1px solid var(--line);padding:10px 8px}
+  html.desk body:has(#v-thread.on) main{margin-left:max(340px,calc(50% - 340px))}
+  html.desk body:has(#v-thread.on) #v-thread .tcomp{left:max(340px,calc(50% - 340px))!important;transform:none}
+  .dk-title{margin:4px 10px 10px;font-size:22px}
+  .dk-cv{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:8px 10px;border-radius:10px;text-align:left;cursor:pointer;font:inherit;color:var(--ink);position:relative}
+  .dk-cv:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}
+  .dk-cv.on{background:var(--g2)}
+  .dk-cv .av,.dk-cv .ent-av,.dk-cv .gav{width:48px;height:48px;flex:none}
+  .dk-cvt{flex:1;min-width:0}.dk-cvt b{display:block;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dk-cvt small{display:block;color:var(--mut);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dk-cv.un .dk-cvt b,.dk-cv.un .dk-cvt small{font-weight:700;color:var(--ink)}
+  .dk-dot{width:10px;height:10px;border-radius:50%;background:var(--g);flex:none}
+}

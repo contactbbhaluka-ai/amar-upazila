@@ -5,30 +5,31 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 
-import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.RemoteInput;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-/** নোটিফিকেশনের "উত্তর দিন" / "পড়েছি" বোতাম: অ্যাপ না খুলেই সার্ভারে পাঠায় (push_reply) */
+/** নোটিফিকেশনের বোতাম: অ্যাপ না খুলেই সার্ভারে পাঠায় (push_reply) */
 public class AuReplyReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent intent) {
         final String conv = intent.getStringExtra("conv");
-        final String action = intent.getAction() == null ? "" : intent.getAction();
-        if (conv == null) return;
-        if (action.endsWith("_CLEAR")) { AuMessagingService.clear(c, conv); return; }
+        String a = intent.getAction() == null ? "" : intent.getAction();
+        if (conv == null || !a.startsWith("com.amarupazila.app.PUSH_")) return;
+        final String action = a.substring("com.amarupazila.app.PUSH_".length()).toLowerCase();
+        if ("clear".equals(action)) { AuMessagingService.clear(c, conv); return; }
         final JSONObject st = AuMessagingService.load(c, conv);
-        if (st == null) { NotificationManagerCompat.from(c).cancel(conv, AuMessagingService.NID); return; }
+        if (st == null) { AuMessagingService.cancel(c, conv); return; }
         String text = null;
-        if (action.endsWith("_REPLY")) {
+        if ("reply".equals(action)) {
             Bundle r = RemoteInput.getResultsFromIntent(intent);
             CharSequence cs = r == null ? null : r.getCharSequence(AuMessagingService.KEY_REPLY);
             text = cs == null ? "" : cs.toString().trim();
@@ -38,26 +39,38 @@ public class AuReplyReceiver extends BroadcastReceiver {
         final PendingResult pr = goAsync();
         new Thread(() -> {
             try {
-                JSONObject res = call(st, reply == null ? "read" : "reply", reply);
+                String rpcAction = "like".equals(action) ? "react" : action;
+                JSONObject res = call(st, rpcAction, "like".equals(action) ? "👍" : reply, "like".equals(action) ? st.optString("mid") : null);
                 boolean ok = res != null && res.optBoolean("ok");
-                if (reply == null) {
-                    // পড়েছি: নোটিফিকেশন সরিয়ে দেওয়া
-                    NotificationManagerCompat.from(c).cancel(conv, AuMessagingService.NID);
-                    AuMessagingService.clear(c, conv);
-                } else if (ok) {
-                    st.put("me", res.optString("me", "আপনি"));
-                    JSONObject m = new JSONObject();
-                    m.put("me", true); m.put("t", reply); m.put("at", System.currentTimeMillis());
-                    JSONArray h = st.getJSONArray("hist"); h.put(m);
-                    while (h.length() > 7) h.remove(0);
-                    AuMessagingService.save(c, conv, st);
-                    AuMessagingService.show(c, conv, st, true, null);
-                } else {
-                    String err = res == null ? "" : res.optString("error");
-                    String note = "expired".equals(err) ? "⚠️ উত্তর দেওয়ার সময় শেষ, অ্যাপ খুলে পাঠান"
-                        : "blocked".equals(err) ? "⚠️ এই কথোপকথনে মেসেজ পাঠানো যাচ্ছে না"
-                        : "⚠️ পাঠানো যায়নি, ইন্টারনেট দেখে আবার চেষ্টা করুন";
-                    AuMessagingService.show(c, conv, st, true, note);
+                String err = res == null ? "net" : res.optString("error");
+                if (ok) st.put("me", res.optString("me", "আপনি"));
+                switch (action) {
+                    case "reply":
+                        if (ok) {
+                            JSONObject m = new JSONObject();
+                            m.put("me", true); m.put("t", reply); m.put("at", System.currentTimeMillis());
+                            JSONArray h = st.getJSONArray("hist"); h.put(m);
+                            while (h.length() > 7) h.remove(0);
+                            AuMessagingService.save(c, conv, st);
+                            AuMessagingService.show(c, conv, st, true, null);
+                        } else AuMessagingService.show(c, conv, st, true, errText(err));
+                        break;
+                    case "read":
+                    case "like":
+                        if (ok) AuMessagingService.cancel(c, conv);
+                        else AuMessagingService.show(c, conv, st, true, errText(err));
+                        break;
+                    case "accept":
+                    case "decline":
+                    case "donate":
+                        String done = !ok ? ("gone".equals(err) ? "এটা আর নেই বা আগেই করা হয়েছে" : errText(err))
+                            : "accept".equals(action) ? "✓ আপনারা এখন বন্ধু"
+                            : "decline".equals(action) ? "রিকোয়েস্ট মুছে ফেলা হয়েছে"
+                            : "ধন্যবাদ! আপনি রক্ত দিতে পারবেন, সেটা মেসেজে জানিয়ে দেওয়া হয়েছে 🩸";
+                        st.put("rt", "");   // একবারই চাপা যায়
+                        AuMessagingService.show(c, conv, st, true, done);
+                        AuMessagingService.clear(c, conv);
+                        break;
                 }
             } catch (Exception ignored) {
             } finally {
@@ -66,13 +79,20 @@ public class AuReplyReceiver extends BroadcastReceiver {
         }).start();
     }
 
-    private static JSONObject call(JSONObject st, String action, String text) {
+    private static String errText(String err) {
+        return "expired".equals(err) ? "⚠️ সময় শেষ, অ্যাপ খুলে করুন"
+            : "blocked".equals(err) ? "⚠️ এই ব্যক্তিকে পাঠানো যাচ্ছে না"
+            : "⚠️ হয়নি, ইন্টারনেট দেখে আবার চেষ্টা করুন";
+    }
+
+    private static JSONObject call(JSONObject st, String action, String text, String mid) {
         HttpURLConnection h = null;
         try {
             JSONObject body = new JSONObject();
             body.put("p_token", st.optString("rt"));
             body.put("p_action", action);
             if (text != null) body.put("p_text", text);
+            if (mid != null && !mid.isEmpty()) body.put("p_mid", Long.parseLong(mid));
             h = (HttpURLConnection) new URL(st.optString("ru")).openConnection();
             h.setRequestMethod("POST");
             h.setConnectTimeout(8000); h.setReadTimeout(8000);
@@ -85,8 +105,8 @@ public class AuReplyReceiver extends BroadcastReceiver {
             o.close();
             if (h.getResponseCode() >= 300) return null;
             InputStream in = h.getInputStream();
-            byte[] buf = new byte[4096]; StringBuilder sb = new StringBuilder(); int n;
-            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[4096]; int n;
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
             while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
             in.close();
             return new JSONObject(new String(bo.toByteArray(), StandardCharsets.UTF_8));

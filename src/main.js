@@ -4213,7 +4213,7 @@ document.addEventListener('click', async e => {
 function afterAuth() {
   if (me()) hideGate();
   if (me()?.needsSetup) { go('me'); renderMe(); return; }
-  if (me() && PN()) setTimeout(() => pushSetup(false), 3500);
+  if (me() && PN() && !S.bubble) setTimeout(() => pushSetup(false), 3500);
   { const m = S.api?.oauthError?.(); if (m) setTimeout(() => toast('Google দিয়ে লগইন হয়নি, আবার চেষ্টা করুন'), 300); }
   { const u = me(); if (u && accSaved(u.id)) accUpd(u.id, { name: u.name, ...(u.avatar && !String(u.avatar).startsWith('blob:') ? { avatar: u.avatar } : {}) }); }
   if (!me() && S.scope === 'friends') S.scope = 'area';
@@ -4222,6 +4222,7 @@ function afterAuth() {
   if (me()) restoreActAs(); else if (S.actAs) setActAs(null, true);
   S.announcer = null; if (me()) S.api.myAnnouncer?.().then(a => { S.announcer = a; if (S.view === 'menu') renderMenu(); }).catch(() => {});
   if (S.view === 'me') renderMe(); if (S.view === 'friends') loadFriends(); if (S.view === 'msgs') loadConvs(); if (S.view === 'notif') loadNotifs(); if (S.view === 'menu') renderMenu();
+  if (me() && S.bubbleRun) setTimeout(S.bubbleRun, 0);
 }
 
 // ================================================================ ☰ সেবা ডিরেক্টরি
@@ -6176,7 +6177,7 @@ const NT_GROUP_TXT = { like: 'আপনার পোস্টে রিয়্
 async function loadNotifs(keep) {
   const box = $('#notifs');
   if (!me()) { $('#nt-tools').innerHTML = ''; box.innerHTML = `<div class="empty">নোটিফিকেশন দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
-  if (!keep) box.innerHTML = SK.list(8, 50);
+  if (!keep) { box.innerHTML = SK.list(8, 50); pushClearTray(); }
   $('#nt-newbar').hidden = true; S.ntNew = 0;
   try {
     const [list, reqs, mutes] = await Promise.all([S.api.notifications(S.actAs?.id), S.actAs ? [] : S.api.friendRequests(), S.api.notifMutes().catch(() => new Set())]);
@@ -7022,6 +7023,11 @@ function pushBind(P) {
   P.createChannel?.({ id: 'default', name: 'সাধারণ নোটিফিকেশন', description: 'মেসেজ, মন্তব্য, রিয়্যাক্ট ও জরুরি খবর', importance: 4, visibility: 1, lights: true, lightColor: '#006a4e', vibration: true }).catch(() => {});
   P.addListener('registration', t => { const tok = t?.value; if (!tok) return; local.set('push_tok', tok); if (me()) S.api.registerPush(tok).catch(() => {}); });
   P.addListener('registrationError', () => {});
+  // নতুন অ্যাপ: নিজস্ব শব্দসহ চ্যানেল (আগের 'default' চ্যানেল সরিয়ে)
+  if (/AUPush\/2/.test(navigator.userAgent)) {
+    P.createChannel?.({ id: 'au_general', name: 'সাধারণ নোটিফিকেশন', description: 'মন্তব্য, রিয়্যাক্ট, ফ্রেন্ড রিকোয়েস্ট ও জরুরি খবর', importance: 4, visibility: 1, sound: 'au_notify.ogg', lights: true, lightColor: '#006a4e', vibration: true }).catch(() => {});
+    P.deleteChannel?.({ id: 'default' }).catch(() => {});
+  }
   // ফোনের নোটিফিকেশনে চাপলে সরাসরি সেই জিনিস খোলে
   P.addListener('pushNotificationActionPerformed', a => setTimeout(() => pushOpen(a?.notification?.data || {}), me() ? 0 : 1500));
   P.addListener('pushNotificationReceived', () => { refreshBadges().catch?.(() => {}); });
@@ -7031,6 +7037,21 @@ function pushClear(tag) {
   const P = PN(); if (!P?.removeDeliveredNotifications) return;
   P.removeDeliveredNotifications({ notifications: [{ id: 4201, tag, title: '', body: '', data: {} }] }).catch(() => {});
 }
+// নোটিফিকেশন ট্যাব খুললে ফোনের বারের সাধারণ নোটিফিকেশনগুলো সরে যায় (মেসেজেরগুলো চ্যাট খুললে)
+function pushClearTray() {
+  const P = PN(); if (!P?.getDeliveredNotifications) return;
+  P.getDeliveredNotifications().then(r => {
+    const l = (r?.notifications || []).filter(n => !/^[ug]/.test(n.tag || ''));
+    if (l.length) P.removeDeliveredNotifications({ notifications: l }).catch(() => {});
+  }).catch(() => {});
+}
+// চ্যাট বাবল (Android 11+): ছোট ভাসমান জানালায় শুধু ওই চ্যাট
+window.auBubble = conv => {
+  if (!/^[ug][\w-]+$/.test(conv || '') || S.bubble === conv) return;
+  S.bubble = conv; document.body.classList.add('bubble');
+  S.bubbleRun = () => { S.bubbleRun = null; hideGate(); const id = conv.slice(1); conv[0] === 'g' ? openChatGroup(id) : openThread(id); };
+  if (me()) S.bubbleRun();
+};
 function pushOpen(d) {
   if (!me()) return go('notif');
   const t = d.type || '';
@@ -8385,3 +8406,4 @@ function restoreNav() {
 // হেডারের উচ্চতা মেপে রাখা: চ্যাটের উপরের অংশ ঠিক হেডারের নিচে আটকে থাকে (ফেসবুকের মতো)
 { const top = document.getElementById('top'), setH = () => document.documentElement.style.setProperty('--hh', top.offsetHeight + 'px');
   setH(); if (window.ResizeObserver) new ResizeObserver(setH).observe(top); else addEventListener('resize', setH); }
+if (window.__auBubble) window.auBubble(window.__auBubble);

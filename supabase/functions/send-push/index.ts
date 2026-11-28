@@ -42,11 +42,11 @@ async function accessToken(sa: { client_email: string; private_key: string }) {
   return cached.token;
 }
 
-type Rich = { conv: string; sender: string; av: string; text: string; group: boolean; title: string };
+type Rich = { kind: 'msg' | 'friend' | 'blood'; conv: string; sender: string; av: string; text: string; group: boolean; title: string; mid?: number };
 type Job = { user: string; title: string; body: string; data: Record<string, string>; tag: string; high?: boolean; rich?: Rich };
 
 async function notifJobs(id: number): Promise<Job[]> {
-  const { data: n } = await sb.from('notifications').select('id,user_id,actor_id,type,post_id,group_id,meta, a:profiles!notifications_actor_id_fkey(name), p:posts!notifications_post_id_fkey(body), g:groups!notifications_group_id_fkey(name)').eq('id', id).maybeSingle();
+  const { data: n } = await sb.from('notifications').select('id,user_id,actor_id,type,post_id,group_id,meta, a:profiles!notifications_actor_id_fkey(name,avatar_url), p:posts!notifications_post_id_fkey(body), g:groups!notifications_group_id_fkey(name)').eq('id', id).maybeSingle();
   if (!n) return [];
   const [{ data: pref }, { data: mute }] = await Promise.all([
     sb.from('notif_prefs').select('off').eq('user_id', n.user_id).maybeSingle(),
@@ -69,11 +69,21 @@ async function notifJobs(id: number): Promise<Job[]> {
   else if (n.type === 'milestone') { title = APP; body = m.kind === 'friends' ? `অভিনন্দন! আপনার এখন ${bnNum(m.n || 0)} জন বন্ধু 🤝` : m.kind === 'reacts' ? `অভিনন্দন! আপনার পোস্টে ${bnNum(m.n || 0)}টি রিয়্যাক্ট হয়েছে ❤️` : `অভিনন্দন! আপনার পোস্ট ${bnNum(m.n || 0)} জন দেখেছেন 🎉`; }
   else if (n.type === 'follower_milestone') { title = APP; body = `অভিনন্দন! আপনার ফলোয়ার এখন ${bnNum(m.n || 0)} জন 🎉`; }
   else if (n.type === 'weekly') { title = APP; body = 'আপনার এই সপ্তাহের রিপোর্ট তৈরি, দেখে নিন 📊'; }
+  // একই পোস্টে অনেকে রিয়্যাক্ট/মন্তব্য করলে একটাই নোটিফিকেশন: "রহিম ও আরও ১২ জন …" (একই tag আগেরটা বদলে দেয়)
+  if (n.post_id && ['like', 'comment', 'share', 'reply'].includes(n.type)) {
+    const { data: cnt } = await sb.rpc('push_group_count', { p_user: n.user_id, p_post: n.post_id, p_type: n.type });
+    if ((cnt || 0) > 1) { title = APP; body = `${actor} ও আরও ${bnNum((cnt as number) - 1)} জন ${body}`; }
+  }
   if (!body) body = 'নতুন নোটিফিকেশন';
   const data: Record<string, string> = { type: n.type, nid: String(n.id) };
   if (n.post_id) data.post = String(n.post_id); if (n.group_id) data.group = String(n.group_id); if (n.actor_id) data.user = n.actor_id;
   if (m.chat_id) data.chat = String(m.chat_id); if (m.page_id) data.page = String(m.page_id);
-  return [{ user: n.user_id, title, body, data, tag: n.post_id ? `p${n.post_id}-${n.type}` : `n${n.id}`, high }];
+  const av = (n as any).a?.avatar_url || '';
+  // ফ্রেন্ড রিকোয়েস্ট ও রক্তের অনুরোধ: নতুন অ্যাপে নোটিফিকেশনেই বোতাম
+  const rich: Rich | undefined = n.type === 'friend_request' && n.actor_id ? { kind: 'friend', conv: 'f:' + n.actor_id, sender: actor, av, text: body, group: false, title }
+    : n.type === 'blood_request' && n.post_id ? { kind: 'blood', conv: 'b:' + n.post_id, sender: actor, av, text: body, group: false, title } : undefined;
+  const tag = n.type === 'friend_request' && n.actor_id ? 'f' + n.actor_id : n.type === 'blood_request' && n.post_id ? 'b' + n.post_id : n.post_id ? `p${n.post_id}-${n.type}` : `n${n.id}`;
+  return [{ user: n.user_id, title, body, data, tag, high, rich }];
 }
 
 async function msgJobs(id: number): Promise<Job[]> {
@@ -90,7 +100,7 @@ async function msgJobs(id: number): Promise<Job[]> {
     ]);
     const skip = new Set([m.sender_id, ...(muted || []).map(x => x.user_id), ...((m.mentions as string[]) || [])]);
     return (mem || []).filter(x => !skip.has(x.user_id)).map(x => ({ user: x.user_id, title: chat?.name || 'গ্রুপ চ্যাট', body: `${sender}: ${text}`, data: { type: 'msg', chat: String(m.chat_id) }, tag: 'g' + m.chat_id, high: true,
-      rich: { conv: 'g:' + m.chat_id, sender, av, text: full(), group: true, title: chat?.name || 'গ্রুপ চ্যাট' } }));
+      rich: { kind: 'msg', mid: m.id, conv: 'g:' + m.chat_id, sender, av, text: full(), group: true, title: chat?.name || 'গ্রুপ চ্যাট' } }));
   }
   const to = m.recipient_id; if (!to) return [];
   const [{ data: mu }, { data: fr }, { data: back }, { data: acc }] = await Promise.all([
@@ -102,7 +112,7 @@ async function msgJobs(id: number): Promise<Job[]> {
   if (mu?.muted) return [];
   const known = (fr || []).length || (back || []).length || acc;
   return [{ user: to, title: known ? sender : `${sender} (মেসেজ রিকোয়েস্ট)`, body: text, data: { type: 'msg', user: m.sender_id }, tag: 'u' + m.sender_id, high: true,
-    rich: { conv: 'u:' + m.sender_id, sender, av, text: full(), group: false, title: known ? sender : `${sender} (মেসেজ রিকোয়েস্ট)` } }];
+    rich: { kind: 'msg', mid: m.id, conv: 'u:' + m.sender_id, sender, av, text: full(), group: false, title: known ? sender : `${sender} (মেসেজ রিকোয়েস্ট)` } }];
 }
 
 Deno.serve(async req => {
@@ -127,13 +137,19 @@ Deno.serve(async req => {
     if (Math.random() < 0.05) await sb.from('push_reply_tokens').delete().lt('exp', new Date().toISOString());
   }
   const RPC = Deno.env.get('SUPABASE_URL') + '/rest/v1/rpc/push_reply', ANON = Deno.env.get('SUPABASE_ANON_KEY') || '';
+  // অ্যাপ আইকনের কোণে না-পড়ার সংখ্যা
+  const badge = new Map<string, number>();
+  const { data: bd } = await sb.rpc('push_badge', { p_users: [...new Set(toks.map(t => t.user_id))] });
+  for (const b of (bd || []) as { user_id: string; n: number }[]) badge.set(b.user_id, b.n);
   await Promise.all(toks.map(async t => {
     const j = jobs.find(x => x.user === t.user_id)!;
     const rt = t.platform === 'android-r' && j.rich && ANON ? replyTok.get(t.user_id) : undefined;
-    const message = rt ? { token: t.token, data: { ...j.data, au_rich: '1', au_title: j.rich!.title, au_sender: j.rich!.sender, au_text: j.rich!.text, au_av: j.rich!.av, au_conv: j.tag, au_grp: j.rich!.group ? '1' : '0', au_rt: rt, au_ru: RPC, au_rk: ANON },
+    const message = rt ? { token: t.token, data: { ...j.data, au_rich: '1', au_title: j.rich!.title, au_sender: j.rich!.sender, au_text: j.rich!.text, au_av: j.rich!.av, au_conv: j.tag, au_grp: j.rich!.group ? '1' : '0', au_rt: rt, au_ru: RPC, au_rk: ANON,
+          au_kind: j.rich!.kind, au_mid: String(j.rich!.mid || ''), au_badge: String(badge.get(t.user_id) || 0) },
         android: { priority: 'HIGH', ttl: '86400s' } }
       : { token: t.token, notification: { title: j.title, body: j.body }, data: j.data,
-        android: { priority: j.high ? 'HIGH' : 'NORMAL', notification: { channel_id: 'default', icon: 'ic_stat_notify', color: '#006a4e', tag: j.tag, sound: 'default' } } };
+        android: { priority: j.high ? 'HIGH' : 'NORMAL', notification: { channel_id: t.platform === 'android-r' ? 'au_general' : 'default', icon: 'ic_stat_notify', color: '#006a4e', tag: j.tag,
+          sound: t.platform === 'android-r' ? 'au_notify' : 'default', notification_count: badge.get(t.user_id) || 0 } } };
     const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
       method: 'POST', headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ message }),

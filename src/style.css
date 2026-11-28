@@ -2745,3 +2745,7 @@ body.gate-on{overflow:hidden}
 .nts-t b{display:block;font-size:15px}.nts-t small{display:block;color:var(--mut);font-size:12.5px;font-weight:400}
 .nts-h{margin:16px 2px 2px;font-size:15px}.nts-sub{margin:0 2px 8px;font-size:13px}
 .nts-card,.nts-h,.nts-sub{flex-shrink:0}
+
+/* চ্যাট বাবল: শুধু চ্যাটটা, উপরের হেডার ও ফেরার বোতাম ছাড়া */
+body.bubble #top, body.bubble #v-thread .bar .back, body.bubble .demo-bar { display: none !important; }
+body.bubble { --hh: 0px; }

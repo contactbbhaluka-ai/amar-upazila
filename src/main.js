@@ -10,6 +10,10 @@ if (EN) import('./i18n.js').then(m => { I18N = m; return m.startI18n(); }).catch
 
 // সাধারণ এক রঙের রেখার আইকন (লেখার রং-ই আইকনের রং)
 const ICONS = {
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  bellOff: '<path d="M6 16V11a6 6 0 0 1 9.5-4.9M18 11v5l2 2H8"/><path d="M10 20.5a2 2 0 0 0 4 0"/><path d="M3.5 3.5l17 17"/>',
+  palette: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.1 0 1.6-.8 1.3-1.7-.4-1.1.3-2.3 1.5-2.3H17a3.5 3.5 0 0 0 3.5-3.5c0-5.2-3.8-9.5-8.5-9.5z"/><circle cx="7.8" cy="11" r="1.1"/><circle cx="10.5" cy="7.5" r="1.1"/><circle cx="14.8" cy="7.8" r="1.1"/>',
+  logout: '<path d="M14 4.5h3.5A1.5 1.5 0 0 1 19 6v12a1.5 1.5 0 0 1-1.5 1.5H14"/><path d="M10 16l-4-4 4-4M6 12h9"/>',
   cross: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/>',
   siren: '<path d="M6 18v-5a6 6 0 0 1 12 0v5"/><path d="M4 18h16v3H4z"/><path d="M12 3V1.5M4.2 6.2 3 5M19.8 6.2 21 5"/><path d="M10 13a2 2 0 0 1 2-2"/>',
   moon: '<path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/>',
@@ -2701,14 +2705,12 @@ $('#convs').addEventListener('click', async e => {
 // মিউট / চ্যাট মুছা / (গ্রুপ) ছেড়ে দেওয়া
 function convMenu(t, c) {
   const muted = c ? c.muted : !!S.th?.muted;
-  openSheet(`<div class="menu">
-    <button data-act="mute">${muted ? '🔔 আনমিউট করুন' : '🔕 মিউট করুন'}</button>
-    ${c?.request ? '<button data-act="accept">✅ রিকোয়েস্ট গ্রহণ করুন</button>' : ''}
-    ${c ? (c.unread ? '<button data-act="read">✓ পড়া হিসেবে চিহ্ন দিন</button>' : '<button data-act="unread">📩 না পড়া হিসেবে চিহ্ন দিন</button>') : ''}
-    <button data-act="clear" class="danger">🗑 চ্যাট মুছে ফেলুন</button>
-    ${t.kind === 'group' ? '<button data-act="leave" class="danger">🚪 গ্রুপ ছেড়ে দিন</button>' : ''}
+  openSheet(`<div class="mx-sheet cs">${cCard('', cRow('mute', muted ? 'bell' : 'bellOff', muted ? 'আনমিউট' : 'মিউট')
+      + (c?.request ? cRow('accept', 'check', 'রিকোয়েস্ট গ্রহণ') : '')
+      + (c ? (c.unread ? cRow('read', 'check', 'পড়া হয়েছে') : cRow('unread', 'mail', 'না পড়া')) : '')
+      + (!c ? cRow('x-search', 'search', 'খুঁজুন') : ''))}
     ${!c ? chatExtrasHtml(t) : ''}
-    <button data-close>বন্ধ করুন</button></div>`);
+    ${cCard('', cRow('clear', 'trash', 'চ্যাট মুছুন', { danger: true }) + (t.kind === 'group' ? cRow('leave', 'logout', 'গ্রুপ ছাড়ুন', { danger: true }) : ''))}</div>`);
   $('#sheet').onclick = async ev => {
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
     if (EXTRA_ACTS.has(a)) return chatExtra(a);
@@ -3306,13 +3308,10 @@ $('#t-menu').addEventListener('click', () => {
   if (th.kind === 'group') return groupMenu();
   if (th.kind === 'page') return convMenu(th, null);
   const p = th.partner;
-  openSheet(`<div class="menu"><button data-act="prof">${ic('user', 18)} প্রোফাইল দেখুন</button>
-    <button data-act="mute">${th.muted ? '🔔 আনমিউট করুন' : '🔕 মিউট করুন'}</button>
-    <button data-act="clear" class="danger">🗑 চ্যাট মুছে ফেলুন</button>
+  openSheet(`<div class="mx-sheet cs"><div class="cs-head">${av(p || { name: '?' })}<h2>${esc(p?.name || '')}</h2></div>
+    ${cQuick([['prof', 'user', 'প্রোফাইল'], ['mute', th.muted ? 'bell' : 'bellOff', th.muted ? 'আনমিউট' : 'মিউট'], ['x-search', 'search', 'খুঁজুন']])}
     ${chatExtrasHtml(th)}
-    <button data-act="report">⚠️ রিপোর্ট করুন</button>
-    <button data-act="block" class="danger">⛔ ${esc(p?.name || '')}-কে ব্লক করুন</button>
-    <button data-close>বন্ধ করুন</button></div>`);
+    ${cCard('গোপনীয়তা ও সহায়তা', cRow('report', 'flag', 'রিপোর্ট') + cRow('block', 'ban', 'ব্লক', { danger: true }) + cRow('clear', 'trash', 'চ্যাট মুছুন', { danger: true }))}</div>`);
   $('#sheet').onclick = async ev => {
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
     if (EXTRA_ACTS.has(a)) return chatExtra(a);
@@ -3375,11 +3374,15 @@ function pinnedSheet() {
 }
 // ⋯ মেনুর বাড়তি অপশন
 const EXTRA_ACTS = new Set(['x-search', 'x-media', 'x-pins', 'x-theme', 'x-nick', 'x-dis']);
+// চ্যাট সেটিংয়ের একটা সারি: আইকন + মূল শব্দ (+ ডানে অবস্থা)
+const cRow = (act, icn, t, { right = '', danger = false, id = '' } = {}) => `<button class="pm-row mx-row${danger ? ' danger' : ''}" data-act="${act}"${id ? ` id="${id}"` : ''}><span class="pm-ic">${ic(icn, 19)}</span><span class="pm-t"><b>${t}</b></span>${right ? `<span class="cs-r">${right}</span>` : ''}</button>`;
+const cCard = (title, rows) => (rows.trim() ? `${title ? `<h3 class="nts-h">${title}</h3>` : ''}<div class="nts-card pm-card">${rows}</div>` : '');
+// উপরের গোল দ্রুত বোতাম (Messenger-এর মতো)
+const cQuick = list => `<div class="cs-q">${list.map(([act, icn, t]) => `<button data-act="${act}"><span>${ic(icn, 20)}</span><small>${t}</small></button>`).join('')}</div>`;
 function chatExtrasHtml(th) {
   const shared = th.kind !== 'page';
-  return `<button data-act="x-search">🔍 চ্যাটে খুঁজুন</button><button data-act="x-media">🖼 শেয়ার করা ছবি</button><button data-act="x-pins">📌 পিন করা মেসেজ</button>
-    ${shared ? `<button data-act="x-theme">🎨 চ্যাটের রং</button><button data-act="x-nick">🏷 ডাকনাম</button>
-    <button data-act="x-dis">⏱ অদৃশ্য মেসেজ (২৪ ঘণ্টা): ${th.shared?.disappear ? '<b class="on-t">চালু</b>' : 'বন্ধ'}</button>` : ''}`;
+  return cCard('কাস্টমাইজ', shared ? cRow('x-theme', 'palette', 'থিম') + cRow('x-nick', 'tag', 'ডাকনাম') + cRow('x-dis', 'clock', 'অদৃশ্য মেসেজ', { right: th.shared?.disappear ? '<b class="on-t">চালু</b>' : 'বন্ধ' }) : '')
+    + cCard('আরও', cRow('x-media', 'album', 'ছবি ও মিডিয়া') + cRow('x-pins', 'pushpin', 'পিন করা মেসেজ'));
 }
 function chatExtra(a) {
   const th = S.th; if (!th) return;
@@ -3703,14 +3706,13 @@ function groupMenu() {
   const th = S.th, meIsAdmin = th.members?.find(x => x.id === me().id)?.role === 'admin';
   openSheet(`<div class="gm-head">${groupAv(th.info?.name, '', th.info?.photo)}<div><h2>${esc(th.info?.name || 'গ্রুপ')}</h2>${th.info?.about ? `<p class="gm-about">${esc(th.info.about)}</p>` : ''}</div></div><h3 class="res-h">সদস্য (${bn(th.members.length)})</h3>
     <div class="gm-list">${th.members.map(x => `<div class="person">${userLink(x.id, av(x))}<div class="info">${userLink(x.id, esc(x.name), 'who-btn')}${x.role === 'admin' ? '<div class="sub">⭐ অ্যাডমিন</div>' : ''}</div>${meIsAdmin && x.id !== me().id ? `<button class="sbtn ghost" data-gmadm="${esc(x.id)}" data-on="${x.role === 'admin' ? 0 : 1}">${x.role === 'admin' ? 'অ্যাডমিন সরান' : 'অ্যাডমিন বানান'}</button><button class="sbtn ghost" data-gmrm="${esc(x.id)}">বাদ দিন</button>` : ''}</div>`).join('')}</div>
-    <div class="menu"><button data-act="add">➕ সদস্য যোগ করুন</button><button data-act="invite">🔗 যোগ দেওয়ার লিংক ও QR</button>
-      ${meIsAdmin ? `<button data-act="joinreq" id="gm-jr">🙋 যোগ দেওয়ার অনুরোধ</button>
-      <button data-act="ro">📢 শুধু অ্যাডমিনরা মেসেজ পাঠাবেন: ${th.info?.adminsOnly ? '<b class="on-t">চালু</b>' : 'বন্ধ'}</button>` : ''}<button data-act="rename">✏️ নাম, ছবি ও বিবরণ</button>
+    <div class="mx-sheet cs">${cQuick([['add', 'plus', 'যোগ করুন'], ['mute', th.muted ? 'bell' : 'bellOff', th.muted ? 'আনমিউট' : 'মিউট'], ['x-search', 'search', 'খুঁজুন']])}
+      ${cCard('গ্রুপ', cRow('rename', 'edit', 'নাম, ছবি ও বিবরণ') + cRow('invite', 'link', 'লিংক ও QR')
+        + (meIsAdmin ? cRow('joinreq', 'users', 'যোগ দেওয়ার অনুরোধ', { id: 'gm-jr' }) + cRow('ro', 'megaphone', 'শুধু অ্যাডমিন লিখবেন', { right: th.info?.adminsOnly ? '<b class="on-t">চালু</b>' : 'বন্ধ' }) : ''))}
       ${chatExtrasHtml(th)}
-      <button data-act="mute">${th.muted ? '🔔 আনমিউট করুন' : '🔕 মিউট করুন'}</button><button data-act="clear" class="danger">🗑 চ্যাট মুছে ফেলুন</button>
-      <button data-act="leave" class="danger">🚪 গ্রুপ ছেড়ে দিন</button><button data-close>বন্ধ করুন</button></div>`);
+      ${cCard('', cRow('clear', 'trash', 'চ্যাট মুছুন', { danger: true }) + cRow('leave', 'logout', 'গ্রুপ ছাড়ুন', { danger: true }))}</div>`);
   $('#sheet').classList.add('tall');
-  if (meIsAdmin) S.api.chatJoinList(th.id).then(l => { const b = $('#gm-jr'); if (b && l.length) b.innerHTML = `🙋 যোগ দেওয়ার অনুরোধ <span class="badge">${bn(l.length)}</span>`; }).catch(() => {});
+  if (meIsAdmin) S.api.chatJoinList(th.id).then(l => { const b = $('#gm-jr'); if (b && l.length) b.insertAdjacentHTML('beforeend', `<span class="cs-r"><span class="badge">${bn(l.length)}</span></span>`); }).catch(() => {});
   $('#sheet').onclick = async ev => {
     const rm = ev.target.closest('[data-gmrm]');
     if (rm) { if (await confirmSheet('এই সদস্যকে গ্রুপ থেকে বাদ দেবেন?', 'বাদ দিন', true)) busy(null, async () => { await S.api.removeChatMember(th.id, rm.dataset.gmrm); toast('বাদ দেওয়া হয়েছে'); await openConv(th, true); groupMenu(); }); return; }

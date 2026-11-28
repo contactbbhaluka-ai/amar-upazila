@@ -145,6 +145,10 @@ const PLACES = {
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
   // লগইন ও সাইনআপ
+  "প্রোফাইল": "Profile", "মিউট": "Mute", "আনমিউট": "Unmute", "খুঁজুন": "Search", "কাস্টমাইজ": "Customize", "থিম": "Theme", "ডাকনাম": "Nicknames", "অদৃশ্য মেসেজ": "Disappearing messages",
+  "আরও": "More", "ছবি ও মিডিয়া": "Photos & media", "পিন করা মেসেজ": "Pinned messages", "গোপনীয়তা ও সহায়তা": "Privacy & support", "রিপোর্ট": "Report", "ব্লক": "Block", "চ্যাট মুছুন": "Delete chat",
+  "রিকোয়েস্ট গ্রহণ": "Accept request", "পড়া হয়েছে": "Mark as read", "না পড়া": "Mark as unread", "গ্রুপ ছাড়ুন": "Leave group", "যোগ করুন": "Add", "গ্রুপ": "Group", "নাম, ছবি ও বিবরণ": "Name, photo & description",
+  "লিংক ও QR": "Link & QR", "যোগ দেওয়ার অনুরোধ": "Join requests", "শুধু অ্যাডমিন লিখবেন": "Only admins can send", "চালু": "On", "বন্ধ": "Off",
   "উত্তর": "Reply", "এডিট": "Edit", "কপি": "Copy", "ফরওয়ার্ড": "Forward", "পিন": "Pin", "আনপিন": "Unpin", "সেভ": "Save", "আনসেভ": "Unsave", "সবার জন্য মুছুন": "Unsend", "আমার জন্য মুছুন": "Delete for me", "দ্রুত রিয়্যাক্ট {n}": "Quick reaction {n}",
   "এডিট করুন": "Edit", "পাঠানোর ১৫ মিনিটের মধ্যে": "Within 15 minutes of sending", "লেখা কপি করুন": "Copy text", "ফরওয়ার্ড করুন": "Forward", "পিন করুন": "Pin", "পিন সরান": "Unpin",
   "চ্যাটের সবাই উপরে দেখবেন": "Everyone in the chat sees it at the top", "সেভ করুন": "Save", "সেভ থেকে সরান": "Remove from saved", "শুধু আপনি দেখবেন": "Only you will see it",

@@ -4231,6 +4231,7 @@ function signupView(setup = false) {
     <div class="au-card"><form id="sform" novalidate>
       <section data-st="1">${setup ? `<div class="au-gdone">${G_LOGO}<div><b>Google দিয়ে ইমেইল যাচাই হয়েছে</b><small>অ্যাকাউন্ট চালু করতে নিচের ধাপগুলো পূরণ করুন</small></div></div>` : gBtn('su-g-top')}${!setup && gOn() ? '<div class="au-or"><span>অথবা নিচের ফর্ম পূরণ করুন</span></div>' : ''}<h2>আপনার পরিচয়</h2><p class="au-sub">${SU_ST[0][2]}</p>
         ${auF('an', ic('user', 18), 'আপনার পূর্ণ নাম', 'maxlength="40" autocomplete="name"')}
+        ${setup ? '<p class="au-hint" id="an-gh" hidden>নামটা আপনার Google অ্যাকাউন্ট থেকে নেওয়া। এটা আপনার আসল নাম না হলে মুছে সঠিক নাম লিখুন।</p>' : ''}
         <div class="au-blk"><label for="su-g">${ic('users', 16)} লিঙ্গ</label>${genderSelect('su-g', undefined, true)}</div>
         <div class="au-blk" id="su-bd-b"><div class="au-lbl">${ic('calendar', 16)} জন্মতারিখ <span>(বয়স ${bn(MIN_AGE)} বছরের বেশি হতে হবে)</span></div>${dateSelect('su-bd', '', true)}</div></section>
       <section data-st="2" hidden><h2>ঠিকানা ও যোগাযোগ</h2><p class="au-sub">${SU_ST[1][2]}</p>
@@ -4250,6 +4251,17 @@ function signupView(setup = false) {
       <button class="btn wide au-btn" id="su-next">পরবর্তী</button></form>
       ${setup ? '<p class="au-swap"><button type="button" class="link" id="su-cancel">বাতিল করে বের হয়ে যান</button></p>' : '<p class="au-swap">আগে থেকে অ্যাকাউন্ট আছে? <button type="button" class="link" data-auswap="login">লগইন করুন</button></p>'}</div></div>`;
   addrRefresh('su');
+  if (setup) {   // Google-এর নাম আগে থেকে বসানো; ভুল হলে × চেপে মুছে নতুন করে লেখা যায়
+    const gName = String(me()?.name || '').trim(), an = $('#an');
+    if (gName && gName !== 'নতুন সদস্য') {
+      an.value = gName.slice(0, 40); $('#an-gh').hidden = false;
+      const f = an.closest('.au-f'); f.classList.add('has-eye');
+      f.insertAdjacentHTML('beforeend', `<button type="button" class="au-eye au-clr" aria-label="নাম মুছুন">${ic('close', 18)}</button>`);
+      const clr = f.querySelector('.au-clr'), sync = () => { clr.hidden = !an.value; };
+      clr.onclick = () => { an.value = ''; sync(); an.focus(); };
+      an.addEventListener('input', sync);
+    }
+  }
   let step = 1;
   const show = n => {
     step = n; $$('#sform section').forEach(s => { s.hidden = Number(s.dataset.st) !== n; });

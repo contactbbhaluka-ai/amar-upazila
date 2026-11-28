@@ -1384,7 +1384,7 @@ function demoApi() {
     googleReady() { return true; },
     async signInGoogle() {
       // ডেমো: Google-এর মতো একটা যাচাই করা Gmail দিয়ে নতুন অ্যাকাউন্ট, বাকি ধাপ পূরণ বাকি
-      const n = Date.now().toString(36).slice(-4), u = { id: 'g' + Date.now(), email: `google.${n}@gmail.com`, password: '', name: 'নতুন সদস্য', needsSetup: true, provider: 'google', district: '', upazila: '', unionId: null, phone: '', bloodGroup: '', lastDonated: '', donorVisible: true, avatar: '', bio: '' };
+      const n = Date.now().toString(36).slice(-4), u = { id: 'g' + Date.now(), email: `google.${n}@gmail.com`, password: '', name: 'Rahim Uddin', needsSetup: true, provider: 'google', district: '', upazila: '', unionId: null, phone: '', bloodGroup: '', lastDonated: '', donorVisible: true, avatar: '', bio: '' };
       db.users.push(u); meId = u.id; seedFor(u.id); save(); return meUser();
     },
     async setPassword(pw) { person(meId).password = pw; save(); },

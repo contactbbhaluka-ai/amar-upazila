@@ -145,6 +145,7 @@ const PLACES = {
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
   // লগইন ও সাইনআপ
+  "উত্তর": "Reply", "এডিট": "Edit", "কপি": "Copy", "ফরওয়ার্ড": "Forward", "পিন": "Pin", "আনপিন": "Unpin", "সেভ": "Save", "আনসেভ": "Unsave", "সবার জন্য মুছুন": "Unsend", "আমার জন্য মুছুন": "Delete for me", "দ্রুত রিয়্যাক্ট {n}": "Quick reaction {n}",
   "এডিট করুন": "Edit", "পাঠানোর ১৫ মিনিটের মধ্যে": "Within 15 minutes of sending", "লেখা কপি করুন": "Copy text", "ফরওয়ার্ড করুন": "Forward", "পিন করুন": "Pin", "পিন সরান": "Unpin",
   "চ্যাটের সবাই উপরে দেখবেন": "Everyone in the chat sees it at the top", "সেভ করুন": "Save", "সেভ থেকে সরান": "Remove from saved", "শুধু আপনি দেখবেন": "Only you will see it",
   "সবার জন্য মুছে ফেলুন": "Unsend for everyone", "শুধু আমার জন্য মুছুন": "Delete for me",

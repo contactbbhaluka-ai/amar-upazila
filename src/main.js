@@ -2995,14 +2995,14 @@ function msgActions(m) {
   const row = (act, icn, t, extra = '', cls = '') => `<button class="pm-row mx-row${cls}" data-act="${act}"><span class="pm-ic">${ic(icn, 19)}</span><span class="pm-t"><b>${t}</b>${extra ? `<small>${extra}</small>` : ''}</span></button>`;
   const canEdit = m.mine && !m.deleted && m.body && !m.poll && Date.now() - new Date(m.createdAt) < 15 * 6e4;
   openSheet(`<div class="mx-sheet">${canRx ? `<div class="mx-rx">${MSG_RX.map(e => `<button data-mx="${e}" class="${m.myReaction === e ? 'on' : ''}" aria-label="${e}">${e}</button>`).join('')}</div>` : ''}
-    <div class="nts-card pm-card">${m.deleted ? '' : row('reply', 'reply', 'উত্তর দিন')}
-      ${canEdit ? row('edit', 'edit', 'এডিট করুন', 'পাঠানোর ১৫ মিনিটের মধ্যে') : ''}
-      ${m.body && !m.deleted ? row('copy', 'doc', 'লেখা কপি করুন') : ''}
-      ${!m.deleted && !m.poll ? row('fwd', 'share', 'ফরওয়ার্ড করুন') : ''}
-      ${!m.deleted ? row('pin', 'pushpin', m.pinnedAt ? 'পিন সরান' : 'পিন করুন', m.pinnedAt ? '' : 'চ্যাটের সবাই উপরে দেখবেন') : ''}
-      ${!m.deleted ? row('save', 'bookmark', m.saved ? 'সেভ থেকে সরান' : 'সেভ করুন', m.saved ? '' : 'শুধু আপনি দেখবেন') : ''}</div>
-    <div class="nts-card pm-card mx-del">${m.mine && !m.deleted && !S.th.asPage ? row('unsend', 'trash', 'সবার জন্য মুছে ফেলুন', '', ' danger') : ''}
-      ${row('hide', 'eyeOff', 'শুধু আমার জন্য মুছুন')}</div></div>`);
+    <div class="nts-card pm-card">${m.deleted ? '' : row('reply', 'reply', 'উত্তর')}
+      ${canEdit ? row('edit', 'edit', 'এডিট') : ''}
+      ${m.body && !m.deleted ? row('copy', 'doc', 'কপি') : ''}
+      ${!m.deleted && !m.poll ? row('fwd', 'share', 'ফরওয়ার্ড') : ''}
+      ${!m.deleted ? row('pin', 'pushpin', m.pinnedAt ? 'আনপিন' : 'পিন') : ''}
+      ${!m.deleted ? row('save', 'bookmark', m.saved ? 'আনসেভ' : 'সেভ') : ''}</div>
+    <div class="nts-card pm-card mx-del">${m.mine && !m.deleted && !S.th.asPage ? row('unsend', 'trash', 'সবার জন্য মুছুন', '', ' danger') : ''}
+      ${row('hide', 'eyeOff', 'আমার জন্য মুছুন')}</div></div>`);
   $('#sheet').onclick = async ev => {
     const rx = ev.target.closest('[data-mx]');
     if (rx) { closeSheet(); if (m.myReaction !== rx.dataset.mx) { playSound('react'); S.myRxAt = Date.now(); } return busy(null, async () => { await S.api.reactMessage(m.id, m.myReaction === rx.dataset.mx ? null : rx.dataset.mx); openConv(S.th, true); }); }
@@ -3518,9 +3518,9 @@ $('#t-mention').addEventListener('click', e => {
 // ➕ মেনু: স্টিকার, লোকেশন, পোল
 $('#t-plus').addEventListener('click', () => {
   const th = S.th; if (!th) return;
-  const it = (act, icn, t, sub) => `<button class="pm-row" data-act="${act}"><span class="pm-ic">${ic(icn, 20)}</span><span class="pm-t"><b>${t}</b><small>${sub}</small></span></button>`;
-  openSheet(`<h2>পাঠান</h2><div class="nts-card pm-card">${it('img', 'photo', 'ছবি', 'গ্যালারি বা ক্যামেরা থেকে, একসাথে ১০টি পর্যন্ত')}${it('stk', 'star', 'স্টিকার', 'মজার অ্যানিমেটেড স্টিকার')}
-    ${it('loc', 'pin', 'লোকেশন', 'আপনি এখন কোথায় আছেন, ম্যাপে')}${th.kind === 'group' ? it('poll', 'poll', 'পোল', 'গ্রুপে ভোট নিন') : ''}${it('qrx', 'thumb', 'দ্রুত রিয়্যাক্ট', `এখন: ${qrx()} · বদলাতে চাপুন`)}</div>`);
+  const it = (act, icn, t) => `<button class="pm-row mx-row" data-act="${act}"><span class="pm-ic">${ic(icn, 19)}</span><span class="pm-t"><b>${t}</b></span></button>`;
+  openSheet(`<h2>পাঠান</h2><div class="nts-card pm-card">${it('img', 'photo', 'ছবি')}${it('stk', 'star', 'স্টিকার')}
+    ${it('loc', 'pin', 'লোকেশন')}${th.kind === 'group' ? it('poll', 'poll', 'পোল') : ''}${it('qrx', 'thumb', `দ্রুত রিয়্যাক্ট ${qrx()}`)}</div>`);
   $('#sheet').onclick = ev => {
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
     closeSheet();

@@ -4330,7 +4330,7 @@ function codeSheet(email, type, opt = {}) {
     <form id="cdf" novalidate><div class="au-otp-wrap"><input id="cd-v" class="au-otp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="––––––" aria-label="যাচাই কোড"></div>
     <button class="btn wide au-btn">${rec ? 'যাচাই করুন' : 'অ্যাকাউন্ট চালু করুন'}</button></form>
     <div class="au-code-acts"><a class="au-mail" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">${ic('mail', 16)} Gmail খুলুন</a><button type="button" class="link" id="cd-re" disabled>আবার পাঠান</button></div>
-    <p class="mut au-code-tip">ইমেইল না পেলে স্প্যাম ফোল্ডার দেখুন। ইমেইলে লিংক থাকলে সেটায় চাপলেও হবে।</p></div>`);
+    <p class="mut au-code-tip">কোড আসতে এক-দুই মিনিট লাগতে পারে। না পেলে স্প্যাম বা Promotions ফোল্ডার দেখুন।</p></div>`);
   const re = $('#cd-re'); let left = 60, t;
   const run = () => { clearInterval(t); t = setInterval(() => { if (!re.isConnected) return clearInterval(t); left--; re.disabled = left > 0; re.textContent = left > 0 ? `আবার পাঠান (${bn(left)})` : 'আবার পাঠান'; if (left <= 0) clearInterval(t); }, 1000); re.disabled = true; re.textContent = `আবার পাঠান (${bn(left)})`; };
   run();

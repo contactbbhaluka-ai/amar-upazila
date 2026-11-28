@@ -940,7 +940,7 @@ function avgLine(n, avg) {
 }
 async function postStatsSheet(p) {
   if (!p) return;
-  openSheet('<div class="skel"></div>');
+  openSheet(SK.sheet());
   try {
     const st = await S.api.postStats(p.id);
     p.views = st.views; document.querySelectorAll(`.views-btn[data-pinfo="${p.id}"] .cnt`).forEach(c => { c.textContent = bn(st.views); });
@@ -993,7 +993,7 @@ async function loadInsights(days) {
   const box = $('#insights');
   if (!me()) { box.innerHTML = '<div class="empty">ড্যাশবোর্ড দেখতে লগইন করুন।</div>'; return; }
   S.insDays = days || S.insDays || 7;
-  box.innerHTML = '<div class="skel"></div><div class="skel"></div>';
+  box.innerHTML = SK.stats();
   try {
     const T = S.insTarget, kind = T?.kind || 'me';
     $('#v-insights .bar b').textContent = T ? `${T.name}: ড্যাশবোর্ড` : 'ড্যাশবোর্ড';
@@ -1044,6 +1044,19 @@ function withAds(f) {
   if (posts.length < 2 && ads.length) out.push(ads.shift());
   return out;
 }
+// ---------- স্কেলেটন লোডিং: আসল জিনিসের আকারে ধূসর ছায়া + শিমার (ফেসবুকের মতো)
+const skL = (w, h = 10, cls = '') => `<i class="sk sk-l ${cls}" style="width:${w};height:${h}px"></i>`;
+const skC = (d) => `<i class="sk sk-c" style="width:${d}px;height:${d}px"></i>`;
+const SK = {
+  post: (n = 2) => Array.from({ length: n }, (_, i) => `<div class="card sk-card sk-post" aria-hidden="true"><div class="sk-row">${skC(42)}<div class="sk-col">${skL('42%', 11)}${skL('26%', 8)}</div></div>${skL('92%')}${skL('78%')}${i % 2 ? '' : `<i class="sk sk-img"></i>`}<div class="sk-acts">${skL('22%', 9)}${skL('22%', 9)}${skL('22%', 9)}</div></div>`).join(''),
+  list: (n = 6, av = 52, btns = 0) => `<div class="card sk-card sk-list" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<div class="sk-row">${skC(av)}<div class="sk-col">${skL(['55%', '40%', '62%', '48%'][i % 4], 11)}${skL(['70%', '58%', '35%', '64%'][i % 4], 8)}${btns ? `<div class="sk-btns">${skL('38%', 26, 'sk-b')}${skL('38%', 26, 'sk-b')}</div>` : ''}</div></div>`).join('')}</div>`,
+  cards: (n = 4) => Array.from({ length: n }, (_, i) => `<div class="card sk-card" aria-hidden="true"><div class="sk-row"><i class="sk sk-sq"></i><div class="sk-col">${skL(['58%', '44%', '66%', '50%'][i % 4], 12)}${skL('36%', 9)}${skL('72%', 9)}</div></div></div>`).join(''),
+  prof: () => `<div class="card sk-card sk-prof" aria-hidden="true"><i class="sk sk-cover"></i>${skC(96)}${skL('46%', 16, 'sk-mid')}${skL('30%', 10, 'sk-mid')}<div class="sk-acts">${skL('30%', 32, 'sk-b')}${skL('30%', 32, 'sk-b')}</div></div>`,
+  grid: (n = 9) => `<div class="sk-grid" aria-hidden="true">${'<i class="sk"></i>'.repeat(n)}</div>`,
+  sheet: () => `<div class="sk-sheet" aria-hidden="true">${skL('50%', 16)}${skL('90%')}${skL('82%')}${skL('64%')}<i class="sk sk-img" style="height:90px"></i></div>`,
+  stats: () => `<div class="sk-stats" aria-hidden="true">${'<i class="sk"></i>'.repeat(4)}</div>${SK.cards(2)}`,
+};
+if (location.hostname === 'localhost') window.SK = SK;   // শুধু লোকাল পরীক্ষার জন্য
 // ---------- লগইন ছাড়া (মেহমান): ফিডে অল্প পোস্ট, প্রোফাইলের শুধু ঝলক
 const GUEST_POSTS = 4;
 const UP_IC = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.6"/><path d="M2.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M19 8v6M16 11h6"/></svg>';
@@ -1051,7 +1064,7 @@ const guestBtns = () => `<button class="btn wide au-btn gt-ic" data-gate2="signu
 const guestMoreCard = () => `<div class="card gst-card"><div class="gst-fade" aria-hidden="true"></div><div class="gst-ic">${ic('lock', 26)}</div><h3>আরও পোস্ট দেখতে লগইন করুন</h3><p class="mut">ভালুকার মানুষের সব পোস্ট, ছবি আর এলাকার খবর দেখতে অ্যাকাউন্ট খুলুন। এক মিনিটেই হয়ে যাবে।</p>${guestBtns()}</div>`;
 document.addEventListener('click', e => { const b = e.target.closest('[data-gate2]'); if (!b) return; closeSheet(); go('me'); authView(b.dataset.gate2 === 'signup' ? 'signup' : 'login'); window.scrollTo(0, 0); });
 async function guestProfile(id) {
-  S.userId = id; open('user'); $('#feed-user').innerHTML = ''; $('#user').innerHTML = '<div class="skel"></div>';
+  S.userId = id; open('user'); $('#feed-user').innerHTML = ''; $('#user').innerHTML = SK.prof();
   let p = null; try { p = await S.api.profile(id); } catch { /* */ }
   if (S.userId !== id) return;
   if (!p || p.gone) { $('#user').innerHTML = '<div class="empty">প্রোফাইলটি পাওয়া যায়নি।</div>'; return; }
@@ -1083,7 +1096,7 @@ async function loadFeed(key, append, soft) {
   const f = S.feeds[key], box = $('#feed-' + key);
   // ফিল্টার বদলালে পুরোনো পোস্ট হালকা করে রেখে নতুনগুলো এলে বদলানো (পাতা লাফায় না)
   const keep = soft && !append && box.querySelector('.post');
-  if (!append) { if (keep) box.classList.add('fd-busy'); else box.innerHTML = '<div class="skel"></div><div class="skel"></div>'; }
+  if (!append) { if (keep) box.classList.add('fd-busy'); else box.innerHTML = SK.post(2); }
   const q = key === 'home'
     ? { scope: S.scope, unionId: S.union ? Number(S.union) : null, category: S.fcat || null }
     : key === 'post' ? { postId: S.postId }
@@ -1684,7 +1697,7 @@ const yearsBn = d => { if (!d) return ''; const days = Math.floor((Date.now() - 
 async function loadFriends(keep) {
   const box = $('#friends');
   if (!me()) { box.innerHTML = `<div class="card empty">বন্ধু খুঁজতে ও যুক্ত হতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
-  if (!keep || !S.fr) box.innerHTML = '<div class="skel"></div>';
+  if (!keep || !S.fr) box.innerHTML = SK.list(6, 64, 1);
   try {
     const [reqs, friends, sugg, sent, near, marks, lists] = await Promise.all([S.api.friendRequests(), S.api.friends(), S.api.suggestions().catch(() => []), S.api.sentRequests().catch(() => []),
       S.api.newNearMe().catch(() => 0), S.api.friendMarks(true).catch(() => new Map()), S.api.friendLists().catch(() => [])]);
@@ -1737,7 +1750,7 @@ function suggTabHtml(F) {
     <optgroup label="ভালুকা">${(S.unions || []).map(x => `<option value="u:${esc(x.id)}" ${area === 'u:' + x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</optgroup>
     ${others.length ? `<optgroup label="অন্য উপজেলা">${others.map(x => `<option value="x:${esc(x)}" ${area === 'x:' + x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</optgroup>` : ''}</select></div>`;
   const areaName = area ? (area.startsWith('u:') ? (S.unions || []).find(x => 'u:' + x.id === area)?.name || '' : area.slice(2)) : '';
-  if (area && !base) return `${areaSel}<div class="card"><div class="skel"></div></div>`;
+  if (area && !base) return `${areaSel}${SK.list(5, 56, 1)}`;
   const list = base.filter(u => f === 'all' || (f === 'mutual' && u.mutual) || (f === 'school' && u.school) || (f === 'new' && u.isNew) || (f === 'area' && u.sameArea));
   const myArea = me()?.union?.split(',')[0] || 'আপনার এলাকা';
   return `${F.near ? `<div class="card fr-near">🏡 এই সপ্তাহে <b>${esc(myArea)}</b> থেকে <b>${bn(F.near)} জন</b> আমার উপজেলায় যোগ দিয়েছেন${F.sugg.some(u => u.isNew && u.sameArea) ? ' <button class="link" data-suggf="new">দেখুন</button>' : ''}</div>` : ''}
@@ -1932,7 +1945,7 @@ const PLIST_IC = { friends: 'users', followers: 'user', following: 'user' };
 const statsHtml = p => `<div class="stats stat-tiles">${Object.entries(PLIST).map(([k, l]) => `<button class="stat-b" data-plist="${esc(p.id)}|${k}" aria-label="${l}: ${typeof p[k] === 'number' ? bn(p[k]) : ''} জন, তালিকা দেখুন"><span class="st-ic">${ic(PLIST_IC[k], 16)}</span><b>${typeof p[k] === 'number' ? bn(p[k]) : esc(p[k])}</b><span class="st-l">${l}</span></button>`).join('')}</div>`;
 async function peopleSheet(uid, kind) {
   const own = me()?.id === uid;
-  openSheet(`<h2>${PLIST[kind]}</h2><div class="skel"></div>`);
+  openSheet(`<h2>${PLIST[kind]}</h2>${SK.list(5, 44)}`);
   try {
     const [r, prof] = await Promise.all([S.api.listPeople(uid, kind), own ? me() : S.api.profile(uid).catch(() => null)]);
     const vis = r.visibility || prof?.[kind + 'Visibility'] || 'public';
@@ -2063,7 +2076,7 @@ async function loadPhotosPane(key) {
   const st = S.pstate[key], pane = $('#' + key + '-pane'), uid = profUid(key), own = ownPane(key), pgid = panePage(key), isPage = key === 'page';
   if (!pane || !uid) return;
   const seg = `<div class="seg pseg">${[['all', 'সব ছবি'], ['albums', 'অ্যালবাম']].map(([k, l]) => `<button data-pseg="${key}|${k}" class="${st.seg === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  pane.innerHTML = (st.album ? '' : seg) + '<div class="ph-grid"><div class="skel"></div></div>';
+  pane.innerHTML = (st.album ? '' : seg) + SK.grid(9);
   try {
     if (st.album) {
       const albums = await S.api.albums(uid, pgid), a = albums.find(x => String(x.id) === String(st.album));
@@ -2165,7 +2178,7 @@ document.addEventListener('click', e => {
 // আগের ছবি থেকে বাছাই: নতুন পোস্ট হয় না, আগের পোস্টের রিয়্যাক্ট-মন্তব্য অক্ষত থাকে
 async function oldPhotoSheet(kind) {
   const u = me(), cover = kind === 'cover', title = cover ? 'আগের ছবি থেকে কভার' : 'আগের ছবি থেকে প্রোফাইল ছবি';
-  openSheet(`<h2>${title}</h2><div class="skel"></div>`);
+  openSheet(`<h2>${title}</h2>${SK.list(5, 44)}`);
   const [prev, other] = await Promise.all([S.api.photos(u.id, { kind }).catch(() => []), S.api.photos(u.id, { kind: 'uploads' }).catch(() => [])]);
   const cur = cover ? u.cover : u.avatar;
   const grid = (list, label) => list.length ? `<h3 class="res-h">${label}</h3><div class="ph-grid op-grid">${list.map(ph => `<button class="ph-cell${ph.url === cur ? ' cur' : ''}" data-oldpic="${esc(ph.url)}"><img loading="lazy" decoding="async" src="${esc(ph.url)}" alt="">${ph.url === cur ? '<span class="op-now">এখন</span>' : ''}</button>`).join('')}</div>` : '';
@@ -2546,7 +2559,7 @@ async function openUser(id, silent, keepState, preview) {
   if (me() && id === me().id && !S.preview) return go('me');
   if (!keepState && S.pstate.user.uid !== id) Object.assign(S.pstate.user, { tab: 'posts', seg: 'all', album: null });
   S.pstate.user.uid = id;
-  if (!silent) { S.userId = id; open('user'); $('#user').innerHTML = '<div class="skel"></div>'; S.feeds.user.posts = []; $('#feed-user').innerHTML = ''; }
+  if (!silent) { S.userId = id; open('user'); $('#user').innerHTML = SK.prof(); S.feeds.user.posts = []; $('#feed-user').innerHTML = ''; }
   try {
     const p = S.preview ? await previewProfile(S.preview) : await S.api.profile(id), r = p.rel || {};
     S.viewProfile = p;
@@ -2589,7 +2602,7 @@ const groupAv = (name, cls = '', photo = '') => (photo ? `<img class="av ${cls}"
 async function loadConvs() {
   const box = $('#convs');
   if (!me()) { box.innerHTML = `<div class="empty">মেসেজ দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
-  if (!box.innerHTML.trim()) box.innerHTML = '<div class="skel"></div>';
+  if (!box.innerHTML.trim()) box.innerHTML = SK.list(8, 54);
   try {
     const list = await S.api.inbox();
     S.inboxList = list; S.mutedKeys = new Set(list.filter(c => c.muted).map(cvKey));
@@ -2639,7 +2652,7 @@ function activeListHtml(q) {
   const fr = (S.inboxFriends || []).filter(p => !q || p.name.toLowerCase().includes(q));
   const seen = p => S.pres.get(p.id), on = fr.filter(p => isOnline(seen(p))), recent = fr.filter(p => !isOnline(seen(p)) && activeText(seen(p))).sort((a, b) => String(seen(b)).localeCompare(String(seen(a))));
   const row = p => `<button class="conv act-li" data-actchat="${esc(p.id)}"><span class="cv-av">${av(p)}${isOnline(seen(p)) ? '<i class="on-dot"></i>' : ''}</span><div class="info"><b>${esc(p.name)}</b><div class="last${isOnline(seen(p)) ? ' act-on' : ''}">${activeText(seen(p))}</div></div><span class="act-msg" aria-hidden="true">${ic('send', 18)}</span></button>`;
-  if (!S.inboxFriends) return '<div class="skel"></div>';
+  if (!S.inboxFriends) return `<div class="sk-active" aria-hidden="true">${skC(52).repeat(6)}</div>`;
   if (!on.length && !recent.length) return `<div class="empty">${q ? `"${esc(q)}" নামে সক্রিয় কেউ নেই` : 'এই মুহূর্তে কোনো বন্ধু সক্রিয় নেই।'}</div>`;
   return (on.length ? `<h3 class="res-h">🟢 এখন সক্রিয় (${bn(on.length)})</h3>${on.map(row).join('')}` : '<p class="mut cv-reqnote">এই মুহূর্তে কোনো বন্ধু সক্রিয় নেই।</p>')
     + (recent.length ? `<h3 class="res-h">কিছুক্ষণ আগে সক্রিয় ছিলেন</h3>${recent.map(row).join('')}` : '');
@@ -5891,7 +5904,7 @@ async function loadDir() {
   const restore = () => { if (S.dirY != null) { const y = S.dirY; S.dirY = null; requestAnimationFrame(() => window.scrollTo(0, y)); } };
   if (!S.svcAll) { const c = local.get('svc_cache'); if (c?.list) { S.svcAll = c.list; S.popCats = c.pop || []; S.dirBanners = c.bans || []; S.svcCacheT = c.t; } }   // নেট ছাড়াও: ফোনে জমা রাখা তালিকা
   if (S.svcAll) { drawDir(); restore(); }   // আগের তালিকা সাথে সাথে দেখাই, পরে চুপচাপ হালনাগাদ
-  else { renderDirHead([]); $('#dir').innerHTML = '<div class="skel"></div>'; }
+  else { renderDirHead([]); $('#dir').innerHTML = SK.cards(5); }
   try {
     const [list, pop, bans] = await Promise.all([S.api.services({}), S.api.popularServiceCats().catch(() => S.popCats || []), S.api.dirBanners().catch(() => S.dirBanners || []), ensureSvcFavs()]);
     const banChanged = JSON.stringify(bans) !== JSON.stringify(S.dirBanners); S.dirBanners = bans;
@@ -6002,7 +6015,7 @@ $('#dir').addEventListener('change', e => { if (e.target.id === 'bready') { S.br
 async function loadBlood({ soft } = {}) {
   const box = $('#dir'), key = S.bscope === 'home' ? 'h' : 'a', had = !!box.querySelector('.blood-head');
   S.bcache = S.bcache || {};
-  if (!had) box.innerHTML = '<div class="skel"></div>';
+  if (!had) box.innerHTML = SK.cards(5);
   try {
     // এক বারে এলাকার সব ডোনার আনি; গ্রুপের সংখ্যা ও ফিল্টার এখান থেকেই
     let all = soft ? S.bcache[key] : null;
@@ -6162,7 +6175,7 @@ const NT_GROUP_TXT = { like: 'আপনার পোস্টে রিয়্
 async function loadNotifs(keep) {
   const box = $('#notifs');
   if (!me()) { $('#nt-tools').innerHTML = ''; box.innerHTML = `<div class="empty">নোটিফিকেশন দেখতে আগে লগইন করুন।<br><button class="btn" style="margin-top:10px" data-go="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`; return; }
-  if (!keep) box.innerHTML = '<div class="skel"></div>';
+  if (!keep) box.innerHTML = SK.list(8, 50);
   $('#nt-newbar').hidden = true; S.ntNew = 0;
   try {
     const [list, reqs, mutes] = await Promise.all([S.api.notifications(S.actAs?.id), S.actAs ? [] : S.api.friendRequests(), S.api.notifMutes().catch(() => new Set())]);
@@ -6566,7 +6579,7 @@ function searchHint() { $('#sres').innerHTML = '<div class="empty">মানু�
 async function runSearch() {
   const q = $('#sq').value.trim();
   if (q.length < 2) return searchHint();
-  $('#sres').innerHTML = '<div class="skel"></div>';
+  $('#sres').innerHTML = SK.list(6, 48);
   try {
     const r = await S.api.search(q);
     if ($('#sq').value.trim() !== q) return;
@@ -7002,7 +7015,7 @@ const ACT_F = [['all', 'সব'], ['react', 'রিয়্যাক্ট'], [
 const RX_EMO = { like: '👍', love: '❤️', haha: '😆', wow: '😮', sad: '😢', angry: '😡' };
 async function loadActivity() {
   const box = $('#act'); if (!box) return;
-  box.innerHTML = '<div class="skel"></div><div class="skel"></div>';
+  box.innerHTML = SK.list(7, 44);
   try { S.act = await S.api.myActivity(); } catch (e) { S.act = []; toast(errText(e)); }
   renderActivity();
 }
@@ -7090,7 +7103,7 @@ const dateBn = d => new Date(d).toLocaleDateString(LOC, { day: 'numeric', month:
 async function loadWallet() {
   const box = $('#wallet'), u = me();
   if (!u) { box.innerHTML = '<div class="empty">কয়েন ও ব্যাজ দেখতে লগইন করুন।</div>'; return; }
-  box.innerHTML = '<div class="skel"></div>';
+  box.innerHTML = SK.stats();
   try {
     const [w, req, boosts] = await Promise.all([S.api.wallet(), S.api.myVerifyRequest(), S.api.myBoosts().catch(() => []), S.api.settings().then(v => { S.settings = { ...S.settings, ...v }; }).catch(() => {})]);
     S.walletCoins = w.coins;
@@ -7145,7 +7158,7 @@ document.addEventListener('click', e => {
   if (S.curPage) pageBadgeSheet(S.curPage);
 });
 async function pageBadgeSheet(pg) {
-  openSheet('<div class="skel"></div>');
+  openSheet(SK.sheet());
   try {
     const [req, w] = await Promise.all([S.api.myVerifyRequest(pg.id), S.api.wallet()]);
     S.walletCoins = w.coins;
@@ -7224,7 +7237,7 @@ function boostRow(b) {
     <small><span class="bo-st ${cls}">${lbl}</span>${b.reach || st === 'active' || st === 'ended' ? ` · ${bn(b.reach)} জন দেখেছেন` : ''}${b.adminNote && st === 'rejected' ? ` · কারণ: ${esc(b.adminNote)}` : ''}</small></span></button>`;
 }
 async function boostSheet(p) {
-  openSheet('<div class="skel"></div>');
+  openSheet(SK.sheet());
   try {
     const [b, w] = await Promise.all([S.api.postBoost(p.id), S.api.wallet()]);
     const st = b && boostState(b);
@@ -7274,7 +7287,7 @@ function decideBoostUI(id, ok, btn) {
 // অ্যাডমিন: কাউকে কয়েন দেওয়া/কাটা এবং ব্যাজ দেওয়া/সরানো
 async function adminUserSheet(u, after) {
   if (!me()?.admin) return;
-  openSheet('<div class="skel"></div>');
+  openSheet(SK.sheet());
   try {
     const w = await S.api.adminUserWallet(u.id), cur = u.verified || '';
     openSheet(`<h2>${esc(u.name)}${vb(u.verified)}</h2><p class="mut" style="margin-top:0">শুধু অ্যাডমিন দেখছেন</p>
@@ -7391,7 +7404,7 @@ async function annHistory() {
 async function loadAdmin() {
   const box = $('#admin');
   if (!me()?.admin) { box.innerHTML = '<div class="empty">এই পাতা শুধু অ্যাডমিনদের জন্য।</div>'; return; }
-  box.innerHTML = '<div class="skel"></div>';
+  box.innerHTML = SK.stats();
   try {
     const [st, set, vreqs, aboosts] = await Promise.all([S.api.adminStats(), S.api.settings(), S.api.adminVerifyRequests().catch(() => []), S.api.adminBoosts().catch(() => [])]);
     S.settings = set;
@@ -7673,7 +7686,7 @@ function openComposer({ pageId, groupId, title }) { openPostComposer({ pageId, g
 // ================================================================ পেইজ
 const pageRow = (pg, btn) => `<div class="ent-row"><button class="ent-btn" data-page="${esc(pg.id)}">${entAv(pg)}</button><div class="info"><button class="ent-btn" data-page="${esc(pg.id)}">${esc(pg.name)}${vb(pg.verified)}</button><div class="sub">${esc(pg.category)} · ${bn(pg.followers)} ফলোয়ার</div></div>${btn || ''}</div>`;
 async function loadPages() {
-  const box = $('#pages'); box.innerHTML = '<div class="skel"></div>';
+  const box = $('#pages'); box.innerHTML = SK.cards(4);
   try {
     const [mine, followed, all, pun] = await Promise.all([S.api.myPages(), S.api.followedPages(), S.api.discoverPages(), S.api.pageUnread().catch(() => new Map())]);
     const known = new Set([...mine, ...followed].map(x => x.id)), more = all.filter(x => !known.has(x.id));
@@ -7684,7 +7697,7 @@ async function loadPages() {
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 async function openPage(id, silent) {
-  if (!silent) { S.pageId = Number(id) || id; S.feeds.page.posts = []; open('page'); $('#page').innerHTML = '<div class="skel"></div>'; $('#feed-page').innerHTML = ''; }
+  if (!silent) { S.pageId = Number(id) || id; S.feeds.page.posts = []; open('page'); $('#page').innerHTML = SK.prof(); $('#feed-page').innerHTML = ''; }
   try {
     const pg = await S.api.page(S.pageId);
     const tel = String(pg.phone || '').replace(/[^\d+]/g, '');
@@ -7771,7 +7784,7 @@ function pageSettingsMenu(pg) {
   };
 }
 async function pageAdminsSheet(pg) {
-  openSheet('<div class="skel"></div>');
+  openSheet(SK.sheet());
   try {
     const list = await S.api.pageAdmins(pg.id);
     openSheet(`<h2>👥 ${esc(pg.name)}-এর অ্যাডমিন</h2>
@@ -7878,7 +7891,7 @@ document.addEventListener('click', e => {
 // ================================================================ গ্রুপ
 const groupRow = (g, btn) => `<div class="ent-row"><button class="ent-btn" data-group="${esc(g.id)}">${entAv(g, '👥')}</button><div class="info"><button class="ent-btn" data-group="${esc(g.id)}">${esc(g.name)}</button><div class="sub">${g.privacy === 'private' ? '🔒 প্রাইভেট' : '🌐 পাবলিক'} · ${bn(g.members)} সদস্য</div></div>${btn || ''}</div>`;
 async function loadGroups() {
-  const box = $('#groups'); box.innerHTML = '<div class="skel"></div>';
+  const box = $('#groups'); box.innerHTML = SK.cards(4);
   try {
     const [mine, all] = await Promise.all([S.api.myGroups(), S.api.discoverGroups()]);
     const active = mine.filter(g => g.status === 'active'), pending = mine.filter(g => g.status === 'pending');
@@ -7890,7 +7903,7 @@ async function loadGroups() {
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 async function openGroup(id, silent) {
-  if (!silent) { S.groupId = Number(id) || id; S.feeds.group.posts = []; open('group'); $('#group').innerHTML = '<div class="skel"></div>'; $('#feed-group').innerHTML = ''; }
+  if (!silent) { S.groupId = Number(id) || id; S.feeds.group.posts = []; open('group'); $('#group').innerHTML = SK.prof(); $('#feed-group').innerHTML = ''; }
   try {
     const g = await S.api.group(S.groupId);
     const member = g.status === 'active', admin = member && g.role === 'admin';

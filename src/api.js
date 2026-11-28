@@ -176,6 +176,8 @@ async function supabaseApi() {
       await C.Plugins.Browser.open({ url: data.url, presentationStyle: 'popover' });
     },
     async setPassword(password) { ok(await sb.auth.updateUser({ password })); if (me) me.hasPassword = true; },
+    async registerPush(token) { if (me && token) ok(await sb.rpc('register_push', { p_token: token, p_platform: 'android' })); },
+    async unregisterPush(token) { if (token) await sb.rpc('unregister_push', { p_token: token }); },
     async finishSetup(v) {
       await this.updateProfile({ ...v, bio: me.bio || '' });
       ok(await sb.from('profiles').update({ needs_setup: false }).eq('id', me.id));
@@ -1386,6 +1388,7 @@ function demoApi() {
       db.users.push(u); meId = u.id; seedFor(u.id); save(); return meUser();
     },
     async setPassword(pw) { person(meId).password = pw; save(); },
+    async registerPush() {}, async unregisterPush() {},
     async finishSetup(v) { await this.updateProfile({ ...v, bio: '' }); const p = person(meId); p.needsSetup = false; save(); return meUser(); },
     async resendCode() {},
     onTokens() {},

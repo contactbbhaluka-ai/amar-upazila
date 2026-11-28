@@ -2726,3 +2726,22 @@ body.gate-on{overflow:hidden}
 .nt-qa{margin:0;padding:0 10px 12px 72px;border-bottom:1px solid var(--line);border-radius:0 0 10px 10px}
 .notif.new + .nt-qa{background:var(--g2)}
 .notif.new + .nt-qa .nt-qt{background:var(--card)}
+/* পুশ নোটিফিকেশন চালুর অনুরোধ */
+.pa{text-align:center}
+.pa-ic{width:72px;height:72px;margin:4px auto 10px;border-radius:50%;display:grid;place-items:center;background:var(--g2);color:var(--g);animation:paRing 1.6s ease-in-out 2}
+@keyframes paRing{0%,100%{transform:rotate(0)}10%{transform:rotate(14deg)}20%{transform:rotate(-12deg)}30%{transform:rotate(8deg)}40%{transform:rotate(0)}}
+.pa h2{margin:0 0 4px}.pa>p{margin:0 0 10px}
+.pa-l{list-style:none;margin:0 0 6px;padding:0;text-align:left;display:flex;flex-direction:column;gap:8px}
+.pa-l li{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:light-dark(#f5f8f6,#16211d)}
+.pa-l li .ic-line{color:var(--g);flex:none}
+.pa-tip{font-size:12.5px;margin-top:12px}
+.pa-row span{display:flex;flex-direction:column}.pa-row small{color:var(--mut);font-size:12.5px;font-weight:400}
+/* নোটিফিকেশন সেটিং: অ্যাপের লাইন আইকন ও সুইচ */
+.nts-card{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+.nts-row{display:flex;align-items:center;gap:12px;padding:11px 12px;margin:0;cursor:pointer;font-weight:500}
+.nts-row+.nts-row{border-top:1px solid var(--line)}
+.nts-row .set-ic{color:var(--g);font-size:0}
+.nts-t{flex:1;min-width:0;font-size:15px;line-height:1.35}
+.nts-t b{display:block;font-size:15px}.nts-t small{display:block;color:var(--mut);font-size:12.5px;font-weight:400}
+.nts-h{margin:16px 2px 2px;font-size:15px}.nts-sub{margin:0 2px 8px;font-size:13px}
+.nts-card,.nts-h,.nts-sub{flex-shrink:0}

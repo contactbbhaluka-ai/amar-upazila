@@ -4213,6 +4213,7 @@ document.addEventListener('click', async e => {
 function afterAuth() {
   if (me()) hideGate();
   if (me()?.needsSetup) { go('me'); renderMe(); return; }
+  if (me() && PN()) setTimeout(() => pushSetup(false), 3500);
   { const m = S.api?.oauthError?.(); if (m) setTimeout(() => toast('Google দিয়ে লগইন হয়নি, আবার চেষ্টা করুন'), 300); }
   { const u = me(); if (u && accSaved(u.id)) accUpd(u.id, { name: u.name, ...(u.avatar && !String(u.avatar).startsWith('blob:') ? { avatar: u.avatar } : {}) }); }
   if (!me() && S.scope === 'friends') S.scope = 'area';
@@ -6344,18 +6345,26 @@ $('#notifs').addEventListener('click', e => {
   };
 });
 // কোন ধরনের নোটিফিকেশন পাবেন
-const NT_PREFS = [['❤️ রিয়্যাক্ট', ['like']], ['💬 মন্তব্য ও উত্তর', ['comment', 'reply']], ['@ উল্লেখ ও ট্যাগ', ['mention', 'tag', 'chat_mention']], ['↗ শেয়ার', ['share']],
-  ['👤 ফ্রেন্ড রিকোয়েস্ট ও গ্রহণ', ['friend_request', 'friend_accept']], ['➕ নতুন ফলোয়ার', ['follow']], ['👥 গ্রুপ ও গ্রুপ চ্যাট', ['group_request', 'group_approved', 'chat_join_request', 'chat_join_ok']],
-  ['📅 অনুষ্ঠানের রিমাইন্ডার', ['event_reminder']], ['🩸 কাছাকাছি রক্তের অনুরোধ', ['blood_request']], ['📍 এলাকার সতর্কবার্তা (হারানো-প্রাপ্তি, সাহায্য চাই)', ['area_alert']],
-  ['🎂 সকালে জন্মদিন ও বন্ধুত্বের বার্ষিকী মনে করানো', ['birthday', 'friend_anniv']], ['🏆 মাইলফলক ও সাপ্তাহিক রিপোর্ট', ['milestone', 'follower_milestone', 'weekly']]];
+const NT_PREFS = [['রিয়্যাক্ট', ['like'], 'thumb'], ['মন্তব্য ও উত্তর', ['comment', 'reply'], 'comment'], ['উল্লেখ ও ট্যাগ', ['mention', 'tag', 'chat_mention'], 'tag'], ['শেয়ার', ['share'], 'share'],
+  ['ফ্রেন্ড রিকোয়েস্ট ও গ্রহণ', ['friend_request', 'friend_accept'], 'user'], ['নতুন ফলোয়ার', ['follow'], 'plus'], ['গ্রুপ ও গ্রুপ চ্যাট', ['group_request', 'group_approved', 'chat_join_request', 'chat_join_ok'], 'users'],
+  ['অনুষ্ঠানের রিমাইন্ডার', ['event_reminder'], 'calendar'], ['কাছাকাছি রক্তের অনুরোধ', ['blood_request'], 'drop'], ['এলাকার সতর্কবার্তা (হারানো-প্রাপ্তি, সাহায্য চাই)', ['area_alert'], 'pin'],
+  ['জন্মদিন ও বন্ধুত্বের বার্ষিকী', ['birthday', 'friend_anniv'], 'cake'], ['মাইলফলক ও সাপ্তাহিক রিপোর্ট', ['milestone', 'follower_milestone', 'weekly'], 'chart']];
 async function notifSettingsSheet() {
   const off = new Set(await S.api.notifPrefs().catch(() => []));
-  openSheet(`<h2>⚙️ নোটিফিকেশন সেটিং</h2><p class="mut">যেগুলো বন্ধ রাখবেন, সেগুলোর নোটিফিকেশন আর আসবে না।</p>
-    ${NT_PREFS.map(([l, types], i) => `<label class="snd-row"><span>${l}</span><input type="checkbox" data-ntp="${i}" ${types.some(t => off.has(t)) ? '' : 'checked'}></label>`).join('')}
+  const P = PN(), perm = P ? (await P.checkPermissions().catch(() => null))?.receive : null, pushOn = perm === 'granted' && !local.get('push_off');
+  openSheet(`<h2>নোটিফিকেশন সেটিং</h2>
+    ${P ? `<div class="nts-card"><label class="nts-row"><span class="set-ic">${ic('bell', 18)}</span><span class="nts-t"><b>ফোনে নোটিফিকেশন</b><small>অ্যাপ বন্ধ থাকলেও ফোনের উপরে দেখাবে</small></span><input type="checkbox" class="switch" id="push-tg" ${pushOn ? 'checked' : ''}></label></div>` : ''}
+    <h3 class="nts-h">কোন কোন নোটিফিকেশন পাবেন</h3><p class="mut nts-sub">যেগুলো বন্ধ রাখবেন, সেগুলোর নোটিফিকেশন আর আসবে না।</p>
+    <div class="nts-card">${NT_PREFS.map(([l, types, icn], i) => `<label class="nts-row"><span class="set-ic">${ic(icn, 18)}</span><span class="nts-t">${l}</span><input type="checkbox" class="switch" data-ntp="${i}" ${types.some(t => off.has(t)) ? '' : 'checked'}></label>`).join('')}</div>
     <p class="mut" style="font-size:13px">উপজেলার জরুরি ঘোষণা, ভেরিফাই ব্যাজ, বুস্ট আর পেইজের অ্যাডমিন হওয়ার মতো জরুরি নোটিফিকেশন সবসময় আসবে। কোনো একটা পোস্টের নোটিফিকেশন বন্ধ করতে সেই নোটিফিকেশনের ⋯ চাপুন।</p>
     <button class="btn ghost wide" data-close style="margin-top:6px">বন্ধ করুন</button>`);
   $('#sheet').classList.add('tall');
-  $('#sheet').onchange = e => {
+  $('#sheet').onchange = async e => {
+    if (e.target.id === 'push-tg') {
+      if (e.target.checked) { local.set('push_off', false); await pushSetup(true); e.target.checked = (await PN()?.checkPermissions().catch(() => null))?.receive === 'granted'; }
+      else { local.set('push_off', true); await pushOff(); toast('ফোনে নোটিফিকেশন বন্ধ করা হয়েছে'); }
+      return;
+    }
     const i = e.target.dataset?.ntp; if (i == null) return;
     NT_PREFS[Number(i)][1].forEach(t => { if (e.target.checked) off.delete(t); else off.add(t); });
     S.api.setNotifPrefs([...off]).then(() => toast(e.target.checked ? 'চালু করা হয়েছে' : 'বন্ধ করা হয়েছে')).catch(er => toast(errText(er)));
@@ -7005,6 +7014,62 @@ $('#menu').addEventListener('click', e => {
 });
 
 
+// ================================================================ পুশ নোটিফিকেশন (Android): অ্যাপ বন্ধ থাকলেও ফোনে
+const PN = () => (window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.PushNotifications : null);
+let pushBound = false;
+function pushBind(P) {
+  if (pushBound) return; pushBound = true;
+  P.createChannel?.({ id: 'default', name: 'সাধারণ নোটিফিকেশন', description: 'মেসেজ, মন্তব্য, রিয়্যাক্ট ও জরুরি খবর', importance: 4, visibility: 1, lights: true, lightColor: '#006a4e', vibration: true }).catch(() => {});
+  P.addListener('registration', t => { const tok = t?.value; if (!tok) return; local.set('push_tok', tok); if (me()) S.api.registerPush(tok).catch(() => {}); });
+  P.addListener('registrationError', () => {});
+  // ফোনের নোটিফিকেশনে চাপলে সরাসরি সেই জিনিস খোলে
+  P.addListener('pushNotificationActionPerformed', a => setTimeout(() => pushOpen(a?.notification?.data || {}), me() ? 0 : 1500));
+  P.addListener('pushNotificationReceived', () => { refreshBadges().catch?.(() => {}); });
+}
+function pushOpen(d) {
+  if (!me()) return go('notif');
+  const t = d.type || '';
+  if (t === 'msg') return d.chat ? openChatGroup(d.chat) : d.user ? openThread(d.user) : go('msgs');
+  if (t === 'login_alert') return devicesSheet();
+  if (['friend_request', 'friend_accept', 'follow', 'birthday', 'friend_anniv'].includes(t) && d.user) return t === 'friend_request' ? go('friends') : openUser(d.user);
+  if (d.chat) return openChatGroup(d.chat);
+  if (d.post) return openPost(Number(d.post));
+  if (d.group) return openGroup(d.group);
+  if (d.page) return openPage(d.page);
+  go('notif');
+}
+async function pushSetup(ask) {
+  const P = PN(); if (!P || !me() || me().needsSetup) return;
+  pushBind(P);
+  if (!ask && local.get('push_off')) return;
+  let st = await P.checkPermissions().catch(() => null); if (!st) return;
+  if (st.receive === 'prompt' || st.receive === 'prompt-with-rationale') {
+    if (!ask) {
+      // আগে অ্যাপের নিজের সুন্দর অনুরোধ, তারপর ফোনের অনুমতি (৩ দিনে একবার)
+      if (Date.now() - (local.get('push_ask_at', 0) || 0) < 3 * 864e5 || $('#modal').classList.contains('on')) return;
+      return pushAskSheet();
+    }
+    st = await P.requestPermissions().catch(() => null);
+  }
+  if (st?.receive !== 'granted') { if (ask) toast('ফোনের সেটিং থেকে "আমার উপজেলা"-র নোটিফিকেশন চালু করুন'); return; }
+  local.set('push_off', false);
+  await P.register().catch(() => {});
+  const tok = local.get('push_tok'); if (tok) S.api.registerPush(tok).catch(() => {});
+}
+function pushAskSheet() {
+  local.set('push_ask_at', Date.now());
+  openSheet(`<div class="pa"><div class="pa-ic">${ic('bell', 30)}</div><h2>নোটিফিকেশন চালু করবেন?</h2>
+    <p class="mut">অ্যাপ বন্ধ থাকলেও সাথে সাথে জানতে পারবেন:</p>
+    <ul class="pa-l"><li>${ic('message', 18)}<span>কেউ মেসেজ দিলে</span></li><li>${ic('comment', 18)}<span>পোস্টে মন্তব্য, রিয়্যাক্ট বা মেনশন হলে</span></li><li>${ic('drop', 18)}<span>কাছাকাছি কারো জরুরি রক্তের দরকার হলে</span></li><li>${ic('megaphone', 18)}<span>উপজেলার জরুরি ঘোষণা এলে</span></li></ul>
+    <button class="btn wide au-btn" id="pa-yes">চালু করুন</button><button class="btn ghost wide" id="pa-no" style="margin-top:8px">এখন না</button>
+    <p class="mut pa-tip">কোন কোন নোটিফিকেশন আসবে, পরে মেনু → সেটিংস → নোটিফিকেশন সেটিং থেকে বদলাতে পারবেন।</p></div>`);
+  $('#pa-yes').onclick = () => { closeSheet(); pushSetup(true); };
+  $('#pa-no').onclick = () => closeSheet();
+}
+async function pushOff() {
+  const tok = local.get('push_tok'); if (tok) await S.api.unregisterPush(tok).catch(() => {});
+}
+
 // ================================================================ মেনু: শর্টকাট, আজকের দিন, কার্যকলাপ, FAQ, লগআউট
 // [id, আইকন, নাম, নিচের লেখা, ফিচার-ফ্ল্যাগ, অংশ]
 const SC_ALL = [
@@ -7112,6 +7177,7 @@ function logoutSheet() {
     <button class="btn ghost wide" data-close style="margin-top:8px">বাতিল</button></div>`);
   const go2 = all => async ev => busy(ev.currentTarget, async () => {
     const rem = $('#lo-rem').checked, id = me()?.id;
+    await pushOff();
     if (rem && !all) { accRemember(me(), '', await S.api.currentToken()); await S.api.detach(); }
     else { if (rem) accRemember(me(), '', ''); else accForget(id); await S.api.signOut(all); }
     closeSheet(); afterAuth(); go('me'); if (all) toast('সব ডিভাইস থেকে লগআউট হয়েছে');

@@ -380,7 +380,7 @@ function openViewer(p, start = 0) {
   $('#v-save').innerHTML = ic('download', 22); $('#viewer').hidden = false; document.body.style.overflow = 'hidden';
   $('#v-prev').hidden = $('#v-next').hidden = im.length < 2;
   requestAnimationFrame(() => { $('#v-track').scrollLeft = start * $('#v-track').clientWidth; vSync(); });
-  pushNav(); S.viewerOpen = true; $('#v-close').focus();
+  pushNav(); S.viewerOpen = true; $('#v-close').focus(); viewerSide(p);
 }
 function vSync() {
   const t = $('#v-track'), v = S.viewer; if (!v) return;
@@ -388,7 +388,7 @@ function vSync() {
   $('#v-count').textContent = v.im.length > 1 ? `${bn(v.i + 1)}/${bn(v.im.length)}` : '';
   $('#v-prev').disabled = v.i <= 0; $('#v-next').disabled = v.i >= v.im.length - 1;
 }
-function closeViewer() { $('#viewer').hidden = true; document.body.style.overflow = ''; S.viewer = null; S.viewerOpen = false; }
+function closeViewer() { $('#viewer').classList.remove('has-side'); $('#viewer').hidden = true; document.body.style.overflow = ''; S.viewer = null; S.viewerOpen = false; }
 $('#v-track').addEventListener('scroll', vSync, { passive: true });
 $('#v-close').addEventListener('click', () => back());
 $('#v-prev').addEventListener('click', () => $('#v-track').scrollBy({ left: -$('#v-track').clientWidth, behavior: 'smooth' }));
@@ -2063,6 +2063,7 @@ function showProfPane(key) {
   const st = S.pstate[key], pane = $('#' + key + '-pane'), feed = $('#feed-' + key), more = $('#more-' + key);
   if (!pane) return;
   const own = key === 'me';
+  deskProfSide(key);
   if (st.tab === 'posts') {
     pane.innerHTML = own ? profComposer() + '<h2 class="sec-h">আমার পোস্ট</h2>' : key === 'page' && S.curPage?.canManage ? pageComposer(S.curPage) : '';
     feed.hidden = false; loadFeed(key, false, true);
@@ -3820,6 +3821,7 @@ function listenMessages() {
   let reloadT = null;
   const reloadThread = () => { clearTimeout(reloadT); reloadT = setTimeout(() => { if (S.view === 'thread' && S.th) openConv(S.th, true); }, 300); };
   S.stopMsg = S.api.onMessage(ev => {
+    miniOnEvent?.(ev);
     const th = S.th, inThread = S.view === 'thread' && th && (ev.type === 'rx' || (th.kind === 'group' ? ev.chatId === th.id : !ev.chatId && (ev.from === th.id || ev.to === th.id || (th.pageId && ev.pageId === th.pageId)) && (ev.pageId || null) === (th.pageId || null)));
     if (inThread) {
       if (ev.type === 'new' && !ev.mine) { $('#t-typing').hidden = true; if (!th.muted) playSound('receive'); }
@@ -8417,6 +8419,7 @@ function syncRootNav(v) {
 // ফেসবুকের মতো মসৃণ বদল: ট্যাবে হালকা ফেড, ভেতরের পাতা ডান থেকে, Back-এ বাঁ থেকে; প্রতিটা ট্যাবের স্ক্রল মনে থাকে
 const RM = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 function show(v) {
+  try { deskDropClose(); hoverHide(); } catch { /* শুরুতে */ }
   const dir = S.navDir || 'page'; S.navDir = null;
   S.tabY = S.tabY || {};
   if (TABS.includes(S.view) && S.view !== v) S.tabY[S.view] = window.scrollY;
@@ -8456,7 +8459,7 @@ function go(v) {
   syncRootNav(v);
   S.navDir = 'tab'; show(v);
   // আগের লেখা রেখেই পেছনে নতুন তথ্য আনা (খালি "লোড হচ্ছে" দেখিয়ে লাফ দেয় না)
-  if (v === 'me') renderMe(); if (v === 'friends') loadFriends(true); if (v === 'msgs') loadConvs();
+  if (v === 'me') renderMe(); if (v === 'friends') loadFriends(true); if (v === 'msgs') loadConvs().then(() => deskAutoOpen()).catch(() => {});
   if (v === 'notif') loadNotifs(!!$('#notifs').children.length && !$('#notifs > .skel')); if (v === 'menu') renderMenu();
 }
 // ভেতরের পেজ খোলা (Back চাপলে আগের পেজে ফেরে)
@@ -8497,6 +8500,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest('[data-v]');
   if (t && !t.closest('#modal')) {
     // একই ট্যাবে আবার চাপলে ফেসবুকের মতো উপরে যায়; উপরে থাকলে হোম নতুন করে আসে
+    if (DESK.matches && t.closest('header') && (t.dataset.v === 'msgs' || t.dataset.v === 'notif') && S.view !== t.dataset.v) return deskDrop(t.dataset.v, t);
     if (t.closest('header') && t.dataset.v === S.view && TABS.includes(S.view) && !S.stack.length) {
       if (window.scrollY > 20) return window.scrollTo({ top: 0, behavior: 'smooth' });
       if (S.view === 'home') return loadFeed('home', false, true);
@@ -8687,7 +8691,7 @@ if (window.__auBubble) window.auBubble(window.__auBubble);
     th.style.paddingBottom = (tc.offsetHeight + 12) + 'px'; if (atEnd && S.view === 'thread') scrollTo({ top: document.documentElement.scrollHeight }); }).observe(tc); }
 
 // ================================================================ ডেস্কটপ (বড় পর্দা): Facebook-এর মতো বাঁয়ে শর্টকাট, মাঝে ফিড, ডানে যোগাযোগ
-const DESK = matchMedia('(min-width: 960px)');   // মোবাইল ব্রাউজারের "ডেস্কটপ সাইট" মোডেও (~৯৮০px)
+var DESK = matchMedia('(min-width: 960px)');   // মোবাইল ব্রাউজারের "ডেস্কটপ সাইট" মোডেও (~৯৮০px)
 function deskEls() {
   if ($('#desk-l')) return;
   document.body.insertAdjacentHTML('beforeend', '<aside class="desk-side desk-l" id="desk-l" aria-label="শর্টকাট"></aside><aside class="desk-side desk-r" id="desk-r" aria-label="যোগাযোগ"></aside><aside class="desk-side desk-c" id="desk-c" aria-label="চ্যাট"></aside>');
@@ -8698,7 +8702,7 @@ function deskEls() {
     const b = e.target.closest('[data-mgo]'); if (b) menuGo(b.dataset.mgo);
   });
   $('#desk-r').addEventListener('click', e => {
-    const u = e.target.closest('[data-dmsg]'); if (u) return openThread(u.dataset.dmsg);
+    const u = e.target.closest('[data-dmsg]'); if (u) return miniOpen(u.dataset.dmsg);
     if (e.target.closest('[data-dbday]')) return birthdaySheet();
   });
 }
@@ -8741,3 +8745,186 @@ function openConvItem(c) { if (c.kind === 'group') openChatGroup(c.chatId); else
 DESK.addEventListener?.('change', renderDesk);
 renderDesk();
 setInterval(() => { if (DESK.matches && document.visibilityState === 'visible') deskRight(); }, 120000);
+
+// ---------------------------------------------------------------- ডেস্কটপ (২): মেসেজ ট্যাবে ঢুকলেই সবচেয়ে নতুন চ্যাট
+function deskAutoOpen() {
+  if (!DESK.matches || S.view !== 'msgs' || S.navDir !== 'tab') return;
+  const c = (S.inboxList || []).find(x => !x.request && !x.asPage); if (c) openConvItem(c);
+}
+// ---------------------------------------------------------------- ডেস্কটপ (৩): হেডারের মেসেজ ও নোটিফিকেশন: ছোট ড্রপডাউন
+function deskDrop(v, btn) {
+  const cur = $('#dk-drop'); if (cur && cur.dataset.v === v) return deskDropClose();
+  deskDropClose();
+  if (!me()) return go(v);
+  const r = btn.getBoundingClientRect(), w = 380;
+  const d = document.createElement('div'); d.id = 'dk-drop'; d.className = 'dk-drop'; d.dataset.v = v;
+  d.style.top = (r.bottom + 6) + 'px'; d.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + 'px';
+  d.innerHTML = `<div class="dk-dbody"></div><button class="dk-dall" data-dkall="${v}">${v === 'msgs' ? 'সব চ্যাট দেখুন' : 'সব নোটিফিকেশন দেখুন'}</button>`;
+  const sec = $('#v-' + v), body = d.querySelector('.dk-dbody');
+  S.dropMoved = { sec, nodes: [...sec.childNodes] }; S.dropMoved.nodes.forEach(n => body.appendChild(n));
+  document.body.appendChild(d); btn.classList.add('dk-open');
+  d.querySelector('[data-dkall]').onclick = () => { deskDropClose(); go(v); };
+  if (v === 'msgs') loadConvs(); else loadNotifs(!!$('#notifs').children.length);
+}
+function deskDropClose() {
+  const d = $('#dk-drop'); if (!d) return;
+  if (S.dropMoved) { S.dropMoved.nodes.forEach(n => S.dropMoved.sec.appendChild(n)); S.dropMoved = null; }
+  d.remove(); document.querySelectorAll('header .dk-open').forEach(b => b.classList.remove('dk-open'));
+}
+document.addEventListener('pointerdown', e => { if ($('#dk-drop') && !e.target.closest('#dk-drop, header [data-v="msgs"], header [data-v="notif"], #modal')) deskDropClose(); }, true);
+
+// ---------------------------------------------------------------- ডেস্কটপ (১): ভাসমান ছোট চ্যাট জানালা (সর্বোচ্চ ৩টি)
+var MINI = [];
+function miniBox() { let b = $('#mini-wrap'); if (!b) { b = document.createElement('div'); b.id = 'mini-wrap'; b.className = 'mini-wrap'; document.body.appendChild(b); } return b; }
+async function miniOpen(uid) {
+  if (!DESK.matches) return openThread(uid);
+  let m = MINI.find(x => x.uid === uid);
+  if (m) { m.el.classList.remove('min'); m.el.querySelector('textarea')?.focus(); return; }
+  if (MINI.length >= 3) miniClose(MINI[0].uid);
+  const el = document.createElement('div'); el.className = 'mini';
+  el.innerHTML = `<div class="mini-h"><span class="mini-who"></span><button type="button" data-mx="full" aria-label="বড় করে খুলুন">${ic('chevR', 18)}</button><button type="button" data-mx="min" aria-label="ছোট করুন">${ic('chevD', 18)}</button><button type="button" data-mx="close" aria-label="বন্ধ করুন">${ic('close', 18)}</button></div>
+    <div class="mini-b"><div class="mut mini-load">লোড হচ্ছে…</div></div>
+    <form class="mini-f"><textarea rows="1" maxlength="2000" placeholder="মেসেজ লিখুন…" aria-label="মেসেজ"></textarea><button class="mini-s" aria-label="পাঠান">${ic('send', 18)}</button></form>`;
+  m = { uid, el, t: { kind: 'dm', id: uid } }; MINI.push(m); miniBox().prepend(el);
+  el.querySelector('.mini-h').addEventListener('click', e => {
+    const a = e.target.closest('[data-mx]')?.dataset.mx;
+    if (a === 'close') return miniClose(uid);
+    if (a === 'full') { miniClose(uid); return openThread(uid); }
+    el.classList.toggle('min');
+  });
+  const ta = el.querySelector('textarea');
+  ta.addEventListener('input', () => autoGrow(ta, 96));
+  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); el.querySelector('form').requestSubmit(); } });
+  el.querySelector('form').addEventListener('submit', async e => {
+    e.preventDefault(); const txt = ta.value.trim(); if (!txt) return;
+    ta.value = ''; autoGrow(ta, 96);
+    try { await S.api.send(m.t, txt); playSound('send'); miniLoad(m); } catch (er) { toast(errText(er)); ta.value = txt; }
+  });
+  S.api.profile(uid).then(p => { m.p = p; el.querySelector('.mini-who').innerHTML = `${av(p || { name: '?' }, 'sm')}<b>${esc(p?.name || '')}</b>`; }).catch(() => {});
+  await miniLoad(m); ta.focus();
+}
+async function miniLoad(m) {
+  try {
+    const d = await S.api.thread(m.t), b = m.el.querySelector('.mini-b');
+    const msgs = (d.msgs || []).slice(-40);
+    b.innerHTML = msgs.length ? msgs.map(x => `<div class="mini-m${x.mine ? ' me' : ''}${x.sticker || emoOnly(x.body) ? ' big' : ''}"><span>${x.deleted ? '<i>মুছে ফেলা মেসেজ</i>' : x.sticker ? stickerHtml(x.sticker) : x.body && !x.image ? esc(x.body) : esc(msgPreview(x))}</span></div>`).join('') : '<p class="mut mini-load">কথোপকথন শুরু করুন 👋</p>';
+    b.scrollTop = b.scrollHeight;
+    S.api.markRead?.(m.uid).then(() => refreshBadges()).catch(() => {});
+  } catch { /* থাক */ }
+}
+function miniClose(uid) { const i = MINI.findIndex(x => x.uid === uid); if (i < 0) return; MINI[i].el.remove(); MINI.splice(i, 1); }
+function miniOnEvent(ev) {
+  for (const m of MINI) if (!ev.chatId && !ev.pageId && (ev.from === m.uid || ev.to === m.uid)) { clearTimeout(m.rt); m.rt = setTimeout(() => miniLoad(m), 250); if (ev.type === 'new' && !ev.mine) { m.el.classList.remove('min'); playSound('receive'); } }
+}
+DESK.addEventListener?.('change', () => { if (!DESK.matches) [...MINI].forEach(m => miniClose(m.uid)); });
+
+// ---------------------------------------------------------------- ডেস্কটপ (৪): কিবোর্ড শর্টকাট
+function autoGrow(ta, max = 120) { ta.style.height = 'auto'; ta.style.height = Math.min(max, ta.scrollHeight) + 'px'; }
+document.addEventListener('keydown', e => {
+  const typing = e.target.closest?.('input, textarea, select, [contenteditable="true"]');
+  if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); return $('#open-search')?.click(); }
+  if (e.key === 'Escape') {
+    if ($('#dk-drop')) return deskDropClose();
+    if ($('#hcard')) return hoverHide();
+    if (GAL.open) return galClose();
+    if ($('#modal').classList.contains('on')) return closeSheet();
+    if (S.viewerOpen) return; // ছবি দেখার পাতা নিজেই Escape ধরে
+  }
+  if (e.altKey && !typing && /^[1-5]$/.test(e.key)) { e.preventDefault(); go(['home', 'friends', 'msgs', 'notif', 'upz'][Number(e.key) - 1]); }
+});
+// মেসেজ লেখার ঘর: Enter = পাঠান (কম্পিউটারে), Shift+Enter = নতুন লাইন; ফোনে Enter = নতুন লাইন
+{
+  const ta = $('#tmsg');
+  ta.addEventListener('input', () => autoGrow(ta));
+  ta.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    if (matchMedia('(pointer: coarse)').matches && !DESK.matches) return;
+    e.preventDefault(); if ($('#t-mention') && !$('#t-mention').hidden && $('#t-mention').querySelector('.on, button')) return;
+    $('#tform').requestSubmit();
+  });
+  $('#tform').addEventListener('submit', () => setTimeout(() => autoGrow(ta), 0));
+}
+
+// ---------------------------------------------------------------- ডেস্কটপ (৫): নামের উপর মাউস রাখলে প্রোফাইলের ঝলক
+var HC = { t: null, cache: new Map(), id: null };
+function hoverHide() { clearTimeout(HC.t); HC.id = null; $('#hcard')?.remove(); }
+document.addEventListener('mouseover', e => {
+  if (!DESK.matches || !matchMedia('(hover: hover)').matches) return;
+  if (e.target.closest('#hcard')) { clearTimeout(HC.t); return; }
+  const a = e.target.closest('[data-user]');
+  if (!a) { if (HC.id) { clearTimeout(HC.t); HC.t = setTimeout(hoverHide, 250); } return; }
+  const id = a.dataset.user; if (HC.id === id && $('#hcard')) { clearTimeout(HC.t); return; }
+  clearTimeout(HC.t);
+  HC.t = setTimeout(async () => {
+    HC.id = id; let u = HC.cache.get(id);
+    if (!u) { try { u = await S.api.profile(id); HC.cache.set(id, u); } catch { return; } }
+    if (HC.id !== id || !a.isConnected || !u) return;
+    $('#hcard')?.remove();
+    const r = a.getBoundingClientRect(), c = document.createElement('div'); c.id = 'hcard'; c.className = 'hcard';
+    const place = [u.unionName || u.union, u.upazila, u.district].filter(Boolean).join(', ');
+    const isMe = id === me()?.id;
+    c.innerHTML = `<div class="hc-top">${av(u, 'lg')}<div><b>${esc(u.name)}</b>${vb?.(u.badge) || ''}${u.bio ? `<p>${esc(u.bio).slice(0, 120)}</p>` : ''}${place ? `<small>${ic('pin', 14)} ${esc(place)}</small>` : ''}</div></div>
+      <div class="hc-acts">${isMe ? '' : `<button class="btn" data-hc="msg">${ic('message', 16)} মেসেজ</button>`}<button class="btn ghost" data-hc="prof">${ic('user', 16)} প্রোফাইল</button></div>`;
+    document.body.appendChild(c);
+    const top = r.bottom + 8 + c.offsetHeight > innerHeight ? r.top - c.offsetHeight - 8 : r.bottom + 8;
+    c.style.top = Math.max(8, top) + 'px'; c.style.left = Math.max(8, Math.min(innerWidth - c.offsetWidth - 8, r.left)) + 'px';
+    c.onclick = ev => { const b = ev.target.closest('[data-hc]'); if (!b) return; hoverHide(); if (b.dataset.hc === 'msg') miniOpen(id); else openUser(id); };
+    c.onmouseleave = () => { HC.t = setTimeout(hoverHide, 250); };
+  }, 550);
+});
+addEventListener('scroll', () => { if ($('#hcard')) hoverHide(); }, { passive: true });
+
+// ---------------------------------------------------------------- ডেস্কটপ (৬): ছবি টেনে এনে ছাড়া (পোস্ট ও মেসেজ)
+{
+  const imgs = dt => [...(dt?.files || [])].filter(f => f.type.startsWith('image/'));
+  let tip = null;
+  const showTip = on => { if (on && !tip) { tip = document.createElement('div'); tip.className = 'drop-tip'; tip.innerHTML = `${ic('photo', 34)}<b>ছবি এখানে ছেড়ে দিন</b>`; document.body.appendChild(tip); } else if (!on && tip) { tip.remove(); tip = null; } };
+  const target = () => ($('#pc-file') && $('#modal').classList.contains('on') ? 'post' : S.view === 'thread' && !$('#modal').classList.contains('on') ? 'msg' : '');
+  addEventListener('dragover', e => { if (!e.dataTransfer?.types?.includes('Files') || !target()) return; e.preventDefault(); showTip(true); });
+  addEventListener('dragleave', e => { if (!e.relatedTarget) showTip(false); });
+  addEventListener('drop', e => {
+    const t = target(); showTip(false); if (!t) return;
+    const fs = imgs(e.dataTransfer); if (!fs.length) return; e.preventDefault();
+    if (t === 'post') { const inp = $('#pc-file'), dt = new DataTransfer(); fs.forEach(f => dt.items.add(f)); inp.files = dt.files; inp.dispatchEvent(new Event('change')); return; }
+    if (S.th?.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ছবি পাঠানো যায় না');
+    const room = 10 - S.att.length; fs.slice(0, Math.max(0, room)).forEach(f => S.att.push({ f, url: URL.createObjectURL(f) }));
+    if (fs.length > room) toast('একসাথে সর্বোচ্চ ১০টি ছবি পাঠানো যায়');
+    renderAtt(); composeState(); $('#tmsg').focus();
+  });
+}
+
+// ---------------------------------------------------------------- ডেস্কটপ (৭): প্রোফাইল ও পেইজ: বাঁয়ে পরিচিতি ও ছবি, ডানে পোস্ট
+async function deskProfSide(key) {
+  const sec = $('#v-' + key); if (!sec) return;
+  let side = sec.querySelector(':scope > .prof-side');
+  const st = S.pstate[key];
+  if (!DESK.matches || st.tab !== 'posts' || (key === 'me' && !me())) { side?.remove(); sec.classList.remove('has-side'); return; }
+  if (!side) { side = document.createElement('aside'); side.className = 'prof-side'; sec.insertBefore(side, $('#feed-' + key)); }
+  sec.classList.add('has-side');
+  const u = key === 'me' ? me() : key === 'user' ? S.viewProfile : null, pg = key === 'page' ? S.curPage : null;
+  let intro = '';
+  if (u) { const rows = detailRows(u, u.featured || FEATURED0); intro = (u.bio ? `<p class="ps-bio">${esc(u.bio)}</p>` : '') + rows.slice(0, 6).join(''); }
+  else if (pg) intro = (pg.about || pg.bio ? `<p class="ps-bio">${esc(pg.about || pg.bio)}</p>` : '') + (pg.category ? `<p class="ps-row">${ic('tag', 16)} ${esc(pg.category)}</p>` : '') + (pg.phone ? `<p class="ps-row">${ic('phone', 16)} ${esc(bn(pg.phone))}</p>` : '');
+  side.innerHTML = `<div class="card ps-card"><h3>পরিচিতি</h3>${intro || '<p class="mut">এখনো কিছু লেখা হয়নি</p>'}${key === 'page' ? '' : `<button class="btn ghost wide" data-ptab="${key}|about">সব তথ্য দেখুন</button>`}</div>
+    <div class="card ps-card"><div class="ps-h"><h3>ছবি</h3><button class="link" data-ptab="${key}|photos">সব ছবি</button></div><div class="ps-photos"><div class="gal-sk"></div><div class="gal-sk"></div><div class="gal-sk"></div></div></div>`;
+  try {
+    const uid = profUid(key); if (!uid) return;
+    const ph = (await S.api.photos(uid, { pageId: panePage(key) })).slice(0, 9);
+    const box = side.querySelector('.ps-photos'); if (!box) return;
+    box.innerHTML = ph.length ? ph.map((x, i) => `<button class="ps-ph" data-psv="${i}"><img src="${esc(x.url)}" alt="" loading="lazy"></button>`).join('') : '<p class="mut" style="grid-column:1/-1;margin:0">কোনো ছবি নেই</p>';
+    box.onclick = e => { const b = e.target.closest('[data-psv]'); if (b) openViewer({ images: ph.map(x => x.url), postIds: ph.map(x => x.postId) }, Number(b.dataset.psv)); };
+  } catch { /* থাক */ }
+}
+
+// ---------------------------------------------------------------- ডেস্কটপ (৯): ছবি দেখার সময় ডানে পোস্টের লেখা
+function viewerSide(p) {
+  const v = $('#viewer'); let side = $('#v-side');
+  if (!DESK.matches || !p || !p.id || (!p.author && !p.body)) { v.classList.remove('has-side'); return; }
+  if (!side) { side = document.createElement('aside'); side.id = 'v-side'; side.className = 'v-side'; v.appendChild(side); }
+  v.classList.add('has-side');
+  side.innerHTML = `<div class="vs-head">${av({ name: p.author, avatar: p.avatar }, 'sm')}<div><b>${esc(p.author || '')}</b><small>${esc(ago(p.createdAt))}</small></div></div>
+    ${p.body ? `<div class="vs-body">${esc(p.body)}</div>` : ''}
+    <div class="vs-stats">${p.likes ? `<span>${ic('thumb', 16)} ${bn(p.likes)}</span>` : ''}</div>
+    <button class="btn wide" data-vsopen>${ic('comment', 18)} মন্তব্য দেখুন ও লিখুন</button>`;
+  side.querySelector('[data-vsopen]').onclick = () => { const id = p.id; back(); setTimeout(() => openPost(id), 120); };
+}

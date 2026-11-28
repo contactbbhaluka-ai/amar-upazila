@@ -2953,3 +2953,82 @@ body.bubble { --hh: 0px; }
   .dk-cv.un .dk-cvt b,.dk-cv.un .dk-cvt small{font-weight:700;color:var(--ink)}
   .dk-dot{width:10px;height:10px;border-radius:50%;background:var(--g);flex:none}
 }
+
+/* মেসেজ লেখার ঘর এখন textarea: একাধিক লাইন (Shift+Enter), নিজে নিজে উঁচু হয় */
+textarea#tmsg{resize:none;min-height:40px;max-height:120px;height:40px;line-height:1.45;border-radius:20px;padding:9px 42px 9px 14px;overflow-y:auto;display:block;scrollbar-width:none}
+.t-inw{align-items:flex-end}
+.t-inw .t-emo-in{top:auto;bottom:2px;transform:none}
+#tform{align-items:flex-end}
+#tform>.t-ic{margin-bottom:0}
+
+/* ================================================================ ডেস্কটপের বাড়তি সুবিধা */
+.mini-wrap,.dk-drop,.hcard,.prof-side,.v-side{display:none}
+@media (min-width:960px){
+  /* ৩: ড্রপডাউন */
+  .dk-drop{display:flex;flex-direction:column;position:fixed;z-index:30;width:380px;max-height:min(640px,calc(100vh - 90px));background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);overflow:hidden;animation:attIn .16s ease}
+  .dk-dbody{flex:1;overflow-y:auto;padding:8px 8px 4px}
+  .dk-dbody>h2,.dk-dbody .sec-h{margin:4px 8px 8px!important}
+  .dk-dbody .card{border:0;box-shadow:none;padding:0 4px!important;margin:0}
+  .dk-dall{flex:none;border:0;border-top:1px solid var(--line);background:var(--card);color:var(--g);font:inherit;font-weight:700;padding:11px;cursor:pointer}
+  .dk-dall:hover{background:var(--g2)}
+  header .dk-open{background:var(--g2)!important;color:var(--g)}
+  /* ১: ভাসমান চ্যাট */
+  .mini-wrap{display:flex;flex-direction:row-reverse;gap:10px;position:fixed;bottom:0;right:16px;z-index:25;align-items:flex-end;pointer-events:none}
+  html.desk body:has(#v-home.on) .mini-wrap{right:calc(var(--dkw) + 12px)}
+  .mini{pointer-events:auto;width:330px;height:450px;background:var(--card);border:1px solid var(--line);border-bottom:0;border-radius:12px 12px 0 0;box-shadow:0 8px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;animation:attIn .18s ease}
+  .mini.min{height:auto}.mini.min .mini-b,.mini.min .mini-f{display:none}
+  .mini-h{display:flex;align-items:center;gap:2px;padding:6px 6px 6px 10px;border-bottom:1px solid var(--line);cursor:pointer}
+  .mini-who{flex:1;display:flex;align-items:center;gap:8px;min-width:0}.mini-who b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mini-who .av{width:32px;height:32px;font-size:14px}
+  .mini-h button{width:32px;height:32px;border:0;border-radius:50%;background:none;color:var(--g);display:grid;place-items:center;cursor:pointer}
+  .mini-h button:hover{background:var(--g2)}
+  .mini-b{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:4px}
+  .mini-m{display:flex}.mini-m.me{justify-content:flex-end}
+  .mini-m span{max-width:78%;padding:7px 11px;border-radius:16px;background:var(--g2);font-size:14.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+  .mini-m.me span{background:var(--g);color:#fff}
+  .mini-m.big span{background:none!important;color:inherit;padding:0;font-size:30px}
+  .mini-m.big .stk{transform:scale(.8);transform-origin:left}
+  .mini-load{margin:auto;text-align:center}
+  .mini-f{display:flex;align-items:flex-end;gap:6px;padding:8px;border-top:1px solid var(--line)}
+  .mini-f textarea{flex:1;resize:none;min-height:36px;height:36px;max-height:96px;border-radius:18px;padding:7px 12px;line-height:1.4;font-size:14.5px}
+  .mini-s{flex:none;width:36px;height:36px;border:0;border-radius:50%;background:none;color:var(--g);display:grid;place-items:center;cursor:pointer}
+  /* ৫: প্রোফাইলের ঝলক */
+  .hcard{display:block;position:fixed;z-index:40;width:340px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);padding:14px;animation:attIn .14s ease}
+  .hc-top{display:flex;gap:12px;align-items:flex-start}
+  .hc-top .av{width:72px;height:72px;font-size:28px;flex:none}
+  .hc-top b{font-size:17px}.hc-top p{margin:4px 0 0;font-size:13.5px;color:var(--mut)}
+  .hc-top small{display:flex;align-items:center;gap:4px;margin-top:6px;color:var(--mut);font-size:13px}
+  .hc-acts{display:flex;gap:8px;margin-top:12px}.hc-acts .btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px}
+  /* ৬: ছবি টেনে আনা */
+  .drop-tip{position:fixed;inset:12px;z-index:70;border:3px dashed var(--g);border-radius:20px;background:color-mix(in srgb,var(--g) 10%,transparent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--g);font-size:18px;pointer-events:none;backdrop-filter:blur(2px)}
+  /* ৭: প্রোফাইল/পেইজ দুই কলাম */
+  html.desk body:has(:is(#v-me,#v-user,#v-page).on.has-side) main,html.desk body:has(:is(#v-me,#v-user,#v-page).on) main{max-width:1040px}
+  :is(#v-me,#v-user,#v-page).has-side.on{display:grid;grid-template-columns:360px minmax(0,1fr);gap:0 16px;align-items:start}
+  :is(#v-me,#v-user,#v-page).has-side>*{grid-column:1/-1}
+  :is(#v-me,#v-user,#v-page).has-side>.prof-side{display:block;grid-column:1;grid-row:span 30;position:sticky;top:calc(var(--hh,60px) + 12px)}
+  :is(#v-me,#v-user,#v-page).has-side>[data-feed],:is(#v-me,#v-user,#v-page).has-side>[id^="more-"]{grid-column:2}
+  :is(#v-me,#v-user,#v-page) .cover{aspect-ratio:auto;height:320px}
+  .ps-card h3{margin:0 0 10px;font-size:19px}
+  .ps-bio{text-align:center;margin:0 0 10px;font-size:15px}
+  .ps-row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:14.5px}
+  .ps-h{display:flex;align-items:center;justify-content:space-between}
+  .ps-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;border-radius:10px;overflow:hidden}
+  .ps-ph{aspect-ratio:1;border:0;padding:0;background:var(--g2);cursor:pointer}
+  .ps-ph img{width:100%;height:100%;object-fit:cover;display:block}
+  /* ৮: সেবা ডিরেক্টরি ও ব্লাড ব্যাংক চওড়া গ্রিডে */
+  html.desk body:has(#v-dir.on) main{max-width:1100px}
+  html.desk #dir{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0 14px;align-items:start}
+  html.desk #dir>:not(.card):not(.svc-tile):not(.svc){grid-column:1/-1}
+  html.desk #dir .svc-grid{grid-template-columns:repeat(6,1fr)}
+  /* ৯: ছবি দেখা: বাঁয়ে বড় ছবি, ডানে পোস্ট */
+  .viewer.has-side{padding-right:380px}
+  .viewer.has-side .v-side{display:flex;flex-direction:column;gap:12px;position:absolute;top:0;right:0;bottom:0;width:380px;background:var(--card);color:var(--ink);padding:16px;overflow-y:auto}
+  .vs-head{display:flex;align-items:center;gap:10px}.vs-head b{display:block}.vs-head small{color:var(--mut);font-size:12.5px}
+  .vs-body{white-space:pre-wrap;line-height:1.55;font-size:15px}
+  .vs-stats{color:var(--mut);display:flex;gap:12px}.vs-stats span{display:flex;align-items:center;gap:4px}
+  .viewer.has-side .v-nav.next{right:396px}
+}
+@media (min-width:960px){
+  body:has(#viewer:not([hidden])) .mini-wrap,body:has(#viewer:not([hidden])) #hcard{display:none}
+  :is(#v-me,#v-user,#v-page) .cover-img,:is(#v-me,#v-user,#v-page) .cover-img img{width:100%}
+}

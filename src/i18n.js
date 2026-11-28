@@ -145,6 +145,8 @@ const PLACES = {
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
   // লগইন ও সাইনআপ
+  "সব চ্যাট দেখুন": "See all chats", "সব নোটিফিকেশন দেখুন": "See all notifications", "পরিচিতি": "Intro", "সব তথ্য দেখুন": "See all info", "সব ছবি": "All photos", "কোনো ছবি নেই": "No photos",
+  "এখনো কিছু লেখা হয়নি": "Nothing added yet", "মন্তব্য দেখুন ও লিখুন": "View and write comments", "ছবি এখানে ছেড়ে দিন": "Drop photos here", "কথোপকথন শুরু করুন 👋": "Start the conversation 👋",
   "চ্যাট": "Chats", "যোগাযোগ": "Contacts", "সব দেখুন": "See all", "আজ {x} জনের জন্মদিন": "{x} birthdays today", "এখনো কোনো বন্ধু নেই": "No friends yet", "লগইন করলে এখানে আপনার বন্ধুরা দেখাবে": "Log in to see your friends here",
   "মুখ": "Faces", "হাত": "Hands", "ভালোবাসা": "Love", "মানুষ": "People", "খাবার": "Food", "প্রকৃতি": "Nature", "উৎসব": "Celebration", "জিনিস": "Objects", "চিহ্ন": "Symbols", "ভালুকার ভাষা": "Bhaluka dialect",
   "পেইজ": "Page", "{n} পেইজের গ্রাহক": "Customer of {n}",

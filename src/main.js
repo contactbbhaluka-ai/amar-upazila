@@ -1093,7 +1093,7 @@ async function loadFeed(key, append, soft) {
     : key === 'group' ? { groupId: S.groupId }
     : { userId: key === 'me' ? me()?.id : S.userId };
   try {
-    if (key !== 'home' && !q.userId && !q.postId && !q.saved && !q.memories && !q.pageId && !q.groupId) { f.posts = []; box.innerHTML = ''; return; }
+    if (key !== 'home' && !q.userId && !q.postId && !q.saved && !q.memories && !q.pageId && !q.groupId) { f.posts = []; box.classList.remove('fd-busy'); box.innerHTML = ''; return; }
     const plainHome = key === 'home' && !append && S.scope === 'area' && !q.unionId && !q.category && !S.api.demoLogin;
     const call = () => S.api.posts({ ...q, before: append ? f.posts.at(-1)?.createdAt : undefined });
     const adsP = key === 'home' && !append && !q.category && feat('featBoost') ? S.api.boostedPosts(3).catch(() => []) : null;
@@ -2038,7 +2038,7 @@ function showProfPane(key) {
   const own = key === 'me';
   if (st.tab === 'posts') {
     pane.innerHTML = own ? profComposer() + '<h2 class="sec-h">আমার পোস্ট</h2>' : key === 'page' && S.curPage?.canManage ? pageComposer(S.curPage) : '';
-    feed.hidden = false; loadFeed(key);
+    feed.hidden = false; loadFeed(key, false, true);
   } else if (st.tab === 'about') {
     feed.hidden = true; if (more) more.hidden = true;
     renderAbout(key);
@@ -7988,7 +7988,12 @@ function syncRootNav(v) {
   if (hd > want) { S.hd = want; S.skipPop = (S.skipPop || 0) + 1; try { history.go(want - hd); } catch { S.skipPop--; } }
   else if (hd < want) pushNav();
 }
+// ফেসবুকের মতো মসৃণ বদল: ট্যাবে হালকা ফেড, ভেতরের পাতা ডান থেকে, Back-এ বাঁ থেকে; প্রতিটা ট্যাবের স্ক্রল মনে থাকে
+const RM = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 function show(v) {
+  const dir = S.navDir || 'page'; S.navDir = null;
+  S.tabY = S.tabY || {};
+  if (TABS.includes(S.view) && S.view !== v) S.tabY[S.view] = window.scrollY;
   DIR_BN = v === 'dir';
   if (v !== 'dir') S.dirAnimDone = false;
   if (v !== 'thread') { try { VP.a.pause(); } catch { /* প্লেয়ার এখনো তৈরি হয়নি */ } }
@@ -7999,7 +8004,10 @@ function show(v) {
   document.body.classList.toggle('searching', v === 'search');
   document.querySelectorAll('.view').forEach(e => e.classList.toggle('on', e.id === 'v-' + v));
   document.querySelectorAll('header [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === S.tab));
-  window.scrollTo(0, 0);
+  const el = $('#v-' + v);
+  if (el && !RM?.matches) { el.classList.remove('vin-tab', 'vin-page', 'vin-back'); void el.offsetWidth; el.classList.add(dir === 'tab' ? 'vin-tab' : dir === 'back' ? 'vin-back' : 'vin-page'); }
+  const y = (dir === 'tab' || dir === 'back') && TABS.includes(v) ? S.tabY[v] || 0 : 0;
+  window.scrollTo({ top: y, behavior: 'instant' });
 }
 // প্রধান ট্যাবে যাওয়া
 function go(v) {
@@ -8014,15 +8022,16 @@ function go(v) {
   if (v === 'friends' && S.actAs) return go('pinsights');
   if (v === 'upz') {   // নিচের "উপজেলা" ট্যাব: সেবা ডিরেক্টরি
     closeSheet(); S.stack = []; S.dcat = ''; if ($('#q')) $('#q').value = '';
-    show('dir'); S.tab = 'upz'; document.body.classList.add('upz-root'); document.querySelectorAll('header [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === 'upz'));
+    S.navDir = 'tab'; show('dir'); S.tab = 'upz'; document.body.classList.add('upz-root'); document.querySelectorAll('header [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === 'upz'));
     S.dirSub = false; syncRootNav('upz');
     return loadDir();
   }
   closeSheet(); S.stack = [];
   syncRootNav(v);
-  show(v);
-  if (v === 'me') renderMe(); if (v === 'friends') loadFriends(); if (v === 'msgs') loadConvs();
-  if (v === 'notif') loadNotifs(); if (v === 'menu') renderMenu();
+  S.navDir = 'tab'; show(v);
+  // আগের লেখা রেখেই পেছনে নতুন তথ্য আনা (খালি "লোড হচ্ছে" দেখিয়ে লাফ দেয় না)
+  if (v === 'me') renderMe(); if (v === 'friends') loadFriends(true); if (v === 'msgs') loadConvs();
+  if (v === 'notif') loadNotifs(!!$('#notifs').children.length && !$('#notifs > .skel')); if (v === 'menu') renderMenu();
 }
 // ভেতরের পেজ খোলা (Back চাপলে আগের পেজে ফেরে)
 function open(v) { closeSheet(); if (S.view !== v) S.stack.push(S.view); pushNav(); show(v); }
@@ -8037,8 +8046,8 @@ function onPop() {
     return closeSheet(true);
   }
   if (S.view === 'dir' && S.dirSub) { S.dirSub = false; S.dcat = ''; if ($('#q')) $('#q').value = ''; S.dirY = S.dirBackY || 0; loadDir(); return; }   // যেখান থেকে ঢুকেছিলেন সেখানেই ফেরা
-  if (!S.stack.length) { if (S.view !== 'home') go('home'); return; }   // অন্য ট্যাব থেকে Back → নিউজফিডের হোম
-  const prev = S.stack.pop(); show(prev);
+  if (!S.stack.length) { if (S.view !== 'home') go('home'); return; }   // ট্যাব বদলের মতোই হালকা ফেড   // অন্য ট্যাব থেকে Back → নিউজফিডের হোম
+  const prev = S.stack.pop(); S.navDir = 'back'; show(prev);
   if (prev === 'dir' && S.dirRet) {
     const r = S.dirRet; S.dirRet = null; S.tab = r.tab; S.dirY = r.y;
     document.querySelectorAll('header [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === S.tab)); document.body.classList.toggle('upz-root', !!r.root);
@@ -8058,7 +8067,15 @@ document.addEventListener('click', e => {
   const so = e.target.closest('a[data-svcopen]'); if (so && !so.closest('#spform')) { e.preventDefault(); return svcOpenAnywhere(so.dataset.svcopen); }
   const op = e.target.closest('a[data-openpost]'); if (op) { e.preventDefault(); return openPost(op.dataset.openpost); }
   if (e.target.closest('[data-back]')) return back();
-  const t = e.target.closest('[data-v]'); if (t && !t.closest('#modal')) go(t.dataset.v);
+  const t = e.target.closest('[data-v]');
+  if (t && !t.closest('#modal')) {
+    // একই ট্যাবে আবার চাপলে ফেসবুকের মতো উপরে যায়; উপরে থাকলে হোম নতুন করে আসে
+    if (t.closest('header') && t.dataset.v === S.view && TABS.includes(S.view) && !S.stack.length) {
+      if (window.scrollY > 20) return window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (S.view === 'home') return loadFeed('home', false, true);
+    }
+    go(t.dataset.v);
+  }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal').classList.contains('on')) closeSheet(); });
 

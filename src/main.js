@@ -10,6 +10,29 @@ if (EN) import('./i18n.js').then(m => { I18N = m; return m.startI18n(); }).catch
 
 // সাধারণ এক রঙের রেখার আইকন (লেখার রং-ই আইকনের রং)
 const ICONS = {
+  cross: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/>',
+  siren: '<path d="M6 18v-5a6 6 0 0 1 12 0v5"/><path d="M4 18h16v3H4z"/><path d="M12 3V1.5M4.2 6.2 3 5M19.8 6.2 21 5"/><path d="M10 13a2 2 0 0 1 2-2"/>',
+  moon: '<path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  coin: '<circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2c-.5-.9-1.5-1.4-2.8-1.4-1.6 0-2.8.8-2.8 2.1 0 2.9 5.8 1.5 5.8 4.3 0 1.3-1.3 2.1-3 2.1-1.4 0-2.5-.6-3-1.6M12 6v1.8M12 16.3V18"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',
+  history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
+  activity: '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
+  cake: '<path d="M4 21V12a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9"/><path d="M4 15c1.3 1 2.7 1 4 0s2.7-1 4 0 2.7 1 4 0 2.7-1 4 0"/><path d="M3 21h18M12 10V7M12 4.5a1 1 0 0 1 0-1"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9M12 17.2v.1"/>',
+  bug: '<rect x="7" y="8" width="10" height="12" rx="5"/><path d="M9 8a3 3 0 0 1 6 0M12 12v8M3 13h4M17 13h4M4 7l3 2M20 7l-3 2M4 20l3-2M20 20l-3-2"/>',
+  doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+  key: '<circle cx="7.5" cy="15.5" r="4"/><path d="M10.5 12.5 20 3M16 7l3 3M14 9l2 2"/>',
+  ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  activeDot: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/>',
+  idcard: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="11" r="2.2"/><path d="M5.8 16c.6-1.5 1.8-2.3 3.2-2.3s2.6.8 3.2 2.3M14.5 10h3.5M14.5 13.5h3.5"/>',
+  sound: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+  type: '<path d="M4 19 9 5l5 14M5.8 14h6.4"/><path d="M15.5 12.5c.4-1 1.3-1.5 2.5-1.5 1.6 0 2.5.9 2.5 2.4V19M20.5 15.5c-.6-.3-1.4-.5-2.3-.5-1.6 0-2.7.8-2.7 2 0 1.1.9 2 2.3 2 1.3 0 2.2-.6 2.7-1.6"/>',
+  pen: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  devices: '<rect x="2" y="5" width="13" height="9" rx="1.5"/><path d="M1 17h15"/><rect x="17" y="8" width="5.5" height="11" rx="1.3"/>',
+  swap: '<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>',
+  flask: '<path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7 15h10"/>',
+  megaphone: '<path d="M3 11v2a1 1 0 0 0 1 1h3l8 5V5L7 10H4a1 1 0 0 0-1 1z"/><path d="M18.5 9a4 4 0 0 1 0 6M7 14l1.5 6h3L10 15"/>',
   eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.8 8.4 2 12 2 12s4 7 10 7c1.8 0 3.4-.6 4.8-1.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
@@ -582,7 +605,7 @@ function renderDaily() {
   const wx = S.wx, w = wx ? (WX[wx.code] || WX[Math.floor(wx.code / 10) * 10] || ['🌡️', '']) : null;
   const open = !!S.dailyOpen;
   box.innerHTML = `<div class="card daily${open ? ' open' : ''}"><button class="dl-top" id="dl-toggle" aria-expanded="${open}">
-      <span class="dl-pr">🕌 <span><small>পরের নামাজ${tomorrow ? ' (কাল)' : ''}</small><b>${next[1]} ${hm(pt[next[0]])}</b><small>${lh ? `${bn(lh)} ঘণ্টা ` : ''}${lm || !lh ? `${bn(lm)} মিনিট ` : ''}পর</small></span></span>
+      <span class="dl-pr">${ic('moon', 18)}<span><small>পরের নামাজ${tomorrow ? ' (কাল)' : ''}</small><b>${next[1]} ${hm(pt[next[0]])}</b><small>${lh ? `${bn(lh)} ঘণ্টা ` : ''}${lm || !lh ? `${bn(lm)} মিনিট ` : ''}পর</small></span></span>
       ${w ? `<span class="dl-wx"><span class="dl-wi">${w[0]}</span><span><b>${bn(wx.temp)}°</b><small>${wx.rain != null ? `☔ বৃষ্টি ${bn(wx.rain)}%` : w[1]}</small></span></span>`
         : `<span class="dl-wx"><span class="dl-wi">🌡️</span><span><small>${S.wxErr ? 'আবহাওয়া<br>আনা যায়নি' : 'আবহাওয়া<br>আসছে…'}</small></span></span>`}
       <span class="dl-chev">${open ? '▴' : '▾'}</span></button>
@@ -6833,7 +6856,7 @@ function renderMenu() {
     if (flag && S.settings[flag] === false && !u?.admin) return '';          // অ্যাডমিন বন্ধ করে রাখলে সাধারণ ব্যবহারকারী দেখেন না
     const off = flag && S.settings[flag] === false;
     // ফেসবুকের মতো শুধু নাম; আগের ছোট বর্ণনা খোঁজার জন্য data-k-তে থাকে
-    return `<button class="sc${off ? ' off' : ''}" data-mgo="${go2}"${sub ? ` data-k="${esc(sub)}"` : ''}><span class="si">${icon}</span><span class="sc-t"><b>${esc(label)}</b>${off ? '<small>বন্ধ আছে</small>' : ''}</span></button>`;
+    return `<button class="sc${off ? ' off' : ''}" data-mgo="${go2}"${sub ? ` data-k="${esc(sub)}"` : ''}><span class="si">${ic(icon, 22)}</span><span class="sc-t"><b>${esc(label)}</b>${off ? '<small>বন্ধ আছে</small>' : ''}</span></button>`;
   };
   const pins = u ? menuPins() : [], pinSet = new Set(pins);
   const scs = (grp) => SC_ALL.filter(x => x[5] === grp && !pinSet.has(x[0])).map(x => sc(x[0], x[1], x[2], x[3], x[4])).join('');
@@ -6842,46 +6865,46 @@ function renderMenu() {
     ${todayHtml()}
     ${u ? `<div class="me-wrap"><button class="me-row" data-v="me">${S.actAs ? entAv(S.actAs) : av(u)}<div class="info"><b>${esc(S.actAs ? S.actAs.name : u.name)}</b><div class="sub">${S.actAs ? 'পেইজ দেখুন' : 'আপনার প্রোফাইল দেখুন'}</div></div></button><button class="sw-toggle" id="sw-toggle" aria-label="প্রোফাইল বা পেইজ বদলান" aria-expanded="false" hidden>${ic('users', 16)}<span class="chev">▾</span></button><div id="switcher" class="sw-drop" hidden></div></div>`
       : `${demoCard()}<div class="card"><b>আপনি লগইন করেননি</b><p class="mut" style="margin:4px 0 10px">পোস্ট, বন্ধু, গ্রুপ ও পেইজ ব্যবহার করতে লগইন করুন।</p><button class="btn wide" data-v="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`}
-    ${u ? `<div class="mn-pinhead"><span>📌 আমার শর্টকাট</span><button id="mn-pinedit">✏️ সাজান</button></div>
+    ${u ? `<div class="mn-pinhead"><span>আমার শর্টকাট</span><button id="mn-pinedit">${ic('edit', 14)} সাজান</button></div>
     ${pins.length ? `<div class="sc-grid mn-quick">${pins.map(k => { const x = SC_ALL.find(y => y[0] === k); return sc(x[0], x[1], x[2], x[3], x[4]); }).join('')}</div>` : '<p class="mut mn-pinempty">"সাজান" চেপে পছন্দের শর্টকাট এখানে রাখুন</p>'}` : ''}
-    ${!u?.admin && S.announcer ? `<button class="me-row admin-row" data-mgo="announce"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:20px">📢</span><div class="info"><b>জরুরি ঘোষণা পাঠান</b><div class="sub">${esc(S.announcer.title)} হিসেবে</div></div></button>` : ''}
+    ${!u?.admin && S.announcer ? `<button class="me-row admin-row" data-mgo="announce"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('megaphone', 22)}</span><div class="info"><b>জরুরি ঘোষণা পাঠান</b><div class="sub">${esc(S.announcer.title)} হিসেবে</div></div></button>` : ''}
     ${u?.admin ? `<button class="me-row admin-row" data-mgo="admin"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('shield', 22)}</span><div class="info"><b>অ্যাডমিন ড্যাশবোর্ড</b></div></button>` : ''}
-    <div class="mn-top"><input type="search" id="mn-q" placeholder="মেনুতে খুঁজুন… (যেমন: পাসওয়ার্ড, ব্লক, রক্ত)" aria-label="মেনুতে খুঁজুন" autocomplete="off"><button class="mn-dark" id="mn-dark" aria-label="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}" title="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}">${isDark() ? '☀️' : '🌙'}</button><button class="mn-dark mn-lang" id="mn-lang" translate="no" aria-label="${EN ? 'বাংলা' : 'English'}" title="${EN ? 'বাংলা' : 'English'}">${EN ? 'বাং' : 'EN'}</button></div>
+    <div class="mn-top"><input type="search" id="mn-q" placeholder="মেনুতে খুঁজুন… (যেমন: পাসওয়ার্ড, ব্লক, রক্ত)" aria-label="মেনুতে খুঁজুন" autocomplete="off"><button class="mn-dark" id="mn-dark" aria-label="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}" title="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}">${ic(isDark() ? 'sun' : 'moon', 20)}</button><button class="mn-dark mn-lang" id="mn-lang" translate="no" aria-label="${EN ? 'বাংলা' : 'English'}" title="${EN ? 'বাংলা' : 'English'}">${EN ? 'বাং' : 'EN'}</button></div>
     <div id="mn-res" class="card" hidden></div>
     <div id="mn-main">
-    ${sec('🏡 উপজেলার সেবা', 'svc')}
-    ${sec('👥 কমিউনিটি', 'com')}
-    ${u ? sec('⭐ আমার', 'my') : ''}
-    <h3 class="mn-h">⚙️ সেটিংস</h3>
-    <details class="card"${u ? '' : ' hidden'}><summary>👤 অ্যাকাউন্ট</summary><div class="setlist">
-      <button id="acc-name"><span class="set-ic">✏️</span>নাম পরিবর্তন<span class="val">${esc(u?.name || '')}</span></button>
-      <button id="acc-un"><span class="set-ic">🆔</span>ইউজারনেম পরিবর্তন<span class="val" translate="no">${u?.username ? '@' + esc(u.username) : ''}</span></button>
-      <button id="acc-email"><span class="set-ic">📧</span>ইমেইল পরিবর্তন<span class="val">${esc(u?.email || '')}</span></button>
-      <button id="acc-phone"><span class="set-ic">📱</span>মোবাইল নম্বর পরিবর্তন<span class="val">${u?.phone ? esc(fmtPhone(u.phone)) : 'দেওয়া নেই'}</span></button>
-      <button id="chpw"><span class="set-ic">🔑</span>পাসওয়ার্ড পরিবর্তন</button>
-      <button id="acc-dev"><span class="set-ic">📱</span>লগইন করা ডিভাইস</button>
-      <button id="acc-sw"><span class="set-ic">🔁</span>অ্যাকাউন্ট বদলান<span class="val">${bn(accList().length || 1)}টি</span></button>
-      <button id="edit"><span class="set-ic">📝</span>প্রোফাইলের বাকি তথ্য<span class="val">ঠিকানা, রক্তের গ্রুপ…</span></button>
-      <button id="delacc" style="color:var(--r)"><span class="set-ic">🗑️</span>অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলুন</button></div></details>
-    <div class="card lang-card"><button id="lang-tg" class="lang-row"><span class="lang-ic">🌐</span><span class="lang-t">${EN ? 'Language: English' : 'ভাষা: ইংরেজি (English)'}</span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${EN ? 'checked' : ''}></button></div>
-    <div class="card lang-card"><button id="dark-tg" class="lang-row"><span class="lang-ic">🌙</span><span class="lang-t">ডার্ক মোড</span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${isDark() ? 'checked' : ''}></button></div>
-    <details class="card"${u ? '' : ' hidden'}><summary>🔒 প্রাইভেসি</summary><div class="setlist">
-      <button id="plock"><span class="set-ic">🔒</span>প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
-      <button id="listpriv"><span class="set-ic">👁️</span>বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
-      <button id="showact"><span class="set-ic">🟢</span>সক্রিয় অবস্থা দেখান (মেসেজে)</button>
-      <button id="blocked"><span class="set-ic">🚫</span>ব্লক করা মানুষ</button></div></details>
-    <details class="card"${u ? '' : ' hidden'}><summary>🔔 নোটিফিকেশন ও শব্দ</summary><div class="setlist">
-      <button id="ntset2"><span class="set-ic">🔔</span>নোটিফিকেশন সেটিং</button>
-      <button id="msgsnd"><span class="set-ic">🔊</span>শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
-    <details class="card"><summary>🔠 ${EN ? 'Font' : 'ফন্ট (Font)'}</summary><div class="setlist">
-      <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button>
-      <button id="fontfam"><span class="set-ic">✒️</span>বাংলা ফন্ট<span class="val">${esc(fontOf(fontCur())[1])}</span></button></div></details>
-    <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
-      ${S.api.demoLogin ? '<button id="demo-guide"><span class="set-ic">🧪</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">🔄</span>ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
-      <button id="faq"><span class="set-ic">💡</span>সাধারণ প্রশ্নোত্তর (FAQ)</button>
-      <button id="help"><span class="set-ic">🐞</span>কোনো সমস্যা জানান</button>
-      <a href="./privacy.html"><span class="set-ic">📜</span>গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>
-      <button id="about"><span class="set-ic">ℹ️</span>অ্যাপ সম্পর্কে<span class="val">${esc(versionLabel())}</span></button></div></details>
+    ${sec('উপজেলার সেবা', 'svc')}
+    ${sec('কমিউনিটি', 'com')}
+    ${u ? sec('আমার', 'my') : ''}
+    <h3 class="mn-h">সেটিংস</h3>
+    <details class="card"${u ? '' : ' hidden'}><summary>${ic('user', 19)}অ্যাকাউন্ট</summary><div class="setlist">
+      <button id="acc-name"><span class="set-ic">${ic('edit', 18)}</span>নাম পরিবর্তন<span class="val">${esc(u?.name || '')}</span></button>
+      <button id="acc-un"><span class="set-ic">${ic('idcard', 18)}</span>ইউজারনেম পরিবর্তন<span class="val" translate="no">${u?.username ? '@' + esc(u.username) : ''}</span></button>
+      <button id="acc-email"><span class="set-ic">${ic('mail', 18)}</span>ইমেইল পরিবর্তন<span class="val">${esc(u?.email || '')}</span></button>
+      <button id="acc-phone"><span class="set-ic">${ic('mobile', 18)}</span>মোবাইল নম্বর পরিবর্তন<span class="val">${u?.phone ? esc(fmtPhone(u.phone)) : 'দেওয়া নেই'}</span></button>
+      <button id="chpw"><span class="set-ic">${ic('key', 18)}</span>পাসওয়ার্ড পরিবর্তন</button>
+      <button id="acc-dev"><span class="set-ic">${ic('devices', 18)}</span>লগইন করা ডিভাইস</button>
+      <button id="acc-sw"><span class="set-ic">${ic('swap', 18)}</span>অ্যাকাউন্ট বদলান<span class="val">${bn(accList().length || 1)}টি</span></button>
+      <button id="edit"><span class="set-ic">${ic('note', 18)}</span>প্রোফাইলের বাকি তথ্য<span class="val">ঠিকানা, রক্তের গ্রুপ…</span></button>
+      <button id="delacc" style="color:var(--r)"><span class="set-ic">${ic('trash', 18)}</span>অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলুন</button></div></details>
+    <div class="card lang-card"><button id="lang-tg" class="lang-row"><span class="lang-ic">${ic('globe', 20)}</span><span class="lang-t">${EN ? 'Language: English' : 'ভাষা: ইংরেজি (English)'}</span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${EN ? 'checked' : ''}></button></div>
+    <div class="card lang-card"><button id="dark-tg" class="lang-row"><span class="lang-ic">${ic('moon', 20)}</span><span class="lang-t">ডার্ক মোড</span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${isDark() ? 'checked' : ''}></button></div>
+    <details class="card"${u ? '' : ' hidden'}><summary>${ic('lock', 19)}প্রাইভেসি</summary><div class="setlist">
+      <button id="plock"><span class="set-ic">${ic('lock', 18)}</span>প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
+      <button id="listpriv"><span class="set-ic">${ic('eye', 18)}</span>বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>
+      <button id="showact"><span class="set-ic">${ic('activeDot', 18)}</span>সক্রিয় অবস্থা দেখান (মেসেজে)</button>
+      <button id="blocked"><span class="set-ic">${ic('ban', 18)}</span>ব্লক করা মানুষ</button></div></details>
+    <details class="card"${u ? '' : ' hidden'}><summary>${ic('bell', 19)}নোটিফিকেশন ও শব্দ</summary><div class="setlist">
+      <button id="ntset2"><span class="set-ic">${ic('bell', 18)}</span>নোটিফিকেশন সেটিং</button>
+      <button id="msgsnd"><span class="set-ic">${ic('sound', 18)}</span>শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
+    <details class="card"><summary>${ic('type', 19)}${EN ? 'Font' : 'ফন্ট (Font)'}</summary><div class="setlist">
+      <button id="fontsz"><span class="set-ic">${ic('type', 18)}</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button>
+      <button id="fontfam"><span class="set-ic">${ic('pen', 18)}</span>বাংলা ফন্ট<span class="val">${esc(fontOf(fontCur())[1])}</span></button></div></details>
+    <details class="card"><summary>${ic('help', 19)}সাহায্য ও সহায়তা</summary><div class="setlist">
+      ${S.api.demoLogin ? `<button id="demo-guide"><span class="set-ic">${ic('flask', 18)}</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">${ic('refresh', 18)}</span>ডেমো প্রোফাইল নতুন করে সাজান</button>` : ''}
+      <button id="faq"><span class="set-ic">${ic('help', 18)}</span>সাধারণ প্রশ্নোত্তর (FAQ)</button>
+      <button id="help"><span class="set-ic">${ic('bug', 18)}</span>কোনো সমস্যা জানান</button>
+      <a href="./privacy.html"><span class="set-ic">${ic('doc', 18)}</span>গোপনীয়তা নীতি ও ব্যবহারের নিয়ম</a>
+      <button id="about"><span class="set-ic">${ic('info', 18)}</span>অ্যাপ সম্পর্কে<span class="val">${esc(versionLabel())}</span></button></div></details>
     ${u ? '<button class="btn ghost wide" id="logout" style="margin-top:4px">লগআউট</button>' : ''}
     </div>`;
   document.querySelectorAll('#menu details').forEach((d, i) => { d.open = !!wasOpen[i]; });
@@ -6918,28 +6941,28 @@ $('#menu').addEventListener('click', e => {
 // ================================================================ মেনু: শর্টকাট, আজকের দিন, কার্যকলাপ, FAQ, লগআউট
 // [id, আইকন, নাম, নিচের লেখা, ফিচার-ফ্ল্যাগ, অংশ]
 const SC_ALL = [
-  ['dir', '🏥', 'সেবা ডিরেক্টরি', 'উপজেলার সব সেবা', null, 'svc'],
-  ['blood', '🩸', 'ব্লাড ব্যাংক', 'রক্তদাতা খুঁজুন', 'featBlood', 'svc'],
-  ['sos', '🚨', 'জরুরি নম্বর', '৯৯৯ ও হেল্পলাইন', null, 'svc'],
-  ['prayer', '🕌', 'নামাজ ও আবহাওয়া', 'ওয়াক্ত ও ৭ দিনের পূর্বাভাস', null, 'svc'],
-  ['groups', '👥', 'গ্রুপ', 'যোগ দিন বা তৈরি করুন', 'featGroups', 'com'],
-  ['pages', '🏳️', 'পেইজ', 'ব্যবসা ও প্রতিষ্ঠান', 'featPages', 'com'],
-  ['saved', '🔖', 'সেভ করা পোস্ট', '', null, 'my'],
-  ['bday', '🎂', 'জন্মদিন', 'বন্ধুদের জন্মদিন', null, 'my'],
-  ['wallet', '🪙', 'কয়েন ও ব্যাজ', 'ভেরিফাইড ব্যাজ নিন', null, 'my'],
-  ['insights', '📊', 'ড্যাশবোর্ড', 'পোস্ট কতজন দেখছেন', null, 'my'],
-  ['mem', '🕰️', 'এই দিনে', 'আগের বছরের আজকের পোস্ট', null, 'my'],
-  ['activity', '📜', 'আমার কার্যকলাপ', 'লাইক, মন্তব্য ও শেয়ার', null, 'my'],
+  ['dir', 'cross', 'সেবা ডিরেক্টরি', 'উপজেলার সব সেবা', null, 'svc'],
+  ['blood', 'drop', 'ব্লাড ব্যাংক', 'রক্তদাতা খুঁজুন', 'featBlood', 'svc'],
+  ['sos', 'siren', 'জরুরি নম্বর', '৯৯৯ ও হেল্পলাইন', null, 'svc'],
+  ['prayer', 'moon', 'নামাজ ও আবহাওয়া', 'ওয়াক্ত ও ৭ দিনের পূর্বাভাস', null, 'svc'],
+  ['groups', 'users', 'গ্রুপ', 'যোগ দিন বা তৈরি করুন', 'featGroups', 'com'],
+  ['pages', 'flag', 'পেইজ', 'ব্যবসা ও প্রতিষ্ঠান', 'featPages', 'com'],
+  ['saved', 'bookmark', 'সেভ করা পোস্ট', '', null, 'my'],
+  ['bday', 'cake', 'জন্মদিন', 'বন্ধুদের জন্মদিন', null, 'my'],
+  ['wallet', 'coin', 'কয়েন ও ব্যাজ', 'ভেরিফাইড ব্যাজ নিন', null, 'my'],
+  ['insights', 'chart', 'ড্যাশবোর্ড', 'পোস্ট কতজন দেখছেন', null, 'my'],
+  ['mem', 'history', 'এই দিনে', 'আগের বছরের আজকের পোস্ট', null, 'my'],
+  ['activity', 'activity', 'আমার কার্যকলাপ', 'লাইক, মন্তব্য ও শেয়ার', null, 'my'],
 ];
 const PIN_MAX = 6;
 const menuPins = () => (local.get('mn_pins', ['wallet', 'insights']) || []).filter(k => SC_ALL.some(x => x[0] === k)).slice(0, PIN_MAX);
 function pinSheet() {
   const draw = () => {
     const pins = menuPins(), rest = SC_ALL.filter(x => !pins.includes(x[0]));
-    const row = (x, i, on) => `<div class="pin-row"><span class="pin-ic">${x[1]}</span><span class="pin-t">${esc(x[2])}</span>${on
+    const row = (x, i, on) => `<div class="pin-row"><span class="pin-ic">${ic(x[1], 20)}</span><span class="pin-t">${esc(x[2])}</span>${on
       ? `<button data-pup="${i}" ${i ? '' : 'disabled'} aria-label="উপরে">↑</button><button data-pdn="${i}" ${i < pins.length - 1 ? '' : 'disabled'} aria-label="নিচে">↓</button><button class="pin-x" data-poff="${x[0]}" aria-label="সরান">✕</button>`
       : `<button class="pin-add" data-pon="${x[0]}" ${pins.length >= PIN_MAX ? 'disabled' : ''}>＋ যোগ</button>`}</div>`;
-    openSheet(`<h2>📌 শর্টকাট সাজান</h2><p class="mut" style="margin-top:-4px">মেনুর একদম উপরে কোন শর্টকাটগুলো থাকবে বেছে নিন। ↑ ↓ দিয়ে আগে-পরে করুন। সর্বোচ্চ ${bn(PIN_MAX)}টি।</p>
+    openSheet(`<h2>শর্টকাট সাজান</h2><p class="mut" style="margin-top:-4px">মেনুর একদম উপরে কোন শর্টকাটগুলো থাকবে বেছে নিন। ↑ ↓ দিয়ে আগে-পরে করুন। সর্বোচ্চ ${bn(PIN_MAX)}টি।</p>
       <h3 class="pin-h">উপরে আছে (${bn(pins.length)})</h3>${pins.length ? pins.map((k, i) => row(SC_ALL.find(x => x[0] === k), i, true)).join('') : '<p class="mut">কিছু নেই</p>'}
       <h3 class="pin-h">বাকি শর্টকাট</h3>${rest.map(x => row(x, 0, false)).join('')}
       <button class="btn wide" data-close style="margin-top:12px">হয়ে গেছে</button>`);

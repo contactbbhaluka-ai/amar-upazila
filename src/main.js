@@ -3464,14 +3464,24 @@ function playSound(k) {
   const now = Date.now(); if (now - sndLast < 120) return; sndLast = now;   // একসাথে কয়েকটা বাজলে কান না ঝালাপালা হয়
   try { const c = sndCtx(); if (c) SOUNDS[k]?.(c); } catch { /* শব্দ না হলেও চলে */ }
 }
-const SND_LIST = [['send', '📤 মেসেজ পাঠালে'], ['receive', '📥 খোলা চ্যাটে মেসেজ এলে'], ['incoming', '🔔 নতুন মেসেজ এলে (অন্য পাতায় থাকলে)'], ['seen', '👀 মেসেজ দেখলে (সিন)'], ['react', '❤️ রিয়্যাক্ট দিলে বা পেলে'], ['notif', '🔔 নতুন নোটিফিকেশন এলে']];
+// [key, নাম, ছোট ব্যাখ্যা, আইকন]
+const SND_LIST = [['send', 'মেসেজ পাঠালে', '', 'send'], ['receive', 'খোলা চ্যাটে মেসেজ এলে', '', 'message'], ['incoming', 'নতুন মেসেজ এলে', 'অন্য পাতায় থাকলে', 'mail'],
+  ['seen', 'মেসেজ দেখলে', 'সিন হলে ছোট টিক শব্দ', 'eye'], ['react', 'রিয়্যাক্ট দিলে বা পেলে', '', 'heart'], ['notif', 'নতুন নোটিফিকেশন এলে', '', 'bell']];
 function soundSheet() {
   const o = local.get('msgsnd', {}), all = o.all !== false;
-  openSheet(`<h2>🔊 শব্দ (মেসেজ ও নোটিফিকেশন)</h2><label class="snd-row snd-all"><span><b>সব শব্দ</b></span><input type="checkbox" data-snd="all" ${all ? 'checked' : ''}></label>
-    ${SND_LIST.map(([k, l]) => `<div class="snd-row${all ? '' : ' off'}"><label><input type="checkbox" data-snd="${k}" ${o[k] !== false ? 'checked' : ''} ${all ? '' : 'disabled'}> ${l}</label><button type="button" class="sbtn ghost" data-sndtry="${k}" aria-label="শুনে দেখুন">▶ শুনুন</button></div>`).join('')}
-    <p class="mut" style="font-size:13px">মিউট করা চ্যাটের নতুন মেসেজে শব্দ হবে না। ফোন সাইলেন্ট থাকলে শব্দ হবে না।</p><button class="btn ghost wide" data-close style="margin-top:6px">বন্ধ করুন</button>`);
+  openSheet(`<h2>শব্দ</h2><p class="mut nts-sub">অ্যাপ খোলা থাকলে মেসেজ ও নোটিফিকেশনের শব্দ</p>
+    <div class="nts-card"><label class="nts-row"><span class="set-ic">${ic('sound', 18)}</span><span class="nts-t"><b>সব শব্দ</b><small>${all ? 'চালু আছে' : 'সব শব্দ বন্ধ'}</small></span><input type="checkbox" class="switch" data-snd="all" ${all ? 'checked' : ''}></label></div>
+    <h3 class="nts-h">কখন শব্দ হবে</h3>
+    <div class="nts-card${all ? '' : ' snd-off'}">${SND_LIST.map(([k, l, sub, icn]) => `<label class="nts-row"><span class="set-ic">${ic(icn, 18)}</span><span class="nts-t">${l}${sub ? `<small>${sub}</small>` : ''}</span>
+      <button type="button" class="snd-try" data-sndtry="${k}" aria-label="${l}: শুনে দেখুন">${ic('play', 14)}</button><input type="checkbox" class="switch" data-snd="${k}" ${o[k] !== false ? 'checked' : ''} ${all ? '' : 'disabled'}></label>`).join('')}</div>
+    <p class="mut snd-note">মিউট করা চ্যাটে বা ফোন সাইলেন্ট থাকলে শব্দ হবে না।</p>`);
   $('#sheet').onchange = e => { const k = e.target.dataset?.snd; if (!k) return; const v = local.get('msgsnd', {}); v[k] = e.target.checked; local.set('msgsnd', v); if (k === 'all') soundSheet(); };
-  $('#sheet').onclick = e => { const b = e.target.closest('[data-sndtry]'); if (b) { const k = b.dataset.sndtry, v = local.get('msgsnd', {}); local.set('msgsnd', { ...v, all: true, [k]: true }); playSound(k); local.set('msgsnd', v); } };
+  $('#sheet').onclick = e => {
+    const b = e.target.closest('[data-sndtry]'); if (!b) return;
+    e.preventDefault();   // label-এর ভেতরে: চাপলে সুইচ যেন না বদলায়
+    const k = b.dataset.sndtry, v = local.get('msgsnd', {}); local.set('msgsnd', { ...v, all: true, [k]: true }); playSound(k); local.set('msgsnd', v);
+    b.classList.remove('on'); void b.offsetWidth; b.classList.add('on');
+  };
 }
 // ================================================================ গ্রুপ চ্যাট
 async function friendPicker(title, exclude, btnLabel, onPick, withName) {

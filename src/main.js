@@ -2809,6 +2809,8 @@ $('#t-req').addEventListener('click', async e => {
   if (a === 'del') return busy(null, async () => { await S.api.clearConversation(th); toast('রিকোয়েস্ট মুছে ফেলা হয়েছে'); history.back(); refreshBadges(); });
   if (a === 'block') return blockUser(th.id, th.partner?.name || '');
 });
+// শুধু ১-৩টা ইমোজি হলে বড় করে, বাবল ছাড়া (Messenger-এর বড় 👍-এর মতো)
+const emoOnly = t => { const x = String(t || '').trim(); if (!x || x.length > 24) return false; try { return /^(?:\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}|\p{Emoji_Modifier})*\s*){1,3}$/u.test(x); } catch { return false; } };
 function msgBody(m) {
   if (m.deleted) return `<i class="del">🚫 ${m.mine ? 'আপনি মেসেজটি মুছে ফেলেছেন' : 'মেসেজটি মুছে ফেলা হয়েছে'}</i>`;
   const r = m.reply;
@@ -2851,7 +2853,7 @@ function renderMsgs() {
     const avBtn = pgSender ? `<button class="avbtn" data-page="${esc(th.pg.id)}" aria-label="${esc(th.pg.name)} পেইজ দেখুন">${entAv(th.pg)}</button>` : userLink(m.senderId, av(m.sender || (th.partner?.id === m.senderId ? th.partner : {}), 'xs'));
     html += `<div class="mrow${m.mine ? ' mine' : ''}">${!m.mine ? `<span class="m-av">${lastOfRun ? avBtn : ''}</span>` : ''}
       <div class="mcol">${showName ? `<span class="m-name">${esc(m.sender?.name || '')}</span>` : ''}
-      ${grp ? `<div class="m-album n${Math.min(grp.length, 4)}${grp.length > 4 ? ' many' : ''}">${grp.map(g => `<div class="bub imgonly alb${g.mine ? ' mine' : ''}" data-mid="${esc(g.id)}" tabindex="0"><button class="m-img" data-mimg="${esc(g.image)}" aria-label="ছবি বড় করে দেখুন"><img alt="" data-path="${esc(g.image)}"></button>${rxChip(g, 'm-rx alb-rx')}</div>`).join('')}</div><small class="alb-t">${bn(grp.length)}টি ছবি · ${esc(clock(grp.at(-1).createdAt))}</small>` : `<div class="bub${m.mine ? ' mine' : ''}${m.deleted ? ' deleted' : ''}${m.image && !m.body ? ' imgonly' : ''}${m.sticker && !m.deleted ? ' stkonly' : ''}${m.poll && !m.deleted ? ' pollb' : ''}${m.pinnedAt ? ' pinned' : ''}" data-mid="${esc(m.id)}" tabindex="0">${msgBody(m)}<small>${m.pinnedAt ? '📌 ' : ''}${m.saved ? '🔖 ' : ''}${m.expiresAt ? '⏱ ' : ''}${m.auto ? '⚡ অটো মেসেজ · ' : ''}${m.editedAt && !m.deleted ? 'সম্পাদিত · ' : ''}${esc(clock(m.createdAt))}</small></div>
+      ${grp ? `<div class="m-album n${Math.min(grp.length, 4)}${grp.length > 4 ? ' many' : ''}">${grp.map(g => `<div class="bub imgonly alb${g.mine ? ' mine' : ''}" data-mid="${esc(g.id)}" tabindex="0"><button class="m-img" data-mimg="${esc(g.image)}" aria-label="ছবি বড় করে দেখুন"><img alt="" data-path="${esc(g.image)}"></button>${rxChip(g, 'm-rx alb-rx')}</div>`).join('')}</div><small class="alb-t">${bn(grp.length)}টি ছবি · ${esc(clock(grp.at(-1).createdAt))}</small>` : `<div class="bub${m.mine ? ' mine' : ''}${m.deleted ? ' deleted' : ''}${m.image && !m.body ? ' imgonly' : ''}${m.sticker && !m.deleted ? ' stkonly' : ''}${!m.deleted && !m.image && !m.reply && emoOnly(m.body) ? ' emoonly' : ''}${m.poll && !m.deleted ? ' pollb' : ''}${m.pinnedAt ? ' pinned' : ''}" data-mid="${esc(m.id)}" tabindex="0">${msgBody(m)}<small>${m.pinnedAt ? '📌 ' : ''}${m.saved ? '🔖 ' : ''}${m.expiresAt ? '⏱ ' : ''}${m.auto ? '⚡ অটো মেসেজ · ' : ''}${m.editedAt && !m.deleted ? 'সম্পাদিত · ' : ''}${esc(clock(m.createdAt))}</small></div>
       ${rxChip(m)}`}</div></div>`;
     if (m === lastMine || grp?.includes(lastMine)) {
       if (grp) m = grp.at(-1);
@@ -3018,7 +3020,31 @@ function showTyping(p) {
   el.querySelector('span:last-child').textContent = `${S.th?.kind === 'group' ? (p.n || 'কেউ') : (S.th?.partner?.name || '')} লিখছেন…`;
   el.hidden = false; clearTimeout(typingT); typingT = setTimeout(() => { el.hidden = true; }, 4000);
 }
-function composeState() { const has = !!$('#tmsg').value.trim(); $('#t-send').hidden = !has; $('#t-mic').hidden = has; }
+// লিখলে: পাঠান বোতাম, বাঁয়ের ছবি-মাইক সরে লেখার জায়গা বড় হয় (Messenger-এর মতো); খালি থাকলে: দ্রুত রিয়্যাক্ট 👍
+function composeState() {
+  const has = !!$('#tmsg').value.trim() || !!S.edit;
+  $('#t-send').hidden = !has; $('#t-like').hidden = has; $('#t-img').hidden = has; $('#t-mic').hidden = has;
+  $('#tform').classList.toggle('typing', has); $('#t-like').textContent = qrx();
+}
+const QRX = ['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🥰'];
+const qrx = () => local.get('qrx', '👍');
+{
+  const b = $('#t-like'); let lp = null, long = false;
+  const down = () => { long = false; clearTimeout(lp); lp = setTimeout(() => { long = true; navigator.vibrate?.(15); qrxSheet(); }, 480); };
+  const up = () => clearTimeout(lp);
+  b.addEventListener('pointerdown', down); ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, up));
+  b.addEventListener('contextmenu', e => e.preventDefault());
+  b.addEventListener('click', () => {
+    if (long) return;
+    b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+    sendNow({ text: qrx() }, null);
+  });
+}
+function qrxSheet() {
+  openSheet(`<h2>দ্রুত রিয়্যাক্ট</h2><p class="mut nts-sub">লেখার ঘর খালি থাকলে এই ইমোজি এক চাপে পাঠানো যায়</p>
+    <div class="qrx-grid">${QRX.map(e => `<button type="button" class="${e === qrx() ? 'on' : ''}" data-qrx="${e}">${e}</button>`).join('')}</div>`);
+  $('#sheet').onclick = e => { const b = e.target.closest('[data-qrx]'); if (!b) return; local.set('qrx', b.dataset.qrx); closeSheet(); composeState(); toast(`দ্রুত রিয়্যাক্ট: ${b.dataset.qrx}`); };
+}
 $('#tmsg').addEventListener('input', () => {
   composeState(); mentionSuggest();
   if (S.typingCh && Date.now() - typingSent > 2500 && $('#tmsg').value.trim()) { typingSent = Date.now(); S.typingCh.send(); }
@@ -3043,8 +3069,8 @@ $('#t-emoji').addEventListener('click', e => {
 async function sendNow(opts = {}, btn) {
   const th = S.th; if (!th || th.partner?.rel?.blocked) return;
   const raw = !(opts.voice || opts.sticker || opts.loc || opts.poll);
-  const body = raw ? $('#tmsg').value.trim() : '';
-  if (S.edit && raw && !opts.image) {
+  const body = raw ? (opts.text != null ? opts.text : $('#tmsg').value.trim()) : '';
+  if (S.edit && raw && !opts.image && opts.text == null) {
     if (!body) return;
     const em = S.edit;
     return busy(btn, async () => { await S.api.editMessage(em.id, body); S.edit = null; $('#tmsg').value = ''; setReplyBar(); composeState(); await openConv(th, true); });
@@ -3053,13 +3079,14 @@ async function sendNow(opts = {}, btn) {
   if ((opts.image || opts.voice) && th.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ছবি ও ভয়েস পাঠানো যায় না');
   if (th.kind === 'group' && body.includes('@')) opts.mentions = (th.members || []).filter(x => x.id !== me().id && body.includes('@' + x.name)).map(x => x.id);
   await busy(btn, async () => {
-    await S.api.send(th, body, { replyTo: S.reply?.id || null, ...opts });
+    const { text: _q, ...sendOpts } = opts;
+    await S.api.send(th, body, { replyTo: S.reply?.id || null, ...sendOpts });
     playSound('send');
-    if (raw) $('#tmsg').value = '';
+    if (raw && opts.text == null) $('#tmsg').value = '';
     $('#t-mention').hidden = true;
     S.reply = null; setReplyBar(); composeState(); $('#t-emoji').hidden = true;
     if (th.request) { await S.api.convSet(th, { accepted: true }).catch(() => {}); th.request = false; }
-    await openConv(th, true); $('#tmsg').focus();
+    await openConv(th, true); if (opts.text == null) $('#tmsg').focus();
   });
 }
 $('#tform').addEventListener('submit', e => { e.preventDefault(); sendNow({}, $('#t-send')); });
@@ -8417,3 +8444,10 @@ function restoreNav() {
 { const top = document.getElementById('top'), setH = () => document.documentElement.style.setProperty('--hh', top.offsetHeight + 'px');
   setH(); if (window.ResizeObserver) new ResizeObserver(setH).observe(top); else addEventListener('resize', setH); }
 if (window.__auBubble) window.auBubble(window.__auBubble);
+// কিবোর্ড খুললে চ্যাটের শেষ মেসেজ আর লেখার ঘর কিবোর্ডের উপরে থাকে
+{ let lastH = window.visualViewport?.height || innerHeight;
+  const onVV = () => {
+    const h = window.visualViewport?.height || innerHeight, shrunk = h < lastH - 80; lastH = h;
+    if (S.view === 'thread' && shrunk && document.activeElement?.id === 'tmsg') requestAnimationFrame(() => scrollTo({ top: document.documentElement.scrollHeight }));
+  };
+  (window.visualViewport || window).addEventListener('resize', onVV); }

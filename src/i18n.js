@@ -145,6 +145,7 @@ const PLACES = {
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
   // লগইন ও সাইনআপ
+  "দ্রুত রিয়্যাক্ট": "Quick reaction", "লেখার ঘর খালি থাকলে এই ইমোজি এক চাপে পাঠানো যায়": "When the message box is empty, send this emoji with one tap", "দ্রুত রিয়্যাক্ট: {n}": "Quick reaction: {n}",
   "শব্দ": "Sounds", "অ্যাপ খোলা থাকলে মেসেজ ও নোটিফিকেশনের শব্দ": "Message and notification sounds while the app is open", "সব শব্দ": "All sounds", "চালু আছে": "On", "সব শব্দ বন্ধ": "All sounds off",
   "কখন শব্দ হবে": "When to play a sound", "মেসেজ পাঠালে": "When you send a message", "খোলা চ্যাটে মেসেজ এলে": "New message in the open chat", "নতুন মেসেজ এলে": "New message",
   "অন্য পাতায় থাকলে": "While on another page", "মেসেজ দেখলে": "When a message is seen", "সিন হলে ছোট টিক শব্দ": "A small tick when seen", "রিয়্যাক্ট দিলে বা পেলে": "When you react or get a reaction",

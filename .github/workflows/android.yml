@@ -70,6 +70,13 @@ jobs:
           [ -d android ] || npx cap add android
           npx cap sync android
 
+      - name: "Keyboard fix (কিবোর্ড খুললে লেখার ঘর কিবোর্ডের উপরে)"
+        run: |
+          cp android-native/MainActivity.java android/app/src/main/java/com/amarupazila/app/MainActivity.java
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q windowSoftInputMode "$M" || perl -0pi -e 's#(<activity\b[^>]*?android:name="\.MainActivity")#$1\n            android:windowSoftInputMode="adjustResize"#s' "$M"
+          grep -n "windowSoftInputMode" "$M" || echo "::warning::windowSoftInputMode যোগ হয়নি"
+
       - name: Microphone permission (মেসেজে ভয়েস রেকর্ডের জন্য)
         run: |
           M=android/app/src/main/AndroidManifest.xml

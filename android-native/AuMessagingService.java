@@ -51,7 +51,7 @@ import java.util.Map;
  */
 public class AuMessagingService extends MessagingService {
     public static final String CH_MSG = "au_msg2";   // শব্দ বদলালে চ্যানেলের নামও বদলাতে হয় (Android পুরোনো চ্যানেলের শব্দ বদলাতে দেয় না)
-    public static final String CH_GEN = "au_gen2";
+    public static final String CH_GEN = "au_gen3";
     public static final int NID = 4201;
     public static final String KEY_REPLY = "au_reply";
     static final String PREF = "au_push";
@@ -104,7 +104,7 @@ public class AuMessagingService extends MessagingService {
     static void channels(Context c) {
         if (Build.VERSION.SDK_INT < 26) return;
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-        Uri snd = sound(c);
+        Uri snd = sound(c, "au_notify"), sndN = sound(c, "au_notif");
         AudioAttributes aa = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
         if (nm.getNotificationChannel(CH_MSG) == null) {
@@ -119,16 +119,17 @@ public class AuMessagingService extends MessagingService {
             NotificationChannel ch = new NotificationChannel(CH_GEN, "সাধারণ নোটিফিকেশন", NotificationManager.IMPORTANCE_HIGH);
             ch.setDescription("মন্তব্য, রিয়্যাক্ট, ফ্রেন্ড রিকোয়েস্ট ও জরুরি খবর");
             ch.enableLights(true); ch.setLightColor(Color.parseColor(GREEN)); ch.enableVibration(true);
-            if (snd != null) ch.setSound(snd, new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            if (sndN != null) ch.setSound(sndN, new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
             nm.createNotificationChannel(ch);
         }
-        for (String old : new String[]{"msgs", "au_msg", "au_general"}) if (nm.getNotificationChannel(old) != null) nm.deleteNotificationChannel(old);   // আগের বিল্ডের চ্যানেল
+        for (String old : new String[]{"msgs", "au_msg", "au_general", "au_gen2"}) if (nm.getNotificationChannel(old) != null) nm.deleteNotificationChannel(old);   // আগের বিল্ডের চ্যানেল
     }
 
-    static Uri sound(Context c) {
-        int id = c.getResources().getIdentifier("au_notify", "raw", c.getPackageName());
-        return id == 0 ? null : Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + c.getPackageName() + "/raw/au_notify");
+    // মেসেজ: au_notify (তিন নোটের ঘণ্টা), অন্য নোটিফিকেশন: au_notif (দুই নোটের ঝিনুক) — শুনেই বোঝা যায় কোনটা
+    static Uri sound(Context c, String name) {
+        int id = c.getResources().getIdentifier(name, "raw", c.getPackageName());
+        return id == 0 ? null : Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + c.getPackageName() + "/raw/" + name);
     }
 
     // ---------------------------------------------------------------- নোটিফিকেশন বানানো (নতুন বার্তা ও বোতাম চাপার পর আবার)
@@ -161,7 +162,7 @@ public class AuMessagingService extends MessagingService {
             .setShowWhen(true)
             .setDeleteIntent(PendingIntent.getBroadcast(c, rc + 3, act(c, "clear", conv), PendingIntent.FLAG_UPDATE_CURRENT | imm));
         if (silent) nb.setSilent(true);
-        else { Uri snd = sound(c); if (snd != null && Build.VERSION.SDK_INT < 26) nb.setSound(snd); nb.setDefaults(NotificationCompat.DEFAULT_VIBRATE | NotificationCompat.DEFAULT_LIGHTS); }
+        else { Uri snd = sound(c, isMsg ? "au_notify" : "au_notif"); if (snd != null && Build.VERSION.SDK_INT < 26) nb.setSound(snd); nb.setDefaults(NotificationCompat.DEFAULT_VIBRATE | NotificationCompat.DEFAULT_LIGHTS); }
         int badge = 0; try { badge = Integer.parseInt(st.optString("badge", "0")); } catch (Exception ignored) {}
         if (badge > 0) nb.setNumber(badge);
         boolean hasTok = !st.optString("rt").isEmpty();

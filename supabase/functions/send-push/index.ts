@@ -148,8 +148,8 @@ Deno.serve(async req => {
           au_kind: j.rich!.kind, au_mid: String(j.rich!.mid || ''), au_badge: String(badge.get(t.user_id) || 0) },
         android: { priority: 'HIGH', ttl: '86400s' } }
       : { token: t.token, notification: { title: j.title, body: j.body }, data: j.data,
-        android: { priority: j.high ? 'HIGH' : 'NORMAL', notification: { channel_id: t.platform === 'android-r' ? 'au_gen2' : 'default', icon: 'ic_stat_notify', color: '#006a4e', tag: j.tag,
-          sound: t.platform === 'android-r' ? 'au_notify' : 'default', notification_count: badge.get(t.user_id) || 0 } } };
+        android: { priority: j.high ? 'HIGH' : 'NORMAL', notification: { channel_id: t.platform === 'android-r' ? 'au_gen3' : 'default', icon: 'ic_stat_notify', color: '#006a4e', tag: j.tag,
+          sound: t.platform === 'android-r' ? 'au_notif' : 'default', notification_count: badge.get(t.user_id) || 0 } } };
     const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
       method: 'POST', headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ message }),

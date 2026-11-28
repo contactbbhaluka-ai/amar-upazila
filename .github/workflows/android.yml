@@ -120,6 +120,10 @@ jobs:
           grep -q 'xmlns:tools' "$M" || perl -0pi -e 's#<manifest\b#<manifest xmlns:tools="http://schemas.android.com/tools"#' "$M"
           grep -q AuMessagingService "$M" || perl -0pi -e 's#(<application\b[^>]*>)#$1\n        <service android:name="com.capacitorjs.plugins.pushnotifications.MessagingService" tools:node="remove" />\n        <service android:name=".AuMessagingService" android:exported="false">\n            <intent-filter>\n                <action android:name="com.google.firebase.MESSAGING_EVENT" />\n            </intent-filter>\n        </service>\n        <receiver android:name=".AuReplyReceiver" android:exported="false" />#s' "$M"
           grep -n "tools\|AuMessaging\|AuReply\|MessagingService" "$M"
+          # নিজের কোডে Firebase-এর ক্লাস (RemoteMessage) লাগে, তাই অ্যাপ মডিউলেও firebase-messaging
+          G=android/app/build.gradle
+          grep -q "firebase-messaging" "$G" || printf '\ndependencies {\n    implementation "com.google.firebase:firebase-messaging:${rootProject.ext.has(\x27firebaseMessagingVersion\x27) ? rootProject.ext.firebaseMessagingVersion : \x2724.1.0\x27}"\n}\n' >> "$G"
+          tail -4 "$G"
 
       - name: Generate app icon and splash
         continue-on-error: true

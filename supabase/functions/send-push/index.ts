@@ -88,10 +88,33 @@ async function notifJobs(id: number): Promise<Job[]> {
 
 async function msgJobs(id: number): Promise<Job[]> {
   const { data: m } = await sb.from('messages').select('id,sender_id,recipient_id,chat_id,body,image_path,voice_path,sticker,loc,poll,mentions,is_auto,deleted_at,page_id, s:profiles!messages_sender_id_fkey(name,avatar_url)').eq('id', id).maybeSingle();
-  if (!m || m.is_auto || m.deleted_at || m.page_id) return [];
+  if (!m || m.is_auto || m.deleted_at) return [];
   const sender = (m as any).s?.name || APP, av = (m as any).s?.avatar_url || '';
   const full = () => (m.body ? cut(m.body, 900) : text);   // নিজের বানানো নোটিফিকেশনে পুরো মেসেজ দেখা যায়
   const text = m.body ? cut(m.body, 140) : m.image_path ? '📷 একটি ছবি পাঠিয়েছেন' : m.voice_path ? '🎤 ভয়েস মেসেজ পাঠিয়েছেন' : m.sticker ? 'একটি স্টিকার পাঠিয়েছেন' : m.loc ? '📍 লোকেশন পাঠিয়েছেন' : m.poll ? '📊 একটি পোল দিয়েছেন' : 'নতুন মেসেজ';
+  // পেইজের মেসেজ: অ্যাডমিন লিখলে গ্রাহকের কাছে পেইজের নামে, গ্রাহক লিখলে পেইজের সব অ্যাডমিনের কাছে
+  if (m.page_id) {
+    const [{ data: pg }, { data: adm }] = await Promise.all([
+      sb.from('pages').select('id,name,owner_id,avatar_url').eq('id', m.page_id).maybeSingle(),
+      sb.from('page_admins').select('user_id').eq('page_id', m.page_id),
+    ]);
+    if (!pg) return [];
+    const staff = new Set<string>([pg.owner_id, ...((adm || []).map(x => x.user_id as string))]);
+    const pid = String(pg.id);
+    if (staff.has(m.sender_id)) {
+      const to = m.recipient_id as string; if (!to || staff.has(to)) return [];
+      const { data: mu } = await sb.from('conv_settings').select('key').eq('user_id', to).like('key', `p:${pid}:%`).eq('muted', true).limit(1);
+      if ((mu || []).length) return [];
+      return [{ user: to, title: pg.name, body: text, data: { type: 'msg', user: pg.owner_id, page: pid }, tag: `q${pid}-${to}`, high: true,
+        rich: { kind: 'msg', mid: m.id, conv: `p:${pid}:${to}`, sender: pg.name, av: pg.avatar_url || '', text: full(), group: false, title: pg.name } }];
+    }
+    const cust = m.sender_id as string;
+    const { data: mus } = await sb.from('conv_settings').select('user_id').eq('key', `p:${pid}:${cust}`).eq('muted', true);
+    const skip = new Set([cust, ...((mus || []).map(x => x.user_id as string))]);
+    const title = `${sender} · ${pg.name}`;
+    return [...staff].filter(u => !skip.has(u)).map(u => ({ user: u, title, body: text, data: { type: 'msg', user: cust, page: pid }, tag: `q${pid}-${cust}`, high: true,
+      rich: { kind: 'msg' as const, mid: m.id, conv: `p:${pid}:${cust}`, sender, av, text: full(), group: false, title } }));
+  }
   if (m.chat_id) {
     const [{ data: chat }, { data: mem }, { data: muted }] = await Promise.all([
       sb.from('chats').select('name').eq('id', m.chat_id).maybeSingle(),

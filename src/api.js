@@ -811,7 +811,7 @@ async function supabaseApi() {
       let rows = ok(rowsR).reverse();
       if (set.cleared_at) rows = rows.filter(m => m.created_at > set.cleared_at);
       const ids = rows.map(m => m.id);
-      const pollIds = rows.filter(m => m.poll).map(m => m.id), shKey = t.kind === 'page' ? null : chatFolder(t);
+      const pollIds = rows.filter(m => m.poll).map(m => m.id), shKey = chatFolder(t);   // পেইজের চ্যাটেও থিম
       const shQ = () => (shKey ? sb.from('conv_shared').select('theme,nicknames,disappear').eq('key', shKey).maybeSingle() : Promise.resolve({ data: null }));
       const [rx, hid, sv, pv, sh] = ids.length ? await Promise.all([sb.from('message_reactions').select('message_id,user_id,emoji').in('message_id', ids), sb.from('message_hidden').select('message_id').eq('user_id', me.id).in('message_id', ids),
         sb.from('message_saved').select('message_id').eq('user_id', me.id).in('message_id', ids), pollIds.length ? sb.from('chat_poll_votes').select('message_id,user_id,opt').in('message_id', pollIds) : { data: [] }, shQ()])

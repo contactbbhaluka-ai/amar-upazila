@@ -2871,3 +2871,6 @@ body.bubble { --hh: 0px; }
 .cs .nts-h{margin-top:14px}
 .cs-r{margin-left:auto;color:var(--mut);font-size:13.5px;flex-shrink:0}
 .cs-r .on-t{color:var(--g)}
+
+.cs-head .ent-av{width:76px;height:76px;font-size:30px}
+.cs-sub{margin:0;font-size:13px}

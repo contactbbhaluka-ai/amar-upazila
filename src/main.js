@@ -2751,7 +2751,7 @@ function dayLabel(d) {
 }
 const fmtSecs = s => `${bn(Math.floor(s / 60))}:${bn(String(Math.floor(s % 60)).padStart(2, '0'))}`;
 // পুরোনো ডাক: সাধারণ বা পেইজের চ্যাট
-function openThread(id, silent, pageId = null) { if (!pageId) pushClear('u' + id); return openConv({ kind: pageId ? 'page' : 'dm', id, pageId: pageId || null }, silent); }
+function openThread(id, silent, pageId = null) { if (!pageId) pushClear('u' + id); else { pushClear(`q${pageId}-${id}`); if (me()) pushClear(`q${pageId}-${me().id}`); } return openConv({ kind: pageId ? 'page' : 'dm', id, pageId: pageId || null }, silent); }
 function openChatGroup(chatId, silent) { pushClear('g' + chatId); return openConv({ kind: 'group', id: Number(chatId) || chatId }, silent); }
 async function openConv(t, silent) {
   if (!silent) {
@@ -3316,7 +3316,7 @@ $('#t-mic').addEventListener('click', async () => {
 $('#t-menu').addEventListener('click', () => {
   const th = S.th; if (!th) return;
   if (th.kind === 'group') return groupMenu();
-  if (th.kind === 'page') return convMenu(th, null);
+  if (th.kind === 'page') return pageChatMenu(th);
   const p = th.partner;
   openSheet(`<div class="mx-sheet cs"><div class="cs-head">${av(p || { name: '?' })}<h2>${esc(p?.name || '')}</h2></div>
     ${cQuick([['prof', 'user', 'প্রোফাইল'], ['mute', th.muted ? 'bell' : 'bellOff', th.muted ? 'আনমিউট' : 'মিউট'], ['x-search', 'search', 'খুঁজুন']])}
@@ -3336,6 +3336,28 @@ $('#t-menu').addEventListener('click', () => {
     }
   };
 });
+// পেইজের চ্যাট সেটিং: একান্ত চ্যাটের মতো একই ডিজাইন
+function pageChatMenu(th) {
+  const pg = th.pg, cust = th.asPage ? th.partner : null;
+  const head = th.asPage ? `${av(cust || { name: '?' })}<h2>${esc(cust?.name || '')}</h2><p class="mut cs-sub">${esc(pg?.name || '')} পেইজের গ্রাহক</p>` : `${entAv(pg || { name: 'পেইজ' })}<h2>${esc(pg?.name || 'পেইজ')}</h2>`;
+  openSheet(`<div class="mx-sheet cs"><div class="cs-head">${head}</div>
+    ${cQuick([th.asPage ? ['prof', 'user', 'প্রোফাইল'] : ['page', 'store', 'পেইজ'], ['mute', th.muted ? 'bell' : 'bellOff', th.muted ? 'আনমিউট' : 'মিউট'], ['x-search', 'search', 'খুঁজুন']])}
+    ${chatExtrasHtml(th)}
+    ${cCard('গোপনীয়তা ও সহায়তা', (th.asPage ? '' : cRow('report', 'flag', 'রিপোর্ট')) + cRow('clear', 'trash', 'চ্যাট মুছুন', { danger: true }))}</div>`);
+  $('#sheet').onclick = async ev => {
+    const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    if (EXTRA_ACTS.has(a)) return chatExtra(a);
+    if (a === 'report') return reportSheet('user', th.id);   // পেইজের মালিককে
+    closeSheet();
+    if (a === 'prof' && cust) return openUser(cust.id);
+    if (a === 'page') return openPage(th.pageId);
+    if (a === 'mute') return busy(null, async () => { await S.api.convSet(th, { muted: !th.muted }); th.muted = !th.muted; renderThreadHead(); toast(th.muted ? 'মিউট করা হয়েছে' : 'আনমিউট করা হয়েছে'); });
+    if (a === 'clear') {
+      if (!(await confirmSheet('এই চ্যাটের সব মেসেজ আপনার দিক থেকে মুছে যাবে। অন্যজনের কাছে থেকে যাবে। মুছবেন?', 'মুছে ফেলুন', true))) return;
+      busy(null, async () => { await S.api.clearConversation(th); toast('চ্যাট মুছে ফেলা হয়েছে'); openConv(th, true); refreshBadges(); });
+    }
+  };
+}
 // ================================================================ মেসেজ: বাড়তি সুবিধা
 // স্টিকার: ছবি নয়, শুধু বড় ইমোজি আর বাংলা লেখা (CSS দিয়ে আঁকা, তাই একদম হালকা)
 const STICKERS = {
@@ -3390,8 +3412,8 @@ const cCard = (title, rows) => (rows.trim() ? `${title ? `<h3 class="nts-h">${ti
 // উপরের গোল দ্রুত বোতাম (Messenger-এর মতো)
 const cQuick = list => `<div class="cs-q">${list.map(([act, icn, t]) => `<button data-act="${act}"><span>${ic(icn, 20)}</span><small>${t}</small></button>`).join('')}</div>`;
 function chatExtrasHtml(th) {
-  const shared = th.kind !== 'page';
-  return cCard('কাস্টমাইজ', shared ? cRow('x-theme', 'palette', 'থিম') + cRow('x-nick', 'tag', 'ডাকনাম') + cRow('x-dis', 'clock', 'অদৃশ্য মেসেজ', { right: th.shared?.disappear ? '<b class="on-t">চালু</b>' : 'বন্ধ' }) : '')
+  const page = th.kind === 'page';
+  return cCard('কাস্টমাইজ', cRow('x-theme', 'palette', 'থিম') + (page ? '' : cRow('x-nick', 'tag', 'ডাকনাম') + cRow('x-dis', 'clock', 'অদৃশ্য মেসেজ', { right: th.shared?.disappear ? '<b class="on-t">চালু</b>' : 'বন্ধ' })))
     + cCard('আরও', cRow('x-media', 'album', 'ছবি ও মিডিয়া') + cRow('x-pins', 'pushpin', 'পিন করা মেসেজ'));
 }
 function chatExtra(a) {
@@ -7255,7 +7277,7 @@ function pushClear(tag) {
 function pushClearTray() {
   const P = PN(); if (!P?.getDeliveredNotifications) return;
   P.getDeliveredNotifications().then(r => {
-    const l = (r?.notifications || []).filter(n => !/^[ug]/.test(n.tag || ''));
+    const l = (r?.notifications || []).filter(n => !/^[ugq]/.test(n.tag || ''));
     if (l.length) P.removeDeliveredNotifications({ notifications: l }).catch(() => {});
   }).catch(() => {});
 }
@@ -7269,7 +7291,7 @@ window.auBubble = conv => {
 function pushOpen(d) {
   if (!me()) return go('notif');
   const t = d.type || '';
-  if (t === 'msg') return d.chat ? openChatGroup(d.chat) : d.user ? openThread(d.user) : go('msgs');
+  if (t === 'msg') return d.chat ? openChatGroup(d.chat) : d.user ? openThread(d.user, false, d.page ? Number(d.page) : null) : go('msgs');
   if (t === 'login_alert') return devicesSheet();
   if (['friend_request', 'friend_accept', 'follow', 'birthday', 'friend_anniv'].includes(t) && d.user) return t === 'friend_request' ? go('friends') : openUser(d.user);
   if (d.chat) return openChatGroup(d.chat);

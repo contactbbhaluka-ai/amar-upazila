@@ -3391,6 +3391,10 @@ const STICKERS = {
   bh_fao: ['🙄', 'ফাও কথা কইও না'], bh_cha: ['☕', 'চা খাইবা নি?'], bh_barit: ['🏡', 'বাড়িত আইয়ো'], bh_jobbor: ['👌', 'জব্বর হইছে!'],
   bh_ghum: ['😴', 'ঘুমাই গেলাম'], bh_teka: ['💸', 'টেহা নাই'], bh_hudai: ['🤷', 'হুদাই'], bh_mon: ['🫂', 'মন খারাপ কইরো না'],
   bh_pore: ['📵', 'অহন ব্যস্ত, পরে কতা কমু'], bh_ki: ['😲', 'কী কও!'], bh_bekke: ['🤗', 'বেক্কে ভালা থাইকো'], bh_shoroil: ['🤣', 'হাসতে হাসতে শেষ!'],
+  bh_balda: ['😑', 'বালডা'], bh_baler: ['🙄', 'বালের আলাপ'], bh_chem: ['😤', 'চেমের আলাপ করস বেডা'], bh_that: ['👊', 'থাত ফালায়া দেম'],
+  bh_kire: ['😏', 'কিরে বেডা!'], bh_pagol: ['🤪', 'বেডা তুই পাগল নি?'], bh_janina: ['🙈', 'আমি কিচ্ছু জানি না'], bh_mair: ['🥊', 'মাইর খাইবি'],
+  bh_chup: ['🤐', 'চুপ কর বেডা'], bh_jalais: ['😠', 'জ্বালাইস না'], bh_bhallage: ['😩', 'ভাল্লাগে না'], bh_koi: ['🤨', 'কই গেছিলি?'],
+  bh_thik: ['👍', 'ঠিক আছে ভাই'], bh_aij: ['🙅', 'আইজ আর না'], bh_khaise: ['😋', 'খাইয়া মজা পাইছি'], bh_dekhum: ['👀', 'দেহি কী হয়'],
 };
 const stickerHtml = k => { const [e, t] = STICKERS[k] || ['✨', '']; return `<span class="stk stk-${Object.keys(STICKERS).indexOf(k) % 6}"><i>${e}</i><b>${esc(t)}</b></span>`; };
 const nickOf = (id, name) => S.th?.shared?.nicknames?.[id] || name;

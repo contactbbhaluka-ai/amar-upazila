@@ -6781,7 +6781,7 @@ function bindMenuSearch() {
     const items = [...$('#menu').querySelectorAll('#mn-main .sc[data-mgo], .mn-quick .sc[data-mgo], .setlist button, .setlist a, .lang-row, #logout')].map(el => {
       const label = (el.querySelector('.sc-t b') || el.querySelector('.lang-t')?.firstChild || el).textContent.replace(/\s+/g, ' ').trim();
       const key = el.dataset.mgo ? MN_SC_KEYS[el.dataset.mgo] || '' : MN_KEYS[el.id] || '';
-      return { el, label, hay: (el.textContent + ' ' + key).toLowerCase() };
+      return { el, label, hay: (el.textContent + ' ' + (el.dataset.k || '') + ' ' + key).toLowerCase() };
     }).filter(x => x.hay.includes(t));
     main.hidden = true; res.hidden = false;
     res.innerHTML = items.length ? items.map((x, i) => `<button class="mn-hit" data-mnhit="${i}">${esc(x.label)}<span>›</span></button>`).join('') : `<p class="mut" style="margin:6px">"${esc(q.value.trim())}" দিয়ে কিছু পাওয়া যায়নি</p>`;
@@ -6832,7 +6832,8 @@ function renderMenu() {
   const sc = (go2, icon, label, sub, flag) => {
     if (flag && S.settings[flag] === false && !u?.admin) return '';          // অ্যাডমিন বন্ধ করে রাখলে সাধারণ ব্যবহারকারী দেখেন না
     const off = flag && S.settings[flag] === false;
-    return `<button class="sc${off ? ' off' : ''}" data-mgo="${go2}"><span class="si">${icon}</span><span class="sc-t"><b>${esc(label)}</b>${off ? '<small>বন্ধ আছে (শুধু অ্যাডমিন দেখছেন)</small>' : sub ? `<small>${esc(sub)}</small>` : ''}</span></button>`;
+    // ফেসবুকের মতো শুধু নাম; আগের ছোট বর্ণনা খোঁজার জন্য data-k-তে থাকে
+    return `<button class="sc${off ? ' off' : ''}" data-mgo="${go2}"${sub ? ` data-k="${esc(sub)}"` : ''}><span class="si">${icon}</span><span class="sc-t"><b>${esc(label)}</b>${off ? '<small>বন্ধ আছে</small>' : ''}</span></button>`;
   };
   const pins = u ? menuPins() : [], pinSet = new Set(pins);
   const scs = (grp) => SC_ALL.filter(x => x[5] === grp && !pinSet.has(x[0])).map(x => sc(x[0], x[1], x[2], x[3], x[4])).join('');
@@ -6844,7 +6845,7 @@ function renderMenu() {
     ${u ? `<div class="mn-pinhead"><span>📌 আমার শর্টকাট</span><button id="mn-pinedit">✏️ সাজান</button></div>
     ${pins.length ? `<div class="sc-grid mn-quick">${pins.map(k => { const x = SC_ALL.find(y => y[0] === k); return sc(x[0], x[1], x[2], x[3], x[4]); }).join('')}</div>` : '<p class="mut mn-pinempty">"সাজান" চেপে পছন্দের শর্টকাট এখানে রাখুন</p>'}` : ''}
     ${!u?.admin && S.announcer ? `<button class="me-row admin-row" data-mgo="announce"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:20px">📢</span><div class="info"><b>জরুরি ঘোষণা পাঠান</b><div class="sub">${esc(S.announcer.title)} হিসেবে</div></div></button>` : ''}
-    ${u?.admin ? `<button class="me-row admin-row" data-mgo="admin"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('shield', 22)}</span><div class="info"><b>অ্যাডমিন ড্যাশবোর্ড</b><div class="sub">অ্যাপের সংখ্যা ও সেটিংস</div></div></button>` : ''}
+    ${u?.admin ? `<button class="me-row admin-row" data-mgo="admin"><span class="ent-av" style="width:42px;height:42px;border-radius:12px;font-size:0">${ic('shield', 22)}</span><div class="info"><b>অ্যাডমিন ড্যাশবোর্ড</b></div></button>` : ''}
     <div class="mn-top"><input type="search" id="mn-q" placeholder="মেনুতে খুঁজুন… (যেমন: পাসওয়ার্ড, ব্লক, রক্ত)" aria-label="মেনুতে খুঁজুন" autocomplete="off"><button class="mn-dark" id="mn-dark" aria-label="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}" title="${isDark() ? 'লাইট মোড' : 'ডার্ক মোড'}">${isDark() ? '☀️' : '🌙'}</button><button class="mn-dark mn-lang" id="mn-lang" translate="no" aria-label="${EN ? 'বাংলা' : 'English'}" title="${EN ? 'বাংলা' : 'English'}">${EN ? 'বাং' : 'EN'}</button></div>
     <div id="mn-res" class="card" hidden></div>
     <div id="mn-main">
@@ -6862,8 +6863,8 @@ function renderMenu() {
       <button id="acc-sw"><span class="set-ic">🔁</span>অ্যাকাউন্ট বদলান<span class="val">${bn(accList().length || 1)}টি</span></button>
       <button id="edit"><span class="set-ic">📝</span>প্রোফাইলের বাকি তথ্য<span class="val">ঠিকানা, রক্তের গ্রুপ…</span></button>
       <button id="delacc" style="color:var(--r)"><span class="set-ic">🗑️</span>অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলুন</button></div></details>
-    <div class="card lang-card"><button id="lang-tg" class="lang-row"><span class="lang-ic">🌐</span><span class="lang-t">${EN ? 'Language: English' : 'ভাষা: ইংরেজি (English)'}<small>${EN ? 'Turn off for Bangla' : 'চালু করলে পুরো অ্যাপ ইংরেজিতে'}</small></span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${EN ? 'checked' : ''}></button></div>
-    <div class="card lang-card"><button id="dark-tg" class="lang-row"><span class="lang-ic">🌙</span><span class="lang-t">ডার্ক মোড<small>${isDark() ? 'চালু · চোখের আরাম, রাতে ভালো' : 'বন্ধ · এখন দিনের (লাইট) মোড'}</small></span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${isDark() ? 'checked' : ''}></button></div>
+    <div class="card lang-card"><button id="lang-tg" class="lang-row"><span class="lang-ic">🌐</span><span class="lang-t">${EN ? 'Language: English' : 'ভাষা: ইংরেজি (English)'}</span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${EN ? 'checked' : ''}></button></div>
+    <div class="card lang-card"><button id="dark-tg" class="lang-row"><span class="lang-ic">🌙</span><span class="lang-t">ডার্ক মোড</span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true" ${isDark() ? 'checked' : ''}></button></div>
     <details class="card"${u ? '' : ' hidden'}><summary>🔒 প্রাইভেসি</summary><div class="setlist">
       <button id="plock"><span class="set-ic">🔒</span>প্রোফাইল লক<span class="val">${u?.locked ? 'চালু' : 'বন্ধ'}</span></button>
       <button id="listpriv"><span class="set-ic">👁️</span>বন্ধু, ফলোয়ার ও ফলো করছেন তালিকা কারা দেখবে</button>

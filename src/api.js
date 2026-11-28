@@ -635,6 +635,10 @@ async function supabaseApi() {
         mentions: (r.comment_mentions || []).map(t => t.profiles).filter(Boolean).map(t => ({ id: t.id, name: t.name })), author: r.pg?.name || r.profiles?.name || 'সদস্য', avatar: (r.page_id ? r.pg?.avatar_url : r.profiles?.avatar_url) || '', badge: r.page_id ? badgeOf(r.pg) : badgeOf(r.profiles), pageId: r.page_id || null,
         likes: r.like_count, reactions: r.reactions || {}, myReaction: mine.get(r.id) || '' }));
     },
+    async myCommentReactions(ids) {
+      if (!me || !ids.length) return new Map();
+      return new Map(ok(await sb.from('comment_likes').select('comment_id,reaction').eq('user_id', me.id).in('comment_id', ids.slice(0, 100))).map(x => [Number(x.comment_id), x.reaction]));
+    },
     async reactComment(id, reaction, prev) {
       if (!reaction) ok(await sb.from('comment_likes').delete().eq('comment_id', id).eq('user_id', me.id));
       else if (prev) ok(await sb.from('comment_likes').update({ reaction }).eq('comment_id', id).eq('user_id', me.id));
@@ -1340,6 +1344,7 @@ function demoApi() {
     // নোটিফিকেশন (সব ধরনের)
     const nt = (from, type, h, postId = null, groupId = null, read = false) => db.notifs.push({ id: nid(db.notifs), to: id, from, type, postId, groupId, createdAt: t(h), read });
     nt('d2', 'like', 2.6, p1.id); nt('d1', 'comment', 2.5, p1.id); nt('d2', 'comment', 2, p1.id);
+    for (const n of db.notifs) if (n.to === id && n.type === 'comment' && n.postId === p1.id && !n.meta) { const c = p1.cm.find(x => x.userId === n.from); if (c) n.meta = { cid: c.id, pid: c.id, text: c.body }; }
     nt('d4', 'friend_request', 1.5); nt('d3', 'friend_request', 1.2); nt('d4', 'group_request', 1, null, g.id);
     { const ntm = (from, type, h, meta, postId = null, read = false) => db.notifs.push({ id: nid(db.notifs), to: id, from, type, postId, groupId: null, meta, createdAt: t(h), read });
       ntm('d6', 'announce', 0.3, { text: 'আগামীকাল সকাল ৯টা থেকে বিকেল ৩টা পর্যন্ত ভালুকা পৌরসভা ও আশেপাশে বিদ্যুৎ থাকবে না। প্রয়োজনীয় কাজ আগেই সেরে নিন।' });
@@ -1826,6 +1831,7 @@ function demoApi() {
       list.sort((a, b) => sort === 'top' ? (b.likes - a.likes) || a.createdAt.localeCompare(b.createdAt) : sort === 'new' ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt));
       return wait(list);
     },
+    async myCommentReactions(ids) { const m = new Map(), set = new Set(ids.map(Number)); for (const p of db.posts) for (const c of p.cm || []) if (set.has(Number(c.id)) && c.rk?.[meId]) m.set(Number(c.id), c.rk[meId]); return m; },
     async reactComment(id, reaction, prev) {
       for (const p of db.posts) for (const c of p.cm) if (c.id === id) {
         c.rx = c.rx || {}; c.rk = c.rk || {}; c.likes = c.likes || 0;
@@ -1856,8 +1862,9 @@ function demoApi() {
       if (parentId && (!parent || parent.parentId)) throw new Error('row-level security');
       const c = { id: Date.now(), userId: meId, body, createdAt: new Date().toISOString(), parentId: parentId || null, pageId: pageId || null }; p.cm.push(c);
       c.mentions = mentionNotify(p, mentions, meId);
-      if (parent) notify(parent.userId, meId, 'reply', p.id);
-      if (!parent || parent.userId !== p.userId) notify(p.userId, meId, 'comment', p.id);
+      const cm = { cid: c.id, pid: parentId || c.id, text: body.slice(0, 120) };
+      if (parent) notify(parent.userId, meId, 'reply', p.id, null, cm);
+      if (!parent || parent.userId !== p.userId) notify(p.userId, meId, 'comment', p.id, null, cm);
       save();
       if (body.trim().length >= 3) earn('comment', p.id + ':' + c.id, p.userId);
       // ডেমো: নমুনা মানুষের মন্তব্যে উত্তর দিলে সে-ও কিছুক্ষণ পর উত্তর দেয়

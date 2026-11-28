@@ -6179,6 +6179,7 @@ async function loadNotifs(keep) {
   $('#nt-newbar').hidden = true; S.ntNew = 0;
   try {
     const [list, reqs, mutes] = await Promise.all([S.api.notifications(S.actAs?.id), S.actAs ? [] : S.api.friendRequests(), S.api.notifMutes().catch(() => new Set())]);
+    { const cids = [...new Set(list.filter(n => NT_QA.includes(n.type) && n.meta?.cid).map(n => Number(n.meta.cid)))]; S.ntRx = cids.length ? await S.api.myCommentReactions(cids).catch(() => new Map()) : new Map(); }
     const prevUnread = S.nt?.unread || new Set();
     S.nt = { list, pending: new Set(reqs.map(r => r.id)), mutes, unread: new Set([...list.filter(n => !n.read).map(n => n.id), ...(keep ? [...prevUnread].filter(id => list.some(n => n.id === id)) : [])]) };
     renderNotifs();
@@ -6260,7 +6261,61 @@ function notifRow(n, pending) {
   html = html.replace(/class="notif( new)?"/, `class="notif${n.isNew ? ' new' : ''}"`);
   const th = n.postImage ? `<img class="nt-th" src="${esc(n.postImage)}" alt="" loading="lazy" decoding="async">` : n.postBg ? `<span class="nt-th pbg-mini ${esc(n.postBg)}">Aa</span>` : '';
   const k = html.lastIndexOf('</div>');
-  return html.slice(0, k) + th + ntMoreBtn(n) + html.slice(k);
+  return html.slice(0, k) + th + ntMoreBtn(n) + html.slice(k) + ntQuick(n);
+}
+// নোটিফিকেশন থেকেই মন্তব্য/মেনশনে উত্তর ও রিয়্যাক্ট
+const NT_QA = ['comment', 'reply', 'mention'];
+function ntQuick(n) {
+  const m = n.meta || {}; if (!NT_QA.includes(n.type) || !m.cid || !me() || !n.postId) return '';
+  const rx = S.ntRx?.get(Number(m.cid)) || '';
+  return `<div class="nt-qa" data-qcid="${esc(m.cid)}" data-qpid="${esc(m.pid || m.cid)}" data-qpost="${esc(n.postId)}" data-qname="${esc(n.actor.name)}" data-qactor="${esc(n.actor.id)}">
+    ${m.text ? `<p class="nt-qt">"${esc(m.text.slice(0, 120))}${m.text.length > 120 ? '…' : ''}"</p>` : ''}
+    <div class="nt-qb"><button class="nt-qbtn${rx ? ' on' : ''}" data-qrx="${esc(rx)}">${rx ? `<span class="nt-qe">${RX_EMO[rx] || '👍'}</span>` : ic('thumb', 16)}<span>${rx ? esc(RX_NAME[rx] || 'লাইক') : 'লাইক'}</span></button><button class="nt-qbtn" data-qreply>${ic('reply', 16)}<span>উত্তর দিন</span></button></div>
+    <div class="nt-qpick" hidden>${Object.entries(RX_EMO).map(([k, e]) => `<button data-qset="${k}" aria-label="${esc(RX_NAME[k] || k)}">${e}</button>`).join('')}</div>
+    <form class="nt-qform" hidden><input class="f" maxlength="1000" placeholder="উত্তর লিখুন…" aria-label="উত্তর লিখুন"><button class="nt-qsend" aria-label="পাঠান">${ic('send', 18)}</button></form></div>`;
+}
+const RX_NAME = { like: 'লাইক', love: 'ভালোবাসা', haha: 'হাহা', wow: 'ওয়াও', sad: 'দুঃখিত', angry: 'রাগ' };
+// রো-তে চাপলে পোস্ট খোলে, তাই আগে ধরা (capture)
+$('#notifs').addEventListener('click', async e => {
+  const qa = e.target.closest('.nt-qa'); if (!qa) return;
+  e.stopImmediatePropagation();
+  const cid = Number(qa.dataset.qcid), pick = qa.querySelector('.nt-qpick'), form = qa.querySelector('.nt-qform');
+  const rb = e.target.closest('[data-qrx]');
+  if (rb) {
+    // এক চাপে লাইক/তুলে নেওয়া; লম্বা চাপ বা আবার চাপলে বাকি রিয়্যাক্ট
+    if (!rb.dataset.qrx) return setRx(qa, cid, 'like');
+    pick.hidden = !pick.hidden; return;
+  }
+  const sb = e.target.closest('[data-qset]');
+  if (sb) { pick.hidden = true; return setRx(qa, cid, sb.dataset.qset === qa.querySelector('[data-qrx]').dataset.qrx ? '' : sb.dataset.qset); }
+  if (e.target.closest('[data-qreply]')) {
+    form.hidden = !form.hidden; pick.hidden = true;
+    if (!form.hidden) { const i = form.querySelector('input'); if (!i.value) i.value = '@' + qa.dataset.qname + ' '; i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+  }
+}, true);
+$('#notifs').addEventListener('keydown', e => { if (e.target.closest('.nt-qa')) e.stopImmediatePropagation(); }, true);
+$('#notifs').addEventListener('contextmenu', e => { const rb = e.target.closest('.nt-qa [data-qrx]'); if (rb) { e.preventDefault(); rb.closest('.nt-qa').querySelector('.nt-qpick').hidden = false; } }, true);
+$('#notifs').addEventListener('submit', e => {
+  const form = e.target.closest('.nt-qform'); if (!form) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const qa = form.closest('.nt-qa'), i = form.querySelector('input'), body = i.value.trim();
+  if (!body || body === '@' + qa.dataset.qname) return i.focus();
+  const ments = body.includes('@' + qa.dataset.qname) ? [qa.dataset.qactor] : [];
+  busy(form.querySelector('button'), async () => {
+    await S.api.addComment(Number(qa.dataset.qpost), body, Number(qa.dataset.qpid), ments, S.actAs?.id || null);
+    i.value = ''; form.hidden = true;
+    form.insertAdjacentHTML('afterend', `<p class="nt-qdone">${ic('check', 14)} উত্তর পাঠানো হয়েছে · <button class="link" data-qopen="${esc(qa.dataset.qpost)}">পোস্টে দেখুন</button></p>`);
+  });
+}, true);
+document.addEventListener('click', e => { const b = e.target.closest('[data-qopen]'); if (b) { e.stopImmediatePropagation(); openPost(Number(b.dataset.qopen)); } }, true);
+async function setRx(qa, cid, rx) {
+  S.ntRx = S.ntRx || new Map();
+  const prev = S.ntRx.get(cid) || '', btn = qa.querySelector('[data-qrx]');
+  const draw = r => { btn.dataset.qrx = r; btn.classList.toggle('on', !!r); btn.innerHTML = `${r ? `<span class="nt-qe">${RX_EMO[r]}</span>` : ic('thumb', 16)}<span>${r ? esc(RX_NAME[r]) : 'লাইক'}</span>`; };
+  if (prev === rx) rx = '';
+  draw(rx); if (rx) S.ntRx.set(cid, rx); else S.ntRx.delete(cid);
+  try { await S.api.reactComment(cid, rx || null, prev || null); }
+  catch (err) { draw(prev); if (prev) S.ntRx.set(cid, prev); else S.ntRx.delete(cid); toast(errText(err)); }
 }
 const ntMoreBtn = n => `<button class="nt-more" data-ntmenu="${esc(n.ids.join(','))}" data-ntpost="${esc(n.postId ?? '')}" aria-label="অপশন">${ic('dots', 16)}</button>`;
 $('#nt-tools').addEventListener('click', e => { const b = e.target.closest('[data-ntf]'); if (b) { S.ntF = b.dataset.ntf; renderNotifs(); } });

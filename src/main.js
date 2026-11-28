@@ -6862,7 +6862,6 @@ function renderMenu() {
   const scs = (grp) => SC_ALL.filter(x => x[5] === grp && !pinSet.has(x[0])).map(x => sc(x[0], x[1], x[2], x[3], x[4])).join('');
   const sec = (h, grp) => { const inner = scs(grp); return inner ? `<h3 class="mn-h">${h}</h3><div class="sc-grid">${inner}</div>` : ''; };
   $('#menu').innerHTML = `
-    ${todayHtml()}
     ${u ? `<div class="me-wrap"><button class="me-row" data-v="me">${S.actAs ? entAv(S.actAs) : av(u)}<div class="info"><b>${esc(S.actAs ? S.actAs.name : u.name)}</b><div class="sub">${S.actAs ? 'পেইজ দেখুন' : 'আপনার প্রোফাইল দেখুন'}</div></div></button><button class="sw-toggle" id="sw-toggle" aria-label="প্রোফাইল বা পেইজ বদলান" aria-expanded="false" hidden>${ic('users', 16)}<span class="chev">▾</span></button><div id="switcher" class="sw-drop" hidden></div></div>`
       : `${demoCard()}<div class="card"><b>আপনি লগইন করেননি</b><p class="mut" style="margin:4px 0 10px">পোস্ট, বন্ধু, গ্রুপ ও পেইজ ব্যবহার করতে লগইন করুন।</p><button class="btn wide" data-v="me">লগইন / অ্যাকাউন্ট খুলুন</button></div>`}
     ${u ? `<div class="mn-pinhead"><span>আমার শর্টকাট</span><button id="mn-pinedit">${ic('edit', 14)} সাজান</button></div>
@@ -6997,17 +6996,6 @@ function nextPrayer() {
   let next = list.find(([k]) => pt[k] > nowH), tomorrow = false;
   if (!next) { next = list[0]; tomorrow = true; }
   return { name: next[1], time: hm(pt[next[0]]), tomorrow };
-}
-function todayHtml() {
-  try {
-    const now = new Date(), t = dhakaParts(now), bd = banglaDate(t), np = nextPrayer();
-    let hij = '';
-    try { hij = new Intl.DateTimeFormat((EN ? 'en' : 'bn') + '-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(now.getTime() + 6 * 36e5 - 864e5)).replace(/\s*(AH|যুগ)$/, ''); } catch { /* পুরনো ব্রাউজার */ }
-    const eng = `${bn(t.day)} ${BN_MON[t.mon]} ${bn(t.year)}`;
-    const son = EN ? `${bd.day} ${EN_SON_MON[bd.mon]} ${bd.year}` : `${bn(bd.day)} ${BN_SON_MON[bd.mon]} ${bn(bd.year)}`;
-    return `<button class="card mn-today" id="mn-today" translate="no"><span class="td-l"><b>${esc(BN_WD[t.wd])}, ${esc(son)}</b><small>${esc(eng)}${hij ? ' · ' + esc(hij) : ''}</small></span>
-      <span class="td-r"><small>${EN ? 'Next prayer' : 'পরের নামাজ'}${np.tomorrow ? (EN ? ' (tomorrow)' : ' (কাল)') : ''}</small><b>🕌 ${esc(EN ? ({ 'ফজর': 'Fajr', 'যোহর': 'Dhuhr', 'আসর': 'Asr', 'মাগরিব': 'Maghrib', 'এশা': 'Isha' })[np.name] : np.name)} ${esc(np.time)}</b></span></button>`;
-  } catch { return ''; }
 }
 // আমার কার্যকলাপ
 const ACT_F = [['all', 'সব'], ['react', 'রিয়্যাক্ট'], ['comment', 'মন্তব্য'], ['share', 'শেয়ার']];
@@ -7529,7 +7517,6 @@ document.addEventListener('click', e => {
   if (id === 'lang-tg' || id === 'mn-lang') return setLang(!EN);
   if (id === 'mn-pinedit') return pinSheet();
   if (id === 'faq') return appFaqSheet();
-  if (e.target.closest('#mn-today')) return prayerWeatherSheet();
   if (id === 'dark-tg') { local.set('theme', isDark() ? 'light' : 'dark'); applyTheme(); renderMenu(); return; }
   if (id === 'acc-email') return emailSheet();
   if (id === 'acc-phone') return phoneSheet();

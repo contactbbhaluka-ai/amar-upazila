@@ -7025,8 +7025,8 @@ function pushBind(P) {
   P.addListener('registrationError', () => {});
   // নতুন অ্যাপ: নিজস্ব শব্দসহ চ্যানেল (আগের 'default' চ্যানেল সরিয়ে)
   if (/AUPush\/2/.test(navigator.userAgent)) {
-    P.createChannel?.({ id: 'au_general', name: 'সাধারণ নোটিফিকেশন', description: 'মন্তব্য, রিয়্যাক্ট, ফ্রেন্ড রিকোয়েস্ট ও জরুরি খবর', importance: 4, visibility: 1, sound: 'au_notify.ogg', lights: true, lightColor: '#006a4e', vibration: true }).catch(() => {});
-    P.deleteChannel?.({ id: 'default' }).catch(() => {});
+    P.createChannel?.({ id: 'au_gen2', name: 'সাধারণ নোটিফিকেশন', description: 'মন্তব্য, রিয়্যাক্ট, ফ্রেন্ড রিকোয়েস্ট ও জরুরি খবর', importance: 4, visibility: 1, sound: 'au_notify.ogg', lights: true, lightColor: '#006a4e', vibration: true }).catch(() => {});
+    ['default', 'au_general'].forEach(id => P.deleteChannel?.({ id }).catch(() => {}));
   }
   // ফোনের নোটিফিকেশনে চাপলে সরাসরি সেই জিনিস খোলে
   P.addListener('pushNotificationActionPerformed', a => setTimeout(() => pushOpen(a?.notification?.data || {}), me() ? 0 : 1500));

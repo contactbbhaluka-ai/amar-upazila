@@ -50,8 +50,8 @@ import java.util.Map;
  * অন্য সব নোটিফিকেশন আগের মতো Capacitor প্লাগইন / Firebase সামলায়।
  */
 public class AuMessagingService extends MessagingService {
-    public static final String CH_MSG = "au_msg";
-    public static final String CH_GEN = "au_general";
+    public static final String CH_MSG = "au_msg2";   // শব্দ বদলালে চ্যানেলের নামও বদলাতে হয় (Android পুরোনো চ্যানেলের শব্দ বদলাতে দেয় না)
+    public static final String CH_GEN = "au_gen2";
     public static final int NID = 4201;
     public static final String KEY_REPLY = "au_reply";
     static final String PREF = "au_push";
@@ -123,12 +123,12 @@ public class AuMessagingService extends MessagingService {
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
             nm.createNotificationChannel(ch);
         }
-        if (nm.getNotificationChannel("msgs") != null) nm.deleteNotificationChannel("msgs");   // আগের বিল্ডের চ্যানেল
+        for (String old : new String[]{"msgs", "au_msg", "au_general"}) if (nm.getNotificationChannel(old) != null) nm.deleteNotificationChannel(old);   // আগের বিল্ডের চ্যানেল
     }
 
     static Uri sound(Context c) {
         int id = c.getResources().getIdentifier("au_notify", "raw", c.getPackageName());
-        return id == 0 ? null : Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + c.getPackageName() + "/" + id);
+        return id == 0 ? null : Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + c.getPackageName() + "/raw/au_notify");
     }
 
     // ---------------------------------------------------------------- নোটিফিকেশন বানানো (নতুন বার্তা ও বোতাম চাপার পর আবার)

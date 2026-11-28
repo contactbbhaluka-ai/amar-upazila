@@ -123,7 +123,7 @@ jobs:
           grep -q AuMessagingService "$M" || perl -0pi -e 's#(<application\b[^>]*>)#$1\n        <service android:name="com.capacitorjs.plugins.pushnotifications.MessagingService" tools:node="remove" />\n        <service android:name=".AuMessagingService" android:exported="false">\n            <intent-filter>\n                <action android:name="com.google.firebase.MESSAGING_EVENT" />\n            </intent-filter>\n        </service>\n        <receiver android:name=".AuReplyReceiver" android:exported="false" />#s' "$M"
           # চ্যাট বাবলের জন্য আলাদা ছোট জানালা
           grep -q BubbleActivity "$M" || perl -0pi -e 's#(<application\b[^>]*>)#$1\n        <activity android:name=".BubbleActivity" android:theme="\@style/AppTheme.NoActionBar" android:allowEmbedded="true" android:resizeableActivity="true" android:documentLaunchMode="always" android:exported="false" android:windowSoftInputMode="adjustResize" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density" />#s' "$M"
-          sed -i 's#default_notification_channel_id" android:value="default"#default_notification_channel_id" android:value="au_general"#' "$M"
+          sed -i 's#default_notification_channel_id" android:value="default"#default_notification_channel_id" android:value="au_gen2"#' "$M"
           grep -n "tools\|AuMessaging\|AuReply\|MessagingService" "$M"
           # নিজের কোডে Firebase-এর ক্লাস (RemoteMessage) লাগে, তাই অ্যাপ মডিউলেও firebase-messaging
           G=android/app/build.gradle

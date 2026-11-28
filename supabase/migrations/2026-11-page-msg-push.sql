@@ -10,7 +10,6 @@ begin
 exception when others then return null;
 end $$;
 
-drop function if exists public.push_reply(text, text, text, bigint);
 create or replace function public.push_reply(p_token text, p_text text default null, p_action text default 'reply', p_mid bigint default null) returns jsonb
 language plpgsql security definer set search_path = public, private as $$
 declare t public.push_reply_tokens; v_txt text := btrim(coalesce(p_text, '')); v_partner uuid; v_chat bigint; v_post bigint; v_page bigint; v_cust uuid; v_staff boolean; v_owner uuid;

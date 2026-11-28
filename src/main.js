@@ -2741,8 +2741,8 @@ function dayLabel(d) {
 }
 const fmtSecs = s => `${bn(Math.floor(s / 60))}:${bn(String(Math.floor(s % 60)).padStart(2, '0'))}`;
 // পুরোনো ডাক: সাধারণ বা পেইজের চ্যাট
-function openThread(id, silent, pageId = null) { return openConv({ kind: pageId ? 'page' : 'dm', id, pageId: pageId || null }, silent); }
-function openChatGroup(chatId, silent) { return openConv({ kind: 'group', id: Number(chatId) || chatId }, silent); }
+function openThread(id, silent, pageId = null) { if (!pageId) pushClear('u' + id); return openConv({ kind: pageId ? 'page' : 'dm', id, pageId: pageId || null }, silent); }
+function openChatGroup(chatId, silent) { pushClear('g' + chatId); return openConv({ kind: 'group', id: Number(chatId) || chatId }, silent); }
 async function openConv(t, silent) {
   if (!silent) {
     $('#tform').hidden = false; $('#t-ro').hidden = true; VP.a.pause(); VP.id = null; VP.pct = 0;
@@ -7025,6 +7025,11 @@ function pushBind(P) {
   // ফোনের নোটিফিকেশনে চাপলে সরাসরি সেই জিনিস খোলে
   P.addListener('pushNotificationActionPerformed', a => setTimeout(() => pushOpen(a?.notification?.data || {}), me() ? 0 : 1500));
   P.addListener('pushNotificationReceived', () => { refreshBadges().catch?.(() => {}); });
+}
+// চ্যাট খুললে ফোনের নোটিফিকেশন বারে ওই কথোপকথনের মেসেজ-নোটিফিকেশন সরে যায়
+function pushClear(tag) {
+  const P = PN(); if (!P?.removeDeliveredNotifications) return;
+  P.removeDeliveredNotifications({ notifications: [{ id: 4201, tag, title: '', body: '', data: {} }] }).catch(() => {});
 }
 function pushOpen(d) {
   if (!me()) return go('notif');

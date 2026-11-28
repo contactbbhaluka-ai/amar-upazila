@@ -42,7 +42,8 @@ async function accessToken(sa: { client_email: string; private_key: string }) {
   return cached.token;
 }
 
-type Job = { user: string; title: string; body: string; data: Record<string, string>; tag: string; high?: boolean };
+type Rich = { conv: string; sender: string; av: string; text: string; group: boolean; title: string };
+type Job = { user: string; title: string; body: string; data: Record<string, string>; tag: string; high?: boolean; rich?: Rich };
 
 async function notifJobs(id: number): Promise<Job[]> {
   const { data: n } = await sb.from('notifications').select('id,user_id,actor_id,type,post_id,group_id,meta, a:profiles!notifications_actor_id_fkey(name), p:posts!notifications_post_id_fkey(body), g:groups!notifications_group_id_fkey(name)').eq('id', id).maybeSingle();
@@ -76,9 +77,10 @@ async function notifJobs(id: number): Promise<Job[]> {
 }
 
 async function msgJobs(id: number): Promise<Job[]> {
-  const { data: m } = await sb.from('messages').select('id,sender_id,recipient_id,chat_id,body,image_path,voice_path,sticker,loc,poll,mentions,is_auto,deleted_at,page_id, s:profiles!messages_sender_id_fkey(name)').eq('id', id).maybeSingle();
+  const { data: m } = await sb.from('messages').select('id,sender_id,recipient_id,chat_id,body,image_path,voice_path,sticker,loc,poll,mentions,is_auto,deleted_at,page_id, s:profiles!messages_sender_id_fkey(name,avatar_url)').eq('id', id).maybeSingle();
   if (!m || m.is_auto || m.deleted_at || m.page_id) return [];
-  const sender = (m as any).s?.name || APP;
+  const sender = (m as any).s?.name || APP, av = (m as any).s?.avatar_url || '';
+  const full = () => (m.body ? cut(m.body, 900) : text);   // নিজের বানানো নোটিফিকেশনে পুরো মেসেজ দেখা যায়
   const text = m.body ? cut(m.body, 140) : m.image_path ? '📷 একটি ছবি পাঠিয়েছেন' : m.voice_path ? '🎤 ভয়েস মেসেজ পাঠিয়েছেন' : m.sticker ? 'একটি স্টিকার পাঠিয়েছেন' : m.loc ? '📍 লোকেশন পাঠিয়েছেন' : m.poll ? '📊 একটি পোল দিয়েছেন' : 'নতুন মেসেজ';
   if (m.chat_id) {
     const [{ data: chat }, { data: mem }, { data: muted }] = await Promise.all([
@@ -87,7 +89,8 @@ async function msgJobs(id: number): Promise<Job[]> {
       sb.from('conv_settings').select('user_id').eq('key', 'g:' + m.chat_id).eq('muted', true),
     ]);
     const skip = new Set([m.sender_id, ...(muted || []).map(x => x.user_id), ...((m.mentions as string[]) || [])]);
-    return (mem || []).filter(x => !skip.has(x.user_id)).map(x => ({ user: x.user_id, title: chat?.name || 'গ্রুপ চ্যাট', body: `${sender}: ${text}`, data: { type: 'msg', chat: String(m.chat_id) }, tag: 'g' + m.chat_id, high: true }));
+    return (mem || []).filter(x => !skip.has(x.user_id)).map(x => ({ user: x.user_id, title: chat?.name || 'গ্রুপ চ্যাট', body: `${sender}: ${text}`, data: { type: 'msg', chat: String(m.chat_id) }, tag: 'g' + m.chat_id, high: true,
+      rich: { conv: 'g:' + m.chat_id, sender, av, text: full(), group: true, title: chat?.name || 'গ্রুপ চ্যাট' } }));
   }
   const to = m.recipient_id; if (!to) return [];
   const [{ data: mu }, { data: fr }, { data: back }, { data: acc }] = await Promise.all([
@@ -98,7 +101,8 @@ async function msgJobs(id: number): Promise<Job[]> {
   ]);
   if (mu?.muted) return [];
   const known = (fr || []).length || (back || []).length || acc;
-  return [{ user: to, title: known ? sender : `${sender} (মেসেজ রিকোয়েস্ট)`, body: text, data: { type: 'msg', user: m.sender_id }, tag: 'u' + m.sender_id, high: true }];
+  return [{ user: to, title: known ? sender : `${sender} (মেসেজ রিকোয়েস্ট)`, body: text, data: { type: 'msg', user: m.sender_id }, tag: 'u' + m.sender_id, high: true,
+    rich: { conv: 'u:' + m.sender_id, sender, av, text: full(), group: false, title: known ? sender : `${sender} (মেসেজ রিকোয়েস্ট)` } }];
 }
 
 Deno.serve(async req => {
@@ -110,16 +114,29 @@ Deno.serve(async req => {
   const { kind, id } = await req.json().catch(() => ({}));
   const jobs = kind === 'notif' ? await notifJobs(Number(id)) : kind === 'msg' ? await msgJobs(Number(id)) : [];
   if (!jobs.length) return json({ sent: 0 });
-  const { data: toks } = await sb.from('push_tokens').select('token,user_id').in('user_id', [...new Set(jobs.map(j => j.user))]);
+  const { data: toks } = await sb.from('push_tokens').select('token,user_id,platform').in('user_id', [...new Set(jobs.map(j => j.user))]);
   if (!toks?.length) return json({ sent: 0 });
   const at = await accessToken(sa);
   let sent = 0; const dead: string[] = [];
+  // নতুন অ্যাপ (android-r): মেসেজ ডাটা হিসেবে যায়, অ্যাপ নিজে নোটিফিকেশন বানায় যাতে সেখান থেকেই উত্তর দেওয়া যায়
+  const replyTok = new Map<string, string>();
+  const richUsers = [...new Set(toks.filter(t => t.platform === 'android-r').map(t => t.user_id))].filter(u => jobs.find(x => x.user === u)?.rich);
+  if (richUsers.length) {
+    const rows = richUsers.map(u => { const b = crypto.getRandomValues(new Uint8Array(24)); const tok = [...b].map(x => x.toString(16).padStart(2, '0')).join(''); replyTok.set(u, tok); return { token: tok, user_id: u, conv: jobs.find(x => x.user === u)!.rich!.conv }; });
+    const { error } = await sb.from('push_reply_tokens').insert(rows); if (error) { console.error('reply tok', error.message); replyTok.clear(); }
+    if (Math.random() < 0.05) await sb.from('push_reply_tokens').delete().lt('exp', new Date().toISOString());
+  }
+  const RPC = Deno.env.get('SUPABASE_URL') + '/rest/v1/rpc/push_reply', ANON = Deno.env.get('SUPABASE_ANON_KEY') || '';
   await Promise.all(toks.map(async t => {
     const j = jobs.find(x => x.user === t.user_id)!;
+    const rt = t.platform === 'android-r' && j.rich && ANON ? replyTok.get(t.user_id) : undefined;
+    const message = rt ? { token: t.token, data: { ...j.data, au_rich: '1', au_title: j.rich!.title, au_sender: j.rich!.sender, au_text: j.rich!.text, au_av: j.rich!.av, au_conv: j.tag, au_grp: j.rich!.group ? '1' : '0', au_rt: rt, au_ru: RPC, au_rk: ANON },
+        android: { priority: 'HIGH', ttl: '86400s' } }
+      : { token: t.token, notification: { title: j.title, body: j.body }, data: j.data,
+        android: { priority: j.high ? 'HIGH' : 'NORMAL', notification: { channel_id: 'default', icon: 'ic_stat_notify', color: '#006a4e', tag: j.tag, sound: 'default' } } };
     const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
       method: 'POST', headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: { token: t.token, notification: { title: j.title, body: j.body }, data: j.data,
-        android: { priority: j.high ? 'HIGH' : 'NORMAL', notification: { channel_id: 'default', icon: 'ic_stat_notify', color: '#006a4e', tag: j.tag, sound: 'default' } } } }),
+      body: JSON.stringify({ message }),
     });
     if (r.ok) { sent++; return; }
     const e = await r.json().catch(() => ({}));

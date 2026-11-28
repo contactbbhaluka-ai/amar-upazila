@@ -176,7 +176,7 @@ async function supabaseApi() {
       await C.Plugins.Browser.open({ url: data.url, presentationStyle: 'popover' });
     },
     async setPassword(password) { ok(await sb.auth.updateUser({ password })); if (me) me.hasPassword = true; },
-    async registerPush(token) { if (me && token) ok(await sb.rpc('register_push', { p_token: token, p_platform: 'android' })); },
+    async registerPush(token) { if (me && token) ok(await sb.rpc('register_push', { p_token: token, p_platform: /AUPush\/2/.test(navigator.userAgent) ? 'android-r' : 'android' })); },   // android-r: নোটিফিকেশন থেকেই উত্তর দেওয়া যায় এমন অ্যাপ
     async unregisterPush(token) { if (token) await sb.rpc('unregister_push', { p_token: token }); },
     async finishSetup(v) {
       await this.updateProfile({ ...v, bio: me.bio || '' });

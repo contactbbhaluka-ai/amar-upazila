@@ -49,7 +49,7 @@ jobs:
         run: |
           node -e '
             const fs = require("fs"), c = JSON.parse(fs.readFileSync("capacitor.config.json", "utf8"));
-            c.appendUserAgent = "AmarUpazilaApp/" + process.env.VERSION_CODE;   // অ্যাপ নিজের ভার্সন চিনতে পারে
+            c.appendUserAgent = "AmarUpazilaApp/" + process.env.VERSION_CODE + (process.env.HAS_FCM === "true" ? " AUPush/2" : "");   // AUPush/2: নোটিফিকেশন থেকেই উত্তর   // অ্যাপ নিজের ভার্সন চিনতে পারে
             if (process.env.LIVE_UPDATE !== "false") {
               const u = new URL(process.env.LIVE_URL);
               c.server = { ...(c.server || {}), url: u.href, errorPath: "offline.html", allowNavigation: [u.hostname] };
@@ -110,6 +110,16 @@ jobs:
           M=android/app/src/main/AndroidManifest.xml
           grep -q default_notification_icon "$M" || perl -0pi -e 's#(<application\b[^>]*>)#$1\n        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="\@drawable/ic_stat_notify" />\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="default" />#s' "$M"
           grep -n "default_notification" "$M"
+
+      - name: "Message notification with reply (নোটিফিকেশন থেকেই মেসেজের উত্তর)"
+        if: env.HAS_FCM == 'true'
+        run: |
+          D=android/app/src/main/java/com/amarupazila/app
+          cp android-native/AuMessagingService.java android-native/AuReplyReceiver.java "$D/"
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q 'xmlns:tools' "$M" || perl -0pi -e 's#<manifest\b#<manifest xmlns:tools="http://schemas.android.com/tools"#' "$M"
+          grep -q AuMessagingService "$M" || perl -0pi -e 's#(<application\b[^>]*>)#$1\n        <service android:name="com.capacitorjs.plugins.pushnotifications.MessagingService" tools:node="remove" />\n        <service android:name=".AuMessagingService" android:exported="false">\n            <intent-filter>\n                <action android:name="com.google.firebase.MESSAGING_EVENT" />\n            </intent-filter>\n        </service>\n        <receiver android:name=".AuReplyReceiver" android:exported="false" />#s' "$M"
+          grep -n "tools\|AuMessaging\|AuReply\|MessagingService" "$M"
 
       - name: Generate app icon and splash
         continue-on-error: true

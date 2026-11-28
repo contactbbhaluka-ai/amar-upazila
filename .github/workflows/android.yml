@@ -72,7 +72,10 @@ jobs:
 
       - name: "Keyboard fix (কিবোর্ড খুললে লেখার ঘর কিবোর্ডের উপরে)"
         run: |
+          M=android/app/src/main/AndroidManifest.xml
           cp android-native/MainActivity.java android/app/src/main/java/com/amarupazila/app/MainActivity.java
+          cp android-native/AuGallery.java android/app/src/main/java/com/amarupazila/app/AuGallery.java   # অ্যাপের ভেতরের ছবির গ্যালারি
+          grep -q READ_MEDIA_IMAGES "$M" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>#' "$M"
           M=android/app/src/main/AndroidManifest.xml
           grep -q windowSoftInputMode "$M" || perl -0pi -e 's#(<activity\b[^>]*?android:name="\.MainActivity")#$1\n            android:windowSoftInputMode="adjustResize"#s' "$M"
           grep -n "windowSoftInputMode" "$M" || echo "::warning::windowSoftInputMode যোগ হয়নি"

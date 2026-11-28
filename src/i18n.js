@@ -145,6 +145,8 @@ const PLACES = {
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
   // লগইন ও সাইনআপ
+  "সব ছবি": "All photos", "ক্যামেরা": "Camera", "{x}টি ছবি বাছাই করা": "{x} photos selected", "ছবি দেখাতে অনুমতি দিন": "Allow access to photos", "অনুমতি দিন": "Allow",
+  "ফাইল থেকে ছবি বাছুন": "Pick from files", "এখানে কোনো ছবি নেই": "No photos here", "তৈরি হচ্ছে…": "Preparing…", "আপনি কিছু ছবির অনুমতি দিয়েছেন": "You allowed some photos", "আরও ছবি বাছুন": "Pick more photos",
   "পাঠান": "Send", "ছবি": "Photo", "গ্যালারি বা ক্যামেরা থেকে, একসাথে ১০টি পর্যন্ত": "From gallery or camera, up to 10 at once", "স্টিকার": "Sticker", "মজার অ্যানিমেটেড স্টিকার": "Fun animated stickers",
   "লোকেশন": "Location", "আপনি এখন কোথায় আছেন, ম্যাপে": "Where you are now, on a map", "পোল": "Poll", "গ্রুপে ভোট নিন": "Take a vote in the group", "পাঠানো হচ্ছে…": "Sending…", "একসাথে সর্বোচ্চ ১০টি ছবি পাঠানো যায়": "You can send up to 10 photos at once",
   "দ্রুত রিয়্যাক্ট": "Quick reaction", "লেখার ঘর খালি থাকলে এই ইমোজি এক চাপে পাঠানো যায়": "When the message box is empty, send this emoji with one tap", "দ্রুত রিয়্যাক্ট: {n}": "Quick reaction: {n}",

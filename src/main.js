@@ -3090,7 +3090,132 @@ async function sendNow(opts = {}, btn) {
   });
 }
 $('#tform').addEventListener('submit', async e => { e.preventDefault(); if (S.att.length && !S.edit) { const hasText = !!$('#tmsg').value.trim(); await sendAtt(); if (hasText) sendNow({}, $('#t-send')); return; } sendNow({}, $('#t-send')); });
-$('#t-img').addEventListener('click', () => { if (S.th?.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ছবি পাঠানো যায় না'); $('#t-file').click(); });
+$('#t-img').addEventListener('click', () => { if (S.th?.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ছবি পাঠানো যায় না'); if (AG()) galOpen(); else $('#t-file').click(); });
+
+// ================================================================ অ্যাপের ভেতরের গ্যালারি (Messenger-এর মতো): নিচে অর্ধেক, উপরে ঠেললে পুরো পাতা ও অ্যালবাম
+const AG = () => (window.Capacitor?.isPluginAvailable?.('AuGallery') ? window.Capacitor.Plugins.AuGallery : null);
+const GAL = { open: false, full: false, album: '', albumName: 'সব ছবি', sel: [], offset: 0, more: true, loading: false, view: 'grid', hist: false, gen: 0, thumbs: new Map() };
+function galEl() {
+  let g = $('#gal'); if (g) return g;
+  g = document.createElement('div'); g.id = 'gal'; g.className = 'gal'; g.hidden = true;
+  g.innerHTML = `<div class="gal-dim"></div><div class="gal-sheet" role="dialog" aria-label="ছবি বাছুন">
+    <div class="gal-head"><span class="gal-grab"></span><div class="gal-bar">
+      <button type="button" class="gal-ib" id="gal-x" aria-label="বন্ধ করুন">${ic('close', 20)}</button>
+      <button type="button" class="gal-alb" id="gal-alb"><span>সব ছবি</span>${ic('chevD', 16)}</button>
+      <button type="button" class="gal-ib" id="gal-files" aria-label="ফাইল থেকে বাছুন">${ic('album', 20)}</button></div></div>
+    <div class="gal-body" id="gal-body"></div>
+    <div class="gal-send" id="gal-send" hidden><span id="gal-n"></span><button type="button" class="btn" id="gal-go">${ic('send', 18)} পাঠান</button></div>
+  </div><input type="file" id="gal-cam" accept="image/*" capture="environment" hidden>`;
+  document.body.appendChild(g);
+  g.querySelector('.gal-dim').onclick = () => galClose();
+  $('#gal-x').onclick = () => galClose();
+  $('#gal-files').onclick = () => { galClose(); setTimeout(() => $('#t-file').click(), 120); };
+  $('#gal-alb').onclick = () => (GAL.view === 'albums' ? galGrid() : galAlbums());
+  $('#gal-go').onclick = galSend;
+  $('#gal-cam').onchange = e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; S.att.push({ f, url: URL.createObjectURL(f) }); galClose(); renderAtt(); composeState(); };
+  const body = $('#gal-body');
+  body.addEventListener('scroll', () => {
+    if (!GAL.full && body.scrollTop > 12) galFull(true);
+    if (GAL.view === 'grid' && body.scrollTop + body.clientHeight > body.scrollHeight - 600) galLoad();
+  }, { passive: true });
+  body.addEventListener('click', e => {
+    if (e.target.closest('#gal-cam-t')) return $('#gal-cam').click();
+    if (e.target.closest('[data-galperm]')) return galPerm(true);
+    if (e.target.closest('[data-galfiles]')) return $('#gal-files').click();
+    const a = e.target.closest('[data-galalb]'); if (a) { GAL.album = a.dataset.galalb; GAL.albumName = a.dataset.name; return galGrid(true); }
+    const t = e.target.closest('[data-gid]'); if (!t) return;
+    const id = t.dataset.gid, i = GAL.sel.indexOf(id);
+    if (i >= 0) GAL.sel.splice(i, 1); else { if (GAL.sel.length >= 10) return toast('একসাথে সর্বোচ্চ ১০টি ছবি পাঠানো যায়'); GAL.sel.push(id); navigator.vibrate?.(8); }
+    galMarks();
+  });
+  // উপরের অংশ টেনে: উপরে → পুরো পাতা, নিচে → ছোট/বন্ধ
+  const head = g.querySelector('.gal-head'), sheet = g.querySelector('.gal-sheet'); let y0 = null, dy = 0;
+  head.addEventListener('pointerdown', e => { if (e.target.closest('button')) return; y0 = e.clientY; dy = 0; sheet.classList.add('drag'); head.setPointerCapture?.(e.pointerId); });
+  head.addEventListener('pointermove', e => { if (y0 == null) return; dy = e.clientY - y0; sheet.style.transform = dy > 0 ? `translateY(${dy}px)` : ''; if (dy < -30 && !GAL.full) galFull(true); });
+  const end = () => { if (y0 == null) return; y0 = null; sheet.classList.remove('drag'); sheet.style.transform = ''; if (dy > 70) { if (GAL.full) galFull(false); else galClose(); } };
+  head.addEventListener('pointerup', end); head.addEventListener('pointercancel', end);
+  return g;
+}
+function galFull(on) { GAL.full = on; $('#gal').classList.toggle('full', on); }
+async function galOpen() {
+  const g = galEl(); document.activeElement?.blur?.();
+  Object.assign(GAL, { open: true, sel: [], view: 'grid' }); galFull(false); galMarks();
+  g.hidden = false; requestAnimationFrame(() => g.classList.add('on'));
+  if (!GAL.hist) GAL.hist = pushNav();
+  galPerm(false);
+}
+function galClose(fromPop) {
+  if (!GAL.open) return; GAL.open = false; GAL.gen++;
+  const g = $('#gal'); g.classList.remove('on', 'full'); setTimeout(() => { if (!GAL.open) g.hidden = true; }, 260);
+  if (GAL.hist && !fromPop) { S.skipPop = (S.skipPop || 0) + 1; S.hd = Math.max(0, (S.hd || 0) - 1); try { history.back(); } catch { S.skipPop--; } }
+  GAL.hist = false;
+}
+async function galPerm(ask) {
+  const P = AG(), body = $('#gal-body');
+  let st = (await P.status().catch(() => ({}))).state;
+  if (ask || st === 'prompt') st = (await P.request().catch(() => ({}))).state;
+  if (!GAL.open) return;
+  if (st === 'granted' || st === 'partial') { GAL.partial = st === 'partial'; return galGrid(true); }
+  $('#gal-alb').hidden = true;
+  body.innerHTML = `<div class="gal-perm"><span class="gal-perm-ic">${ic('photo', 30)}</span><h3>ছবি দেখাতে অনুমতি দিন</h3>
+    <p class="mut">আপনার ছবিগুলো এখানে দেখাতে ফোনের অনুমতি লাগে। ছবি আপনার ফোনেই থাকে; আপনি যেটা পাঠাতে বাছবেন শুধু সেটাই যাবে।</p>
+    ${st === 'denied' ? '<p class="mut gal-perm-s">অনুমতি বন্ধ করা আছে। ফোনের সেটিং → অ্যাপ → আমার উপজেলা → অনুমতি → ছবি থেকে চালু করুন।</p>' : `<button type="button" class="btn wide" data-galperm>অনুমতি দিন</button>`}
+    <button type="button" class="btn ghost wide" data-galfiles style="margin-top:8px">ফাইল থেকে ছবি বাছুন</button></div>`;
+}
+function galGrid(reset) {
+  const body = $('#gal-body'); GAL.view = 'grid';
+  $('#gal-alb').hidden = false; $('#gal-alb span').textContent = GAL.albumName; $('#gal-alb').classList.remove('open');
+  if (reset || !body.querySelector('.gal-grid')) {
+    GAL.offset = 0; GAL.more = true; GAL.gen++;
+    body.innerHTML = (GAL.partial ? `<button type="button" class="gal-part" data-galperm>${ic('info', 16)}<span>আপনি কিছু ছবির অনুমতি দিয়েছেন · <b>আরও ছবি বাছুন</b></span></button>` : '')
+      + `<div class="gal-grid" id="gal-grid">${GAL.album ? '' : `<button type="button" class="gal-cam" id="gal-cam-t" aria-label="ক্যামেরা">${ic('camera', 28)}<small>ক্যামেরা</small></button>`}${'<div class="gal-sk"></div>'.repeat(14)}</div>`;
+    body.scrollTop = 0; galLoad();
+  }
+}
+async function galLoad() {
+  if (GAL.loading || !GAL.more) return; GAL.loading = true; const gen = GAL.gen;
+  try {
+    const r = await AG().list({ album: GAL.album, offset: GAL.offset, limit: 60, thumb: 240 });
+    if (gen !== GAL.gen) return;
+    const grid = $('#gal-grid'); grid.querySelectorAll('.gal-sk').forEach(x => x.remove());
+    const items = r?.items || []; GAL.offset += items.length; GAL.more = !!r?.more;
+    grid.insertAdjacentHTML('beforeend', items.map(it => { GAL.thumbs.set(it.id, it.thumb); return `<button type="button" class="gal-it" data-gid="${esc(it.id)}"><img src="${it.thumb}" alt="" decoding="async"><i class="gal-ck"></i></button>`; }).join(''));
+    if (!GAL.offset) grid.insertAdjacentHTML('beforeend', '<p class="mut gal-empty">এখানে কোনো ছবি নেই</p>');
+    galMarks();
+  } catch (e) { if (gen === GAL.gen) toast('ছবি দেখানো যাচ্ছে না'); }
+  finally { if (gen === GAL.gen) GAL.loading = false; else GAL.loading = false; }
+}
+async function galAlbums() {
+  const body = $('#gal-body'); GAL.view = 'albums'; GAL.gen++; galFull(true); $('#gal-alb').classList.add('open');
+  body.innerHTML = `<div class="gal-albs">${'<div class="gal-ab sk"><div></div></div>'.repeat(6)}</div>`;
+  const gen = GAL.gen;
+  try {
+    const r = await AG().albums(); if (gen !== GAL.gen) return;
+    const all = (r?.albums || []), total = all.reduce((n, a) => n + (a.count || 0), 0);
+    const card = (id, name, n, cover) => `<button type="button" class="gal-ab${GAL.album === id ? ' on' : ''}" data-galalb="${esc(id)}" data-name="${esc(name)}"><div>${cover ? `<img src="${cover}" alt="">` : ic('album', 28)}</div><b>${esc(name)}</b><small>${bn(n)}টি ছবি</small></button>`;
+    body.innerHTML = `<div class="gal-albs">${card('', 'সব ছবি', total, all[0]?.cover)}${all.map(a => card(a.id, a.name, a.count, a.cover)).join('')}</div>`;
+    body.scrollTop = 0;
+  } catch { if (gen === GAL.gen) toast('অ্যালবাম দেখানো যাচ্ছে না'); }
+}
+function galMarks() {
+  document.querySelectorAll('#gal .gal-it').forEach(t => { const i = GAL.sel.indexOf(t.dataset.gid); t.classList.toggle('sel', i >= 0); t.querySelector('.gal-ck').textContent = i >= 0 ? bn(i + 1) : ''; });
+  const n = GAL.sel.length, bar = $('#gal-send'); if (!bar) return;
+  bar.hidden = !n; $('#gal-n').textContent = n ? `${bn(n)}টি ছবি বাছাই করা` : '';
+}
+async function galSend() {
+  const ids = GAL.sel.slice(); if (!ids.length) return;
+  const btn = $('#gal-go'); btn.disabled = true; const old = btn.innerHTML; btn.textContent = 'তৈরি হচ্ছে…';
+  try {
+    for (const id of ids) {
+      const r = await AG().get({ id, max: 1600 });
+      const bin = atob(r.data), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const f = new File([u8], `photo-${id}.jpg`, { type: r.mime || 'image/jpeg' });
+      S.att.push({ f, url: URL.createObjectURL(f) });
+    }
+    galClose(); renderAtt(); composeState(); sendAtt();
+  } catch (e) { toast('ছবিটি নেওয়া যায়নি'); }
+  btn.disabled = false; btn.innerHTML = old;
+}
 // ছবি বাছাই করলে সাথে সাথে যায় না: লেখার ঘরের উপরে ছোট ছবিগুলো দেখায়, পাঠান চাপলে যায় (Messenger-এর মতো)
 S.att = [];
 $('#t-file').addEventListener('change', e => {
@@ -8259,6 +8384,7 @@ function back() { try { history.back(); } catch { onPop(); } }
 function onPop() {
   if (S.skipPop) { if (--S.skipPop === 0) while (S.pendPush > 0) { S.pendPush--; try { history.pushState({ au: 1 }, ''); } catch { /* sandbox */ } } return; }
   S.hd = Math.max(0, (S.hd || 0) - 1);
+  if (GAL.open) return galClose(true);
   if (S.viewerOpen) return closeViewer();
   if ($('#modal').classList.contains('on')) {
     // উপ-শিট থেকে Back → আবার সেই বিস্তারিতে

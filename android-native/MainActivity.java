@@ -17,6 +17,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(AuGallery.class);   // অ্যাপের ভেতরের ছবির গ্যালারি
         super.onCreate(savedInstanceState);
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return;   // পুরোনো ফোনে adjustResize নিজেই কাজ করে
         final View root = findViewById(android.R.id.content);

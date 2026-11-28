@@ -61,7 +61,7 @@ jobs:
 
       - name: "Push notification plugin (শুধু GOOGLE_SERVICES_JSON সিক্রেট থাকলে, না থাকলে পুশ ছাড়াই বিল্ড)"
         if: env.HAS_FCM == 'true'
-        run: npm install --no-save @capacitor/push-notifications@^7.0.0
+        run: npm install @capacitor/push-notifications@^7.0.0   # package.json-এ যোগ হলে তবেই cap sync প্লাগইনটা চেনে
 
       - name: Create / sync Android project
         run: |

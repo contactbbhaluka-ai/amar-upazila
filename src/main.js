@@ -7953,7 +7953,7 @@ document.addEventListener('click', e => {
     openSheet(`<h2>থিম</h2><div class="seg3">${THEMES.map(([v, l]) => `<label><input type="radio" name="th" value="${v}" ${v === cur ? 'checked' : ''}>${esc(l)}</label>`).join('')}</div><button class="btn ghost wide" data-close style="margin-top:14px">ঠিক আছে</button>`);
     $('#sheet').onchange = ev => { local.set('theme', ev.target.value); applyTheme(); renderMenu(); };
   }
-  if (id === 'help') openSheet(`<h2>কোনো সমস্যা জানান</h2><p>অ্যাপে কোনো সমস্যা বা পরামর্শ থাকলে এই ইমেইলে লিখুন:</p><p><b>your-email@example.com</b></p><p class="mut">কোনো পোস্ট বা মানুষের বিরুদ্ধে অভিযোগ থাকলে সেই পোস্ট বা প্রোফাইলের ⋯ মেনু থেকে রিপোর্ট করুন।</p><button class="btn ghost wide" data-close>বন্ধ করুন</button>`);
+  if (id === 'help') openSheet(`<h2>কোনো সমস্যা জানান</h2><p>অ্যাপে কোনো সমস্যা বা পরামর্শ থাকলে এই ইমেইলে লিখুন:</p><p><a href="mailto:amarupazila-help@googlegroups.com"><b>amarupazila-help@googlegroups.com</b></a></p><p class="mut">কোনো পোস্ট বা মানুষের বিরুদ্ধে অভিযোগ থাকলে সেই পোস্ট বা প্রোফাইলের ⋯ মেনু থেকে রিপোর্ট করুন।</p><button class="btn ghost wide" data-close>বন্ধ করুন</button>`);
   if (id === 'about') openSheet(`<h2>আমার উপজেলা</h2><p>ভার্সন ১.০</p><p class="mut">উপজেলার মানুষকে যুক্ত রাখা আর সব সেবার তথ্য এক জায়গায় আনার জন্য তৈরি।</p><a class="link" href="./privacy.html">গোপনীয়তা নীতি</a><button class="btn ghost wide" data-close style="margin-top:10px">বন্ধ করুন</button>`);
 });
 

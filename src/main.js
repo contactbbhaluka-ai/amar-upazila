@@ -6753,9 +6753,24 @@ const isDark = () => { const t = local.get('theme', 'light'); return t ? t === '
 const FONT_SIZES = [['sm', 'ছোট', 0.92], ['md', 'মাঝারি', 1], ['lg', 'বড়', 1.12], ['xl', 'অনেক বড়', 1.25]];
 function applyFont() { const z = FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[2] || 1; document.body.style.zoom = z === 1 ? '' : String(z); document.documentElement.style.setProperty('--zoom', z); }
 applyFont();
+// বাংলা ফন্ট: অ্যাডমিন পুরো অ্যাপের ডিফল্ট ঠিক করেন, প্রত্যেকে চাইলে নিজের ফোনে আলাদা ফন্ট বাছাই করতে পারেন
+const FONTS = [
+  ['hind', 'হিন্দ শিলিগুড়ি', 'Hind Siliguri', '"Hind Siliguri","Noto Sans Bengali",system-ui,sans-serif', 'Hind+Siliguri:wght@400;600;700'],
+  ['noto', 'নোটো সান্স বাংলা', 'Noto Sans Bengali', '"Noto Sans Bengali",system-ui,sans-serif', 'Noto+Sans+Bengali:wght@400;600;700'],
+  ['system', 'ফোনের নিজস্ব ফন্ট', 'System', 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', ''],
+];
+const fontOf = k => FONTS.find(f => f[0] === k) || FONTS[0];
+const fontAdmin = () => fontOf(S.settings?.defaultFont || 'hind')[0];
+const fontCur = () => fontOf(local.get('fontfam', '') || fontAdmin())[0];
+function loadFontCss(k) {
+  const f = fontOf(k); if (!f[4] || document.querySelector(`link[data-font="${k}"]`) || k === 'hind') return;
+  const l = document.createElement('link'); l.rel = 'stylesheet'; l.dataset.font = k; l.href = `https://fonts.googleapis.com/css2?family=${f[4]}&display=swap`; document.head.appendChild(l);
+}
+function applyFontFam() { const k = fontCur(); loadFontCss(k); document.documentElement.style.setProperty('--font', fontOf(k)[3]); document.documentElement.dataset.font = k; }
+applyFontFam();
 // মেনুতে খোঁজা: শর্টকাট আর সেটিং দুটোই
 const MN_KEYS = { faq: 'faq help প্রশ্ন উত্তর সাহায্য কীভাবে', 'dark-tg': 'dark night mode theme ডার্ক রাত থিম মোড', 'lang-tg': 'language bhasha english bangla ভাষা ইংরেজি বাংলা', 'acc-un': 'username id ইউজারনেম আইডি', chpw: 'password পাসওয়ার্ড গোপন', edit: 'profile প্রোফাইল নাম ছবি এডিট', delacc: 'delete account মুছে অ্যাকাউন্ট', plock: 'lock লক', listpriv: 'privacy তালিকা বন্ধু ফলোয়ার', showact: 'active online সক্রিয় অনলাইন',
-  blocked: 'block ব্লক', ntset2: 'notification নোটিফিকেশন', msgsnd: 'sound শব্দ আওয়াজ', theme: 'dark light ডার্ক লাইট থিম রং', fontsz: 'font size লেখা অক্ষর বড় ছোট', help: 'help সমস্যা সাহায্য অভিযোগ', about: 'version ভার্সন সম্পর্কে',
+  blocked: 'block ব্লক', ntset2: 'notification নোটিফিকেশন', msgsnd: 'sound শব্দ আওয়াজ', theme: 'dark light ডার্ক লাইট থিম রং', fontsz: 'font size লেখা অক্ষর বড় ছোট', fontfam: 'font bangla বাংলা ফন্ট অক্ষর লেখার ধরন noto hind', help: 'help সমস্যা সাহায্য অভিযোগ', about: 'version ভার্সন সম্পর্কে',
   logout: 'logout লগআউট বের', 'demo-guide': 'demo ডেমো' };
 const MN_SC_KEYS = { mem: 'memory memories স্মৃতি এই দিনে আগের বছর', activity: 'activity log কার্যকলাপ লাইক মন্তব্য শেয়ার ইতিহাস', dir: 'হাসপাতাল ফার্মেসি ডাক্তার থানা service', blood: 'রক্ত ডোনার blood', sos: '৯৯৯ পুলিশ ফায়ার অ্যাম্বুলেন্স emergency', prayer: 'নামাজ আজান ওয়াক্ত আবহাওয়া বৃষ্টি weather', groups: 'group', pages: 'page দোকান ব্যবসা', saved: 'save সেভ', bday: 'birthday জন্মদিন', wallet: 'coin কয়েন ব্যাজ verify', insights: 'dashboard ড্যাশবোর্ড ভিউ' };
 function bindMenuSearch() {
@@ -6775,6 +6790,15 @@ function bindMenuSearch() {
 }
 document.addEventListener('click', e => {
   if (e.target.closest('#mn-dark')) { local.set('theme', isDark() ? 'light' : 'dark'); applyTheme(); renderMenu(); return; }
+  if (e.target.closest('#fontfam')) {
+    FONTS.forEach(f => loadFontCss(f[0]));
+    const draw = () => { const mine = local.get('fontfam', ''); return `<h2>বাংলা ফন্ট</h2><p class="mut">যেটা পড়তে সবচেয়ে আরাম লাগে সেটা বাছাই করুন। শুধু আপনার এই ফোনে বদলাবে।</p><div class="ff-list">
+      <button class="ff-opt${!mine ? ' on' : ''}" data-ff=""><span class="ff-s" style="font-family:${fontOf(fontAdmin())[3].replace(/"/g, "'")}">আমার উপজেলা, ভালুকার খবর ১২৩</span><b>অ্যাপের ডিফল্ট</b><small>এখন: ${esc(fontOf(fontAdmin())[1])}</small></button>
+      ${FONTS.map(([k, l, en, fam]) => `<button class="ff-opt${mine === k ? ' on' : ''}" data-ff="${k}"><span class="ff-s" style="font-family:${fam.replace(/"/g, "'")}">আমার উপজেলা, ভালুকার খবর ১২৩</span><b>${l}</b><small translate="no">${en}</small></button>`).join('')}</div><button class="btn ghost wide" data-close style="margin-top:10px">ঠিক আছে</button>`; };
+    openSheet(draw());
+    $('#sheet').onclick = ev => { const b = ev.target.closest('[data-ff]'); if (!b) return; local.set('fontfam', b.dataset.ff); applyFontFam(); $$('#sheet .ff-opt').forEach(x => x.classList.toggle('on', x === b)); renderMenu(); };
+    return;
+  }
   if (e.target.closest('#fontsz')) {
     const cur = local.get('fontsz', 'md');
     openSheet(`<h2>🔠 লেখার আকার</h2><p class="mut">পুরো অ্যাপের লেখা ও বাটন একসাথে বড় বা ছোট হবে।</p><div class="fs-list">${FONT_SIZES.map(([k, l, z]) => `<button class="fs-opt${k === cur ? ' on' : ''}" data-fs="${k}"><span style="font-size:${Math.round(16 * z)}px">আমার উপজেলা</span><b>${l}</b></button>`).join('')}</div><button class="btn ghost wide" data-close style="margin-top:10px">ঠিক আছে</button>`);
@@ -6848,8 +6872,9 @@ function renderMenu() {
     <details class="card"${u ? '' : ' hidden'}><summary>🔔 নোটিফিকেশন ও শব্দ</summary><div class="setlist">
       <button id="ntset2"><span class="set-ic">🔔</span>নোটিফিকেশন সেটিং</button>
       <button id="msgsnd"><span class="set-ic">🔊</span>শব্দ (মেসেজ ও নোটিফিকেশন)</button></div></details>
-    <details class="card"><summary>🔠 ${EN ? 'Font size' : 'ফন্ট সাইজ (Font size)'}</summary><div class="setlist">
-      <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button></div></details>
+    <details class="card"><summary>🔠 ${EN ? 'Font' : 'ফন্ট (Font)'}</summary><div class="setlist">
+      <button id="fontsz"><span class="set-ic">🔠</span>লেখার আকার<span class="val">${esc(FONT_SIZES.find(f => f[0] === local.get('fontsz', 'md'))?.[1] || 'মাঝারি')}</span></button>
+      <button id="fontfam"><span class="set-ic">✒️</span>বাংলা ফন্ট<span class="val">${esc(fontOf(fontCur())[1])}</span></button></div></details>
     <details class="card"><summary>❓ সাহায্য ও সহায়তা</summary><div class="setlist">
       ${S.api.demoLogin ? '<button id="demo-guide"><span class="set-ic">🧪</span>ডেমো চেকলিস্ট: কী কী দেখবেন</button><button id="demo-reset"><span class="set-ic">🔄</span>ডেমো প্রোফাইল নতুন করে সাজান</button>' : ''}
       <button id="faq"><span class="set-ic">💡</span>সাধারণ প্রশ্নোত্তর (FAQ)</button>
@@ -7402,6 +7427,8 @@ async function loadAdmin() {
           <input type="checkbox" id="set-${k}" data-flag="${k}" class="switch" role="switch" ${set[k] !== false ? 'checked' : ''}>
         </label>`).join('')}
       </div>
+      <div class="card"><b>অ্যাপের ডিফল্ট বাংলা ফন্ট</b><p class="mut" style="margin:2px 0 8px">অ্যাপ ও ওয়েবসাইটে সবার জন্য এই ফন্ট দেখাবে। কেউ সেটিং থেকে নিজের পছন্দের ফন্ট বাছাই করলে তার ফোনে সেটাই দেখাবে।</p>
+        <div class="ff-admin">${FONTS.map(([k, l, en, fam]) => `<label class="ff-a${(set.defaultFont || 'hind') === k ? ' on' : ''}"><input type="radio" name="deffont" value="${k}" data-deffont ${(set.defaultFont || 'hind') === k ? 'checked' : ''}><span style="font-family:${fam.replace(/"/g, "'")}">আমার উপজেলা</span><small>${l}</small></label>`).join('')}</div></div>
       <div class="card">
         <b>ঘোষণা</b><p class="mut" style="margin:2px 0 8px">লিখে সংরক্ষণ করলে সবার হোম পেইজের উপরে দেখাবে। মুছে সংরক্ষণ করলে সরে যাবে।</p>
         <textarea class="f" id="set-ann" rows="2" maxlength="300" placeholder="যেমন: আগামীকাল উপজেলা পরিষদে বিনামূল্যে রক্তদান কর্মসূচি">${esc(set.announcement || '')}</textarea>
@@ -7422,6 +7449,11 @@ async function loadAdmin() {
   } catch (e) { box.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
 }
 $('#admin').addEventListener('change', async e => {
+  if (e.target.matches?.('[data-deffont]')) {
+    const v = e.target.value, prev = S.settings.defaultFont || 'hind';
+    return busy(null, async () => { await S.api.setSetting('defaultFont', v); S.settings.defaultFont = v; settingsChanged(); document.querySelectorAll('.ff-a').forEach(x => x.classList.toggle('on', x.querySelector('input').value === v)); toast('ডিফল্ট ফন্ট বদলানো হয়েছে'); })
+      .catch(() => { S.settings.defaultFont = prev; const r = document.querySelector(`[data-deffont][value="${prev}"]`); if (r) r.checked = true; });
+  }
   const flag = e.target.dataset.flag;
   if (flag) {
     const on = e.target.checked;
@@ -8034,7 +8066,7 @@ function refreshGBtns() {
   const g = $('#gate [data-gate="signup"]'); if (g && !$('#gate [data-google]')) g.insertAdjacentHTML('afterend', gBtn('g-gate'));
   const or = $('#me .au-card .au-or'); if (or && $('#aform') && !$('#me [data-google]')) or.insertAdjacentHTML('afterend', gBtn('g-login'));
 }
-function settingsChanged() { refreshGBtns(); local.set('settings', S.settings); renderNotices(); if (S.view === 'menu') renderMenu(); checkForceUpdate(); }
+function settingsChanged() { refreshGBtns(); applyFontFam(); local.set('settings', S.settings); renderNotices(); if (S.view === 'menu') renderMenu(); checkForceUpdate(); }
 const hashStr = t => { let h = 0; for (const c of String(t)) h = (h * 31 + c.charCodeAt(0)) | 0; return String(h); };
 function renderNotices() {
   const box = $('#notices'); if (!box) return;

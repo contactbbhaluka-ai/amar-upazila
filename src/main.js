@@ -2746,7 +2746,7 @@ function openChatGroup(chatId, silent) { pushClear('g' + chatId); return openCon
 async function openConv(t, silent) {
   if (!silent) {
     $('#tform').hidden = false; $('#t-ro').hidden = true; VP.a.pause(); VP.id = null; VP.pct = 0;
-    S.th = { ...t }; S.threadId = t.kind === 'group' ? null : t.id; S.threadPage = t.pageId || null; S.reply = null; S.edit = null; S.tq = ''; $('#t-search').hidden = true; $('#t-mention').hidden = true; $('#t-top').innerHTML = ''; $('#v-thread').dataset.theme = '';
+    clearAtt?.(); S.th = { ...t }; S.threadId = t.kind === 'group' ? null : t.id; S.threadPage = t.pageId || null; S.reply = null; S.edit = null; S.tq = ''; $('#t-search').hidden = true; $('#t-mention').hidden = true; $('#t-top').innerHTML = ''; $('#v-thread').dataset.theme = '';
     open('thread'); $('#thread').innerHTML = '<div class="mut">লোড হচ্ছে…</div>'; $('#t-req').innerHTML = ''; setReplyBar(); $('#t-typing').hidden = true; $('#t-emoji').hidden = true;
     S.typingCh?.stop(); S.typingCh = null;
   }
@@ -3022,7 +3022,7 @@ function showTyping(p) {
 }
 // লিখলে: পাঠান বোতাম, বাঁয়ের ছবি-মাইক সরে লেখার জায়গা বড় হয় (Messenger-এর মতো); খালি থাকলে: দ্রুত রিয়্যাক্ট 👍
 function composeState() {
-  const has = !!$('#tmsg').value.trim() || !!S.edit;
+  const has = !!$('#tmsg').value.trim() || !!S.edit || !!S.att?.length;
   $('#t-send').hidden = !has; $('#t-like').hidden = has; $('#t-img').hidden = has; $('#t-mic').hidden = has;
   $('#tform').classList.toggle('typing', has); $('#t-like').textContent = qrx();
 }
@@ -3089,28 +3089,49 @@ async function sendNow(opts = {}, btn) {
     await openConv(th, true); if (opts.text == null) $('#tmsg').focus();
   });
 }
-$('#tform').addEventListener('submit', e => { e.preventDefault(); sendNow({}, $('#t-send')); });
+$('#tform').addEventListener('submit', async e => { e.preventDefault(); if (S.att.length && !S.edit) { const hasText = !!$('#tmsg').value.trim(); await sendAtt(); if (hasText) sendNow({}, $('#t-send')); return; } sendNow({}, $('#t-send')); });
 $('#t-img').addEventListener('click', () => { if (S.th?.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ছবি পাঠানো যায় না'); $('#t-file').click(); });
-$('#t-file').addEventListener('change', async e => {
-  let files = [...e.target.files].filter(f => f.type.startsWith('image/')); e.target.value = ''; if (!files.length) return;
-  if (files.length > 10) { toast('একসাথে সর্বোচ্চ ১০টি ছবি পাঠানো যায়, প্রথম ১০টি যাচ্ছে'); files = files.slice(0, 10); }
-  if (files.length === 1) { try { const blob = await compress(files[0], 1280, 0.75); await sendNow({ image: blob }, $('#t-img')); } catch (er) { toast(errText(er) || 'ছবিটি পাঠানো যায়নি'); } return; }
-  const th = S.th; if (!th) return;
+// ছবি বাছাই করলে সাথে সাথে যায় না: লেখার ঘরের উপরে ছোট ছবিগুলো দেখায়, পাঠান চাপলে যায় (Messenger-এর মতো)
+S.att = [];
+$('#t-file').addEventListener('change', e => {
+  const files = [...e.target.files].filter(f => f.type.startsWith('image/')); e.target.value = ''; if (!files.length) return;
+  const room = 10 - S.att.length;
+  if (files.length > room) toast('একসাথে সর্বোচ্চ ১০টি ছবি পাঠানো যায়');
+  files.slice(0, Math.max(0, room)).forEach(f => S.att.push({ f, url: URL.createObjectURL(f) }));
+  renderAtt(); composeState(); $('#tmsg').focus();
+});
+function renderAtt() {
+  const box = $('#t-att'); box.hidden = !S.att.length;
+  box.innerHTML = S.att.length ? S.att.map((a, i) => `<div class="att-it"><img src="${a.url}" alt=""><button type="button" class="att-x" data-attx="${i}" aria-label="ছবিটি বাদ দিন">${ic('close', 14)}</button></div>`).join('')
+    + (S.att.length < 10 ? `<button type="button" class="att-add" id="att-add" aria-label="আরও ছবি যোগ করুন">${ic('plus', 22)}</button>` : '') : '';
+}
+function clearAtt() { S.att.forEach(a => URL.revokeObjectURL(a.url)); S.att = []; renderAtt(); }
+$('#t-att').addEventListener('click', e => {
+  if (e.target.closest('#att-add')) return $('#t-file').click();
+  const x = e.target.closest('[data-attx]'); if (!x) return;
+  const [a] = S.att.splice(Number(x.dataset.attx), 1); if (a) URL.revokeObjectURL(a.url);
+  renderAtt(); composeState();
+});
+async function sendAtt() {
+  const th = S.th; if (!th || !S.att.length) return;
   if (th.shared?.disappear) return toast('অদৃশ্য মেসেজ চালু থাকলে ছবি পাঠানো যায় না');
-  const btn = $('#t-img'); btn.disabled = true; let sent = 0;
+  const list = S.att.slice(), btn = $('#t-send'); clearAtt(); composeState(); btn.disabled = true;
+  $('#t-att').hidden = false; $('#t-att').innerHTML = `<div class="att-busy">${list.map(a => `<img src="${a.url}" alt="">`).join('')}<span>পাঠানো হচ্ছে…</span></div>`;
+  let sent = 0;
   try {
-    for (const f of files) {
-      toast(`ছবি পাঠানো হচ্ছে ${bn(sent + 1)}/${bn(files.length)}…`);
-      const blob = await compress(f, 1280, 0.75);
+    for (const a of list) {
+      const blob = await compress(a.f, 1280, 0.75);
       await S.api.send(th, '', { image: blob, replyTo: sent === 0 ? S.reply?.id || null : null });
       sent++;
     }
-    toast(`${bn(sent)}টি ছবি পাঠানো হয়েছে`); playSound('send');
-  } catch (er) { toast(`${bn(sent)}টি গেছে, বাকিগুলো পাঠানো যায়নি: ${errText(er)}`); }
+    playSound('send');
+  } catch (er) { toast(sent ? `${bn(sent)}টি গেছে, বাকিগুলো পাঠানো যায়নি: ${errText(er)}` : (errText(er) || 'ছবি পাঠানো যায়নি')); }
+  list.forEach(a => URL.revokeObjectURL(a.url)); $('#t-att').hidden = true; $('#t-att').innerHTML = '';
   btn.disabled = false; S.reply = null; setReplyBar();
   if (th.request) { await S.api.convSet(th, { accepted: true }).catch(() => {}); th.request = false; }
   if (S.th === th) openConv(th, true);
-});
+}
+
 // ভয়েস মেসেজ (সর্বোচ্চ ২ মিনিট)
 let rec = null;
 $('#t-mic').addEventListener('click', async () => {
@@ -3355,8 +3376,9 @@ $('#t-mention').addEventListener('click', e => {
 // ➕ মেনু: স্টিকার, লোকেশন, পোল
 $('#t-plus').addEventListener('click', () => {
   const th = S.th; if (!th) return;
-  openSheet(`<div class="menu"><button data-act="stk">✨ স্টিকার পাঠান</button><button data-act="loc">📍 আমার লোকেশন পাঠান</button>
-    ${th.kind === 'group' ? '<button data-act="poll">📊 পোল (ভোট) তৈরি করুন</button>' : ''}<button data-act="img">🖼 ছবি পাঠান</button><button data-close>বন্ধ করুন</button></div>`);
+  const it = (act, icn, t, sub) => `<button class="pm-row" data-act="${act}"><span class="pm-ic">${ic(icn, 20)}</span><span class="pm-t"><b>${t}</b><small>${sub}</small></span></button>`;
+  openSheet(`<h2>পাঠান</h2><div class="nts-card pm-card">${it('img', 'photo', 'ছবি', 'গ্যালারি বা ক্যামেরা থেকে, একসাথে ১০টি পর্যন্ত')}${it('stk', 'star', 'স্টিকার', 'মজার অ্যানিমেটেড স্টিকার')}
+    ${it('loc', 'pin', 'লোকেশন', 'আপনি এখন কোথায় আছেন, ম্যাপে')}${th.kind === 'group' ? it('poll', 'poll', 'পোল', 'গ্রুপে ভোট নিন') : ''}${it('qrx', 'thumb', 'দ্রুত রিয়্যাক্ট', `এখন: ${qrx()} · বদলাতে চাপুন`)}</div>`);
   $('#sheet').onclick = ev => {
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
     closeSheet();
@@ -3364,6 +3386,7 @@ $('#t-plus').addEventListener('click', () => {
     if (a === 'img') return $('#t-img').click();
     if (a === 'loc') return sendLocation();
     if (a === 'poll') return pollSheet();
+    if (a === 'qrx') return setTimeout(qrxSheet, 250);
   };
 });
 async function sendLocation() {
@@ -8451,3 +8474,7 @@ if (window.__auBubble) window.auBubble(window.__auBubble);
     if (S.view === 'thread' && shrunk && document.activeElement?.id === 'tmsg') requestAnimationFrame(() => scrollTo({ top: document.documentElement.scrollHeight }));
   };
   (window.visualViewport || window).addEventListener('resize', onVV); }
+// লেখার ঘরের উচ্চতা (ছবির সারি, উত্তর, ইমোজি প্যানেল সহ) মেপে চ্যাটের নিচে ততটা জায়গা: শেষ মেসেজ কখনো ঢাকা পড়ে না
+{ const tc = document.querySelector('#v-thread .tcomp'), th = document.getElementById('thread');
+  if (tc && th && window.ResizeObserver) new ResizeObserver(() => { const atEnd = innerHeight + scrollY >= document.documentElement.scrollHeight - 40;
+    th.style.paddingBottom = (tc.offsetHeight + 12) + 'px'; if (atEnd && S.view === 'thread') scrollTo({ top: document.documentElement.scrollHeight }); }).observe(tc); }

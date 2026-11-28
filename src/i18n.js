@@ -145,6 +145,8 @@ const PLACES = {
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
   // লগইন ও সাইনআপ
+  "পাঠান": "Send", "ছবি": "Photo", "গ্যালারি বা ক্যামেরা থেকে, একসাথে ১০টি পর্যন্ত": "From gallery or camera, up to 10 at once", "স্টিকার": "Sticker", "মজার অ্যানিমেটেড স্টিকার": "Fun animated stickers",
+  "লোকেশন": "Location", "আপনি এখন কোথায় আছেন, ম্যাপে": "Where you are now, on a map", "পোল": "Poll", "গ্রুপে ভোট নিন": "Take a vote in the group", "পাঠানো হচ্ছে…": "Sending…", "একসাথে সর্বোচ্চ ১০টি ছবি পাঠানো যায়": "You can send up to 10 photos at once",
   "দ্রুত রিয়্যাক্ট": "Quick reaction", "লেখার ঘর খালি থাকলে এই ইমোজি এক চাপে পাঠানো যায়": "When the message box is empty, send this emoji with one tap", "দ্রুত রিয়্যাক্ট: {n}": "Quick reaction: {n}",
   "শব্দ": "Sounds", "অ্যাপ খোলা থাকলে মেসেজ ও নোটিফিকেশনের শব্দ": "Message and notification sounds while the app is open", "সব শব্দ": "All sounds", "চালু আছে": "On", "সব শব্দ বন্ধ": "All sounds off",
   "কখন শব্দ হবে": "When to play a sound", "মেসেজ পাঠালে": "When you send a message", "খোলা চ্যাটে মেসেজ এলে": "New message in the open chat", "নতুন মেসেজ এলে": "New message",

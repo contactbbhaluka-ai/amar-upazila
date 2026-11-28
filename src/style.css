@@ -2848,3 +2848,13 @@ body.bubble { --hh: 0px; }
 .gal-perm h3{margin:4px 0}
 .gal-perm p{font-size:13.5px}
 .gal-perm-s{color:var(--red,#c0392b)!important}
+
+/* মেসেজ: চেপে ধরলে অপশন; লেখা সিলেক্ট/কপি মেনু আসে না (কপি অপশন মেনুতে আছে) */
+#thread .bub{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#thread .bub.lp-hold{transform:scale(.96);transition:transform .45s ease}
+.mx-sheet,.mx-sheet *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.mx-sheet .pm-card{margin-top:10px}
+.mx-row{padding:9px 12px}
+.mx-row .pm-ic{width:36px;height:36px}
+.mx-row.danger .pm-ic{background:#fdecea;color:#d93025}
+.mx-row.danger b{color:#d93025}

@@ -145,6 +145,9 @@ const PLACES = {
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
   // লগইন ও সাইনআপ
+  "এডিট করুন": "Edit", "পাঠানোর ১৫ মিনিটের মধ্যে": "Within 15 minutes of sending", "লেখা কপি করুন": "Copy text", "ফরওয়ার্ড করুন": "Forward", "পিন করুন": "Pin", "পিন সরান": "Unpin",
+  "চ্যাটের সবাই উপরে দেখবেন": "Everyone in the chat sees it at the top", "সেভ করুন": "Save", "সেভ থেকে সরান": "Remove from saved", "শুধু আপনি দেখবেন": "Only you will see it",
+  "সবার জন্য মুছে ফেলুন": "Unsend for everyone", "শুধু আমার জন্য মুছুন": "Delete for me",
   "সব ছবি": "All photos", "ক্যামেরা": "Camera", "{x}টি ছবি বাছাই করা": "{x} photos selected", "ছবি দেখাতে অনুমতি দিন": "Allow access to photos", "অনুমতি দিন": "Allow",
   "ফাইল থেকে ছবি বাছুন": "Pick from files", "এখানে কোনো ছবি নেই": "No photos here", "তৈরি হচ্ছে…": "Preparing…", "আপনি কিছু ছবির অনুমতি দিয়েছেন": "You allowed some photos", "আরও ছবি বাছুন": "Pick more photos",
   "পাঠান": "Send", "ছবি": "Photo", "গ্যালারি বা ক্যামেরা থেকে, একসাথে ১০টি পর্যন্ত": "From gallery or camera, up to 10 at once", "স্টিকার": "Sticker", "মজার অ্যানিমেটেড স্টিকার": "Fun animated stickers",

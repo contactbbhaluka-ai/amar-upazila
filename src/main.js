@@ -2924,10 +2924,26 @@ $('#thread').addEventListener('click', e => {
   const id = (rxb || b)?.dataset.mrx || (rxb || b)?.dataset.mid; if (!id) return;
   const m = (S.th?.msgs || []).find(x => String(x.id) === String(id)); if (!m) return;
   if (rxb) return msgActions(m);
-  // দুবার চাপলে ❤️, একবার চাপলে অপশন
+  // দুবার চাপলে ❤️; অপশন আসে চেপে ধরলে (Messenger-এর মতো)
+  if (S.lpAt && Date.now() - S.lpAt < 600) return;
   if (tapId === id && tapT) { clearTimeout(tapT); tapT = null; tapId = null; return quickHeart(m, b); }
-  clearTimeout(tapT); tapId = id; tapT = setTimeout(() => { tapT = null; tapId = null; msgActions(m); }, 260);
+  clearTimeout(tapT); tapId = id; tapT = setTimeout(() => { tapT = null; tapId = null; }, 300);
 });
+// চেপে ধরে রাখা (০.৪৫ সেকেন্ড): মেসেজটা একটু ছোট হয়ে কাঁপে, তারপর অপশন
+{
+  let lp = null;
+  const cancel = () => { if (!lp) return; clearTimeout(lp.t); lp.el.classList.remove('lp-hold'); lp = null; };
+  $('#thread').addEventListener('pointerdown', e => {
+    if (e.button > 0) return;
+    const b = e.target.closest('[data-mid]'); if (!b || e.target.closest('[data-vplay], [data-vseek], [data-pvote], a')) return;
+    const m = (S.th?.msgs || []).find(x => String(x.id) === b.dataset.mid); if (!m) return;
+    cancel(); b.classList.add('lp-hold');
+    lp = { el: b, x: e.clientX, y: e.clientY, t: setTimeout(() => { const el = lp?.el; lp = null; if (!el) return; el.classList.remove('lp-hold'); S.lpAt = Date.now(); navigator.vibrate?.(18); clearTimeout(tapT); tapT = null; msgActions(m); }, 450) };
+  });
+  $('#thread').addEventListener('pointermove', e => { if (lp && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 10) cancel(); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('#thread').addEventListener(ev, cancel));
+  addEventListener('scroll', cancel, { passive: true });
+}
 let tapT = null, tapId = null;
 // সোয়াইপ করে উত্তর: মেসেজ ডানে টানলে সেটার উত্তর দেওয়া শুরু হয় (মেসেঞ্জার/হোয়াটসঅ্যাপের মতো)
 {
@@ -2965,7 +2981,7 @@ let tapT = null, tapId = null;
 $('#thread').addEventListener('contextmenu', e => {
   const b = e.target.closest('[data-mid]'); if (!b) return;
   const m = (S.th?.msgs || []).find(x => String(x.id) === b.dataset.mid); if (!m) return;
-  e.preventDefault(); clearTimeout(tapT); tapT = null; msgActions(m);
+  e.preventDefault(); if (S.lpAt && Date.now() - S.lpAt < 900) return; clearTimeout(tapT); tapT = null; msgActions(m);
 });
 function quickHeart(m, el) {
   if (m.deleted) return;
@@ -2976,16 +2992,17 @@ function quickHeart(m, el) {
 }
 function msgActions(m) {
   const canRx = !m.deleted;
-  openSheet(`${canRx ? `<div class="mx-rx">${MSG_RX.map(e => `<button data-mx="${e}" class="${m.myReaction === e ? 'on' : ''}" aria-label="${e}">${e}</button>`).join('')}</div>` : ''}
-    <div class="menu">${m.deleted ? '' : `<button data-act="reply">${ic('reply', 18)} উত্তর দিন</button>`}
-      ${m.mine && !m.deleted && m.body && !m.poll && Date.now() - new Date(m.createdAt) < 15 * 6e4 ? '<button data-act="edit">✏️ এডিট করুন <small class="mut">(১৫ মিনিটের মধ্যে)</small></button>' : ''}
-      ${!m.deleted && !m.poll ? '<button data-act="fwd">↪ ফরওয়ার্ড করুন</button>' : ''}
-      ${!m.deleted ? `<button data-act="pin">📌 ${m.pinnedAt ? 'পিন সরান' : 'পিন করুন (সবাই উপরে দেখবেন)'}</button>` : ''}
-      ${!m.deleted ? `<button data-act="save">🔖 ${m.saved ? 'সেভ থেকে সরান' : 'সেভ করুন (শুধু আপনি দেখবেন)'}</button>` : ''}
-      ${m.body && !m.deleted ? `<button data-act="copy">${ic('link', 18)} লেখা কপি করুন</button>` : ''}
-      ${m.mine && !m.deleted && !S.th.asPage ? `<button data-act="unsend" class="danger">${ic('trash', 18)} সবার জন্য মুছে ফেলুন</button>` : ''}
-      <button data-act="hide">${ic('trash', 18)} শুধু আমার জন্য মুছুন</button>
-      <button data-close>বন্ধ করুন</button></div>`);
+  const row = (act, icn, t, extra = '', cls = '') => `<button class="pm-row mx-row${cls}" data-act="${act}"><span class="pm-ic">${ic(icn, 19)}</span><span class="pm-t"><b>${t}</b>${extra ? `<small>${extra}</small>` : ''}</span></button>`;
+  const canEdit = m.mine && !m.deleted && m.body && !m.poll && Date.now() - new Date(m.createdAt) < 15 * 6e4;
+  openSheet(`<div class="mx-sheet">${canRx ? `<div class="mx-rx">${MSG_RX.map(e => `<button data-mx="${e}" class="${m.myReaction === e ? 'on' : ''}" aria-label="${e}">${e}</button>`).join('')}</div>` : ''}
+    <div class="nts-card pm-card">${m.deleted ? '' : row('reply', 'reply', 'উত্তর দিন')}
+      ${canEdit ? row('edit', 'edit', 'এডিট করুন', 'পাঠানোর ১৫ মিনিটের মধ্যে') : ''}
+      ${m.body && !m.deleted ? row('copy', 'doc', 'লেখা কপি করুন') : ''}
+      ${!m.deleted && !m.poll ? row('fwd', 'share', 'ফরওয়ার্ড করুন') : ''}
+      ${!m.deleted ? row('pin', 'pushpin', m.pinnedAt ? 'পিন সরান' : 'পিন করুন', m.pinnedAt ? '' : 'চ্যাটের সবাই উপরে দেখবেন') : ''}
+      ${!m.deleted ? row('save', 'bookmark', m.saved ? 'সেভ থেকে সরান' : 'সেভ করুন', m.saved ? '' : 'শুধু আপনি দেখবেন') : ''}</div>
+    <div class="nts-card pm-card mx-del">${m.mine && !m.deleted && !S.th.asPage ? row('unsend', 'trash', 'সবার জন্য মুছে ফেলুন', '', ' danger') : ''}
+      ${row('hide', 'eyeOff', 'শুধু আমার জন্য মুছুন')}</div></div>`);
   $('#sheet').onclick = async ev => {
     const rx = ev.target.closest('[data-mx]');
     if (rx) { closeSheet(); if (m.myReaction !== rx.dataset.mx) { playSound('react'); S.myRxAt = Date.now(); } return busy(null, async () => { await S.api.reactMessage(m.id, m.myReaction === rx.dataset.mx ? null : rx.dataset.mx); openConv(S.th, true); }); }

@@ -13,6 +13,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # ফোনে সরাসরি নামানোর লিংক (GitHub Release) বানাতে
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
       HAS_FCM: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
@@ -176,6 +178,17 @@ jobs:
         with:
           name: app-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      # ফোন থেকে এক চাপে নামানোর স্থায়ী লিংক (zip নয়, সরাসরি .apk):
+      # https://github.com/<owner>/<repo>/releases/download/test-apk/amar-upazila-test.apk
+      - name: "Test APK download link (ফোনে সরাসরি নামানোর লিংক)"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk amar-upazila-test.apk
+          gh release view test-apk >/dev/null 2>&1 || gh release create test-apk --prerelease --title "পরীক্ষার APK (সর্বশেষ)" --notes "প্রতিটি Android build-এর পর এখানে নতুন APK আসে। ফোনে নামিয়ে ইনস্টল করুন।"
+          gh release upload test-apk amar-upazila-test.apk --clobber
+          gh release edit test-apk --notes "সর্বশেষ বিল্ড: 1.0.${{ github.run_number }} ($(date -u +'%Y-%m-%d %H:%M') UTC)। ফোনে নামিয়ে ইনস্টল করুন।"
 
       - uses: actions/upload-artifact@v4
         if: env.HAS_KEYSTORE == 'true'

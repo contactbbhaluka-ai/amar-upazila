@@ -2874,3 +2874,15 @@ body.bubble { --hh: 0px; }
 
 .cs-head .ent-av{width:76px;height:76px;font-size:30px}
 .cs-sub{margin:0;font-size:13px}
+#tform button,.t-like{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+/* ইমোজি প্যানেল: ভাগে ভাগে, স্ক্রল */
+.emo-scroll{max-height:230px;overflow-y:auto;overscroll-behavior:contain;padding-bottom:4px}
+.emo-h{margin:8px 2px 2px;font-size:12px;font-weight:600;color:var(--mut)}
+.emo-h:first-child{margin-top:2px}
+.t-emoji .emo-tabs{overflow-x:auto;scrollbar-width:none}
+.t-emoji .emo-tabs button{flex:none}
+.qrx-all{max-height:60vh;overflow-y:auto}
+.qrx-all .emo-grid button{font-size:26px;height:44px;border:0;background:none;border-radius:10px;cursor:pointer}
+.qrx-all .emo-grid button.on{background:var(--g2)}
+.qrx-more{display:grid;place-items:center;color:var(--g)!important;border-style:dashed!important}

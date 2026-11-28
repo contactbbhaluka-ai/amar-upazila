@@ -145,6 +145,7 @@ const PLACES = {
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
   // লগইন ও সাইনআপ
+  "মুখ": "Faces", "হাত": "Hands", "ভালোবাসা": "Love", "মানুষ": "People", "খাবার": "Food", "প্রকৃতি": "Nature", "উৎসব": "Celebration", "জিনিস": "Objects", "চিহ্ন": "Symbols", "ভালুকার ভাষা": "Bhaluka dialect",
   "পেইজ": "Page", "{n} পেইজের গ্রাহক": "Customer of {n}",
   "গ্যালারিতে সেভ": "Save to gallery", "গ্যালারিতে সেভ হয়েছে": "Saved to gallery", "সেভ হচ্ছে…": "Saving…", "সেভ করা যায়নি": "Couldn't save", "সেভ করতে ফোনের অনুমতি দিন": "Allow phone permission to save", "ছবিটি এখনো লোড হয়নি": "The photo hasn't loaded yet",
   "প্রোফাইল": "Profile", "মিউট": "Mute", "আনমিউট": "Unmute", "খুঁজুন": "Search", "কাস্টমাইজ": "Customize", "থিম": "Theme", "ডাকনাম": "Nicknames", "অদৃশ্য মেসেজ": "Disappearing messages",

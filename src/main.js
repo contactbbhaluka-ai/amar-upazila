@@ -2741,7 +2741,19 @@ const sameT = (a, b) => a.kind === b.kind && String(a.id) === String(b.id) && (a
 function afterConvChange() { if (S.view === 'msgs') loadConvs(); else if (S.view === 'thread' && S.th) openConv(S.th, true); refreshBadges(); }
 
 // ================================================================ মেসেজ: চ্যাট
-const EMOJIS = ['😀', '😂', '🥰', '😍', '😊', '😉', '😎', '🤔', '😢', '😭', '😡', '😮', '🙏', '👍', '👎', '👏', '💪', '❤️', '💚', '🔥', '🎉', '✅', '❌', '🌸', '☕', '🍚', '⚽', '🏏', '🤲', '🕌', '🇧🇩', '😴'];
+// ইমোজি: ভাগে ভাগে (মেসেজের ইমোজি প্যানেল ও দ্রুত রিয়্যাক্ট বাছাই)
+const EMO_GROUPS = [
+  ['মুখ', '😀 😃 😄 😁 😆 😅 🤣 😂 🙂 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😋 😛 😜 🤪 😝 🤗 🤭 🤫 🤔 🤐 🤨 😐 😑 😶 😏 😒 🙄 😬 😮‍💨 🤥 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 🥴 😵 😵‍💫 🤯 🤠 🥳 🥸 😎 🤓 🧐 😕 😟 🙁 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 💀 🤡 👻 👽 🤖 💩 🙈 🙉 🙊'],
+  ['হাত', '👍 👎 👏 🙌 👐 🤲 🙏 🤝 👋 🤚 ✋ 🖐️ 👌 🤌 🤏 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ ✊ 👊 🤛 🤜 💪 ✍️ 🤳 💅 👀 🧠 🫀'],
+  ['ভালোবাসা', '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❤️‍🔥 ❤️‍🩹 💕 💞 💓 💗 💖 💘 💝 💟 💌 💋 🌹 🥀 💐'],
+  ['মানুষ', '👶 🧒 👦 👧 🧑 👨 👩 🧓 👴 👵 👨‍🌾 👩‍🌾 👨‍🍳 👩‍🍳 👨‍🎓 👩‍🎓 👨‍🏫 👩‍🏫 👨‍⚕️ 👩‍⚕️ 👮 🧕 👳 🤵 👰 🤰 🧑‍🤝‍🧑 👪 🏃 🚶 🧎 🤷 🙋 🙆 🙅 🤦 💁 🙇'],
+  ['খাবার', '🍚 🍛 🍜 🍲 🥘 🍗 🍖 🥩 🐟 🦐 🥚 🍳 🍞 🥖 🫓 🍕 🍔 🌭 🍟 🥗 🍰 🎂 🧁 🍩 🍪 🍫 🍬 🍭 🍯 🥛 ☕ 🍵 🧃 🥤 🍉 🍌 🥭 🍍 🍎 🍊 🍋 🍇 🍓 🥥 🌶️ 🧅 🥔 🍆 🥕 🌽'],
+  ['প্রকৃতি', '🌞 🌝 🌙 ⭐ 🌟 ✨ ⚡ 🔥 🌈 ☁️ 🌧️ ⛈️ 🌩️ ❄️ 💧 🌊 🌸 🌺 🌻 🌼 🌷 🌱 🌿 🍀 🍃 🍂 🌳 🌴 🌾 🐄 🐐 🐓 🐔 🦆 🐟 🐈 🐕 🐦 🦋 🐝 🐘 🐅'],
+  ['উৎসব', '🎉 🎊 🎈 🎁 🎂 🕯️ 🪔 🎆 🎇 🏆 🥇 🎖️ 🇧🇩 🕌 🕋 📿 🤲 🌙 ⭐ 🛕 ⛪ 🎓 💍 💒'],
+  ['জিনিস', '📱 📞 ☎️ 💻 📷 📸 🎥 📺 📻 🎧 🎤 🎵 🎶 📖 📚 ✏️ 📝 📌 📍 📅 ⏰ ⌛ 💡 🔑 🔒 🏠 🏡 🏫 🏥 🏪 🏦 🛺 🚗 🚌 🚲 🏍️ 🚂 ✈️ ⛵ 💰 💵 💸 🎒 👕 👗 🥻 ⚽ 🏏 🏸 🎮'],
+  ['চিহ্ন', '✅ ☑️ ✔️ ❌ ❎ ⭕ 🚫 ⚠️ ❗ ❓ ‼️ ⁉️ 💯 🆗 🆕 🔴 🟢 🔵 🟡 ⚫ ⚪ ➡️ ⬅️ ⬆️ ⬇️ 🔁 🔄 ♻️ ⏩ 💤 💢 💥 💫 💦 💨 🕐'],
+].map(([n, l]) => [n, l.split(' ')]);
+const EMOJIS = EMO_GROUPS.flatMap(g => g[1]);
 const MSG_RX = ['❤️', '😂', '😮', '😢', '😡', '👍'];
 function dayLabel(d) {
   const p = dhakaParts(d), t = dhakaParts(new Date()), y = dhakaParts(new Date(Date.now() - 864e5));
@@ -3069,10 +3081,14 @@ const qrx = () => local.get('qrx', '👍');
     sendNow({ text: qrx() }, null);
   });
 }
-function qrxSheet() {
-  openSheet(`<h2>দ্রুত রিয়্যাক্ট</h2><p class="mut nts-sub">লেখার ঘর খালি থাকলে এই ইমোজি এক চাপে পাঠানো যায়</p>
-    <div class="qrx-grid">${QRX.map(e => `<button type="button" class="${e === qrx() ? 'on' : ''}" data-qrx="${e}">${e}</button>`).join('')}</div>`);
-  $('#sheet').onclick = e => { const b = e.target.closest('[data-qrx]'); if (!b) return; local.set('qrx', b.dataset.qrx); closeSheet(); composeState(); toast(`দ্রুত রিয়্যাক্ট: ${b.dataset.qrx}`); };
+function qrxSheet(all) {
+  const cur = qrx(), base = QRX.includes(cur) ? QRX : [cur, ...QRX.slice(0, 7)];
+  openSheet(all ? `<h2>দ্রুত রিয়্যাক্ট</h2><div class="emo-scroll qrx-all">${EMO_GROUPS.map(([n, l]) => `<h4 class="emo-h">${n}</h4><div class="emo-grid">${l.map(e => `<button type="button" class="${e === cur ? 'on' : ''}" data-qrx="${e}">${e}</button>`).join('')}</div>`).join('')}</div>`
+    : `<h2>দ্রুত রিয়্যাক্ট</h2><div class="qrx-grid">${base.map(e => `<button type="button" class="${e === cur ? 'on' : ''}" data-qrx="${e}">${e}</button>`).join('')}<button type="button" class="qrx-more" data-qrxall aria-label="আরও ইমোজি">${ic('plus', 26)}</button></div>`);
+  $('#sheet').onclick = e => {
+    if (e.target.closest('[data-qrxall]')) return qrxSheet(true);
+    const b = e.target.closest('[data-qrx]'); if (!b) return; local.set('qrx', b.dataset.qrx); closeSheet(); composeState();
+  };
 }
 $('#tmsg').addEventListener('input', () => {
   composeState(); mentionSuggest();
@@ -3081,9 +3097,10 @@ $('#tmsg').addEventListener('input', () => {
 // ইমোজি
 function emojiPanel(tab) {
   const p = $('#t-emoji'); S.emoTab = tab;
-  p.innerHTML = `<div class="emo-tabs"><button type="button" data-emotab="emo" class="${tab === 'emo' ? 'on' : ''}">😊 ইমোজি</button><button type="button" data-emotab="stk" class="${tab === 'stk' ? 'on' : ''}">✨ স্টিকার</button></div>`
-    + (tab === 'stk' ? `<div class="stk-grid">${Object.keys(STICKERS).map(k => `<button type="button" data-stk="${k}" aria-label="${esc(STICKERS[k][1])}">${stickerHtml(k)}</button>`).join('')}</div>`
-      : `<div class="emo-grid">${EMOJIS.map(e => `<button type="button" data-emo="${e}">${e}</button>`).join('')}</div>`);
+  p.innerHTML = `<div class="emo-tabs"><button type="button" data-emotab="emo" class="${tab === 'emo' ? 'on' : ''}">😊 ইমোজি</button><button type="button" data-emotab="stk" class="${tab === 'stk' ? 'on' : ''}">✨ স্টিকার</button><button type="button" data-emotab="bh" class="${tab === 'bh' ? 'on' : ''}">🗣 ভালুকার ভাষা</button></div>`
+    + (tab === 'stk' ? `<div class="stk-grid">${Object.keys(STICKERS).filter(k => !k.startsWith('bh_')).map(k => `<button type="button" data-stk="${k}" aria-label="${esc(STICKERS[k][1])}">${stickerHtml(k)}</button>`).join('')}</div>`
+      : tab === 'bh' ? `<div class="stk-grid">${Object.keys(STICKERS).filter(k => k.startsWith('bh_')).map(k => `<button type="button" data-stk="${k}" aria-label="${esc(STICKERS[k][1])}">${stickerHtml(k)}</button>`).join('')}</div>`
+      : `<div class="emo-scroll">${EMO_GROUPS.map(([n, l]) => `<h4 class="emo-h">${n}</h4><div class="emo-grid">${l.map(e => `<button type="button" data-emo="${e}">${e}</button>`).join('')}</div>`).join('')}</div>`);
   p.hidden = false;
 }
 $('#t-emo').addEventListener('click', () => { if ($('#t-emoji').hidden) emojiPanel(S.emoTab || 'emo'); else $('#t-emoji').hidden = true; });
@@ -3366,6 +3383,12 @@ const STICKERS = {
   alhamdu: ['✨', 'আলহামদুলিল্লাহ'], morning: ['🌅', 'শুভ সকাল'], night: ['🌙', 'শুভ রাত্রি'], bday: ['🎂', 'শুভ জন্মদিন'],
   tea: ['☕', 'চা খাবেন?'], coming: ['🏃', 'আসছি!'], wait: ['⏳', 'একটু অপেক্ষা'], sad: ['😢', 'মন খারাপ'],
   wow: ['😮', 'বাহ!'], call: ['📞', 'ফোন দিও'], busy: ['📵', 'এখন ব্যস্ত'], miss: ['🥺', 'মিস করছি'],
+  // ভালুকা, ময়মনসিংহের আঞ্চলিক ভাষা
+  bh_kemun: ['🙂', 'কেমুন আছুইন?'], bh_bhat: ['🍚', 'ভাত খাইছুইন?'], bh_ohon: ['🏃', 'অহন আইতাছি'], bh_khara: ['✋', 'একটু খাড়ান'],
+  bh_hacha: ['🤞', 'হাছা কইতাছি'], bh_dhong: ['😒', 'ঢং কইরো না'], bh_matha: ['🤯', 'মাথা নষ্ট!'], bh_bachaise: ['😮‍💨', 'আল্লায় বাঁচাইছে'],
+  bh_fao: ['🙄', 'ফাও কথা কইও না'], bh_cha: ['☕', 'চা খাইবা নি?'], bh_barit: ['🏡', 'বাড়িত আইয়ো'], bh_jobbor: ['👌', 'জব্বর হইছে!'],
+  bh_ghum: ['😴', 'ঘুমাই গেলাম'], bh_teka: ['💸', 'টেহা নাই'], bh_hudai: ['🤷', 'হুদাই'], bh_mon: ['🫂', 'মন খারাপ কইরো না'],
+  bh_pore: ['📵', 'অহন ব্যস্ত, পরে কতা কমু'], bh_ki: ['😲', 'কী কও!'], bh_bekke: ['🤗', 'বেক্কে ভালা থাইকো'], bh_shoroil: ['🤣', 'হাসতে হাসতে শেষ!'],
 };
 const stickerHtml = k => { const [e, t] = STICKERS[k] || ['✨', '']; return `<span class="stk stk-${Object.keys(STICKERS).indexOf(k) % 6}"><i>${e}</i><b>${esc(t)}</b></span>`; };
 const nickOf = (id, name) => S.th?.shared?.nicknames?.[id] || name;
@@ -3555,7 +3578,7 @@ $('#t-plus').addEventListener('click', () => {
   const th = S.th; if (!th) return;
   const it = (act, icn, t) => `<button class="pm-row mx-row" data-act="${act}"><span class="pm-ic">${ic(icn, 19)}</span><span class="pm-t"><b>${t}</b></span></button>`;
   openSheet(`<h2>পাঠান</h2><div class="nts-card pm-card">${it('img', 'photo', 'ছবি')}${it('stk', 'star', 'স্টিকার')}
-    ${it('loc', 'pin', 'লোকেশন')}${th.kind === 'group' ? it('poll', 'poll', 'পোল') : ''}${it('qrx', 'thumb', `দ্রুত রিয়্যাক্ট ${qrx()}`)}</div>`);
+    ${it('loc', 'pin', 'লোকেশন')}${th.kind === 'group' ? it('poll', 'poll', 'পোল') : ''}</div>`);
   $('#sheet').onclick = ev => {
     const a = ev.target.closest('[data-act]')?.dataset.act; if (!a) return;
     closeSheet();
@@ -3563,7 +3586,6 @@ $('#t-plus').addEventListener('click', () => {
     if (a === 'img') return $('#t-img').click();
     if (a === 'loc') return sendLocation();
     if (a === 'poll') return pollSheet();
-    if (a === 'qrx') return setTimeout(qrxSheet, 250);
   };
 });
 async function sendLocation() {

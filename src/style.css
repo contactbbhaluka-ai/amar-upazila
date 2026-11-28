@@ -2891,7 +2891,7 @@ body.bubble { --hh: 0px; }
 
 /* ================================================================ ডেস্কটপ (বড় পর্দা) */
 .desk-side{display:none}
-@media (min-width:1100px){
+@media (min-width:960px){
   :root{--dkw:300px}
   .app{max-width:none;padding-bottom:24px}
   /* উপরের এক সারির হেডার: বাঁয়ে নাম, মাঝে ট্যাব, ডানে সার্চ ও মেনু */
@@ -2929,13 +2929,20 @@ body.bubble { --hh: 0px; }
   .dk-foot{font-size:12px;color:var(--mut);margin:14px 10px 0}
   .dk-empty{padding:6px 10px;font-size:13px}
 }
-@media (min-width:1100px) and (max-width:1279px){:root{--dkw:260px}}
+/* মাঝারি পর্দা (ছোট ল্যাপটপ, মোবাইল ব্রাউজারের "ডেস্কটপ সাইট" মোড ~৯৮০px): শুধু বাঁ পাশ, ফিড তার ডানে */
+@media (min-width:960px) and (max-width:1279px){
+  :root{--dkw:240px;--dcw:300px}
+  html.desk body:has(#v-home.on) .desk-r{display:none!important}
+  html.desk body:has(#v-home.on) main{margin:0 auto 0 calc(var(--dkw) + 12px);max-width:min(680px,calc(100vw - var(--dkw) - 24px))}
+  header .topbar .title{flex-basis:200px}
+  header nav.tabs{width:min(520px,50vw)}
+}
 
-@media (min-width:1100px){
+@media (min-width:960px){
   html.desk body:has(#v-thread.on) .desk-c{display:block}
-  .desk-c{left:0;width:340px;background:var(--card);border-right:1px solid var(--line);padding:10px 8px}
-  html.desk body:has(#v-thread.on) main{margin-left:max(340px,calc(50% - 340px))}
-  html.desk body:has(#v-thread.on) #v-thread .tcomp{left:max(340px,calc(50% - 340px))!important;transform:none}
+  .desk-c{left:0;width:var(--dcw,340px);background:var(--card);border-right:1px solid var(--line);padding:10px 8px}
+  html.desk body:has(#v-thread.on) main{margin-left:max(calc(var(--dcw,340px) + 12px),calc(50% - 340px));max-width:min(680px,calc(100vw - var(--dcw,340px) - 24px))}
+  html.desk body:has(#v-thread.on) #v-thread .tcomp{left:max(calc(var(--dcw,340px) + 12px),calc(50% - 340px))!important;transform:none;width:min(680px,calc(100vw - var(--dcw,340px) - 24px))}
   .dk-title{margin:4px 10px 10px;font-size:22px}
   .dk-cv{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:8px 10px;border-radius:10px;text-align:left;cursor:pointer;font:inherit;color:var(--ink);position:relative}
   .dk-cv:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}

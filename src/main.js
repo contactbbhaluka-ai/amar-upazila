@@ -8687,7 +8687,7 @@ if (window.__auBubble) window.auBubble(window.__auBubble);
     th.style.paddingBottom = (tc.offsetHeight + 12) + 'px'; if (atEnd && S.view === 'thread') scrollTo({ top: document.documentElement.scrollHeight }); }).observe(tc); }
 
 // ================================================================ ডেস্কটপ (বড় পর্দা): Facebook-এর মতো বাঁয়ে শর্টকাট, মাঝে ফিড, ডানে যোগাযোগ
-const DESK = matchMedia('(min-width: 1100px)');
+const DESK = matchMedia('(min-width: 960px)');   // মোবাইল ব্রাউজারের "ডেস্কটপ সাইট" মোডেও (~৯৮০px)
 function deskEls() {
   if ($('#desk-l')) return;
   document.body.insertAdjacentHTML('beforeend', '<aside class="desk-side desk-l" id="desk-l" aria-label="শর্টকাট"></aside><aside class="desk-side desk-r" id="desk-r" aria-label="যোগাযোগ"></aside><aside class="desk-side desk-c" id="desk-c" aria-label="চ্যাট"></aside>');

@@ -5448,7 +5448,7 @@ async function svcCardImage(s) {
   try { await document.fonts?.ready; } catch { /* থাক */ }
   const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const ctx = cv.getContext('2d'), person = s.category === 'famous', col = svcColor(s.category) || '#0a6b4f';
-  const F = (w, px) => `${w} ${px}px "Hind Siliguri","Noto Sans Bengali",sans-serif`;
+  const F = (w, px) => `${w} ${px}px "Noto Sans Bengali",sans-serif`;
   const img = await loadImgSafe(s.image_url || s.images?.[0]);
   const cover = (im, x, y, w, h, fy = 0.5) => { const r = Math.max(w / im.width, h / im.height), iw = im.width * r, ih = im.height * r; ctx.drawImage(im, x + (w - iw) / 2, y + (h - ih) * fy, iw, ih); };
   const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
@@ -6982,6 +6982,7 @@ function drawFrame(ctx, f, size) {
 function loadImg(src) { return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = rej; im.src = src; }); }
 async function frameSheet() {
   const u = me(); if (!u) return;
+  loadFontCss('hind');   // ফ্রেমের লেখা আগের মতো হিন্দ শিলিগুড়িতে
   S.frame = { id: FRAMES[0][0], img: null, src: u.avatar || '' };
   openSheet(`<div class="fr-sheet"><h2>প্রোফাইল ছবিতে ফ্রেম</h2>
     <canvas id="fr-cv" width="512" height="512" aria-label="ফ্রেমসহ ছবির পূর্বরূপ"></canvas>
@@ -6997,6 +6998,7 @@ async function frameSheet() {
   };
   if (S.frame.src) { try { S.frame.img = await loadImg(S.frame.src); } catch { S.frame.img = null; } }
   draw();
+  document.fonts?.load?.('700 40px "Hind Siliguri"').then(() => { if ($('#fr-cv')) draw(); }).catch(() => {});
   $('#sheet').onclick = e => { const b = e.target.closest('[data-fr2]'); if (!b) return; S.frame.id = b.dataset.fr2; document.querySelectorAll('[data-fr2]').forEach(x => x.classList.toggle('on', x === b)); draw(); };
   $('#fr-file').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const blob = await compress(f, 800, 0.9); S.frame.img = await loadImg(URL.createObjectURL(blob)); draw(); } catch { toast('ছবিটা খোলা যায়নি'); } };
   $('#fr-save').onclick = () => {
@@ -7096,11 +7098,11 @@ const FONTS = [
   ['noto', 'নোটো সান্স বাংলা', 'Noto Sans Bengali', '"Noto Sans Bengali",system-ui,sans-serif', 'Noto+Sans+Bengali:wght@400;600;700'],
   ['system', 'ফোনের নিজস্ব ফন্ট', 'System', 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', ''],
 ];
-const fontOf = k => FONTS.find(f => f[0] === k) || FONTS[0];
-const fontAdmin = () => fontOf(S.settings?.defaultFont || 'hind')[0];
+const fontOf = k => FONTS.find(f => f[0] === k) || FONTS[1];
+const fontAdmin = () => fontOf(S.settings?.defaultFont || 'noto')[0];
 const fontCur = () => fontOf(local.get('fontfam', '') || fontAdmin())[0];
 function loadFontCss(k) {
-  const f = fontOf(k); if (!f[4] || document.querySelector(`link[data-font="${k}"]`) || k === 'hind') return;
+  const f = fontOf(k); if (!f[4] || document.querySelector(`link[data-font="${k}"]`) || k === 'noto') return;
   const l = document.createElement('link'); l.rel = 'stylesheet'; l.dataset.font = k; l.href = `https://fonts.googleapis.com/css2?family=${f[4]}&display=swap`; document.head.appendChild(l);
 }
 function applyFontFam() { const k = fontCur(); loadFontCss(k); document.documentElement.style.setProperty('--font', fontOf(k)[3]); document.documentElement.dataset.font = k; }
@@ -7836,7 +7838,7 @@ async function loadAdmin() {
         </label>`).join('')}
       </div>
       <div class="card"><b>অ্যাপের ডিফল্ট বাংলা ফন্ট</b><p class="mut" style="margin:2px 0 8px">অ্যাপ ও ওয়েবসাইটে সবার জন্য এই ফন্ট দেখাবে। কেউ সেটিং থেকে নিজের পছন্দের ফন্ট বাছাই করলে তার ফোনে সেটাই দেখাবে।</p>
-        <div class="ff-admin">${FONTS.map(([k, l, en, fam]) => `<label class="ff-a${(set.defaultFont || 'hind') === k ? ' on' : ''}"><input type="radio" name="deffont" value="${k}" data-deffont ${(set.defaultFont || 'hind') === k ? 'checked' : ''}><span style="font-family:${fam.replace(/"/g, "'")}">আমার উপজেলা</span><small>${l}</small></label>`).join('')}</div></div>
+        <div class="ff-admin">${FONTS.map(([k, l, en, fam]) => `<label class="ff-a${(set.defaultFont || 'noto') === k ? ' on' : ''}"><input type="radio" name="deffont" value="${k}" data-deffont ${(set.defaultFont || 'noto') === k ? 'checked' : ''}><span style="font-family:${fam.replace(/"/g, "'")}">আমার উপজেলা</span><small>${l}</small></label>`).join('')}</div></div>
       <div class="card">
         <b>ঘোষণা</b><p class="mut" style="margin:2px 0 8px">লিখে সংরক্ষণ করলে সবার হোম পেইজের উপরে দেখাবে। মুছে সংরক্ষণ করলে সরে যাবে।</p>
         <textarea class="f" id="set-ann" rows="2" maxlength="300" placeholder="যেমন: আগামীকাল উপজেলা পরিষদে বিনামূল্যে রক্তদান কর্মসূচি">${esc(set.announcement || '')}</textarea>
@@ -7858,7 +7860,7 @@ async function loadAdmin() {
 }
 $('#admin').addEventListener('change', async e => {
   if (e.target.matches?.('[data-deffont]')) {
-    const v = e.target.value, prev = S.settings.defaultFont || 'hind';
+    const v = e.target.value, prev = S.settings.defaultFont || 'noto';
     return busy(null, async () => { await S.api.setSetting('defaultFont', v); S.settings.defaultFont = v; settingsChanged(); document.querySelectorAll('.ff-a').forEach(x => x.classList.toggle('on', x.querySelector('input').value === v)); toast('ডিফল্ট ফন্ট বদলানো হয়েছে'); })
       .catch(() => { S.settings.defaultFont = prev; const r = document.querySelector(`[data-deffont][value="${prev}"]`); if (r) r.checked = true; });
   }

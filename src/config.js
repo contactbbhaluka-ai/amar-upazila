@@ -93,6 +93,6 @@ export const SETTING_KEYS = {
   // Google দিয়ে লগইন: Supabase-এ Google provider চালু করার পর অ্যাডমিন ড্যাশবোর্ড থেকে চালু করুন
   featGoogle: ['feature_google', false],
   // পুরো অ্যাপের ডিফল্ট বাংলা ফন্ট: hind | noto | system
-  defaultFont: ['default_font', 'hind'],
+  defaultFont: ['default_font', 'noto'],
 };
 export const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.amarupazila.app';

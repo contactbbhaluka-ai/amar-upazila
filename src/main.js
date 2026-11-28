@@ -262,8 +262,10 @@ function confirmSheet(text, okLabel, danger) {
   });
 }
 async function busy(btn, fn) {
-  const old = btn?.textContent; if (btn) { btn.disabled = true; btn.textContent = '…'; }
-  try { return await fn(); } catch (e) { toast(errText(e)); } finally { if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = old; } }
+  // আইকন-বোতামের (যেমন পাঠান) ভেতরের ছবি হারিয়ে না যায়: পুরো ভেতরটা রেখে পরে ফিরিয়ে দেওয়া
+  const old = btn?.innerHTML, iconOnly = !!btn && !btn.textContent.trim();
+  if (btn) { btn.disabled = true; if (iconOnly) btn.classList.add('is-busy'); else btn.textContent = '…'; }
+  try { return await fn(); } catch (e) { toast(errText(e)); } finally { if (btn && btn.isConnected) { btn.disabled = false; btn.classList.remove('is-busy'); if (!iconOnly) btn.innerHTML = old; } }
 }
 function needUser() { if (me()) return true; toast('আগে লগইন বা নতুন অ্যাকাউন্ট খুলুন'); go('me'); return false; }
 function av(u, cls = '') {

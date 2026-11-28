@@ -2886,3 +2886,5 @@ body.bubble { --hh: 0px; }
 .qrx-all .emo-grid button{font-size:26px;height:44px;border:0;background:none;border-radius:10px;cursor:pointer}
 .qrx-all .emo-grid button.on{background:var(--g2)}
 .qrx-more{display:grid;place-items:center;color:var(--g)!important;border-style:dashed!important}
+
+.is-busy{opacity:.45;pointer-events:none}

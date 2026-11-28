@@ -145,6 +145,7 @@ const PLACES = {
 // অভিধানের বাইরের কিছু শব্দ (তারিখ, ভাষার সুইচ ইত্যাদি)
 const EXTRA = {
   // লগইন ও সাইনআপ
+  "গ্যালারিতে সেভ": "Save to gallery", "গ্যালারিতে সেভ হয়েছে": "Saved to gallery", "সেভ হচ্ছে…": "Saving…", "সেভ করা যায়নি": "Couldn't save", "সেভ করতে ফোনের অনুমতি দিন": "Allow phone permission to save", "ছবিটি এখনো লোড হয়নি": "The photo hasn't loaded yet",
   "প্রোফাইল": "Profile", "মিউট": "Mute", "আনমিউট": "Unmute", "খুঁজুন": "Search", "কাস্টমাইজ": "Customize", "থিম": "Theme", "ডাকনাম": "Nicknames", "অদৃশ্য মেসেজ": "Disappearing messages",
   "আরও": "More", "ছবি ও মিডিয়া": "Photos & media", "পিন করা মেসেজ": "Pinned messages", "গোপনীয়তা ও সহায়তা": "Privacy & support", "রিপোর্ট": "Report", "ব্লক": "Block", "চ্যাট মুছুন": "Delete chat",
   "রিকোয়েস্ট গ্রহণ": "Accept request", "পড়া হয়েছে": "Mark as read", "না পড়া": "Mark as unread", "গ্রুপ ছাড়ুন": "Leave group", "যোগ করুন": "Add", "গ্রুপ": "Group", "নাম, ছবি ও বিবরণ": "Name, photo & description",

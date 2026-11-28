@@ -3,6 +3,9 @@ package com.amarupazila.app;
 import android.Manifest;
 import android.content.ContentResolver;
 import android.content.ContentUris;
+import android.content.ContentValues;
+import android.media.MediaScannerConnection;
+import android.os.Environment;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -28,7 +31,12 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -39,7 +47,8 @@ import java.util.Map;
 @CapacitorPlugin(name = "AuGallery", permissions = {
     @Permission(alias = "photos", strings = { "android.permission.READ_MEDIA_IMAGES" }),
     @Permission(alias = "partial", strings = { "android.permission.READ_MEDIA_VISUAL_USER_SELECTED" }),
-    @Permission(alias = "storage", strings = { Manifest.permission.READ_EXTERNAL_STORAGE })
+    @Permission(alias = "storage", strings = { Manifest.permission.READ_EXTERNAL_STORAGE }),
+    @Permission(alias = "write", strings = { Manifest.permission.WRITE_EXTERNAL_STORAGE })
 })
 public class AuGallery extends Plugin {
     private static final String PARTIAL = "android.permission.READ_MEDIA_VISUAL_USER_SELECTED";
@@ -175,6 +184,61 @@ public class AuGallery extends Plugin {
                 r.put("mime", "image/jpeg"); r.put("w", b.getWidth()); r.put("h", b.getHeight());
                 call.resolve(r);
             } catch (Exception e) { call.reject("get: " + e.getMessage()); }
+        }).start();
+    }
+
+
+    // ---------------------------------------------------------------- ছবি গ্যালারিতে সেভ (Pictures/Amar Upazila অ্যালবামে)
+    @PluginMethod
+    public void save(PluginCall call) {
+        if (Build.VERSION.SDK_INT < 29 && getPermissionState("write") != PermissionState.GRANTED) { requestPermissionForAlias("write", call, "saveCb"); return; }
+        doSave(call);
+    }
+
+    @PermissionCallback
+    private void saveCb(PluginCall call) {
+        if (getPermissionState("write") != PermissionState.GRANTED) { call.reject("permission"); return; }
+        doSave(call);
+    }
+
+    private void doSave(PluginCall call) {
+        final String url = call.getString("url", ""), data = call.getString("data", "");
+        String nm = call.getString("name", "amar-upazila-" + System.currentTimeMillis() + ".jpg").replaceAll("[^A-Za-z0-9._-]", "_");
+        final String name = nm.contains(".") ? nm : nm + ".jpg";
+        new Thread(() -> {
+            try {
+                byte[] bytes;
+                String mime = "image/jpeg";
+                if (!data.isEmpty()) bytes = Base64.decode(data.replaceFirst("^data:[^,]*,", ""), Base64.DEFAULT);
+                else {
+                    HttpURLConnection h = (HttpURLConnection) new URL(url).openConnection();
+                    h.setConnectTimeout(10000); h.setReadTimeout(20000);
+                    if (h.getContentType() != null && h.getContentType().startsWith("image/")) mime = h.getContentType().split(";")[0];
+                    InputStream in = h.getInputStream(); ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                    byte[] buf = new byte[16384]; int n; while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+                    in.close(); h.disconnect(); bytes = bo.toByteArray();
+                }
+                if (mime.equals("image/png") && name.endsWith(".jpg")) mime = "image/jpeg";
+                if (Build.VERSION.SDK_INT >= 29) {
+                    ContentResolver cr = getContext().getContentResolver();
+                    ContentValues v = new ContentValues();
+                    v.put(MediaStore.Images.Media.DISPLAY_NAME, name);
+                    v.put(MediaStore.Images.Media.MIME_TYPE, mime);
+                    v.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Amar Upazila");
+                    v.put(MediaStore.Images.Media.IS_PENDING, 1);
+                    Uri u = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+                    if (u == null) { call.reject("insert"); return; }
+                    OutputStream o = cr.openOutputStream(u); o.write(bytes); o.close();
+                    v.clear(); v.put(MediaStore.Images.Media.IS_PENDING, 0); cr.update(u, v, null, null);
+                } else {
+                    File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Amar Upazila");
+                    if (!dir.exists()) dir.mkdirs();
+                    File f = new File(dir, name);
+                    FileOutputStream fo = new FileOutputStream(f); fo.write(bytes); fo.close();
+                    MediaScannerConnection.scanFile(getContext(), new String[]{ f.getAbsolutePath() }, new String[]{ mime }, null);
+                }
+                JSObject r = new JSObject(); r.put("ok", true); call.resolve(r);
+            } catch (Exception e) { call.reject("save: " + e.getMessage()); }
         }).start();
     }
 

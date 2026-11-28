@@ -396,9 +396,17 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') $('#v-prev').click(); if (e.key === 'ArrowRight') $('#v-next').click(); if (e.key === 'Escape') back();
 });
 // ছবি ফোনে/কম্পিউটারে সেভ
-$('#v-save').addEventListener('click', async () => {
-  const v = S.viewer; if (!v) return;
-  const src = v.im[v.i], name = `amar-upazila-${v.p.id}-${v.i + 1}.jpg`;
+$('#v-save').addEventListener('click', () => { const v = S.viewer; if (v) saveImage(v.im[v.i], `amar-upazila-${v.p.id || 'img'}-${v.i + 1}.jpg`); });
+// অ্যাপে: সরাসরি ফোনের গ্যালারিতে ("Amar Upazila" অ্যালবাম); ওয়েবসাইটে: ডাউনলোড/শেয়ার
+async function saveImage(src, name) {
+  if (!src) return toast('ছবিটি এখনো লোড হয়নি');
+  name = name || `amar-upazila-${Date.now()}.jpg`;
+  if (AG()?.save) {
+    toast('সেভ হচ্ছে…');
+    try { await AG().save(/^data:/.test(src) ? { data: src, name } : { url: src, name }); toast('গ্যালারিতে সেভ হয়েছে'); navigator.vibrate?.(10); }
+    catch (e) { toast(/permission/.test(e?.message || '') ? 'সেভ করতে ফোনের অনুমতি দিন' : 'সেভ করা যায়নি'); }
+    return;
+  }
   try {
     const blob = await (await fetch(src)).blob();
     const file = new File([blob], name, { type: blob.type || 'image/jpeg' });
@@ -408,7 +416,7 @@ $('#v-save').addEventListener('click', async () => {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     toast('ছবি সেভ হচ্ছে… ডাউনলোড ফোল্ডারে দেখুন');
   } catch (err) { if (err?.name !== 'AbortError') { window.open(src, '_blank'); toast('ছবিটি নতুন ট্যাবে খোলা হয়েছে, সেখান থেকে সেভ করুন'); } }
-});
+}
 
 // ================================================================ পোস্ট (হোম, আমার, অন্যের প্রোফাইল — সব জায়গায় একই)
 // প্রোফাইল/কভার ছবি বদল বা অ্যালবামে ছবি যোগের লাইন (ফেসবুকের মতো)
@@ -2999,6 +3007,7 @@ function msgActions(m) {
   openSheet(`<div class="mx-sheet">${canRx ? `<div class="mx-rx">${MSG_RX.map(e => `<button data-mx="${e}" class="${m.myReaction === e ? 'on' : ''}" aria-label="${e}">${e}</button>`).join('')}</div>` : ''}
     <div class="nts-card pm-card">${m.deleted ? '' : row('reply', 'reply', 'উত্তর')}
       ${canEdit ? row('edit', 'edit', 'এডিট') : ''}
+      ${m.image && !m.deleted ? row('dl', 'download', 'গ্যালারিতে সেভ') : ''}
       ${m.body && !m.deleted ? row('copy', 'doc', 'কপি') : ''}
       ${!m.deleted && !m.poll ? row('fwd', 'share', 'ফরওয়ার্ড') : ''}
       ${!m.deleted ? row('pin', 'pushpin', m.pinnedAt ? 'আনপিন' : 'পিন') : ''}
@@ -3015,6 +3024,7 @@ function msgActions(m) {
     if (a === 'fwd') forwardSheet(m);
     if (a === 'pin') busy(null, async () => { await S.api.pinMessage(m.id, !m.pinnedAt); toast(m.pinnedAt ? 'পিন সরানো হয়েছে' : 'পিন করা হয়েছে'); openConv(S.th, true); });
     if (a === 'save') busy(null, async () => { await S.api.saveMessage(m.id, !m.saved); toast(m.saved ? 'সেভ থেকে সরানো হয়েছে' : 'সেভ হয়েছে। মেসেজ পাতার 🔖 বাটনে পাবেন'); openConv(S.th, true); });
+    if (a === 'dl') { const u = document.querySelector(`#thread [data-mid="${CSS.escape(String(m.id))}"] [data-mimg]`)?.dataset.url; return saveImage(u, `amar-upazila-msg-${m.id}.jpg`); }
     if (a === 'copy') { try { await navigator.clipboard.writeText(m.body); toast('কপি হয়েছে'); } catch { toast('কপি করা যায়নি'); } }
     if (a === 'unsend') { if (await confirmSheet('মেসেজটি সবার জন্য মুছে ফেলবেন? সবাই দেখবেন "মেসেজটি মুছে ফেলা হয়েছে"।', 'মুছে ফেলুন', true)) busy(null, async () => { await S.api.unsendMessage(m); openConv(S.th, true); }); }
     if (a === 'hide') busy(null, async () => { await S.api.hideMessage(m.id); openConv(S.th, true); });
